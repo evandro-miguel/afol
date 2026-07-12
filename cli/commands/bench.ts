@@ -1,5 +1,11 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	type CliMicroResult,
@@ -15,7 +21,11 @@ import {
 	saveRunArchive,
 } from "../services/benchmark/report";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
-import type { BenchResult, BenchScenario } from "../services/benchmark/types";
+import type {
+	BenchReport,
+	BenchResult,
+	BenchScenario,
+} from "../services/benchmark/types";
 import { DEFAULT_BENCH_PACK_ID } from "../services/benchmark/types";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -32,6 +42,13 @@ const RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH =
 const RUNTIME_LIVE_VALIDATE_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
 const RUNTIME_LIVE_EXECUTION_COMMAND = "afol bench run --all --save";
+const RUNTIME_LIVE_SNAPSHOT_SCHEMA_VERSION = "1.0.0";
+const RUNTIME_LIVE_STALE_AFTER_DAYS = 7;
+const RUNTIME_LIVE_SCENARIO_IDS: Record<string, string> = {
+	"governed-task-lifecycle": "live-implement-start-complete-evidence",
+	"file-inspection-vs-command": "live-implement-next-governance-preflight",
+	"validation-flow": "live-tools-benchmark-discovery",
+};
 
 type ParsedArgs = {
 	json: boolean;
@@ -265,6 +282,52 @@ function runLiveScenarios(
 	);
 }
 
+export function saveRuntimeLiveSnapshot(
+	projectRoot: string,
+	report: BenchReport,
+	savedResultPath: string,
+): string {
+	const snapshotPath = join(projectRoot, RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH);
+	const scenarios = report.results.map((result) => ({
+		id: RUNTIME_LIVE_SCENARIO_IDS[result.scenario_id] ?? result.scenario_id,
+		pass: result.pass,
+		duration_ms: result.timing.wall_clock_ms,
+		tool_call_count: result.tools.total_calls,
+		tool_success_rate: result.tools.success_rate,
+		error_count: result.tools.error_count,
+		token_usage: {
+			input_tokens: result.tokens.input,
+			output_tokens: result.tokens.output,
+			total_tokens: result.tokens.total,
+		},
+	}));
+	const payload = {
+		schema_version: RUNTIME_LIVE_SNAPSHOT_SCHEMA_VERSION,
+		pack_id: "runtime-flow-live-agent-v4",
+		generated_at: report.timestamp,
+		stale_after_days: RUNTIME_LIVE_STALE_AFTER_DAYS,
+		saved_result_path: savedResultPath,
+		benchmark_profile: {
+			runtime: "codex",
+			model: "gpt-5.4-mini",
+			reasoning_effort: "medium",
+		},
+		summary: {
+			pass: scenarios.every((scenario) => scenario.pass),
+			duration_ms: report.summary.total_time_ms,
+			tool_call_count: scenarios.reduce(
+				(sum, row) => sum + row.tool_call_count,
+				0,
+			),
+			error_count: scenarios.reduce((sum, row) => sum + row.error_count, 0),
+		},
+		scenarios,
+	};
+	mkdirSync(dirname(snapshotPath), { recursive: true });
+	writeFileSync(snapshotPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+	return relative(projectRoot, snapshotPath).replaceAll("\\", "/");
+}
+
 function emitJson(
 	io: CommandIo,
 	action: string,
@@ -423,13 +486,22 @@ export async function runBenchCommand(
 				const baseline = loadBaseline(projectRoot, DEFAULT_BENCH_PACK_ID);
 				const report = buildReport(results, baseline);
 				let runPath: string | null = null;
+				let runtimeSnapshotPath: string | null = null;
 				if (parsed.save) {
 					runPath = saveRunArchive(projectRoot, report);
+					if (parsed.all) {
+						runtimeSnapshotPath = saveRuntimeLiveSnapshot(
+							projectRoot,
+							report,
+							runPath,
+						);
+					}
 				}
 				if (parsed.json) {
 					emitJson(io, "bench.run", {
 						...report.json,
 						run_path: runPath,
+						runtime_snapshot_path: runtimeSnapshotPath,
 					});
 				} else {
 					const extra = runPath ? `\nsaved run: ${runPath}` : "";

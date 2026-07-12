@@ -14,7 +14,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { DEFAULT_BENCH_MODEL } from "../services/benchmark/types";
+import { saveRuntimeLiveSnapshot } from "../commands/bench";
+import { buildReport, saveRunArchive } from "../services/benchmark/report";
+import {
+	type BenchResult,
+	DEFAULT_BENCH_MODEL,
+} from "../services/benchmark/types";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
 import { buildResult } from "../validate/command";
 import {
@@ -1345,6 +1350,16 @@ describe("runtime live validation helpers", () => {
 			);
 
 			unlinkSync(savedResultPath);
+			const snapshotPath = getRuntimeLiveSnapshotPath(root);
+			const trackedSnapshot = readJson(snapshotPath);
+			trackedSnapshot.schema_version = "1.0.0";
+			trackedSnapshot.generated_at = new Date().toISOString();
+			trackedSnapshot.stale_after_days = 7;
+			delete trackedSnapshot.saved_result_path;
+			writeFileSync(
+				snapshotPath,
+				`${JSON.stringify(trackedSnapshot, null, 2)}\n`,
+			);
 			const missingSavedResult = buildRuntimeLiveAgentResults(
 				root,
 				scenarios,
@@ -1352,18 +1367,92 @@ describe("runtime live validation helpers", () => {
 			);
 			expect(missingSavedResult.results).toHaveLength(4);
 			expect(
-				missingSavedResult.results.every((entry) => entry.status === "failed"),
+				missingSavedResult.results.every((entry) => entry.status === "passed"),
 			).toBe(true);
 			expect(missingSavedResult.notes).toContain(
-				`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
+				"runtime-live-agent-evidence-source:snapshot",
 			);
 			expect(
 				missingSavedResult.results.every((entry) =>
-					entry.notes.includes(
-						`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
-					),
+					entry.notes.includes("live-runner-evidence-source:snapshot"),
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validates a saved v2 archive through its fresh normalized snapshot", () => {
+		const root = createFixtureRoot();
+		try {
+			const ids = [
+				"governed-task-lifecycle",
+				"file-inspection-vs-command",
+				"validation-flow",
+				"maintenance-cadence-review",
+			];
+			const results = ids.map((scenarioId, index) => ({
+				schema_version: "2.0.0",
+				run_id: `run-${index}`,
+				scenario_id: scenarioId,
+				pack_id: "comprehensive-live",
+				status: "passed",
+				mode: "live",
+				git_commit: "fixture",
+				model: DEFAULT_BENCH_MODEL,
+				timestamp: new Date().toISOString(),
+				tokens: {
+					input: 10,
+					output: 10,
+					cached_input: 0,
+					reasoning_output: 0,
+					total: 20,
+				},
+				timing: { wall_clock_ms: 10 },
+				tools: {
+					total_calls: 1,
+					success_rate: 1,
+					by_type: {
+						file_read: 0,
+						afol_command: 1,
+						shell: 0,
+						agent_message: 0,
+					},
+					error_count: 0,
+				},
+				effectiveness: { task_completed: true, error_count: 0 },
+				plan_quality: { meta_planning_detected: false, direct_execution: true },
+				thresholds: {
+					max_output_tokens: 4000,
+					max_duration_ms: 60000,
+					min_tool_success_rate: 0.98,
+				},
+				pass: true,
+				notes: [],
+			})) as BenchResult[];
+			const report = buildReport(results, null);
+			const runPath = saveRunArchive(root, report);
+			saveRuntimeLiveSnapshot(root, report, runPath);
+			const registry = loadRegistry(root);
+			const scenarios = registry.scenariosByPack["runtime-live-agent"] ?? [];
+			const baselinePath = join(
+				root,
+				".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
+			);
+			const valid = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
+			expect(valid.results.every((entry) => entry.status === "passed")).toBe(
+				true,
+			);
+
+			const snapshotPath = getRuntimeLiveSnapshotPath(root);
+			const snapshot = readJson(snapshotPath);
+			snapshot.generated_at = "2020-01-01T00:00:00.000Z";
+			writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+			const stale = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
+			expect(stale.results.every((entry) => entry.status === "failed")).toBe(
+				true,
+			);
+			expect(stale.notes[0]).toStartWith("runtime-live-snapshot-stale:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1440,7 +1529,7 @@ describe("runtime live validation helpers", () => {
 			thresholdScenario.retry_count = 0;
 			thresholdScenario.context_bytes = 1024;
 			thresholdScenario.prompt_bytes = 240;
-			thresholdScenario.output_tokens = 401;
+			thresholdScenario.output_tokens = 4001;
 			writeFileSync(
 				savedResultPath,
 				`${JSON.stringify(savedResult, null, 2)}\n`,

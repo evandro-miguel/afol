@@ -26,10 +26,8 @@
       "sb-wb",
       "--task-id",
       "T-01",
-      "--command",
-      "echo ok",
-      "--result",
-      "passed"
+      "--test",
+      "echo ok"
     ]
   ],
   "result_schema": "1.0.0",

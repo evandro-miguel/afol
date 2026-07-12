@@ -5,6 +5,7 @@ import {
 	asBoolean,
 	asOptionalNumber,
 	asOptionalObject,
+	asOptionalString,
 	asString,
 	isObject,
 	loadJsonObject,
@@ -18,6 +19,14 @@ import {
 const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH =
 	".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json";
 const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
+const LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION = "1.0.0";
+const LIVE_BENCHMARK_STALE_AFTER_DAYS = 7;
+const LIVE_BENCHMARK_RESULT_SCHEMA_VERSION = "2.0.0";
+const LIVE_BENCHMARK_SCENARIO_IDS: Record<string, string> = {
+	"governed-task-lifecycle": "live-implement-start-complete-evidence",
+	"file-inspection-vs-command": "live-implement-next-governance-preflight",
+	"validation-flow": "live-tools-benchmark-discovery",
+};
 const LIVE_BENCHMARK_REFRESH_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
 const LIVE_BENCHMARK_REFRESH_NOTE =
@@ -227,6 +236,113 @@ function resolveRelativePath(projectRoot: string, targetPath: string): string {
 	);
 }
 
+function requiredNumber(value: unknown, key: string): number {
+	const parsed = asOptionalNumber(value, key);
+	if (parsed === undefined) {
+		throw new Error(`Missing numeric field: ${key}`);
+	}
+	return parsed;
+}
+
+function parseSavedRunArchive(
+	data: Record<string, unknown>,
+	sourcePath: string,
+): LiveRunnerResultPayload {
+	const schemaVersion = asString(
+		data.schema_version,
+		`${sourcePath}.schema_version`,
+	);
+	if (schemaVersion !== LIVE_BENCHMARK_RESULT_SCHEMA_VERSION) {
+		throw new Error(
+			`runtime-live-result-schema-mismatch:${schemaVersion};expected:${LIVE_BENCHMARK_RESULT_SCHEMA_VERSION}`,
+		);
+	}
+	if (!Array.isArray(data.results) || data.results.length === 0) {
+		throw new Error(
+			`Invalid saved benchmark results array: ${sourcePath}.results`,
+		);
+	}
+	const generatedAt = asString(data.timestamp, `${sourcePath}.timestamp`);
+	const scenarios = data.results.map((entry, index) => {
+		if (!isObject(entry)) {
+			throw new Error(
+				`Invalid saved benchmark result: ${sourcePath}.results[${index}]`,
+			);
+		}
+		const timing = asOptionalObject(
+			entry.timing,
+			`${sourcePath}.results[${index}].timing`,
+		);
+		const tools = asOptionalObject(
+			entry.tools,
+			`${sourcePath}.results[${index}].tools`,
+		);
+		const tokens = asOptionalObject(
+			entry.tokens,
+			`${sourcePath}.results[${index}].tokens`,
+		);
+		const id = asString(
+			entry.scenario_id,
+			`${sourcePath}.results[${index}].scenario_id`,
+		);
+		return {
+			id: LIVE_BENCHMARK_SCENARIO_IDS[id] ?? id,
+			pass: asBoolean(entry.pass, `${sourcePath}.results[${index}].pass`),
+			duration_ms: requiredNumber(
+				timing?.wall_clock_ms,
+				`${sourcePath}.results[${index}].timing.wall_clock_ms`,
+			),
+			tool_call_count: requiredNumber(
+				tools?.total_calls,
+				`${sourcePath}.results[${index}].tools.total_calls`,
+			),
+			tool_success_rate: requiredNumber(
+				tools?.success_rate,
+				`${sourcePath}.results[${index}].tools.success_rate`,
+			),
+			error_count: requiredNumber(
+				tools?.error_count,
+				`${sourcePath}.results[${index}].tools.error_count`,
+			),
+			retry_count: 0,
+			context_bytes: 0,
+			prompt_bytes: 0,
+			input_tokens: requiredNumber(
+				tokens?.input,
+				`${sourcePath}.results[${index}].tokens.input`,
+			),
+			output_tokens: requiredNumber(
+				tokens?.output,
+				`${sourcePath}.results[${index}].tokens.output`,
+			),
+			total_tokens: requiredNumber(
+				tokens?.total,
+				`${sourcePath}.results[${index}].tokens.total`,
+			),
+		};
+	});
+	return {
+		pack_id: LIVE_BENCHMARK_EXPECTED_PACK_ID,
+		generated_at: generatedAt,
+		pass: scenarios.every((scenario) => scenario.pass),
+		duration_ms: scenarios.reduce((sum, row) => sum + row.duration_ms, 0),
+		tool_call_count: scenarios.reduce(
+			(sum, row) => sum + row.tool_call_count,
+			0,
+		),
+		error_count: scenarios.reduce((sum, row) => sum + row.error_count, 0),
+		retry_count: 0,
+		context_bytes_total: 0,
+		prompt_bytes_total: 0,
+		benchmark_profile: {
+			runtime: "codex",
+			model: "gpt-5.4-mini",
+			reasoning_effort: "medium",
+		},
+		scenarios,
+	};
+}
+
 function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 	const snapshotPath = join(projectRoot, LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH);
 	if (!existsSync(snapshotPath)) {
@@ -253,20 +369,68 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 			`runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
 		);
 	}
-	const savedResultPathRaw = asString(
+	const savedResultPathRaw = asOptionalString(
 		snapshot.saved_result_path,
 		`${snapshotPath}.saved_result_path`,
 	);
-	const savedResultPath = resolve(projectRoot, savedResultPathRaw);
-	if (!existsSync(savedResultPath)) {
+	const savedResultPath = savedResultPathRaw
+		? resolve(projectRoot, savedResultPathRaw)
+		: undefined;
+	const payloadSource =
+		savedResultPath && existsSync(savedResultPath) ? "result" : "snapshot";
+	const schemaVersion = asString(
+		snapshot.schema_version,
+		`${snapshotPath}.schema_version`,
+	);
+	if (schemaVersion !== LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION) {
 		throw new Error(
-			`runtime-live-result-missing:${resolveRelativePath(projectRoot, savedResultPathRaw)};snapshot:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-snapshot-schema-mismatch:${schemaVersion};expected:${LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
 		);
 	}
-	const payloadSource = "result";
-	const payloadPath = savedResultPath;
-	const payloadRaw = loadJsonObject(savedResultPath);
-	const payload = parseLiveRunnerPayload(payloadRaw, payloadPath);
+	const staleAfterDays = asOptionalNumber(
+		snapshot.stale_after_days,
+		`${snapshotPath}.stale_after_days`,
+	);
+	const generatedAt = Date.parse(
+		asString(snapshot.generated_at, `${snapshotPath}.generated_at`),
+	);
+	if (
+		!Number.isFinite(generatedAt) ||
+		staleAfterDays !== LIVE_BENCHMARK_STALE_AFTER_DAYS
+	) {
+		throw new Error(
+			`runtime-live-snapshot-freshness-invalid:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+		);
+	}
+	const ageMs = Date.now() - generatedAt;
+	if (ageMs < 0 || ageMs > staleAfterDays * 24 * 60 * 60 * 1000) {
+		throw new Error(
+			`runtime-live-snapshot-stale:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};generated-at:${snapshot.generated_at};max-age-days:${staleAfterDays};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+		);
+	}
+	const snapshotPayload = parseLiveRunnerPayload(snapshot, snapshotPath);
+	const payloadPath =
+		payloadSource === "result" && savedResultPath
+			? savedResultPath
+			: snapshotPath;
+	const payload =
+		payloadSource === "result"
+			? (() => {
+					const savedResult = loadJsonObject(payloadPath);
+					return savedResult.schema_version ===
+						LIVE_BENCHMARK_RESULT_SCHEMA_VERSION
+						? parseSavedRunArchive(savedResult, payloadPath)
+						: parseLiveRunnerPayload(savedResult, payloadPath);
+				})()
+			: snapshotPayload;
+	if (
+		payloadSource === "result" &&
+		payload.generated_at !== snapshotPayload.generated_at
+	) {
+		throw new Error(
+			`runtime-live-result-timestamp-mismatch:${payload.generated_at};snapshot:${snapshotPayload.generated_at}`,
+		);
+	}
 	if (payload.pack_id !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
 		throw new Error(
 			`runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
@@ -285,10 +449,10 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 			projectRoot,
 			LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH,
 		),
-		savedResultPathRelative: resolveRelativePath(
-			projectRoot,
-			savedResultPathRaw,
-		),
+		savedResultPathRelative:
+			payloadSource === "result" && savedResultPathRaw
+				? resolveRelativePath(projectRoot, savedResultPathRaw)
+				: LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH,
 		payloadSource,
 		payload,
 	};

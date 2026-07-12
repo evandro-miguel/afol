@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runBenchCommand } from "../commands/bench";
+import { runBenchCommand, saveRuntimeLiveSnapshot } from "../commands/bench";
 import { runCliMicroBenchmark } from "../services/benchmark/cli-micro";
 import {
 	collectExpectationNotes,
@@ -12,8 +18,9 @@ import {
 	classifyCommand,
 	parseEventStream,
 } from "../services/benchmark/metrics";
+import { buildReport } from "../services/benchmark/report";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
-import type { BenchScenario } from "../services/benchmark/types";
+import type { BenchResult, BenchScenario } from "../services/benchmark/types";
 
 type CapturedIo = {
 	stdout: string[];
@@ -426,6 +433,36 @@ describe("bench command surfaces", () => {
 			expect(payload.data.snapshot_exists).toBe(true);
 			expect(payload.data.snapshot_parse_error).toBeTruthy();
 			expect(payload.data.note).toContain("snapshot parse failed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("saved all-scenario runs write a compliant runtime-live snapshot", () => {
+		const root = createProjectRoot();
+		try {
+			const result = validSavedBenchResult({
+				scenario_id: "governed-task-lifecycle",
+			}) as BenchResult;
+			const report = buildReport([result], null);
+			const snapshotPath = saveRuntimeLiveSnapshot(
+				root,
+				report,
+				".afol/data/benchmarks/results/run.json",
+			);
+			const snapshot = JSON.parse(
+				readFileSync(join(root, snapshotPath), "utf8"),
+			) as Record<string, unknown>;
+			expect(snapshot.schema_version).toBe("1.0.0");
+			expect(snapshot.stale_after_days).toBe(7);
+			expect(Date.parse(String(snapshot.generated_at))).not.toBeNaN();
+			expect(snapshot.scenarios).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						id: "live-implement-start-complete-evidence",
+					}),
+				]),
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
