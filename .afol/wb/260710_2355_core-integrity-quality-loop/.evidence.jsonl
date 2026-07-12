@@ -4,3 +4,6 @@
 {"id":"E-20260711013334474-401576","task_id":"T-02","created_at":"2026-07-11T05:33:34.474Z","command":"afol validate project --json","result":"passed","exit_code":0}
 {"id":"E-20260711040611580-db4cb3","task_id":"T-03","created_at":"2026-07-11T08:06:11.580Z","command":"critic-codex-xhigh review S-C01-R -> reports/c01-r-review-001.json","result":"passed"}
 {"id":"E-20260711044904222-ed361b","task_id":"T-03","created_at":"2026-07-11T08:49:04.222Z","command":"critic-codex-xhigh STOP-C01-AUTHORITY and S-C01-I scope review -> reports/c01-authority-critic-005.json","result":"passed"}
+{"id":"E-20260712170346455-3650a3","task_id":"T-03","created_at":"2026-07-12T21:03:46.455Z","command":"bun test cli/tests/kernel.test.ts cli/tests/mutation-safety.test.ts cli/tests/operation-context.test.ts cli/tests/file-command-unit.test.ts cli/tests/file-commands.test.ts cli/tests/evidence-atomic.test.ts","result":"passed"}
+{"id":"E-20260712170402583-03b081","task_id":"T-04","created_at":"2026-07-12T21:04:02.583Z","command":"bun test --only-failures","result":"passed"}
+{"id":"E-20260712170406372-40494c","task_id":"T-04","created_at":"2026-07-12T21:04:06.372Z","command":"bun run validate:release","result":"passed"}

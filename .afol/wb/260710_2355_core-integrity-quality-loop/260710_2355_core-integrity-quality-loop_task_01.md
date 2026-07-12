@@ -27,6 +27,6 @@ spec_waiver_reason: ""
 |------|-------|-------|-------|
 | T-01 | done | worker | Establish quantified baseline and validate every audit claim against source and runtime evidence. |
 | T-02 | done | worker | Convert verified defects into governed child specs and an executable slice plan with acceptance gates. |
-| T-03 | in_progress | worker | Implement and independently review each accepted remediation slice. |
-| T-04 | pending | worker | Run mutation testing, project benchmarks, release validation, and security gates. |
+| T-03 | done | worker | Implement and independently review each accepted remediation slice. |
+| T-04 | done | worker | Run mutation testing, project benchmarks, release validation, and security gates. |
 | T-05 | pending | worker | Obtain final closure council approval and close F-22 only when evidence proves release readiness. |
