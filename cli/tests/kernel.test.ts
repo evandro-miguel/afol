@@ -66,6 +66,35 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 	});
 }
 
+function expectRestrictedJsonError(proc: ReturnType<typeof runKernel>): void {
+	expect(proc.status).toBe(2);
+	expect(proc.stderr as string).toBe("");
+	const payload = JSON.parse((proc.stdout as string).trim()) as {
+		schema?: string;
+		ok?: boolean;
+		exit_code?: number;
+		error?: unknown;
+	};
+	expect(payload.schema).toBe("afol.result/v1");
+	expect(payload.ok).toBe(false);
+	expect(payload.exit_code).toBe(2);
+	expect(payload.error).toBeTruthy();
+}
+
+function readOptionalBytes(path: string): string | null {
+	return existsSync(path) ? readFileSync(path).toString("base64") : null;
+}
+
+function expectOptionalBytesUnchanged(
+	path: string,
+	before: string | null,
+): void {
+	expect(existsSync(path)).toBe(before !== null);
+	if (before !== null) {
+		expect(readFileSync(path).toString("base64")).toBe(before);
+	}
+}
+
 function mkProjectRoot(name: string, fakeAgentsBody: string): string {
 	void fakeAgentsBody;
 	const root = mkdtempSync(join(tmpdir(), `kernel-${name}-`));
@@ -707,6 +736,170 @@ describe("kernel front-door", () => {
 			expect(localStatePayload.ok).toBe(false);
 			expect(localStatePayload.action).toBe("local-state.rebuild");
 			expect(localStatePayload.error.code).toBe("approval-required");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("R-02 restricted front door denies ADR writes", () => {
+		const root = mkProjectRoot("r-02-adr", "");
+		const decisionsDir = join(root, ".afol", "adm", "decisions");
+		const sentinel = join(decisionsDir, "keep.md");
+		mkdirSync(decisionsDir, { recursive: true });
+		writeFileSync(sentinel, "synthetic decision fixture\n", "utf8");
+		const beforeEntries = readdirSync(decisionsDir);
+		const beforeSentinel = readFileSync(sentinel).toString("base64");
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"adr",
+				"new",
+				"restricted decision",
+				"--json",
+			]);
+
+			expectRestrictedJsonError(proc);
+			expect(readdirSync(decisionsDir)).toEqual(beforeEntries);
+			expect(readFileSync(sentinel).toString("base64")).toBe(beforeSentinel);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-003 restricted front door denies adm migration", () => {
+		const root = mkProjectRoot("sec-003-adm", "");
+		const source = join(root, "docs", "arc", "SPECS", "restricted.md");
+		const target = join(root, ".afol", "adm", "specs", "restricted.md");
+		const migrationsDir = join(root, ".afol", "adm", "migrations");
+		mkdirSync(dirname(source), { recursive: true });
+		writeFileSync(source, "# synthetic ADM source\n", "utf8");
+		const beforeSource = readFileSync(source).toString("base64");
+		try {
+			const proc = runKernel(root, ["--agent", "adm", "migrate", "--json"]);
+
+			expectRestrictedJsonError(proc);
+			expect(readFileSync(source).toString("base64")).toBe(beforeSource);
+			expect(existsSync(target)).toBe(false);
+			expect(existsSync(migrationsDir)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-003 restricted front door denies spec waivers", () => {
+		const root = mkProjectRoot("sec-003-spec", "");
+		const created = newWorkstream(root, "restricted spec", {
+			featureId: "F-SEC-003",
+			parentSpec: "missing-spec",
+			task: "synthetic spec waiver",
+		});
+		const storePath = join(root, ".afol", "state", "spec-gate.json");
+		const beforeStore = readOptionalBytes(storePath);
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"spec",
+				"waive",
+				"--session",
+				created.session,
+				"--task",
+				"T-01",
+				"--reason",
+				"synthetic waiver",
+				"--json",
+			]);
+
+			expectRestrictedJsonError(proc);
+			expectOptionalBytesUnchanged(storePath, beforeStore);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-003 restricted front door denies changelog writes", () => {
+		const root = mkProjectRoot("sec-003-changelog", "");
+		const changelog = join(root, ".afol", "adm", "changelog", "CHANGELOG.md");
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"changelog",
+				"add",
+				"--type",
+				"fix",
+				"--message",
+				"synthetic restricted change",
+				"--json",
+			]);
+
+			expectRestrictedJsonError(proc);
+			expect(existsSync(changelog)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-003 restricted front door denies state sync", () => {
+		const root = mkProjectRoot("sec-003-state", "");
+		const created = newWorkstream(root, "restricted state", {
+			task: "synthetic state sync",
+		});
+		const stateDb = join(root, ".afol", "state", "afol.db");
+		const beforeState = readOptionalBytes(stateDb);
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"state",
+				"sync",
+				"--session",
+				created.session,
+				"--json",
+			]);
+
+			expectRestrictedJsonError(proc);
+			expectOptionalBytesUnchanged(stateDb, beforeState);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-003 restricted front door denies hydrate", () => {
+		const root = mkProjectRoot("sec-003-hydrate", "");
+		const created = newWorkstream(root, "restricted hydrate", {
+			task: "synthetic hydrate",
+		});
+		const stateDb = join(root, ".afol", "state", "afol.db");
+		const beforeState = readOptionalBytes(stateDb);
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"hydrate",
+				"--session",
+				created.session,
+				"--json",
+			]);
+
+			expectRestrictedJsonError(proc);
+			expectOptionalBytesUnchanged(stateDb, beforeState);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-003 restricted front door denies adapter writes", () => {
+		const root = mkProjectRoot("sec-003-adapter", "");
+		const configPath = join(root, ".afol", "config.json");
+		const beforeConfig = readFileSync(configPath).toString("base64");
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"adapter",
+				"disable",
+				"claude",
+				"--json",
+			]);
+
+			expectRestrictedJsonError(proc);
+			expect(readFileSync(configPath).toString("base64")).toBe(beforeConfig);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1575,6 +1768,97 @@ describe("kernel front-door", () => {
 			expect(proc.stderr as string).toContain("Missing required file");
 		} finally {
 			rmSync(rootMissing, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-006 evidence redacts sensitive command values consistently", () => {
+		const root = mkProjectRoot("sec-006-evidence-redaction", "");
+		try {
+			const created = newWorkstream(root, "evidence redaction", {
+				task: "verify synthetic command redaction",
+			});
+			const cases = [
+				{
+					command: "DEMO_API_KEY=synthetic-assignment bun test",
+					expected: "DEMO_API_KEY=[REDACTED] bun test",
+					raw: "synthetic-assignment",
+				},
+				{
+					command: 'bun test --api-key "synthetic quoted option"',
+					expected: "bun test --api-key [REDACTED]",
+					raw: "synthetic quoted option",
+				},
+				{
+					command: "bun test --token=synthetic-token",
+					expected: "bun test --token=[REDACTED]",
+					raw: "synthetic-token",
+				},
+				{
+					command: "API_KEY_NOTE=synthetic-note bun test",
+					expected: "API_KEY_NOTE=synthetic-note bun test",
+					raw: "synthetic-note",
+				},
+			];
+
+			for (const fixture of cases) {
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: fixture.command,
+					result: "passed",
+					provenance: "observed",
+				});
+			}
+
+			const evidenceText = readFileSync(
+				join(root, ".afol", "wb", created.session, ".evidence.jsonl"),
+				"utf8",
+			);
+			const eventText = readFileSync(
+				join(root, ".afol", "data", "events", "events.jsonl"),
+				"utf8",
+			);
+			const evidence = evidenceText
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as { id: string; command: string });
+			const events = eventText
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			const recordEvents = events.filter(
+				(event) => event.type === "workbench.record_evidence",
+			);
+			const telemetryEvents = events.filter(
+				(event) => event.event_type === "tool_exec",
+			);
+
+			expect(evidence.map((entry) => entry.command)).toEqual(
+				cases.map((fixture) => fixture.expected),
+			);
+			for (const entry of evidence) {
+				const event = recordEvents.find(
+					(candidate) =>
+						(candidate.detail as { evidence_id?: string } | undefined)
+							?.evidence_id === entry.id,
+				);
+				expect(event?.command).toBe(entry.command);
+			}
+			for (const fixture of cases.slice(0, 3)) {
+				expect(evidenceText).not.toContain(fixture.raw);
+				expect(eventText).not.toContain(fixture.raw);
+			}
+			expect(evidenceText).toContain(cases[3]?.raw ?? "");
+			expect(eventText).toContain("DEMO_API_KEY=[REDACTED]");
+			expect(eventText).toContain(cases[3]?.raw ?? "");
+			expect(telemetryEvents.map((event) => event.cmd_type)).toEqual([
+				"DEMO_API_KEY=[REDACTED]",
+				"bun",
+				"bun",
+				"API_KEY_NOTE=synthetic-note",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 });

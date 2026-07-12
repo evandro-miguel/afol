@@ -58,6 +58,8 @@
     ],
     "specs": [
       "260710_core-integrity-and-transaction-safety_spec_01",
+      "260711_c01-action-policy-and-protected-resources_spec-child_01",
+      "260711_c01-authorization-red-reproducers_spec-child_01",
       "260306_artifact-resolution-layer_spec_01",
       "260306_context-driven-execution-commands_spec_01",
       "260306_execution-intelligence-and-knowledge-system_spec_01",

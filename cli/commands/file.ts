@@ -3,8 +3,10 @@ import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
+	resolveCanonicalAction,
 } from "../core/operation-context";
 import { withExternalPathLock } from "../services/io/session-lock";
+import { resolveProjectWritePath } from "../services/project/root";
 import { validateMutationRuntime } from "../services/state/validate";
 import { withTaskInProgressMutation } from "../services/workbench/lifecycle";
 import {
@@ -25,6 +27,7 @@ import {
 	type CommandIo,
 	type CommandResult,
 	DEFAULT_IO,
+	isProtectedResourcePath,
 	requireWriteContext,
 } from "./file/shared";
 
@@ -41,6 +44,19 @@ function assertFileRuntime(options: FileCommandOptions): void {
 		operation: "file mutation",
 	});
 	if (!validation.ok) throw new Error(validation.message);
+}
+
+function assertFileOperandAdmission(projectRoot: string, path: string): void {
+	const resolved = resolveProjectWritePath(projectRoot, path);
+	if (!resolved.ok) {
+		if (resolved.error.includes("symlink")) {
+			throw new Error(`protected-path:${path}`);
+		}
+		throw new Error(resolved.error);
+	}
+	if (isProtectedResourcePath(resolved.value.relativePath)) {
+		throw new Error(`protected-path:${path}`);
+	}
 }
 
 export async function runFileCommand(
@@ -71,6 +87,7 @@ export async function runFileCommand(
 				parsePatchArgs(rest),
 				projectRoot,
 			);
+			assertFileOperandAdmission(projectRoot, parsed.path);
 			// Restricted callers may inspect dry-run mutation plans, but real writes require local approval.
 			if (!parsed.dryRun && requiresApproval(ctx)) {
 				throw new Error("file patch requires local interactive approval");
@@ -96,6 +113,8 @@ export async function runFileCommand(
 				parseMoveArgs(rest),
 				projectRoot,
 			);
+			assertFileOperandAdmission(projectRoot, parsed.path);
+			assertFileOperandAdmission(projectRoot, parsed.destinationPath);
 			if (!parsed.dryRun && requiresApproval(ctx)) {
 				throw new Error("file move requires local interactive approval");
 			}
@@ -141,6 +160,7 @@ export async function runFileCommand(
 				parseArchiveArgs(rest),
 				projectRoot,
 			);
+			assertFileOperandAdmission(projectRoot, parsed.path);
 			if (!parsed.dryRun && requiresApproval(ctx)) {
 				throw new Error("file archive requires local interactive approval");
 			}
@@ -167,7 +187,24 @@ export async function runFileCommand(
 		outputResult(result, io, asJson);
 		return result.status === "blocked" ? 4 : 0;
 	} catch (error) {
-		const message = `for file command: ${(error as Error).message}`;
+		const errorMessage = (error as Error).message;
+		if (requiresApproval(ctx) && errorMessage.startsWith("protected-path:")) {
+			const policy = resolveCanonicalAction({ kind: "file", args });
+			const action = policy?.action ?? "file";
+			const message = `${action} requires local interactive approval`;
+			if (args.includes("--json") || args.includes("-j")) {
+				io.stdout(
+					stringifyEnvelope(
+						envelopeErr("approval-required", message, {
+							action,
+							exitCode: 2,
+						}),
+					),
+				);
+			} else io.stderr(`err approval-required ${message}`);
+			return 2;
+		}
+		const message = `for file command: ${errorMessage}`;
 		if (args.includes("--json") || args.includes("-j")) {
 			io.stdout(
 				stringifyEnvelope(

@@ -48,9 +48,12 @@ import {
 	runTransitionCommand,
 	runVerifyTasksCommand,
 } from "./commands/workbench";
+import { envelopeErr, stringifyEnvelope } from "./core/envelope";
 import {
 	defaultOperationContext,
+	isActionAllowed,
 	type OperationContext,
+	resolveCanonicalAction,
 	resolveOperationContext,
 } from "./core/operation-context";
 import { CLI_VERSION } from "./generated/version";
@@ -365,6 +368,32 @@ export async function main(argv: string[]): Promise<number> {
 			console.log(help);
 			return 0;
 		}
+	}
+
+	const policy = resolveCanonicalAction({
+		kind: resolution.kind,
+		args: resolution.args,
+		...(resolution.kind === "subcommand"
+			? { group: resolution.group, action: resolution.action }
+			: {}),
+	});
+	if (!isActionAllowed(operationCtx, policy)) {
+		const action = policy?.action ?? resolution.kind;
+		const message = `${action} requires local interactive approval`;
+		const json = resolution.args.includes("--json");
+		if (json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeErr("approval-required", message, {
+						action,
+						exitCode: 2,
+					}),
+				),
+			);
+		} else {
+			console.error(`err approval-required ${message}`);
+		}
+		return 2;
 	}
 
 	if (resolution.kind === "bootstrap") {

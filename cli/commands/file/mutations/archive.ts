@@ -15,6 +15,7 @@ import {
 	type MutationRecord,
 	withMutationJournalLock,
 } from "../../../services/mutations/journal";
+import { resolveProjectPath } from "../../../services/project/root";
 import {
 	archiveDestination,
 	type CommandArgs,
@@ -175,7 +176,9 @@ export function undoArchiveMutation(
 
 	const reason = args.reason || `undo ${mutation.id}`;
 	const source = resolveSafePath(projectRoot, mutation.sourcePath);
-	const destination = resolveSafePath(projectRoot, destinationPath);
+	const destinationResult = resolveProjectPath(projectRoot, destinationPath);
+	if (!destinationResult.ok) throw new Error(destinationResult.error);
+	const destination = destinationResult.value;
 
 	if (args.dryRun) {
 		const beforeSourceBytes = readFileBytes(source.path);

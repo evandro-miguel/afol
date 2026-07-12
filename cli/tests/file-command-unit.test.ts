@@ -666,7 +666,6 @@ describe("file shared helpers", () => {
 	test("project defaults, safe paths, and file reads stay in bounds", () => {
 		const root = mkProjectRoot();
 		try {
-			const mutationsDir = resolveProjectPaths(root).mutationsDir;
 			const patchArgs = applyProjectMutationDefaults(
 				{
 					command: "pt",
@@ -680,7 +679,7 @@ describe("file shared helpers", () => {
 				},
 				root,
 			);
-			expect(patchArgs.path).toBe(join(mutationsDir, ".file-probe.txt"));
+			expect(patchArgs.path).toBe(".afol/tmp/file-command/.file-probe.txt");
 
 			const moveArgs = applyProjectMutationDefaults(
 				{
@@ -695,9 +694,9 @@ describe("file shared helpers", () => {
 				},
 				root,
 			);
-			expect(moveArgs.path).toBe(join(mutationsDir, "move-source.txt"));
+			expect(moveArgs.path).toBe(".afol/tmp/file-command/move-source.txt");
 			expect(moveArgs.destinationPath).toBe(
-				join(mutationsDir, "move-destination.txt"),
+				".afol/tmp/file-command/move-destination.txt",
 			);
 
 			const readTarget = writeFileTree(root, "notes/read.txt", "hello");

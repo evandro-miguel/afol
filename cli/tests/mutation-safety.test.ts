@@ -8,10 +8,11 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { normalizeHash } from "../commands/file/shared";
 import { resolveProjectPaths } from "../services/project/paths";
 
@@ -44,6 +45,17 @@ function expectFileEnvelope(
 		expect(payload[key]).toEqual(value);
 	}
 	return payload as Record<string, unknown> & { data: Record<string, unknown> };
+}
+
+function expectRestrictedFileError(proc: ReturnType<typeof runKernel>): void {
+	expect(proc.status).toBe(2);
+	expect(proc.stderr as string).toBe("");
+	const payload = parseJsonOutput(proc.stdout as string);
+	expect(payload.schema).toBe("afol.result/v1");
+	expect(payload.ok).toBe(false);
+	expect(payload.exit_code).toBe(2);
+	expect(payload.action).toBe("file.patch.preview");
+	expect(payload.error).toBeTruthy();
 }
 
 function mkProjectRoot(): string {
@@ -99,7 +111,182 @@ function readMutationJournal(root: string): Array<Record<string, unknown>> {
 		.map((row) => JSON.parse(row) as Record<string, unknown>);
 }
 
+function assertRestrictedControlPlanePreview(
+	relativePath: string,
+	marker: string,
+): void {
+	const root = mkProjectRoot();
+	const target = join(root, relativePath);
+	mkdirSync(dirname(target), { recursive: true });
+	writeFileSync(target, `${marker}\n`, "utf8");
+	const journalPath = join(
+		resolveProjectPaths(root).abs.mutationsDir,
+		"mutations.jsonl",
+	);
+	const beforeTarget = readFileSync(target).toString("base64");
+	const beforeJournal = existsSync(journalPath)
+		? readFileSync(journalPath).toString("base64")
+		: null;
+	try {
+		const proc = runKernel(root, [
+			"--agent",
+			"f",
+			"pt",
+			"--path",
+			relativePath,
+			"--append",
+			"\nsynthetic control-plane append\n",
+			"--dry-run",
+			"--json",
+		]);
+
+		expectRestrictedFileError(proc);
+		expect(`${proc.stdout as string}\n${proc.stderr as string}`).not.toContain(
+			marker,
+		);
+		expect(readFileSync(target).toString("base64")).toBe(beforeTarget);
+		if (beforeJournal === null) {
+			expect(existsSync(journalPath)).toBe(false);
+		} else {
+			expect(readFileSync(journalPath).toString("base64")).toBe(beforeJournal);
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+}
+
 describe("mutation safety command family", () => {
+	test("SEC-001 restricted file dry-run denies .env before preview or persistence", () => {
+		const root = mkProjectRoot();
+		const sensitivePath = join(root, ".env");
+		const fixtureText = "NON_SECRET_FIXTURE_MARKER=synthetic-only\n";
+		writeFileSync(sensitivePath, fixtureText, "utf8");
+		const journalPath = join(
+			resolveProjectPaths(root).abs.mutationsDir,
+			"mutations.jsonl",
+		);
+		const before = readFileSync(sensitivePath).toString("base64");
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"f",
+				"pt",
+				"--path",
+				".env",
+				"--append",
+				"\nsynthetic append only\n",
+				"--dry-run",
+				"--json",
+			]);
+
+			expectRestrictedFileError(proc);
+			expect(
+				`${proc.stdout as string}\n${proc.stderr as string}`,
+			).not.toContain(fixtureText);
+			expect(readFileSync(sensitivePath).toString("base64")).toBe(before);
+			expect(existsSync(journalPath)).toBe(false);
+			expect(existsSync(resolveProjectPaths(root).abs.mutationBackupsDir)).toBe(
+				false,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-004 restricted file preview denies .afol/wb targets", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/wb/protected-control-plane.txt",
+			"CONTROL_PLANE_FIXTURE_WB",
+		);
+	});
+
+	test("SEC-004 restricted file preview denies .afol/adm targets", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/adm/protected-control-plane.txt",
+			"CONTROL_PLANE_FIXTURE_ADM",
+		);
+	});
+
+	test("SEC-004 restricted file preview denies .afol/state targets", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/state/protected-control-plane.txt",
+			"CONTROL_PLANE_FIXTURE_STATE",
+		);
+	});
+
+	test("SEC-004 restricted file preview denies the mutation journal", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/data/mutations/mutations.jsonl",
+			"CONTROL_PLANE_FIXTURE_JOURNAL",
+		);
+	});
+
+	test("SEC-004 symlink operands cannot bypass protected-resource admission", () => {
+		for (const relativeTarget of [
+			".env",
+			".afol/adm/protected-control-plane.txt",
+		]) {
+			for (const restricted of [true, false]) {
+				const root = mkProjectRoot();
+				const target = join(root, relativeTarget);
+				const alias = join(
+					root,
+					"notes",
+					`${restricted ? "agent" : "local"}-${relativeTarget.replaceAll("/", "-")}`,
+				);
+				mkdirSync(dirname(target), { recursive: true });
+				mkdirSync(dirname(alias), { recursive: true });
+				writeFileSync(target, "SYNTHETIC_SYMLINK_TARGET\n", "utf8");
+				symlinkSync(target, alias);
+				const before = readFileSync(target).toString("base64");
+				const journalPath = join(
+					resolveProjectPaths(root).abs.mutationsDir,
+					"mutations.jsonl",
+				);
+				try {
+					if (!restricted) createMutationSession(root, "S-SYMLINK", "T-01");
+					const proc = runKernel(root, [
+						...(restricted ? ["--agent"] : []),
+						"file",
+						"patch",
+						"--path",
+						join("notes", alias.split("/").at(-1) ?? ""),
+						"--append",
+						"synthetic append",
+						...(restricted
+							? ["--dry-run"]
+							: [
+									"--session",
+									"S-SYMLINK",
+									"--task-id",
+									"T-01",
+									"--reason",
+									"synthetic symlink check",
+								]),
+						"--json",
+					]);
+
+					expect(proc.status).toBe(2);
+					expect(readFileSync(target).toString("base64")).toBe(before);
+					expect(existsSync(journalPath)).toBe(false);
+					expect(
+						`${proc.stdout as string}${proc.stderr as string}`,
+					).not.toContain("SYNTHETIC_SYMLINK_TARGET");
+					const payload = parseJsonOutput(proc.stdout as string);
+					expect(payload.error).toBeTruthy();
+					if (restricted) {
+						expect(payload.action).toBe("file.patch.preview");
+						expect((payload.error as { code: string }).code).toBe(
+							"approval-required",
+						);
+					}
+				} finally {
+					rmSync(root, { recursive: true, force: true });
+				}
+			}
+		}
+	});
+
 	test("pt dry-run shows diff and hashes without mutating", () => {
 		const root = mkProjectRoot();
 		try {

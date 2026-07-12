@@ -77,6 +77,46 @@ export type EvidenceEntry = {
 	warnings?: string[];
 };
 
+const SENSITIVE_COMMAND_KEYS = new Set([
+	"TOKEN",
+	"PASSWORD",
+	"PASSWD",
+	"SECRET",
+	"API_KEY",
+	"ACCESS_KEY",
+	"PRIVATE_KEY",
+]);
+
+function sensitiveAssignmentKey(key: string): boolean {
+	const normalized = key.toUpperCase();
+	return [...SENSITIVE_COMMAND_KEYS].some(
+		(classifier) =>
+			normalized === classifier || normalized.endsWith(`_${classifier}`),
+	);
+}
+
+function sensitiveLongOption(option: string): boolean {
+	const normalized = option.slice(2).replaceAll("-", "_").toUpperCase();
+	return SENSITIVE_COMMAND_KEYS.has(normalized);
+}
+
+/** Redact credential-shaped values while preserving command spelling. */
+export function sanitizeEvidenceCommand(command: string): string {
+	let sanitized = command.replace(
+		/(^|\s)([A-Za-z_][A-Za-z0-9_]*)(=)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]*)/g,
+		(match, prefix: string, key: string) =>
+			sensitiveAssignmentKey(key) ? `${prefix}${key}=[REDACTED]` : match,
+	);
+	sanitized = sanitized.replace(
+		/(^|\s)(--[A-Za-z0-9-]+)(=|\s+)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+)/g,
+		(match, prefix: string, option: string, separator: string) =>
+			sensitiveLongOption(option)
+				? `${prefix}${option}${separator}[REDACTED]`
+				: match,
+	);
+	return sanitized;
+}
+
 export type NewWorkstreamMetadata = {
 	intent?: string;
 	featureId?: string;
@@ -1211,6 +1251,7 @@ export function recordEvidence(
 		}
 		ensureTaskExists(paths.taskPath, input.session, input.taskId);
 		const now = new Date();
+		const sanitizedCommand = sanitizeEvidenceCommand(input.command);
 		const provenance: EvidenceProvenance = input.provenance ?? "declared";
 		const taskState = readTaskRows(paths.taskPath).find(
 			(row) => row.taskId === input.taskId,
@@ -1225,7 +1266,7 @@ export function recordEvidence(
 			id: evidenceId(now),
 			task_id: input.taskId,
 			created_at: now.toISOString(),
-			command: input.command,
+			command: sanitizedCommand,
 			result: input.result,
 			provenance,
 			...(isTaskState(taskState ?? "")
@@ -1290,7 +1331,7 @@ export function recordEvidence(
 					type: "workbench.record_evidence",
 					session: input.session,
 					taskId: input.taskId,
-					command: input.command,
+					command: sanitizedCommand,
 					result: input.result,
 					detail: {
 						provenance,
@@ -1308,7 +1349,7 @@ export function recordEvidence(
 						event_type: "tool_exec",
 						session_id: input.session,
 						task_id: input.taskId,
-						cmd_type: firstToken(input.command),
+						cmd_type: firstToken(sanitizedCommand),
 						provenance,
 						outcome:
 							evidenceCompletionStatus([evidence]) === "passed"
