@@ -63,9 +63,9 @@ describe("operation-context", () => {
 
 	test("trusted local allows read, preview, and mutation policies", () => {
 		const ctx = defaultOperationContext();
-		expect(isActionAllowed(ctx, { action: "file.read", sideEffect: "read" })).toBe(
-			true,
-		);
+		expect(
+			isActionAllowed(ctx, { action: "file.read", sideEffect: "read" }),
+		).toBe(true);
 		expect(
 			isActionAllowed(ctx, {
 				action: "file.patch.preview",
@@ -77,12 +77,13 @@ describe("operation-context", () => {
 		).toBe(true);
 	});
 
-	test.each([agentOperationContext(), remoteOperationContext(), defaultOperationContext()])(
-		"undefined policy is allowed regardless of context",
-		(ctx) => {
-			expect(isActionAllowed(ctx, undefined)).toBe(true);
-		},
-	);
+	test.each([
+		agentOperationContext(),
+		remoteOperationContext(),
+		defaultOperationContext(),
+	])("undefined policy is allowed regardless of context", (ctx) => {
+		expect(isActionAllowed(ctx, undefined)).toBe(true);
+	});
 
 	test("resolveOperationContext defaults to local", () => {
 		const { ctx, remainingArgs } = resolveOperationContext(["status"], {});
