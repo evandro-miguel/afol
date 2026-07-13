@@ -91,8 +91,9 @@ afol c -m "<summary>"
 ```
 
 `afol evidence --result passed` is declared evidence; it does not authorize
-task completion. `done --test-shell` (or `d -x`) records observed exit-zero
-evidence and completes the task.
+task completion. `d -x "<argv command>"` executes without a shell. Use
+`done --test-shell "<shell expression>"` when `&&`, pipes, redirection, or other
+shell syntax is required. Both record observed exit-zero evidence.
 
 Verify a global installation outside this checkout:
 

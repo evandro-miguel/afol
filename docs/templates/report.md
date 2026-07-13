@@ -50,7 +50,7 @@ output_artifacts:
 ## Closure
 
 - Report status: `<created|existing|waived|missing>`
-- Summary source: `<flag|report|state|waiver>`
+- Summary source: `<flag|log|state|waiver>`
 - Waiver reason: `<reason_or_not_applicable>`
 
 ## Delivered Changes

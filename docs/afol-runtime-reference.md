@@ -49,8 +49,9 @@ afol c -m "<summary>"
 ```
 
 Declared `evidence --result passed` is useful for recording claims, but only
-observed exit-zero evidence from `done --test-shell`/`d -x` authorizes task
-completion.
+observed exit-zero evidence authorizes completion. `d -x "<argv command>"`
+executes without a shell; use `done --test-shell "<shell expression>"` when the
+verification requires `&&`, pipes, redirection, or other shell syntax.
 
 Inspection:
 

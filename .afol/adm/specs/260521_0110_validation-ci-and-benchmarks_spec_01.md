@@ -147,9 +147,13 @@ choose commands, tools, rules, skills, or mutation paths.
   `bun run validate:release`.
 - `.agents/scripts` coverage is historical only; that runtime is retired and
   is not a current baseline or fallback.
-- Current observed release evidence is retained under
-  `.afol/wb/260713_0733_final-observed-release/`; current observed short-path
-  benchmark evidence is under
+- The earlier observed release session
+  `.afol/wb/260713_0733_final-observed-release/` proves product commit
+  `af160f8`. Current observed release evidence for product commit `81a3a34` is
+  retained under
+  `.afol/wb/260713_0753_documentation-and-template-freshness/` with
+  `validate-release-clean.log` as the task artifact. Current observed
+  short-path benchmark evidence is under
   `.afol/wb/260713_0724_final-observed-workbench-benchmark/`.
 
 ## 4) Test Matrix By Tool And Scenario

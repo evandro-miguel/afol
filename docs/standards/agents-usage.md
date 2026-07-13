@@ -38,6 +38,10 @@ afol d T-01 -x "afol validate project"
 afol c -m "Validation passed"
 ```
 
+`d -x` executes an argv command without shell parsing. Use
+`afol done --test-shell "<shell expression>"` explicitly for `&&`, pipes,
+redirection, or other shell syntax.
+
 ## Command Reference
 
 Use `docs/afol-runtime-reference.md` and `afol --help` for the maintained

@@ -335,9 +335,12 @@ Minimum acceptance:
   `runtime-live-agent` in
   `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
   (`status=skipped`, `all-scenarios-skipped:not-implemented-live-runner`).
-- Current clean-checkout release evidence is retained in
-  `.afol/wb/260713_0733_final-observed-release/`; observed short-path benchmark
-  evidence is retained in
+- Clean-checkout release evidence for historical product commit `af160f8` is
+  retained in `.afol/wb/260713_0733_final-observed-release/`. Current evidence
+  for product commit `81a3a34` is retained in
+  `.afol/wb/260713_0753_documentation-and-template-freshness/` with the
+  `validate-release-clean.log` artifact. Observed short-path benchmark evidence
+  is retained in
   `.afol/wb/260713_0724_final-observed-workbench-benchmark/`.
 - Exit criteria: type checks; unit tests; schema tests; command parity tests;
   template export tests; workbench validation; MCP parity tests; benchmark
