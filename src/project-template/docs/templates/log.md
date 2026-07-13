@@ -35,6 +35,13 @@ links:
 
 - <decision> -> <reason>
 
+## Closure / Benchmark State (when applicable)
+
+- Report status: `<created|existing|waived|missing|not_applicable>`
+- Summary source or waiver reason: `<value_or_not_applicable>`
+- Benchmark profile: `<pack/run_id/samples/baseline_or_not_applicable>`
+- Observed artifact: `<path_or_not_applicable>`
+
 ## Blockers
 
 - <blocker or none>

@@ -167,12 +167,14 @@ path authoritative until the release is registered.
 - Existing project governance should be reviewed after install before non-trivial work begins.
 - If the target repo already has its own `AGENTS.md` or local command wrappers,
   review the merge outcome before accepting the install.
-- Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills for project-specific behavior,
   while leaving universal AFOL skills such as `agentic-folder-sys` in the global
   Codex skill layer.
-- `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
+- Keep project-specific skills directly under the configured
+  `paths.skills_dir` (normally `.agents/skills/**`). Universal skills remain in
+  the machine-global skill layer. `afol skill list|show|search` inspects the
+  local catalog; it does not synchronize an external skills repository.
 - Python/uv bootstrap scripts are factory-only compatibility surfaces. Public
   downstream installs should use the native `afol bootstrap` path and should
   not require `.agents/scripts`, `.agents/runtime`, or project-local uv

@@ -230,11 +230,11 @@ afol local-state rebuild --json
   or explicitly justified.
 - Local `.env` files -> allowed only as ignored, non-versioned files.
 - Screenshots/images -> `.afol/wb/screenshots/` or `tests/screenshots/`.
-- Temp files -> `tmp/` or `.tmp_<name>/`.
+- Temp files -> configured `paths.tmp_dir` (default `.afol/tmp/`).
 - Build artifacts -> `dist/`.
 - Workbench artifacts -> `.afol/wb/<session>/`.
-- Local auxiliary worktrees -> grouped Worktrunk siblings such as
-  `~/01_projects/dev/<repo>/<repo>.dev`, unversioned.
+- Local auxiliary worktrees -> use the repository owner's configured external
+  worktree root; do not create new nested worktrees inside this project.
 - Legacy nested `.worktree/` directories may stay ignored during migration; do
   not create new nested worktrees.
 - Script incidental output -> never root. If it happens, treat as script bug and

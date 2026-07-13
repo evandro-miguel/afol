@@ -32,7 +32,7 @@ follow-up when recurrence is likely.
 | Feature/workstream | Roadmap, parent spec, RULE-002 |
 | Spec, roadmap, managed doc | RULE-003 and the matching template |
 | Workbench artifact | global Codex `agentic-folder-sys`, RULE-002, RULE-004 |
-| Project-local skill | `writing-skills`, skills-sync docs, RULE-002 |
+| Project-local skill | `writing-skills`, configured `paths.skills_dir`, RULE-002 |
 | Code | Project config, nearest tests, language skill |
 | Runtime command/tool | Command docs/tests, `.afol/adm/tools.json` |
 | Folder/scaffold layout | RULE-005, template docs, map evidence |
