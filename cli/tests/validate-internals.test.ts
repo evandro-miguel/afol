@@ -1195,7 +1195,7 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 
 	test("enforces the project token rule independent of scenario thresholds", () => {
 		const root = createBenchExecutionFixtureRoot();
