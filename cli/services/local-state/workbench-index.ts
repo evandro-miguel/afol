@@ -75,6 +75,7 @@ const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
 const NESTED_LIST_ITEM_RE = /^\s{2,}[-*]\s+(.+?)\s*$/;
 const GLOB_TOKEN_RE = /[*?[\]{}]/;
 const WORKBENCH_INDEX_LOCK_SESSION = "workbench-index";
+const WORKBENCH_AUXILIARY_DIRS = new Set(["_archive", "screenshots"]);
 
 const ZERO_TIME = new Date(0).toISOString();
 
@@ -122,7 +123,7 @@ export function collectSessionIds(root: string): string[] {
 			(entry) =>
 				entry.isDirectory() &&
 				!entry.name.startsWith(".") &&
-				entry.name !== "_archive",
+				!WORKBENCH_AUXILIARY_DIRS.has(entry.name),
 		)
 		.map((entry) => entry.name)
 		.sort();

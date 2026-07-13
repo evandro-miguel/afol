@@ -706,6 +706,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "generated",
 		description: "Generate hydrated project state",
 		category: "inspect",
+		guidance: [
+			"Use --session <id> to hydrate one session.",
+			"Use --all to hydrate every canonical workbench session.",
+		],
 	},
 	{
 		command: "render",

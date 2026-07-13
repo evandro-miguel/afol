@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -158,6 +159,101 @@ describe("state commands", () => {
 				(payload.data as { snapshot: { sessionId: string }; session: string })
 					.session,
 			).toBe("test-session");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol hydrate --all uses canonical workbench session discovery", async () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "wb", "custom-session"), {
+				recursive: true,
+			});
+			mkdirSync(join(root, ".afol", "wb", ".hidden-session"), {
+				recursive: true,
+			});
+			mkdirSync(join(root, ".afol", "wb", "_archive"), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", "screenshots"), { recursive: true });
+
+			const captured = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["--all", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				exit_code: 0,
+				action: "hydrate.all",
+				session_count: 2,
+			});
+
+			const db = new Database(join(root, ".afol", "state", "afol.db"), {
+				readonly: true,
+			});
+			try {
+				const sessions = db
+					.query("SELECT session_id FROM sessions ORDER BY session_id")
+					.all() as Array<{ session_id: string }>;
+				expect(sessions.map((row) => row.session_id)).toEqual([
+					"custom-session",
+					"test-session",
+				]);
+			} finally {
+				db.close();
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol hydrate --all reports failures with the aggregate action", async () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "wb", "bad session"), { recursive: true });
+			const captured = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["--all", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				exit_code: 1,
+				action: "hydrate.all",
+				session: "bad session",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol hydrate rejects --all with --session", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["--all", "--session", "test-session"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Use either --all or --session for hydrate, not both.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -431,7 +527,7 @@ describe("state commands", () => {
 			const captured = captureIo();
 			expect(await runHydrateCommand("hydrate", [], root, captured.io)).toBe(2);
 			expect(captured.stderr.join("\n")).toContain(
-				"Missing --session for hydrate.",
+				"Missing --session or --all for hydrate.",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
