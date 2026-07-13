@@ -199,6 +199,91 @@ describe("validate command", () => {
 		}
 	});
 
+	test.each([
+		{
+			name: "rejects disabled adapter with .claude",
+			enabled: false,
+			artifact: ".claude",
+			expectedCode: 1,
+			expectedOk: false,
+			expectedMessage:
+				"claude adapter is disabled but owned artifacts are present: .claude",
+		},
+		{
+			name: "rejects disabled adapter with CLAUDE.md",
+			enabled: false,
+			artifact: "CLAUDE.md",
+			expectedCode: 1,
+			expectedOk: false,
+			expectedMessage:
+				"claude adapter is disabled but owned artifacts are present: CLAUDE.md",
+		},
+		{
+			name: "allows enabled adapter with owned artifacts",
+			enabled: true,
+			artifact: ".claude",
+			expectedCode: 0,
+			expectedOk: true,
+			expectedMessage: "ok claude adapter enabled",
+		},
+		{
+			name: "allows disabled adapter without owned artifacts",
+			enabled: false,
+			artifact: null,
+			expectedCode: 0,
+			expectedOk: true,
+			expectedMessage: "ok claude adapter disabled with no owned artifacts",
+		},
+	])("$name", async ({
+		enabled,
+		artifact,
+		expectedCode,
+		expectedOk,
+		expectedMessage,
+	}) => {
+		const root = createValidationFixture();
+		try {
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: { name: "validate-fixture" },
+					adapters: { claude: { enabled } },
+				}),
+				"utf8",
+			);
+			if (artifact === ".claude") {
+				mkdirSync(join(root, ".claude", "skills"), { recursive: true });
+				writeFileSync(
+					join(root, ".claude", "skills", "generated.md"),
+					"generated adapter artifact\n",
+					"utf8",
+				);
+			} else if (artifact === "CLAUDE.md") {
+				writeFileSync(join(root, "CLAUDE.md"), "claude adapter artifact\n");
+			}
+			rebuildValidationFixtureIndexes(root);
+
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id?: string; ok?: boolean; message?: string }>;
+			};
+			const adapterCheck = payload.checks?.find(
+				(check) => check.id === "adapter_consistency",
+			);
+
+			expect(code).toBe(expectedCode);
+			expect(adapterCheck).toEqual({
+				id: "adapter_consistency",
+				ok: expectedOk,
+				message: expectedMessage,
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("project readiness ignores missing outcomes for completed history", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_closed-history";

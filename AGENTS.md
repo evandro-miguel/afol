@@ -380,7 +380,10 @@ TypeScript AFOL implementation.
 
 - Repository index: `afol-dev`.
 - Use the globally installed `gitnexus` skill as the operating guide.
-- Check index freshness before graph queries.
+- Check index freshness before graph queries. When stale, run
+  `gitnexus analyze --index-only --no-stats`; do not use plain `analyze`,
+  `npx`, `npm`, or `pnpm`, because provider-context injection can recreate
+  disabled `.claude/**` artifacts or mutate host tooling.
 - Before editing a function, class, or method, run upstream impact analysis and report any HIGH or CRITICAL risk.
 - After meaningful edits and before committing, run change detection against `main`.
 - Confirm graph findings in source. Do not depend on provider-specific files, local provider skill mirrors, or MCP-only routing.

@@ -6,6 +6,10 @@ import {
 	scanTemplateToolchainClaims,
 	TEMPLATE_ROOT,
 } from "../../schemas/template-policy";
+import {
+	findClaudeArtifacts,
+	readClaudeAdapterEnabled,
+} from "../adapter/claude";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
 	validateFilesIndex,
@@ -33,6 +37,7 @@ export type ProjectValidationCheck = {
 		| "skills_dir"
 		| "wb_dir"
 		| "agents_payload_clean"
+		| "adapter_consistency"
 		| "template_forbidden"
 		| "rules_local_state_index"
 		| "skills_local_state_index"
@@ -207,6 +212,28 @@ function validateAgentsPayloadClean(
 	};
 }
 
+function validateAdapterConsistency(
+	projectRoot: string,
+): ProjectValidationCheck {
+	const claudeEnabled = readClaudeAdapterEnabled(projectRoot);
+	const claudeArtifacts = findClaudeArtifacts(projectRoot);
+	if (!claudeEnabled && claudeArtifacts.length > 0) {
+		return {
+			id: "adapter_consistency",
+			ok: false,
+			message: `claude adapter is disabled but owned artifacts are present: ${claudeArtifacts.join(", ")}`,
+		};
+	}
+
+	return {
+		id: "adapter_consistency",
+		ok: true,
+		message: claudeEnabled
+			? "ok claude adapter enabled"
+			: "ok claude adapter disabled with no owned artifacts",
+	};
+}
+
 async function validateTemplateForbidden(
 	projectRoot: string,
 ): Promise<ProjectValidationCheck> {
@@ -305,6 +332,7 @@ export async function validateProjectStructure(
 		validateDirectory(projectRoot, "skills_dir", projectPaths.abs.skillsDir),
 		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
 		validateAgentsPayloadClean(projectRoot),
+		validateAdapterConsistency(projectRoot),
 		(() => {
 			const result = validateWorkBenchIndex(projectRoot);
 			return {
