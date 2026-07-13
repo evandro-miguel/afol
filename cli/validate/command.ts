@@ -31,6 +31,7 @@ const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
 // >5000 output tokens = non-ideal (warn); >10000 = prohibitive (fail).
 const TOKEN_RULE_NONIDEAL = 5_000;
 const TOKEN_RULE_PROHIBITIVE = 10_000;
+const BASELINE_TIMING_REGRESSION_FACTOR = 1.25;
 
 function resolveValidationSelection(
 	snapshot: RegistrySnapshot,
@@ -68,22 +69,30 @@ function appendBaselineRegressionNotes(
 	if (!baseline) {
 		return;
 	}
+	const timingP50Limit =
+		typeof baseline.timing_p50_ms === "number"
+			? baseline.timing_p50_ms * BASELINE_TIMING_REGRESSION_FACTOR
+			: undefined;
 	if (
-		typeof baseline.timing_p50_ms === "number" &&
+		typeof timingP50Limit === "number" &&
 		typeof metrics.timing_p50_ms === "number" &&
-		metrics.timing_p50_ms > baseline.timing_p50_ms
+		metrics.timing_p50_ms > timingP50Limit
 	) {
 		notes.push(
-			`baseline-regression:timing_p50_ms:${metrics.timing_p50_ms}>${baseline.timing_p50_ms}`,
+			`baseline-regression:timing_p50_ms:${metrics.timing_p50_ms}>${timingP50Limit}`,
 		);
 	}
+	const timingP95Limit =
+		typeof baseline.timing_p95_ms === "number"
+			? baseline.timing_p95_ms * BASELINE_TIMING_REGRESSION_FACTOR
+			: undefined;
 	if (
-		typeof baseline.timing_p95_ms === "number" &&
+		typeof timingP95Limit === "number" &&
 		typeof metrics.timing_p95_ms === "number" &&
-		metrics.timing_p95_ms > baseline.timing_p95_ms
+		metrics.timing_p95_ms > timingP95Limit
 	) {
 		notes.push(
-			`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${baseline.timing_p95_ms}`,
+			`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${timingP95Limit}`,
 		);
 	}
 }

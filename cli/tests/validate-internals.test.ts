@@ -1197,6 +1197,95 @@ describe("scenario benchmark execution", () => {
 		}
 	}, 30_000);
 
+	test("applies the documented timing tolerance to baseline comparisons", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 200,
+				timing_p95_ms: 300,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "baseline-timing-tolerance",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 1_000,
+					max_p95_ms: 1_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {
+					duration_ms: 250,
+					timing_p50_ms: 250,
+					timing_p95_ms: 375,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 1,
+					context_bytes: 0,
+					output_bytes: 4,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+
+			const withinTolerance = buildResult(
+				root,
+				scenario,
+				baselinePath,
+				baseline,
+			);
+			expect(withinTolerance.status).toBe("passed");
+
+			const p50Regression = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 251,
+						timing_p50_ms: 251,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(p50Regression.status).toBe("failed");
+			expect(p50Regression.notes).toContain(
+				"baseline-regression:timing_p50_ms:251>250",
+			);
+
+			const p95Regression = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						timing_p95_ms: 376,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(p95Regression.status).toBe("failed");
+			expect(p95Regression.notes).toContain(
+				"baseline-regression:timing_p95_ms:376>375",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("enforces the project token rule independent of scenario thresholds", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
