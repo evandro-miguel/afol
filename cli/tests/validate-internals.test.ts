@@ -1286,6 +1286,63 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
+	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const counterPath = join(root, "sandbox-sample-count.txt");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-sample-count",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: `node -e 'require("node:fs").appendFileSync(${JSON.stringify(counterPath)},"x")'`,
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {
+					duration_ms: 1,
+					timing_p50_ms: 1,
+					timing_p95_ms: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 0,
+					context_bytes: 0,
+					output_bytes: 0,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+
+			const result = buildResult(
+				root,
+				scenario,
+				join(root, "baseline.json"),
+				baseline,
+			);
+			expect(result.status).toBe("passed");
+			expect(readFileSync(counterPath, "utf8")).toBe("xxxx");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("enforces the project token rule independent of scenario thresholds", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {

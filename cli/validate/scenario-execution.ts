@@ -529,29 +529,6 @@ function isCommandSuccess(sample: ScenarioSampleRun): boolean {
 	return !sample.signal && !sample.spawn_error && sample.exit_code === 0;
 }
 
-function buildSampleMetrics(
-	sample: ScenarioSampleRun,
-	passed: boolean,
-	command: string,
-): ScenarioExecutionMetrics {
-	const outputBytes = Buffer.byteLength(sample.stdout, "utf8");
-	return {
-		duration_ms: sample.duration_ms,
-		timing_p50_ms: sample.duration_ms,
-		timing_p95_ms: sample.duration_ms,
-		error_count: passed ? 0 : 1,
-		retry_count: 0,
-		context_tokens: 0,
-		prompt_tokens: 0,
-		output_tokens: Math.round(outputBytes / 4),
-		context_bytes: 0,
-		output_bytes: outputBytes,
-		argv_chars: argvCharCount(command),
-		tool_call_count: 1,
-		tool_success_rate: passed ? 1 : 0,
-	};
-}
-
 type SandboxScenarioSampleResult = {
 	sample: ScenarioSampleRun | null;
 	note: string | null;
@@ -612,23 +589,6 @@ function runSandboxScenarioCommand(
 	command: string,
 ): ScenarioExecutionResult {
 	const expectedExit = scenario.expected_exit;
-	if (!scenario.compiled_binary) {
-		const result = runSandboxScenarioSample(projectRoot, scenario, command);
-		if (!result.sample) {
-			return {
-				metrics: coerceMetrics(scenario.deterministic_metrics),
-				notes: [result.note ?? "setup-failed:unknown"],
-				passed: false,
-			};
-		}
-		const passed = scenarioSamplePassed(result.sample, expectedExit);
-		return {
-			metrics: buildSampleMetrics(result.sample, passed, command),
-			notes: buildSandboxNotes(result.sample, passed, expectedExit),
-			passed,
-		};
-	}
-
 	const warmup = runSandboxScenarioSample(projectRoot, scenario, command);
 	const measured = Array.from({ length: BENCH_SAMPLES }, () =>
 		runSandboxScenarioSample(projectRoot, scenario, command),
@@ -702,21 +662,6 @@ function runSandboxScenarioCommand(
 				: [...warmupNotes, ...sampleFailureNotes],
 		passed,
 	};
-}
-
-function buildSandboxNotes(
-	sample: ScenarioSampleRun,
-	passed: boolean,
-	expectedExit: number | undefined,
-): string[] {
-	if (!passed) {
-		return [
-			`sample-failed:1:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
-		];
-	}
-	return typeof expectedExit === "number"
-		? [`expected-exit-honored:${expectedExit}`]
-		: [];
 }
 
 export function runScenarioCommand(
