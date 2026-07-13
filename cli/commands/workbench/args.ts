@@ -161,6 +161,9 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	if (allowNoReport && !reason.trim()) {
 		throw new Error("Missing --reason for close allow-no-report.");
 	}
+	if (allowNoReport && summary.trim()) {
+		throw new Error("Cannot combine --summary with --allow-no-report.");
+	}
 	return {
 		session: resolveSession(root, session, "close"),
 		json,

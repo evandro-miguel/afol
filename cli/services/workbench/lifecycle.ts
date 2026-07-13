@@ -133,7 +133,7 @@ export type CloseSessionOptions = {
 };
 
 export type CloseSessionReport = {
-	status: "created" | "existing" | "waived";
+	status: "created" | "existing" | "waived" | "missing";
 	path: string | null;
 	summary_source: "flag" | "log" | "state" | "waiver";
 };
@@ -1704,8 +1704,8 @@ export function closeSession(
 		const reportRelativePath = relative(root, reportPath).replaceAll("\\", "/");
 		let reportStatus: CloseSessionReport["status"] = existsSync(reportPath)
 			? "existing"
-			: "waived";
-		let summarySource: CloseSessionReport["summary_source"] = "waiver";
+			: "missing";
+		let summarySource: CloseSessionReport["summary_source"] = "state";
 		let summary = options.summary?.trim() ?? "";
 		const taskRows = readTaskRows(paths.taskPath);
 		const hadLog = existsSync(paths.logPath);
@@ -1732,9 +1732,11 @@ export function closeSession(
 					`Session ${session} failed strict verification: ${message}`,
 				);
 			}
-			if (!existsSync(reportPath)) {
+			if (reportStatus === "missing") {
 				if (!options.allowNoReport) {
 					reportStatus = "created";
+				} else {
+					reportStatus = "waived";
 				}
 				if (options.allowNoReport && !options.reason?.trim()) {
 					throw new Error(
@@ -1744,7 +1746,7 @@ export function closeSession(
 			}
 			if (summary) {
 				summarySource = "flag";
-			} else if (options.allowNoReport) {
+			} else if (reportStatus === "waived") {
 				summary = `Report waived: ${options.reason?.trim()}`;
 				summarySource = "waiver";
 			} else if (logSummary) {
@@ -1796,6 +1798,9 @@ export function closeSession(
 			}
 		} else if (!summary) {
 			if (logSummary?.startsWith("Report waived:")) {
+				if (reportStatus === "missing") {
+					reportStatus = "waived";
+				}
 				summarySource = "waiver";
 			} else if (logSummary) {
 				summarySource = "log";
@@ -1805,7 +1810,7 @@ export function closeSession(
 		}
 
 		const warnings =
-			reportStatus === "waived"
+			reportStatus === "waived" || reportStatus === "missing"
 				? evaluateCloseWarnings(session, paths.sessionDir)
 				: [];
 
@@ -1863,7 +1868,10 @@ export function closeSession(
 		const result = warnings as CloseSessionResult;
 		result.report = {
 			status: reportStatus,
-			path: reportStatus === "waived" ? null : reportRelativePath,
+			path:
+				reportStatus === "waived" || reportStatus === "missing"
+					? null
+					: reportRelativePath,
 			summary_source: summarySource,
 		};
 		return result;

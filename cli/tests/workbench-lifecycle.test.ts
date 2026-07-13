@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -2558,6 +2559,37 @@ describe("workbench lifecycle service", () => {
 			expect(log).not.toContain("old");
 			expect(log).not.toContain("second");
 			expect(log).toContain("## Notes");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closed session with a missing report is not mislabeled as waived", () => {
+		const root = mkRoot("close-missing-report");
+		try {
+			const created = newWorkstream(root, "close missing report");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const first = closeSession(root, created.session);
+			expect(first.report.status).toBe("created");
+			unlinkSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+			);
+
+			const repeated = closeSession(root, created.session);
+			expect(repeated.report.status).toBe("missing");
+			expect(repeated.report.path).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

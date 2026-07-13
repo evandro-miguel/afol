@@ -72,6 +72,23 @@ describe("workbench parseCloseArgs", () => {
 		);
 		expect(parsed.summary).toBe("verified close");
 	});
+
+	test("rejects a summary combined with a no-report waiver", () => {
+		expect(() =>
+			parseCloseArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"--allow-no-report",
+					"--reason",
+					"research-only session",
+					"--summary",
+					"different summary",
+				],
+				process.cwd(),
+			),
+		).toThrow("Cannot combine --summary with --allow-no-report.");
+	});
 });
 
 describe("workbench parseSessionTaskArgs", () => {
