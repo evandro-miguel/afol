@@ -1,0 +1,1 @@
+{"id":"E-20260713065719847-79fa4c","task_id":"T-01","created_at":"2026-07-13T10:57:19.847Z","command":"bun test --only-failures cli/tests/validate-internals.test.ts cli/tests/workbench-lifecycle.test.ts","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}

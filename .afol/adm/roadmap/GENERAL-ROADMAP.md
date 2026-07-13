@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-20T00:00:00-04:00'
+updated_at: '2026-07-12T21:20:00Z'
 ---
 
 # GENERAL ROADMAP
@@ -40,15 +40,22 @@ universal CLI plus minimal local project state.
 
 ## 3) Strategic Priorities
 
-1. Low-token command execution.
-2. Minimal local template.
-3. Bun/TypeScript as the system core.
-4. Smart routing of rules and skills.
-5. File-first, chat-light handoffs.
-6. Safe file operations with mutation tracking.
-7. Updateable downstream project installations.
-8. Strong validation and closure gates.
-9. Future public distribution.
+1. **Extreme agent ease of use** — obvious short happy path; low friction.
+2. **Extremely low latency** — hot-path CLI in tens to low hundreds of ms.
+3. **Low write-token consumption** — agents must not author giant `afol`
+   strings; active-session fast path is first-class (worse to waste model
+   output on commands than on compact CLI stdout).
+4. **Low forced output tokens** — compact defaults; verbose/full opt-in;
+   file-first detail (F-06).
+5. **Very high reliability** — short and long forms share one state machine;
+   fail closed when session is ambiguous.
+6. Minimal local template.
+7. Bun/TypeScript as the system core.
+8. Smart routing of rules and skills.
+9. Safe file operations with mutation tracking.
+10. Updateable downstream project installations.
+11. Strong validation and closure gates.
+12. Future public distribution.
 
 ## 4) Current-State Reconciliation
 
@@ -199,18 +206,26 @@ Minimum acceptance:
 
 ### F-03 Agent Command Design System
 
-- Status: final
+- Status: final (initial delivery) with **open residual child**
 - Governing spec:
   .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
-- Why: Agents should use short, predictable commands to reduce repeated token
-  cost.
-- Exit criteria: short grammar exists; long aliases exist; high-frequency
-  operations use 1-3 letter commands; compact output is default; JSON output is
-  available.
+- Living residual:
+  .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
+- Why: Agents need extreme ease of use, extremely low latency, low
+  **write-token** cost for CLI argv, low forced stdout, and very high
+  reliability. Long commands and long default output train agents to waste
+  model tokens; write tokens are worse than read tokens.
+- Exit criteria (initial, done): short grammar exists; long aliases exist;
+  high-frequency operations use 1-3 letter commands; compact output is default;
+  JSON output is available.
+- Residual exit criteria (child): agent docs/hints lead with active-session
+  fast path (`st T-01`, `d T-01 -x "…"`, `c`); explicit `-S` path retained for
+  CI/multi-agent; flag tables match live CLI; input argv + latency budgets
+  validated; default agent commands stay under output token rules.
 - Closure note: accepted implementation evidence is
   `E-20260529134101240986`; closeout session
   `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
-  passed.
+  passed. Residual tracked by the 2026-07-12 child spec.
 
 ### F-04 Governance Workbench System
 

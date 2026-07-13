@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:00:00+08:00'
-updated_at: '2026-05-29T13:20:21-03:00'
+updated_at: '2026-07-12T21:20:00Z'
 roadmap_feature: F-06
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -27,6 +27,16 @@ risk_level: medium
 
 Reduce token usage by moving durable work into files and keeping chat handoffs
 compact.
+
+This spec covers **handoff and artifact bulk** (what agents put in chat vs
+files). It does **not** replace F-03 for **CLI write-token economy** (how long
+the `afol …` command strings are) or default CLI stdout budgets. Those live in:
+
+- `.afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md`
+- `.afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md`
+
+Together with F-03: agents should write **short commands**, receive **short
+results**, and store **long detail** in workbench files.
 
 ## 2) Problem
 

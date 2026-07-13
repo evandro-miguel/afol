@@ -276,6 +276,9 @@ export function buildResult(
 		output_tokens: metrics.output_tokens ?? 0,
 		context_bytes: metrics.context_bytes ?? 0,
 		output_bytes: metrics.output_bytes ?? 0,
+		...(typeof metrics.argv_chars === "number"
+			? { argv_chars: metrics.argv_chars }
+			: {}),
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 		git_commit: getGitCommit(projectRoot),

@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:10:00+08:00'
-updated_at: '2026-05-29T14:10:48-03:00'
+updated_at: '2026-07-12T21:20:00Z'
 roadmap_feature: F-01
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -32,11 +32,24 @@ Build a universal Bun/TypeScript CLI that agents call from any governed project
 through the local command `afol`, with `afol` retained as a compatibility alias
 during migration.
 
-The intended simple operator surface includes `afol s`, `afol ck`, and
+The CLI is agent-primary. Success means:
+
+1. **Extreme ease of use** — short, obvious commands for the happy path.
+2. **Extremely low latency** — hot path in tens to low hundreds of ms.
+3. **Low write-token consumption** — agents rarely type long session ids or
+   flag spam; active-session fast path is first-class.
+4. **Very high reliability** — short and long forms share one state machine.
+5. **Low forced read tokens** — compact defaults; verbose/full is opt-in.
+
+The intended simple operator surface includes `afol s`, `afol v`/`afol ck`, and
 `afol b <repo> --partial`. The workbench shortcuts `afol st`,
-`afol d -x "..."`, and `afol c` route to the existing governed
-implementation/session commands while typed parity continues to grow. Long
-aliases remain available for human readability.
+`afol d -x "..."`, and `afol c` are the **agent-canonical** lifecycle path when
+session context resolves. Long aliases remain for humans, audits, CI, and
+multi-agent explicit session use.
+
+Command design detail: `.afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md`
+Living residual:
+`.afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md`
 
 The CLI owns behavior. The project owns state.
 
@@ -73,6 +86,8 @@ Required kernel boundaries:
 - Reads and writes must respect template-safe path scope and symlink policy.
 - Compact text output is default; JSON is opt-in with `-j`.
 - Every command returns a typed result envelope before formatting.
+- Agent hot-path commands must stay within F-03 latency and write-token
+  contracts; do not trade reliability for shorter strings that change gates.
 
 ## 4) Versioned Project State
 

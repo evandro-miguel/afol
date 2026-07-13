@@ -2,9 +2,11 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	accessSync,
+	chmodSync,
 	existsSync,
 	constants as fsConstants,
 	lstatSync,
+	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
@@ -56,8 +58,13 @@ interface ScenarioExecutionMetrics {
 	output_tokens: number;
 	context_bytes: number;
 	output_bytes: number;
+	argv_chars?: number;
 	tool_call_count: number;
 	tool_success_rate: number;
+}
+
+function argvCharCount(command: string): number {
+	return Array.from(command.trim()).length;
 }
 
 interface ScenarioExecutionResult {
@@ -138,6 +145,7 @@ function resolveScenarioInvocation(
 	projectRoot: string,
 	command: string,
 	preferLocalWrapper = true,
+	trustedAfolBinary?: string,
 ): CommandInvocation {
 	const tokens = tokenizeCommand(command);
 	if (tokens.length === 0) {
@@ -148,6 +156,7 @@ function resolveScenarioInvocation(
 		projectRoot,
 		tokens,
 		preferLocalWrapper,
+		trustedAfolBinary,
 	);
 }
 
@@ -156,6 +165,7 @@ function resolveCommandInvocation(
 	projectRoot: string,
 	tokens: string[],
 	preferLocalWrapper: boolean,
+	trustedAfolBinary?: string,
 ): CommandInvocation {
 	const program = tokens[0];
 	if (program === undefined) {
@@ -163,6 +173,9 @@ function resolveCommandInvocation(
 	}
 	const args = tokens.slice(1);
 	if (program === "afol" || program === "a") {
+		if (trustedAfolBinary) {
+			return { command: trustedAfolBinary, args };
+		}
 		if (!preferLocalWrapper) {
 			return {
 				command: "bun",
@@ -211,6 +224,41 @@ function createSandboxRoot(projectRoot: string): string {
 		symlinkSync(projectNodeModules, join(sandboxRoot, "node_modules"), "dir");
 	}
 	return sandboxRoot;
+}
+
+function provisionSandboxBinary(
+	sandboxRoot: string,
+	compiledBinary: boolean,
+): { binaryPath: string | null; error: string | null } {
+	if (!compiledBinary) return { binaryPath: null, error: null };
+	const targetDir = join(sandboxRoot, ".afol", "bin");
+	const targetBinary = join(targetDir, "afol");
+	mkdirSync(targetDir, { recursive: true });
+	const result = spawnSync(
+		"bun",
+		[
+			"build",
+			"--compile",
+			join(REAL_REPO_ROOT, "cli", "main.ts"),
+			"--outfile",
+			targetBinary,
+		],
+		{
+			cwd: REAL_REPO_ROOT,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		},
+	);
+	if (result.status !== 0 || result.signal || result.error) {
+		return {
+			binaryPath: null,
+			error: `compiled-binary:${outputTail(
+				String((result.stderr ?? result.error?.message) || "bun build failed"),
+			)}`,
+		};
+	}
+	chmodSync(targetBinary, 0o755);
+	return { binaryPath: targetBinary, error: null };
 }
 
 function gitStatusPorcelain(projectRoot: string): {
@@ -469,6 +517,9 @@ function coerceMetrics(
 		output_tokens: metrics.output_tokens ?? 0,
 		context_bytes: metrics.context_bytes ?? 0,
 		output_bytes: metrics.output_bytes ?? 0,
+		...(typeof metrics.argv_chars === "number"
+			? { argv_chars: metrics.argv_chars }
+			: {}),
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 	};
@@ -481,6 +532,7 @@ function isCommandSuccess(sample: ScenarioSampleRun): boolean {
 function buildSampleMetrics(
 	sample: ScenarioSampleRun,
 	passed: boolean,
+	command: string,
 ): ScenarioExecutionMetrics {
 	const outputBytes = Buffer.byteLength(sample.stdout, "utf8");
 	return {
@@ -494,20 +546,32 @@ function buildSampleMetrics(
 		output_tokens: Math.round(outputBytes / 4),
 		context_bytes: 0,
 		output_bytes: outputBytes,
+		argv_chars: argvCharCount(command),
 		tool_call_count: 1,
 		tool_success_rate: passed ? 1 : 0,
 	};
 }
 
-function runSandboxScenarioCommand(
+type SandboxScenarioSampleResult = {
+	sample: ScenarioSampleRun | null;
+	note: string | null;
+};
+
+function runSandboxScenarioSample(
 	projectRoot: string,
 	scenario: Scenario,
 	command: string,
-): ScenarioExecutionResult {
-	const expectedExit = scenario.expected_exit;
+): SandboxScenarioSampleResult {
 	let sandboxRoot: string | null = null;
 	try {
 		sandboxRoot = createSandboxRoot(projectRoot);
+		const provisioning = provisionSandboxBinary(
+			sandboxRoot,
+			scenario.compiled_binary === true,
+		);
+		if (provisioning.error) {
+			return { sample: null, note: `setup-failed:${provisioning.error}` };
+		}
 		for (const [index, setupCommand] of (scenario.setup ?? []).entries()) {
 			if (setupCommand.length === 0) {
 				throw new Error("Empty setup command");
@@ -517,13 +581,13 @@ function runSandboxScenarioCommand(
 				sandboxRoot,
 				setupCommand,
 				false,
+				provisioning.binaryPath ?? undefined,
 			);
 			const setupSample = runScenarioSample(sandboxRoot, setupInvocation);
 			if (!isCommandSuccess(setupSample)) {
 				return {
-					metrics: coerceMetrics(scenario.deterministic_metrics),
-					notes: [`setup-failed:${index}:${setupSample.exit_code ?? "null"}`],
-					passed: false,
+					sample: null,
+					note: `setup-failed:${index}:${setupSample.exit_code ?? "null"}`,
 				};
 			}
 		}
@@ -532,19 +596,112 @@ function runSandboxScenarioCommand(
 			sandboxRoot,
 			command,
 			false,
+			provisioning.binaryPath ?? undefined,
 		);
-		const sample = runScenarioSample(sandboxRoot, invocation);
-		const passed = scenarioSamplePassed(sample, expectedExit);
-		return {
-			metrics: buildSampleMetrics(sample, passed),
-			notes: buildSandboxNotes(sample, passed, expectedExit),
-			passed,
-		};
+		return { sample: runScenarioSample(sandboxRoot, invocation), note: null };
 	} finally {
 		if (sandboxRoot) {
 			rmSync(sandboxRoot, { recursive: true, force: true });
 		}
 	}
+}
+
+function runSandboxScenarioCommand(
+	projectRoot: string,
+	scenario: Scenario,
+	command: string,
+): ScenarioExecutionResult {
+	const expectedExit = scenario.expected_exit;
+	if (!scenario.compiled_binary) {
+		const result = runSandboxScenarioSample(projectRoot, scenario, command);
+		if (!result.sample) {
+			return {
+				metrics: coerceMetrics(scenario.deterministic_metrics),
+				notes: [result.note ?? "setup-failed:unknown"],
+				passed: false,
+			};
+		}
+		const passed = scenarioSamplePassed(result.sample, expectedExit);
+		return {
+			metrics: buildSampleMetrics(result.sample, passed, command),
+			notes: buildSandboxNotes(result.sample, passed, expectedExit),
+			passed,
+		};
+	}
+
+	const warmup = runSandboxScenarioSample(projectRoot, scenario, command);
+	const measured = Array.from({ length: BENCH_SAMPLES }, () =>
+		runSandboxScenarioSample(projectRoot, scenario, command),
+	);
+	const setupNotes = [warmup, ...measured]
+		.map((result) => result.note)
+		.filter((note): note is string => note !== null);
+	const samples = measured
+		.map((result) => result.sample)
+		.filter((sample): sample is ScenarioSampleRun => sample !== null);
+	if (
+		!warmup.sample ||
+		setupNotes.length > 0 ||
+		samples.length !== BENCH_SAMPLES
+	) {
+		return {
+			metrics: coerceMetrics({
+				...scenario.deterministic_metrics,
+				argv_chars: argvCharCount(command),
+			}),
+			notes: setupNotes.length > 0 ? setupNotes : ["setup-failed:unknown"],
+			passed: false,
+		};
+	}
+	const warmupNotes = scenarioSamplePassed(warmup.sample, expectedExit)
+		? []
+		: [
+				`warmup-failed:exit=${warmup.sample.exit_code ?? "null"}:stderr=${outputTail((warmup.sample.spawn_error ?? warmup.sample.stderr) || warmup.sample.stdout)}`,
+			];
+	const sampleFailureNotes = samples.flatMap((sample, index) =>
+		scenarioSamplePassed(sample, expectedExit)
+			? []
+			: [
+					`sample-failed:${index + 1}:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
+				],
+	);
+	const durations = samples.map((sample) => sample.duration_ms);
+	const representativeSample =
+		samples.findLast(
+			(sample) => Buffer.byteLength(sample.stdout, "utf8") > 0,
+		) ?? samples.at(-1);
+	const outputBytes = representativeSample
+		? Buffer.byteLength(representativeSample.stdout, "utf8")
+		: 0;
+	const successfulSamples = samples.filter((sample) =>
+		scenarioSamplePassed(sample, expectedExit),
+	).length;
+	const passed =
+		warmupNotes.length === 0 &&
+		sampleFailureNotes.length === 0 &&
+		successfulSamples === BENCH_SAMPLES;
+	return {
+		metrics: {
+			duration_ms: Math.round(percentile(durations, 0.5)),
+			timing_p50_ms: Math.round(percentile(durations, 0.5)),
+			timing_p95_ms: Math.round(percentile(durations, 0.95)),
+			error_count: BENCH_SAMPLES - successfulSamples,
+			retry_count: 0,
+			context_tokens: 0,
+			prompt_tokens: 0,
+			output_tokens: Math.round(outputBytes / 4),
+			context_bytes: 0,
+			output_bytes: outputBytes,
+			argv_chars: argvCharCount(command),
+			tool_call_count: 1,
+			tool_success_rate: Number((successfulSamples / BENCH_SAMPLES).toFixed(4)),
+		},
+		notes:
+			passed && typeof expectedExit === "number"
+				? [`expected-exit-honored:${expectedExit}`]
+				: [...warmupNotes, ...sampleFailureNotes],
+		passed,
+	};
 }
 
 function buildSandboxNotes(
@@ -674,6 +831,7 @@ export function runScenarioCommand(
 		output_tokens: Math.round(outputBytes / 4),
 		context_bytes: 0,
 		output_bytes: outputBytes,
+		argv_chars: argvCharCount(command),
 		tool_call_count: 1,
 		tool_success_rate: Number((successfulSamples / BENCH_SAMPLES).toFixed(4)),
 	};

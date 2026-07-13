@@ -25,6 +25,7 @@ import {
 	advanceTaskAfterObservedTest,
 	appendTimelineEntry,
 	closeSession,
+	completeObservedTask,
 	doneTask,
 	isSessionClosed,
 	newWorkstream,
@@ -836,6 +837,92 @@ describe("workbench lifecycle service", () => {
 				provenance: "observed",
 				outcome: "success",
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("completeObservedTask coalesces observed completion into one refresh", () => {
+		const root = mkRoot("complete-observed");
+		try {
+			const created = newWorkstream(root, "complete observed", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const result = completeObservedTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "echo ok",
+				exitCode: 0,
+			});
+			expect(result.done?.authorizingEvidenceId).toBeTruthy();
+			expect(result.warnings).toEqual([]);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | done |",
+			);
+			expect(
+				readFileSync(created.evidencePath, "utf8").trim().split("\n"),
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("completeObservedTask refreshes after a failed observed test", () => {
+		const root = mkRoot("complete-observed-failure");
+		try {
+			const created = newWorkstream(root, "complete observed failure", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const result = completeObservedTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "false",
+				exitCode: 1,
+			});
+			expect(result.done).toBeUndefined();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | in_progress |",
+			);
+			expect(
+				readFileSync(created.evidencePath, "utf8").trim().split("\n"),
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("completeObservedTask preserves committed evidence when refresh warns", () => {
+		const root = mkRoot("complete-observed-refresh-warning");
+		try {
+			const created = newWorkstream(root, "complete observed warning", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const result = completeObservedTask(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					command: "echo ok",
+					exitCode: 0,
+				},
+				{
+					beforeAuxiliary: (label) => {
+						if (label === "local-state refresh") {
+							throw new Error("injected refresh");
+						}
+					},
+				},
+			);
+			expect(result.done?.authorizingEvidenceId).toBeTruthy();
+			expect(result.warnings).toEqual([
+				"local-state refresh failed after durable commit: injected refresh",
+			]);
+			expect(
+				readFileSync(created.evidencePath, "utf8").trim().split("\n"),
+			).toHaveLength(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -39,13 +39,16 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Use the configured plan directory when work includes implementation,
   validation, or delivery.
 - Before product edits: create/target a session and move task to `in_progress`.
-- Canonical path:
-  1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol start --session {session-id} --task-id T-01 --brief --json`
+- Canonical agent fast path (prefer when active/bound session resolves):
+  1. `afol n {theme} -F {F-id} -P {spec-id} -t "<task>"`
+  2. `afol st T-01`
   3. Edit and run named verification.
-  4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
-  5. `afol done --session {session-id} --task-id T-01`
-  6. `afol close --session {session-id}`
+  4. `afol d T-01 -x "<verification command>"` (or `afol e T-01 -c "…" -o passed` then `afol d T-01`)
+  5. `afol c`
+- Explicit multi-agent/CI path when session is ambiguous:
+  `afol st -S {session-id} -T T-01`, then `afol d -S {session-id} -T T-01 -x "…"`,
+  then `afol c -S {session-id}`.
+- Prefer short commands; long forms remain valid for humans/audits.
 - Use `afol` as the only downstream front door.
   It is an external command, not a repository-local file.
 - Planning-only or read-only questions stay in chat unless durable artifacts

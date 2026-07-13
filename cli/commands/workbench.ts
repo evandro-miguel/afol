@@ -10,9 +10,9 @@ import {
 	resolveGovernance,
 } from "../services/governance/pending-specs";
 import {
-	advanceTaskAfterObservedTest,
 	appendTimelineEntry,
 	closeSession,
+	completeObservedTask,
 	doneTask,
 	type LifecycleAuxiliaryRuntime,
 	newWorkstream,
@@ -416,18 +416,17 @@ export async function runDoneCommand(
 				return 1;
 			}
 		}
-		let observedTestPassed = false;
+		let observedCompletion: ReturnType<typeof completeObservedTask> | null =
+			null;
 		if (parsed.testCommand) {
 			const verification = runVerification(root, parsed.testCommand, {
 				shell: false,
 			});
-			recordEvidence(root, {
+			observedCompletion = completeObservedTask(root, {
 				session: parsed.session,
 				taskId: parsed.taskId,
 				command: parsed.testCommand,
-				result: verification.exitCode === 0 ? "passed" : "failed",
 				exitCode: verification.exitCode,
-				provenance: "observed",
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
@@ -445,19 +444,16 @@ export async function runDoneCommand(
 				}
 				return 1;
 			}
-			observedTestPassed = true;
 		}
 		if (parsed.testShellCommand) {
 			const verification = runVerification(root, parsed.testShellCommand, {
 				shell: true,
 			});
-			recordEvidence(root, {
+			observedCompletion = completeObservedTask(root, {
 				session: parsed.session,
 				taskId: parsed.taskId,
 				command: parsed.testShellCommand,
-				result: verification.exitCode === 0 ? "passed" : "failed",
 				exitCode: verification.exitCode,
-				provenance: "observed",
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
@@ -477,7 +473,6 @@ export async function runDoneCommand(
 				}
 				return 1;
 			}
-			observedTestPassed = true;
 		}
 		if (parsed.evidenceCommand && parsed.evidenceResult) {
 			recordEvidence(root, {
@@ -491,10 +486,13 @@ export async function runDoneCommand(
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
 		}
-		if (observedTestPassed) {
-			advanceTaskAfterObservedTest(root, parsed);
-		}
-		const done = doneTask(root, parsed);
+		const done = observedCompletion?.done ?? doneTask(root, parsed);
+		const completionWarnings = [
+			...new Set([
+				...(observedCompletion?.warnings ?? []),
+				...(done.warnings ?? []),
+			]),
+		];
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -502,10 +500,10 @@ export async function runDoneCommand(
 						{
 							session: parsed.session,
 							task: parsed.taskId,
-							status: done.warnings?.length
+							status: completionWarnings.length
 								? "committed_with_warnings"
 								: "done",
-							warnings: done.warnings ?? [],
+							warnings: completionWarnings,
 							authorizing_evidence_id: done.authorizingEvidenceId,
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
@@ -518,9 +516,7 @@ export async function runDoneCommand(
 				`task done: ${parsed.taskId}`,
 				`authorizing evidence: ${done.authorizingEvidenceId}`,
 			];
-			lines.push(
-				...(done.warnings ?? []).map((warning) => `warning: ${warning}`),
-			);
+			lines.push(...completionWarnings.map((warning) => `warning: ${warning}`));
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			console.log(lines.join("\n"));
 		}

@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T16:47:37-03:00'
-updated_at: '2026-06-16T00:00:00-03:00'
+updated_at: '2026-07-12T21:20:00Z'
 roadmap_feature: F-18
 roadmap_slice: F-18.S8
 spec_role: child
@@ -187,7 +187,10 @@ Expected focused validation:
   duplicate aliases, missing `accessed_at`, invalid tags, oversized docs
   without summaries, and unsupported claims.
 - Memory with old `updated_at` is treated as suspect for current focus.
-- Multi-agent lifecycle commands require explicit session id.
+- Multi-agent lifecycle commands require explicit session id when session
+  resolution is ambiguous or CI disables global active-session fallback. The
+  single active-session agent fast path may omit session id (F-03 /
+  `260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01`).
 - Archive is metadata-first before physical moves, preserving stable refs.
 - Maintenance commands report cleanup actions before applying them.
 - Weekly dry-run reports memory, library, and workbench maintenance warnings.

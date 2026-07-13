@@ -146,6 +146,10 @@ export type LifecycleAuxiliaryRuntime = {
 	beforeAuxiliary?: (label: string) => void;
 };
 
+type InternalLifecycleAuxiliaryRuntime = LifecycleAuxiliaryRuntime & {
+	deferLocalStateRefresh?: boolean;
+};
+
 export type TimelineEntryResult = {
 	logPath: string;
 	message: string;
@@ -1258,7 +1262,7 @@ export function transitionTask(
 		state: TaskState;
 		completionPolicy?: CompletionPolicy;
 	},
-	runtime: LifecycleAuxiliaryRuntime = {},
+	runtime: InternalLifecycleAuxiliaryRuntime = {},
 ): string[] {
 	if (input.state === "done") {
 		throw new Error(
@@ -1296,12 +1300,14 @@ export function transitionTask(
 				}),
 			runtime,
 		);
-		auxiliaryWarning(
-			warnings,
-			"local-state refresh",
-			() => refreshWorkbenchLocalState(root, input.session),
-			runtime,
-		);
+		if (!runtime.deferLocalStateRefresh) {
+			auxiliaryWarning(
+				warnings,
+				"local-state refresh",
+				() => refreshWorkbenchLocalState(root, input.session),
+				runtime,
+			);
+		}
 		return warnings;
 	});
 }
@@ -1309,7 +1315,8 @@ export function transitionTask(
 export function advanceTaskAfterObservedTest(
 	root: string,
 	input: WorkbenchTaskRef,
-): void {
+	runtime: InternalLifecycleAuxiliaryRuntime = {},
+): string[] {
 	const paths = sessionPaths(root, input.session);
 	ensureSessionOpenForMutation(root, input.session);
 	const state = ensureTaskExists(
@@ -1318,15 +1325,27 @@ export function advanceTaskAfterObservedTest(
 		input.taskId,
 	).state;
 	if (state === "in_progress") {
-		transitionTask(root, { ...input, state: "implemented_untested" });
-		transitionTask(root, { ...input, state: "tested_needs_spec_validation" });
-		return;
+		return [
+			...transitionTask(
+				root,
+				{ ...input, state: "implemented_untested" },
+				runtime,
+			),
+			...transitionTask(
+				root,
+				{ ...input, state: "tested_needs_spec_validation" },
+				runtime,
+			),
+		];
 	}
 	if (state === "implemented_untested") {
-		transitionTask(root, { ...input, state: "tested_needs_spec_validation" });
-		return;
+		return transitionTask(
+			root,
+			{ ...input, state: "tested_needs_spec_validation" },
+			runtime,
+		);
 	}
-	if (state === "tested_needs_spec_validation" || state === "done") return;
+	if (state === "tested_needs_spec_validation" || state === "done") return [];
 	throw new Error(
 		`Observed test cannot advance ${input.taskId} from ${state}; start or recover the task first.`,
 	);
@@ -1335,7 +1354,7 @@ export function advanceTaskAfterObservedTest(
 export function recordEvidence(
 	root: string,
 	input: RecordEvidenceInput,
-	runtime: LifecycleAuxiliaryRuntime = {},
+	runtime: InternalLifecycleAuxiliaryRuntime = {},
 ): EvidenceEntry {
 	const entry = withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
@@ -1453,12 +1472,14 @@ export function recordEvidence(
 				runtime,
 			);
 		}
-		auxiliaryWarning(
-			warnings,
-			"local-state refresh",
-			() => refreshWorkbenchLocalState(root, input.session),
-			runtime,
-		);
+		if (!runtime.deferLocalStateRefresh) {
+			auxiliaryWarning(
+				warnings,
+				"local-state refresh",
+				() => refreshWorkbenchLocalState(root, input.session),
+				runtime,
+			);
+		}
 		evidence.warnings = warnings;
 		return evidence;
 	});
@@ -1503,7 +1524,7 @@ export type DoneTaskResult = {
 export function doneTask(
 	root: string,
 	input: WorkbenchTaskRef,
-	runtime: LifecycleAuxiliaryRuntime = {},
+	runtime: InternalLifecycleAuxiliaryRuntime = {},
 ): DoneTaskResult {
 	return withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
@@ -1584,16 +1605,87 @@ export function doneTask(
 				}),
 			runtime,
 		);
-		auxiliaryWarning(
-			warnings,
-			"local-state refresh",
-			() => refreshWorkbenchLocalState(root, input.session),
-			runtime,
-		);
+		if (!runtime.deferLocalStateRefresh) {
+			auxiliaryWarning(
+				warnings,
+				"local-state refresh",
+				() => refreshWorkbenchLocalState(root, input.session),
+				runtime,
+			);
+		}
 		return {
 			authorizingEvidenceId: authorization.evidenceId,
 			...(warnings.length > 0 ? { warnings } : {}),
 		};
+	});
+}
+
+export type CompleteObservedTaskInput = Omit<
+	RecordEvidenceInput,
+	"result" | "provenance" | "exitCode"
+> & { exitCode: number };
+
+export type CompleteObservedTaskResult = {
+	evidence: EvidenceEntry;
+	done?: DoneTaskResult;
+	warnings: string[];
+};
+
+/** Complete an observed test and task under one lock with one state refresh. */
+export function completeObservedTask(
+	root: string,
+	input: CompleteObservedTaskInput,
+	runtime: LifecycleAuxiliaryRuntime = {},
+): CompleteObservedTaskResult {
+	return withSessionLock(root, input.session, () => {
+		let evidenceWritten = false;
+		let result: CompleteObservedTaskResult | undefined;
+		const warnings: string[] = [];
+		try {
+			const evidence = recordEvidence(
+				root,
+				{
+					...input,
+					result: input.exitCode === 0 ? "passed" : "failed",
+					provenance: "observed",
+				},
+				{
+					...runtime,
+					deferLocalStateRefresh: true,
+				},
+			);
+			evidenceWritten = true;
+			warnings.push(...(evidence.warnings ?? []));
+			if (input.exitCode === 0) {
+				warnings.push(
+					...advanceTaskAfterObservedTest(root, input, {
+						...runtime,
+						deferLocalStateRefresh: true,
+					}),
+				);
+				const done = doneTask(root, input, {
+					...runtime,
+					deferLocalStateRefresh: true,
+				});
+				warnings.push(...(done.warnings ?? []));
+				result = { done, evidence, warnings };
+			} else {
+				result = { evidence, warnings };
+			}
+		} finally {
+			if (evidenceWritten) {
+				auxiliaryWarning(
+					warnings,
+					"local-state refresh",
+					() => refreshWorkbenchLocalState(root, input.session),
+					runtime,
+				);
+			}
+		}
+		if (!result) {
+			throw new Error("Observed task completion did not record evidence.");
+		}
+		return { ...result, warnings };
 	});
 }
 

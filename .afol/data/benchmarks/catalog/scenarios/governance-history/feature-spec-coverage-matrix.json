@@ -98,6 +98,7 @@
       "260521_0010_universal-agent-cli_spec_01",
       "260521_0020_minimal-project-template_spec_01",
       "260521_0030_agent-command-design-system_spec_01",
+      "260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01",
       "260521_0040_governance-workbench-system_spec_01",
       "260521_0050_smart-rules-and-skills-routing_spec_01",
       "260521_0060_file-first-low-token-execution_spec_01",

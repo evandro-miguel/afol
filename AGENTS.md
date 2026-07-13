@@ -119,26 +119,41 @@ Workflow/template routing:
 - Global skill guidance may reference this template map, but the repo/template
   must not carry a project-local `agentic-folder-sys` skill copy.
 
-Canonical commands:
+Canonical commands (agent **fast path** — prefer when active/bound session
+resolves; see F-03 and
+`.afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md`):
 
 ```bash
-afol status
-afol validate project
+afol s
+afol v project
 afol validate bench --pack <pack-id> --json
-afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
-afol start --session <session-id> --task-id <task-id> --brief --json
-afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
-afol done --session <session-id> --task-id <task-id>
-afol close --session <session-id>
-afol update check
-afol update preview
-afol update apply --dry-run
+afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
+afol st T-01
+afol e T-01 -c "<cmd>" -o passed
+afol d T-01 -x "<cmd>"
+afol c
+afol up check
+afol up preview
+afol up apply --dry-run
 ```
+
+Explicit multi-agent / CI path (when session is ambiguous or global fallback
+is disabled):
+
+```bash
+afol st -S <session-id> -T T-01
+afol e -S <session-id> -T T-01 -c "<cmd>" -o passed
+afol d -S <session-id> -T T-01 -x "<cmd>"
+afol c -S <session-id>
+```
+
+Long human forms (`afol start --session … --task-id …`) remain valid; do not
+prefer them for routine agent tool calls.
 
 Agent-facing JSON commands:
 
 ```bash
-afol status --json
+afol s -j
 afol status --task-id <task-id> --json
 afol status --health --json
 afol health --json
@@ -307,13 +322,22 @@ Use the narrowest tool that answers the question.
 ## Token Economy (HARD RULE — never abuse tokens)
 
 AFOL is a low-token system by design. Token economy is mandatory, not optional.
+Priorities: **extreme ease of use**, **extremely low latency**, **low write
+tokens** (commands you author), **low forced output tokens** (stdout you must
+read), **very high reliability**. Write tokens are worse than read tokens.
 
-- Any single `afol` command emitting **>5,000 output tokens is non-ideal**;
-  **>10,000 output tokens is prohibited**. `afol validate bench` enforces this
-  automatically — a scenario exceeding 10k tokens FAILS the bench; 5k–10k
-  warns. Do not merge a command that violates this.
-- Use the **compact/default** form of every command. Only pass `--verbose`
-  when you specifically need the full manifest/diff for a concrete reason.
+- **Write path:** prefer short aliases and omit session when active/bound
+  session resolves (`afol st T-01`, `afol d T-01 -x "<cmd>"`, `afol c`). Do not
+  repeat long `--session <id>` on every step unless CI/multi-agent ambiguity
+  requires `-S`. Prefer `d -x` over separate evidence + done when one
+  verification command is enough.
+- **Forced output:** any single `afol` command emitting **>5,000 output tokens
+  is non-ideal**; **>10,000 output tokens is prohibited**. `afol validate
+  bench` enforces this automatically — a scenario exceeding 10k tokens FAILS
+  the bench; 5k–10k warns. Do not merge a command that violates this.
+- Use the **compact/default** form of every command. Only pass `--verbose` or
+  `--full` when you specifically need the full manifest/diff for a concrete
+  reason.
 - `afol up check` returns a compact summary (revisions, counts, conflict
   names). `afol up preview` and `--verbose` carry the full file-by-file
   manifest and are token-heavy — use them only when an update conflict
@@ -323,15 +347,17 @@ AFOL is a low-token system by design. Token economy is mandatory, not optional.
 - For `.afol/adm/rules/**`, YAML frontmatter is metadata only. Rule character
   budgets and prompt injection count/use only the Markdown body after
   frontmatter; put enforceable agent guidance in the body, not duplicated YAML.
-- Prefer the shortest unambiguous AFOL command form for routine lifecycle work,
-  especially in orchestrated handoffs. Use long flags only when clarity,
-  safety, or ambiguous aliases require them.
+- Prefer the shortest unambiguous AFOL command form for routine lifecycle work.
+  Use long flags only when clarity, safety, multi-agent isolation, or
+  ambiguous aliases require them.
 - When the global `afol` binary is stale and the local kernel must be used,
   keep the local prefix but still use compact subcommands where practical, for
   example `bun run kernel -- vf <session> --strict` instead of a verbose
   equivalent.
 - Treat any `afol` command that emits >5k tokens by default as a BUG and fix
   the command. The bench guard will already be failing it.
+- Governing specs: F-03 parent + child
+  `260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01`.
 
 Before editing code, inspect the live repo state and use the smallest AFOL
 validation that proves the change. For cross-cutting scaffold/release work, run:

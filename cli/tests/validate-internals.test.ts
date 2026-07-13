@@ -463,6 +463,30 @@ describe("validate registry", () => {
 			expect(snapshot.scenariosByPack["library-knowledge"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["governance-history"]).toHaveLength(7);
 			expect(snapshot.scenariosByPack["adm-governance"]).toHaveLength(4);
+			const shortWorkbenchCommands = [
+				"wb-short-start",
+				"wb-short-done",
+				"wb-short-close",
+			]
+				.map((scenarioId) =>
+					snapshot.scenariosByPack["workbench-parity"]?.find(
+						(scenario) => scenario.scenario_id === scenarioId,
+					),
+				)
+				.filter((scenario): scenario is Scenario => scenario !== undefined);
+			expect(shortWorkbenchCommands).toHaveLength(3);
+			expect(
+				shortWorkbenchCommands.reduce(
+					(total, scenario) =>
+						total + Array.from(scenario.command ?? "").length,
+					0,
+				),
+			).toBeLessThanOrEqual(120);
+			for (const scenario of shortWorkbenchCommands) {
+				expect(scenario.thresholds.max_p95_ms).toBeLessThanOrEqual(300);
+				expect(scenario.thresholds.max_argv_chars).toBeDefined();
+				expect(scenario.compiled_binary).toBe(true);
+			}
 			expect(snapshot.coverage?.exemptions).toHaveLength(0);
 			expect(snapshot.coverage?.subcommand_exemptions).toHaveLength(0);
 			expect(
@@ -959,6 +983,21 @@ describe("scenario benchmark execution", () => {
 			expect(success.result.output_bytes).toBeGreaterThan(0);
 			expect(success.result.tool_success_rate).toBe(1);
 			expect(success.result.error_count).toBe(0);
+			expect(success.result.argv_chars).toBe(
+				Array.from(successScenario.command?.trim() ?? "").length,
+			);
+
+			const unicodeScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-unicode-argv",
+				command: `  node -e 'console.log("😀")'  `,
+				thresholds: { ...successScenario.thresholds, max_argv_chars: 100 },
+			};
+			const unicode = withCapturedConsoleError(() =>
+				buildResult(root, unicodeScenario, baselinePath, baseline),
+			);
+			expect(unicode.result.status).toBe("passed");
+			expect(unicode.result.argv_chars).toBe(26);
 
 			writeFileSync(join(root, "preexisting-dirty.txt"), "dirty\n", "utf8");
 			const dirtySuccess = withCapturedConsoleError(() =>
@@ -1092,6 +1131,9 @@ describe("scenario benchmark execution", () => {
 			expect(sandbox.result.status).toBe("passed");
 			expect(sandbox.result.tool_call_count).toBe(1);
 			expect(sandbox.result.timing_p50_ms).toBeGreaterThan(0);
+			expect(sandbox.result.argv_chars).toBe(
+				Array.from(sandboxScenario.command?.trim() ?? "").length,
+			);
 			expect(
 				sandbox.result.notes.some((note) => note.startsWith("sample-failed:")),
 			).toBe(false);
@@ -1111,6 +1153,38 @@ describe("scenario benchmark execution", () => {
 					note.startsWith("sample-failed:"),
 				),
 			).toBe(true);
+
+			const staleSandboxBinaryScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-sandbox-does-not-trust-project-binary",
+				sandbox: true,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const fs=require('node:fs'); fs.mkdirSync('.afol/bin',{recursive:true}); fs.writeFileSync('.afol/bin/afol','#!/bin/sh\\nexit 7\\n','utf8'); fs.chmodSync('.afol/bin/afol',0o755);",
+					],
+				],
+				command: "afol --version",
+			};
+			const staleSandboxBinary = withCapturedConsoleError(() =>
+				buildResult(root, staleSandboxBinaryScenario, baselinePath, baseline),
+			);
+			expect(staleSandboxBinary.result.status).toBe("passed");
+			expect(staleSandboxBinary.result.output_bytes).toBeGreaterThan(0);
+
+			const compiledSandboxScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-sandbox-trusts-fresh-compiled-binary",
+				sandbox: true,
+				compiled_binary: true,
+				command: "afol --version",
+			};
+			const compiledSandbox = withCapturedConsoleError(() =>
+				buildResult(root, compiledSandboxScenario, baselinePath, baseline),
+			);
+			expect(compiledSandbox.result.status).toBe("passed");
+			expect(compiledSandbox.result.output_bytes).toBeGreaterThan(0);
 
 			const sandboxStatusAfter = spawnSync("git", ["status", "--porcelain"], {
 				cwd: root,
@@ -1285,7 +1359,9 @@ describe("runtime live validation helpers", () => {
 					max_output_tokens: 400,
 					min_tool_success_rate: 0.5,
 					max_p95_ms: 50,
+					max_p50_ms: 8,
 					min_p50_ms: 10,
+					max_argv_chars: 4,
 					min_unknown_value: 1,
 					median_latency_ms: 1,
 				},
@@ -1293,6 +1369,7 @@ describe("runtime live validation helpers", () => {
 					duration_ms: 120,
 					timing_p50_ms: 9,
 					timing_p95_ms: 60,
+					argv_chars: 5,
 					output_tokens: 401,
 					tool_success_rate: 0.25,
 				},
@@ -1303,6 +1380,8 @@ describe("runtime live validation helpers", () => {
 				"threshold-exceeded:max_output_tokens:401>400",
 				"threshold-below-min:min_tool_success_rate:0.25<0.5",
 				"threshold-exceeded:max_p95_ms:60>50",
+				"threshold-exceeded:max_p50_ms:9>8",
+				"threshold-exceeded:max_argv_chars:5>4",
 				"threshold-below-min:min_p50_ms:9<10",
 				"threshold-metric-missing:min_unknown_value",
 				"unsupported-threshold:median_latency_ms",

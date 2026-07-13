@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:50:00+08:00'
-updated_at: '2026-05-29T11:08:02-03:00'
+updated_at: '2026-07-12T21:20:00Z'
 roadmap_feature: F-11
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -32,8 +32,17 @@ risk_level: high
 Create validation gates that make the universal agent operating layer
 trustworthy.
 
-The validation system must prove correctness, speed, quality, safety, command
-parity, update safety, and token economy.
+The validation system must prove correctness, **speed/latency**, quality,
+safety, command parity, update safety, and **token economy on both axes**:
+
+1. **Forced output tokens** — CLI stdout agents must read (compact default;
+   >5k warn, >10k fail per project rule).
+2. **Write tokens** — argv / command strings agents must author (short
+   lifecycle path, omit-able session, collapsed `d -x`; see F-03 child
+   `260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01`).
+
+Gates should fail when agents are forced into giant commands or giant default
+output, not only when functional tests break.
 
 2026-05-31 DR addendum:
 
@@ -145,8 +154,10 @@ choose commands, tools, rules, skills, or mutation paths.
 
 | Surface | Scenario | Metrics | Required threshold |
 | --- | --- | --- | --- |
-| `afol -h` | compact help | quality, tokens | <= 25 lines |
-| `afol s` | status success | accuracy, speed | 100% pass, p50 <= 2s |
+| `afol -h` | compact help | quality, tokens | <= 25 lines and <= ~550 est. output tokens |
+| `afol s` | status success | accuracy, speed | 100% pass, p50 <= 100 ms warm local, p95 <= 300 ms |
+| `afol st T-01` / `afol d -x` / `afol c` | agent fast-path lifecycle | write tokens, reliability, speed | works without repeated session id when active session resolves; p95 <= 300 ms |
+| `afol st -S … -T …` | explicit multi-agent lifecycle | reliability | required when session ambiguous or CI fallback disabled |
 | `afol status` | long alias parity | parity | semantic equality with `s` |
 | `afol -j s` | JSON output | contract | valid JSON, required keys |
 | invalid root | safety error | safety, quality | non-zero, actionable hint |
@@ -253,7 +264,7 @@ spec-test. Pack-level names alone are not enough.
 | `update-safety` | 4 | check, preview, conflict, local edit |
 | `mcp-parity` | 5 | status, evidence, rule, mutation, error |
 | `runtime-live-agent` | 3 | status, governed flow, MCP smoke |
-| `token-economy` | 4 | help, status, routing, noisy output |
+| `token-economy` | 4+ | help, status, routing, noisy **output**; extend with **input argv** / short-lifecycle scenarios per F-03 child |
 
 Completeness gate: if a changed path selects a pack, CI fails when the pack has
 fewer registered scenarios than the minimum or when any scenario lacks an
@@ -282,6 +293,11 @@ Protocol:
 8. Reject comparison when scenario id, tokenizer id, or host profile differs
    unless a compatible normalized baseline id is declared.
 9. Allow threshold override only with a written reason in benchmark evidence.
+
+For F-03 input-token measurements, `argv_chars` is the number of Unicode code
+points in the trimmed authored `scenario.command` (`Array.from(command.trim()).length`).
+Scenario setup commands, tokenized process argv, wrappers, and generated
+arguments are excluded.
 
 Early thresholds are provisional until baseline artifacts exist. Once a baseline
 exists, comparisons use that versioned baseline.

@@ -150,6 +150,11 @@ function parseScenario(
 	} else if (data.sandbox !== undefined) {
 		throw new Error(`Invalid boolean field: ${sourcePath}.sandbox`);
 	}
+	if (typeof data.compiled_binary === "boolean") {
+		scenario.compiled_binary = data.compiled_binary;
+	} else if (data.compiled_binary !== undefined) {
+		throw new Error(`Invalid boolean field: ${sourcePath}.compiled_binary`);
+	}
 	if (data.setup !== undefined) {
 		if (!Array.isArray(data.setup)) {
 			throw new Error(`Invalid setup commands field: ${sourcePath}.setup`);
