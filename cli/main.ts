@@ -380,7 +380,7 @@ export async function main(argv: string[]): Promise<number> {
 	if (!isActionAllowed(operationCtx, policy)) {
 		const action = policy?.action ?? resolution.kind;
 		const message = `${action} requires local interactive approval`;
-		const json = resolution.args.includes("--json");
+		const json = resolution.args.some((arg) => kernelRegistry.isJsonAlias(arg));
 		if (json) {
 			console.log(
 				stringifyEnvelope(

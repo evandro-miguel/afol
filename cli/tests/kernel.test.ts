@@ -766,6 +766,41 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("restricted front door keeps JSON parity for -j and --json", () => {
+		const root = mkProjectRoot("r-02-json-alias-parity", "");
+		try {
+			const invocations = ["--json", "-j"].map((jsonFlag) =>
+				runKernel(root, [
+					"--agent",
+					"adr",
+					"new",
+					"restricted decision",
+					jsonFlag,
+				]),
+			);
+
+			for (const proc of invocations) {
+				expectRestrictedJsonError(proc);
+				const payload = JSON.parse((proc.stdout as string).trim()) as {
+					action?: string;
+					error?: { code?: string; message?: string };
+				};
+				expect(payload.action).toBe("adr.new");
+				expect(payload.error?.code).toBe("approval-required");
+				expect(payload.error?.message).toContain(
+					"requires local interactive approval",
+				);
+			}
+
+			const payloads = invocations.map((proc) =>
+				JSON.parse(proc.stdout as string),
+			);
+			expect(payloads[0]).toEqual(payloads[1]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("SEC-003 restricted front door denies adm migration", () => {
 		const root = mkProjectRoot("sec-003-adm", "");
 		const source = join(root, "docs", "arc", "SPECS", "restricted.md");
