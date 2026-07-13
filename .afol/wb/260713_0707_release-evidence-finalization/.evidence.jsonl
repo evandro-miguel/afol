@@ -1,0 +1,1 @@
+{"id":"E-20260713070931753-f00246","task_id":"T-01","created_at":"2026-07-13T11:09:31.753Z","command":"cd .tmp/release-clean && bun run validate:release","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}
