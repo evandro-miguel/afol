@@ -1,0 +1,34 @@
+{
+  "artifact": "dist/afol",
+  "package_name": "afol",
+  "version": "0.1.0-alpha.1",
+  "version_registry_path": ".afol/adm/source/release-version.json",
+  "version_registry_sha256": "b485c2a28cd405b658635a8d056ff6f9444980ef0c73b0e590902a8ee1f2ed50",
+  "sha256": "3549d26e35408f70669cadbff3c7afaeb874b72ed456fb17c406171c8d86b4aa",
+  "size_bytes": 96184448,
+  "bun": "1.3.14",
+  "node": "v24.3.0",
+  "generated_at": "2026-07-13T11:29:53.373Z",
+  "commit_sha": "af160f8e1f45533cd4749197644d37a80d11b34a",
+  "branch": "dev",
+  "lockfile": "bun.lock",
+  "lock_sha256": "0718f6e0d065c2530f25ddc06d0b56a1938c2c7e753c15304c406c49a29ed909",
+  "template_hash": "898023713ea50a6c7b7ba0229018e05d463d4228bd4a021bb28b60bbd8aabe74",
+  "build_command": "bun run build:deterministic",
+  "platform": "linux",
+  "arch": "x64",
+  "security_scanners": [
+    {
+      "tool": "osv-scanner",
+      "kind": "deps",
+      "status": "passed",
+      "version": "osv-scanner version: 2.4.0\nosv-scalibr version: 0.4.5\ncommit: n/a\nbuilt at: n/a"
+    },
+    {
+      "tool": "gitleaks",
+      "kind": "secrets",
+      "status": "passed",
+      "version": "gitleaks version version is set by build process"
+    }
+  ]
+}

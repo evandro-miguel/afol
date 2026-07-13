@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-07-13T11:29:53.297Z",
+  "mode": "release",
+  "target": {
+    "artifact": "dist/afol",
+    "artifact_sha256": "3549d26e35408f70669cadbff3c7afaeb874b72ed456fb17c406171c8d86b4aa",
+    "commit_sha": "af160f8e1f45533cd4749197644d37a80d11b34a",
+    "lockfile": "bun.lock",
+    "lock_sha256": "0718f6e0d065c2530f25ddc06d0b56a1938c2c7e753c15304c406c49a29ed909"
+  },
+  "scans": [
+    {
+      "tool": "osv-scanner",
+      "kind": "deps",
+      "mode": "release",
+      "status": "passed",
+      "version": "osv-scanner version: 2.4.0\nosv-scalibr version: 0.4.5\ncommit: n/a\nbuilt at: n/a"
+    },
+    {
+      "tool": "gitleaks",
+      "kind": "secrets",
+      "mode": "release",
+      "status": "passed",
+      "version": "gitleaks version version is set by build process"
+    }
+  ]
+}
