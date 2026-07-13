@@ -452,9 +452,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "--session <session-id>",
+				usage: "--session <session-id> [-m|--summary <text>]",
 				sideEffect: "write",
 				description: "Close a specific session after its tasks are complete",
+			},
+			{
+				usage: "--allow-no-report --reason <text>",
+				sideEffect: "write",
+				description: "Close without a report with an explicit waiver",
 			},
 			{
 				usage: "--json",

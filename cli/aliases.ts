@@ -173,6 +173,7 @@ export const FLAG_ALIASES = Object.freeze({
 	}),
 	close: Object.freeze({
 		"-S": "--session",
+		"-m": "--summary",
 	}),
 	ctx: Object.freeze({
 		"-S": "--session",

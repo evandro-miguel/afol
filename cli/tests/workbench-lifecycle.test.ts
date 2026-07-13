@@ -2297,7 +2297,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("closeSession blocks missing final report unless override is provided", () => {
+	test("closeSession creates missing final report unless explicitly waived", () => {
 		const root = mkRoot("close-warnings");
 		try {
 			const created = newWorkstream(root, "close-session-warnings", {
@@ -2321,26 +2321,197 @@ describe("workbench lifecycle service", () => {
 			});
 			doneTask(root, { session: created.session, taskId: "T-02" });
 
-			expect(() => closeSession(root, created.session)).toThrow(
-				"requires a final report artifact",
-			);
-			expect(() =>
-				closeSession(root, created.session, { allowNoReport: true }),
-			).toThrow("Missing --reason for close allow-no-report override.");
-
-			const warnings = closeSession(root, created.session, {
-				allowNoReport: true,
-				reason: "research-only session",
-			});
-			expect(warnings).toContain("final report artifact is missing");
-			expect(warnings).toContain("log summary section is missing");
+			const result = closeSession(root, created.session);
+			expect(result.report.status).toBe("created");
+			expect(
+				existsSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						created.session,
+						`${created.session}_report_01.md`,
+					),
+				),
+			).toBe(true);
 			expect(existsSync(created.activeSessionPath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("single high-impact task requires report while typed trivial task does not", () => {
+	test("closeSession creates a deterministic report and one summary section", () => {
+		const root = mkRoot("close-autoreport");
+		try {
+			const created = newWorkstream(root, "close auto report");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			const result = closeSession(root, created.session, {
+				summary: "close verified\n## Summary",
+			});
+			const reportPath = join(
+				root,
+				".afol",
+				"wb",
+				created.session,
+				`${created.session}_report_01.md`,
+			);
+			expect(result.report).toMatchObject({
+				status: "created",
+				path: `.afol/wb/${created.session}/${created.session}_report_01.md`,
+				summary_source: "flag",
+			});
+			expect(readFileSync(reportPath, "utf8")).toContain("close verified");
+			expect(
+				readFileSync(created.logPath, "utf8").match(/^## Summary$/gm) ?? [],
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession records an explicit report waiver idempotently", () => {
+		const root = mkRoot("close-waiver-artifact");
+		try {
+			const created = newWorkstream(root, "close waiver artifact");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			const result = closeSession(root, created.session, {
+				allowNoReport: true,
+				reason: "no report needed",
+			});
+			expect(result.report).toMatchObject({
+				status: "waived",
+				path: null,
+				summary_source: "waiver",
+			});
+			expect(
+				existsSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						created.session,
+						`${created.session}_report_01.md`,
+					),
+				),
+			).toBe(false);
+			const firstLog = readFileSync(created.logPath, "utf8");
+			expect(firstLog).toContain("Report waived: no report needed");
+			expect((firstLog.match(/^## Summary$/gm) ?? []).length).toBe(1);
+			expect(closeSession(root, created.session).report.status).toBe("waived");
+			expect(readFileSync(created.logPath, "utf8")).toBe(firstLog);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession preserves existing report bytes", () => {
+		const root = mkRoot("close-existing-report");
+		try {
+			const created = newWorkstream(root, "close existing report");
+			const reportPath = join(
+				root,
+				".afol",
+				"wb",
+				created.session,
+				`${created.session}_report_01.md`,
+			);
+			const report = "# Human-authored report\n\nKeep this byte-for-byte.\n";
+			writeFileSync(reportPath, report, "utf8");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			expect(closeSession(root, created.session).report.status).toBe(
+				"existing",
+			);
+			expect(readFileSync(reportPath, "utf8")).toBe(report);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession canonicalizes duplicate log summaries and persists explicit summary", () => {
+		const root = mkRoot("close-summary-canonical");
+		try {
+			const created = newWorkstream(root, "close summary canonical");
+			writeFileSync(
+				created.logPath,
+				"# Log\n\n## Summary\nold\n\n## Summary\nsecond\n\n## Notes\nkeep\n",
+				"utf8",
+			);
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			closeSession(root, created.session, { summary: "new summary" });
+			const log = readFileSync(created.logPath, "utf8");
+			expect((log.match(/^## Summary$/gm) ?? []).length).toBe(1);
+			expect(log).toContain("new summary");
+			expect(log).not.toContain("old");
+			expect(log).not.toContain("second");
+			expect(log).toContain("## Notes");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession rolls back generated report when log write fails", () => {
+		const root = mkRoot("close-rollback");
+		try {
+			const created = newWorkstream(root, "close rollback");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			rmSync(created.logPath);
+			mkdirSync(created.logPath);
+			expect(() => closeSession(root, created.session)).toThrow();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "active"',
+			);
+			expect(
+				existsSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						created.session,
+						`${created.session}_report_01.md`,
+					),
+				),
+			).toBe(false);
+			rmSync(created.logPath, { recursive: true, force: true });
+			expect(closeSession(root, created.session).report.status).toBe("created");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("single high-impact task gets an auto-generated report", () => {
 		const root = mkRoot("impact-report");
 		try {
 			const created = newWorkstream(root, "impact report", {
@@ -2361,9 +2532,7 @@ describe("workbench lifecycle service", () => {
 					"$1 impact=high $2",
 				),
 			);
-			expect(() => closeSession(root, created.session)).toThrow(
-				"requires a final report artifact",
-			);
+			expect(closeSession(root, created.session).report.status).toBe("created");
 			writeFileSync(
 				created.taskPath,
 				readFileSync(created.taskPath, "utf8").replace(
@@ -2411,7 +2580,7 @@ describe("workbench lifecycle service", () => {
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
 
-			expect(closeSession(root, created.session)).toEqual([]);
+			expect(closeSession(root, created.session)).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2446,10 +2615,7 @@ describe("workbench lifecycle service", () => {
 				schema: "afol.result/v1",
 				ok: true,
 				action: "workbench.close",
-				warnings: [
-					"final report artifact is missing",
-					"log summary section is missing",
-				],
+				warnings: ["final report artifact is missing"],
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });

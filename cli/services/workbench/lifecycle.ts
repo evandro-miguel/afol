@@ -129,6 +129,17 @@ export type NewWorkstreamMetadata = {
 export type CloseSessionOptions = {
 	allowNoReport?: boolean;
 	reason?: string;
+	summary?: string;
+};
+
+export type CloseSessionReport = {
+	status: "created" | "existing" | "waived";
+	path: string | null;
+	summary_source: "flag" | "log" | "state" | "waiver";
+};
+
+export type CloseSessionResult = string[] & {
+	report: CloseSessionReport;
 };
 
 export type LifecycleAuxiliaryRuntime = {
@@ -290,6 +301,89 @@ function evaluateCloseWarnings(session: string, sessionDir: string): string[] {
 		warnings.push("log summary section is missing");
 	}
 	return warnings;
+}
+
+function readLogSummary(content: string): string | null {
+	const lines = content.split(/\r?\n/);
+	const start = lines.findIndex((line) => /^##\s+Summary\s*$/.test(line));
+	if (start < 0) {
+		return null;
+	}
+	const rest = lines.slice(start + 1);
+	const end = rest.findIndex((line) => /^##\s+/.test(line));
+	const summary = rest
+		.slice(0, end < 0 ? undefined : end)
+		.join("\n")
+		.trim();
+	return summary || null;
+}
+
+function closeMarkdownText(value: string): string {
+	return value.replace(/\r?\n/g, " ").replace(/^##\s+/gm, "### ");
+}
+
+function canonicalizeLogSummary(content: string, summary: string): string {
+	const lines = content.split(/\r?\n/);
+	const output: string[] = [];
+	let found = false;
+	let skipping = false;
+	for (const line of lines) {
+		if (/^##\s+Summary\s*$/.test(line)) {
+			if (!found) {
+				while (output.at(-1) === "") {
+					output.pop();
+				}
+				output.push("## Summary", "", summary);
+				found = true;
+			}
+			skipping = true;
+			continue;
+		}
+		if (skipping) {
+			if (!/^##\s+/.test(line)) {
+				continue;
+			}
+			skipping = false;
+			if (output.at(-1) !== "") {
+				output.push("");
+			}
+		}
+		output.push(line);
+	}
+	if (!found) {
+		while (output.at(-1) === "") {
+			output.pop();
+		}
+		output.push("", "## Summary", "", summary);
+	}
+	return `${output.join("\n").replace(/\n+$/g, "")}\n`;
+}
+
+function renderCloseReport(
+	session: string,
+	taskRows: TaskRow[],
+	evidence: EvidenceEntry[],
+	summary: string,
+): string {
+	const lines = [
+		`# Report: ${session}`,
+		"",
+		"## Summary",
+		closeMarkdownText(summary),
+		"",
+		"## Tasks",
+		...taskRows.map(
+			(row) =>
+				`- ${row.taskId}: ${row.state}${row.notes ? ` — ${closeMarkdownText(row.notes)}` : ""}`,
+		),
+		"",
+		"## Evidence",
+		...evidence.map(
+			(entry) =>
+				`- ${entry.task_id}: ${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
+		),
+	];
+	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
 }
 
 function explicitTaskSummaries(metadata?: NewWorkstreamMetadata): string[] {
@@ -1507,17 +1601,28 @@ export function closeSession(
 	root: string,
 	session: string,
 	options: CloseSessionOptions = {},
-): string[] {
+): CloseSessionResult {
 	return withSessionLock(root, session, () => {
 		const paths = sessionPaths(root, session);
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
-
-		const warnings = evaluateCloseWarnings(session, paths.sessionDir);
+		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
+		const reportRelativePath = relative(root, reportPath).replaceAll("\\", "/");
+		let reportStatus: CloseSessionReport["status"] = existsSync(reportPath)
+			? "existing"
+			: "waived";
+		let summarySource: CloseSessionReport["summary_source"] = "waiver";
+		let summary = options.summary?.trim() ?? "";
+		const taskRows = readTaskRows(paths.taskPath);
+		const hadLog = existsSync(paths.logPath);
+		const originalLog = hadLog
+			? readFileSync(paths.logPath, "utf8")
+			: "# Log\n";
+		const logSummary = readLogSummary(originalLog);
 		if (state.kind === "open") {
-			const blockingRows = readTaskRows(paths.taskPath).filter((row) =>
+			const blockingRows = taskRows.filter((row) =>
 				BLOCKING_STATES.has(row.state),
 			);
 			if (blockingRows.length > 0) {
@@ -1535,27 +1640,82 @@ export function closeSession(
 					`Session ${session} failed strict verification: ${message}`,
 				);
 			}
-			const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
-			const taskRows = readTaskRows(paths.taskPath);
-			const reportRequired =
-				verification.totalTasks > 1 ||
-				taskRows.some((row) =>
-					/(?:^|\s)(?:impact=high|side_effects=true)(?:\s|$)/.test(row.notes),
-				);
-			if (reportRequired && !existsSync(reportPath)) {
+			if (!existsSync(reportPath)) {
 				if (!options.allowNoReport) {
-					throw new Error(
-						`Session ${session} requires a final report artifact. Rerun close with --allow-no-report --reason <text>.`,
-					);
+					reportStatus = "created";
 				}
-				if (!options.reason?.trim()) {
+				if (options.allowNoReport && !options.reason?.trim()) {
 					throw new Error(
 						"Missing --reason for close allow-no-report override.",
 					);
 				}
 			}
-			markTaskMetadataClosed(paths.taskPath, session, new Date().toISOString());
+			if (summary) {
+				summarySource = "flag";
+			} else if (options.allowNoReport) {
+				summary = `Report waived: ${options.reason?.trim()}`;
+				summarySource = "waiver";
+			} else if (logSummary) {
+				summary = logSummary;
+				summarySource = "log";
+			} else {
+				summary = `Strict verification passed for ${taskRows.length} task${taskRows.length === 1 ? "" : "s"}.`;
+				summarySource = "state";
+			}
+			const summaryText = closeMarkdownText(summary);
+			const nextLog = canonicalizeLogSummary(originalLog, summaryText);
+			const reportWasPresent = existsSync(reportPath);
+			let reportCreated = false;
+			let logWritten = false;
+			try {
+				if (reportStatus === "created") {
+					atomicWriteText(
+						reportPath,
+						renderCloseReport(
+							session,
+							taskRows,
+							loadEvidenceEntries(paths.evidencePath),
+							summaryText,
+						),
+					);
+					reportCreated = !reportWasPresent;
+				}
+				if (nextLog !== originalLog) {
+					atomicWriteText(paths.logPath, nextLog);
+					logWritten = true;
+				}
+				markTaskMetadataClosed(
+					paths.taskPath,
+					session,
+					new Date().toISOString(),
+				);
+			} catch (error) {
+				if (reportCreated) {
+					unlinkSync(reportPath);
+				}
+				if (logWritten) {
+					if (hadLog) {
+						atomicWriteText(paths.logPath, originalLog);
+					} else if (existsSync(paths.logPath)) {
+						unlinkSync(paths.logPath);
+					}
+				}
+				throw error;
+			}
+		} else if (!summary) {
+			if (logSummary?.startsWith("Report waived:")) {
+				summarySource = "waiver";
+			} else if (logSummary) {
+				summarySource = "log";
+			} else if (reportStatus === "existing") {
+				summarySource = "state";
+			}
 		}
+
+		const warnings =
+			reportStatus === "waived"
+				? evaluateCloseWarnings(session, paths.sessionDir)
+				: [];
 
 		const diagnostics = closeDiagnosticState(root, session);
 		for (const [alreadyRecorded, label, writeDiagnostic] of [
@@ -1608,6 +1768,12 @@ export function closeSession(
 				"local-state refresh failed after the durable close commit; run afol local-state rebuild.",
 			);
 		}
-		return warnings;
+		const result = warnings as CloseSessionResult;
+		result.report = {
+			status: reportStatus,
+			path: reportStatus === "waived" ? null : reportRelativePath,
+			summary_source: summarySource,
+		};
+		return result;
 	});
 }

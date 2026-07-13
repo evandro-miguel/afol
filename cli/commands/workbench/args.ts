@@ -115,6 +115,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let json = false;
 	let allowNoReport = false;
 	let reason = "";
+	let summary = "";
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -132,6 +133,15 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		}
 		if (arg === "--allow-no-report") {
 			allowNoReport = true;
+			continue;
+		}
+		if (arg === "--summary" || arg === "-m") {
+			const value = args[i + 1];
+			if (!value) {
+				throw new Error("Missing value for --summary in close.");
+			}
+			summary = value;
+			i += 1;
 			continue;
 		}
 		if (arg === "--reason") {
@@ -156,6 +166,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		json,
 		allowNoReport,
 		reason,
+		summary,
 	};
 }
 

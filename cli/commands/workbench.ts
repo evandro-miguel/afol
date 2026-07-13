@@ -632,12 +632,17 @@ export async function runCloseCommand(
 		const closeWarnings = closeSession(root, parsed.session, {
 			allowNoReport: parsed.allowNoReport,
 			reason: parsed.reason,
+			summary: parsed.summary,
 		});
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
 					envelopeOk(
-						{ session: parsed.session, status: "closed" },
+						{
+							session: parsed.session,
+							status: "closed",
+							report: closeWarnings.report,
+						},
 						{
 							action: "workbench.close",
 							...(closeWarnings.length > 0 ? { warnings: closeWarnings } : {}),
