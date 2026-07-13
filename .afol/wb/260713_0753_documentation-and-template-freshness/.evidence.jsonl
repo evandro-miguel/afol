@@ -1,0 +1,1 @@
+{"id":"E-20260713075716398-fa5815","task_id":"T-01","created_at":"2026-07-13T11:57:16.398Z","command":"bun test --only-failures cli/tests/kernel.test.ts","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}

@@ -7,7 +7,10 @@ system has been retired and must not be restored.
 
 ## Current Architecture
 
-- `afol`: public CLI entrypoint.
+- `$HOME/.local/bin/afol`: installed public CLI; it must be a real compiled
+  executable, not a wrapper or symlink into this repository.
+- `./afol`, `bun run kernel`, and `dist/afol`: repository-local development
+  entrypoints and build artifact only.
 - `cli/**`: Bun/TypeScript implementation.
 - `src/project-template/**`: exportable downstream scaffold payload.
 - `.afol/config.json`: canonical AFOL project configuration.
@@ -66,17 +69,37 @@ link or waive the missing spec.
 afol status
 afol validate project
 afol validate bench --pack <pack-id> --json
-afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
+afol new <theme> --feature-id <F-id> --parent-spec <spec-id> --task "<task>"
 afol new <theme> --no-spec-required --reason "<reason>"
 afol start --session <session-id> --task-id <task-id>
-afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
-afol done --session <session-id> --task-id <task-id>
-afol close --session <session-id>
+afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
+afol close --session <session-id> --summary "<summary>"
 afol governance pending --json
 afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
 afol update check
 afol update preview
 afol update apply --dry-run
+```
+
+When one active or bound session is unambiguous, agents should prefer the
+compact path:
+
+```bash
+afol st T-01
+afol d T-01 -x "<cmd>"
+afol c -m "<summary>"
+```
+
+`afol evidence --result passed` is declared evidence; it does not authorize
+task completion. `done --test-shell` (or `d -x`) records observed exit-zero
+evidence and completes the task.
+
+Verify a global installation outside this checkout:
+
+```bash
+command -v afol
+test ! -L "$(command -v afol)"
+afol --version
 ```
 
 ## Development

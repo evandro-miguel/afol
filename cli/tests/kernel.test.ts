@@ -1386,6 +1386,14 @@ describe("kernel front-door", () => {
 					expect(proc.stdout as string).not.toContain("session closed:");
 				}
 			}
+			const closeHelp = runKernel(root, ["close", "--help"]);
+			expect(closeHelp.stdout as string).toContain(
+				"Usage: afol close [--session <session-id>]",
+			);
+			expect(closeHelp.stdout as string).toContain("-m, --summary <text>");
+			expect(closeHelp.stdout as string).toContain("--allow-no-report");
+			expect(closeHelp.stdout as string).toContain("--reason <text>");
+			expect(closeHelp.stdout as string).toContain("-j, --json");
 			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

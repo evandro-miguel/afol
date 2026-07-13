@@ -98,11 +98,14 @@ const START_COMMAND_HELP = [
 ].join("\n");
 
 const CLOSE_COMMAND_HELP = [
-	"Usage: afol close --session <session-id> [options]",
+	"Usage: afol close [--session <session-id>] [options]",
 	"",
 	"Options",
-	"  --session <session-id>  Workbench session to close",
-	"  --json                 Emit machine-readable close result",
+	"  --session <session-id>      Workbench session; omit when active/bound",
+	"  -m, --summary <text>        Summary for the generated report",
+	"  --allow-no-report           Explicitly waive a missing report",
+	"  --reason <text>             Required with --allow-no-report",
+	"  -j, --json                  Emit machine-readable close result",
 ].join("\n");
 
 const exit = (code: number): never => {

@@ -3,7 +3,7 @@ doc_type: reference
 id: afol_runtime_reference
 status: active
 created_at: '2026-06-17T00:00:00Z'
-updated_at: '2026-06-18T00:00:00Z'
+updated_at: '2026-07-13T00:00:00Z'
 ---
 
 # AFOL Runtime Reference
@@ -13,9 +13,10 @@ scaffold factory. `afol` is the supported public interface.
 
 ## Entrypoints
 
-- `afol`: public shell wrapper.
-- `bun run cli/main.ts`: development entrypoint.
-- `dist/afol`: built CLI output.
+- `$HOME/.local/bin/afol`: installed public CLI; a real compiled executable,
+  never a wrapper or symlink into this repository.
+- `./afol` and `bun run cli/main.ts`: repository-local development entrypoints.
+- `dist/afol`: compiled release artifact.
 - `cli/main.ts`, `cli/router.ts`, and `cli/registry.ts`: TypeScript command
   dispatch and command registry.
 
@@ -34,11 +35,22 @@ Workflow:
 
 ```bash
 afol start --session <session-id> --task-id <task-id>
-afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
-afol done --session <session-id> --task-id <task-id>
-afol close --session <session-id>
+afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
+afol close --session <session-id> --summary "<summary>"
 afol verify-tasks .afol/wb/<session-id> --strict
 ```
+
+Compact single-session agent path:
+
+```bash
+afol st T-01
+afol d T-01 -x "<cmd>"
+afol c -m "<summary>"
+```
+
+Declared `evidence --result passed` is useful for recording claims, but only
+observed exit-zero evidence from `done --test-shell`/`d -x` authorizes task
+completion.
 
 Inspection:
 
