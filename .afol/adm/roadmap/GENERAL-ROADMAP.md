@@ -239,6 +239,9 @@ Minimum acceptance:
   closure validation catches drift.
 - Closure note: accepted implementation evidence is `E-20260528084521802724`;
   closeout session `.afol/wb/260528_0833_f04-workbench-core-review-fix/`.
+- Current close/report semantics were revalidated in
+  `.afol/wb/260713_0716_close-waiver-summary-conflict/`; historical strict
+  evidence does not replace current release-readiness gates.
 
 ### F-05 Smart Rules and Skills Routing
 
@@ -332,6 +335,10 @@ Minimum acceptance:
   `runtime-live-agent` in
   `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
   (`status=skipped`, `all-scenarios-skipped:not-implemented-live-runner`).
+- Current clean-checkout release evidence is retained in
+  `.afol/wb/260713_0733_final-observed-release/`; observed short-path benchmark
+  evidence is retained in
+  `.afol/wb/260713_0724_final-observed-workbench-benchmark/`.
 - Exit criteria: type checks; unit tests; schema tests; command parity tests;
   template export tests; workbench validation; MCP parity tests; benchmark
   packs for accuracy, speed, safety, quality, and token cost on risky changes.

@@ -26,6 +26,6 @@ spec_waiver_reason: ""
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
 | T-01 | done | worker | Align public CLI documentation and help with live contracts attempt=1 |
-| T-02 | pending | worker | Refresh governance specs standards templates and release runbook |
+| T-02 | done | worker | Refresh governance specs standards templates and release runbook attempt=1 |
 | T-03 | pending | worker | Fix exportable template policy and remove retired or nonexistent skill flows |
 | T-04 | pending | worker | Validate documentation template manifests and final review |

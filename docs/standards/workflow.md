@@ -97,7 +97,9 @@ Materialize and update log only after real execution starts or a real decision/b
 
 #### Step 6: Report
 
-Create report using `docs/templates/report.md` only after there is a real delivered outcome or verified finding to summarize
+Close the session only after there is a real delivered outcome or verified
+finding. `afol close` preserves an existing report and deterministically creates
+the missing report from `--summary` or durable session state.
 
 - Summarize changes
 - Include verification evidence
@@ -106,6 +108,13 @@ Create report using `docs/templates/report.md` only after there is a real delive
 - If runtime guidance changed, include runtime contract sync status (`AGENTS.md`
   as canonical, adapter config, and any enabled runtime mirrors).
 - List any optional artifacts that were created for the workstream and whether each one is `final`
+- Prefer `afol c -m "<summary>"` when the active session is unambiguous.
+- Use `--allow-no-report --reason "<reason>"` only for an explicit exception;
+  `--summary` cannot be combined with that waiver. A closed legacy session with
+  neither report nor persisted waiver is `missing`, not `waived`.
+- Treat `verify-tasks <session> --strict` as session evidence integrity. A
+  release-ready claim additionally requires current clean-checkout build,
+  test, security, checksum, and provenance evidence.
 
 #### Step 7: Postmortem (Optional but Recommended)
 

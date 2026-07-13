@@ -48,8 +48,8 @@ output, not only when functional tests break.
 
 - Release/security gate set for F-11 includes build determinism, static analysis,
   and dependency-risk checks.
-- TS minimum compiler floor is TypeScript 6 for the documented baseline and
-  TS7/`tsgo` runs remain informative until the stack is fully stabilized.
+- The active compiler is TypeScript 7 and `bun run typecheck` is a required
+  release gate, not an informative future lane.
 - Security floor adds Biome/Oxlint/Knip and dependency/runtime checks with OSV and
   Gitleaks (or modern equivalent) in the release-quality path.
 - `bun run validate:security` drives the release security lane through
@@ -73,9 +73,9 @@ MVP hardening treats the release lane as:
 - `bun run validate:release` as the required release gate equivalent in CI.
 - Hard checks inside that lane: toolchain, template, bootstrap, deterministic
   build, smoke, checksum/provenance generation, and security scan orchestration.
-- Security is informative in this phase: `bun run validate:security` can skip
-  when scanners are unavailable, but every non-local release must document that
-  waiver explicitly with the missing-tool reason.
+- `bun run validate:security` remains informative for local diagnosis. The
+  release lane is strict: missing OSV/Gitleaks, scanner failures, findings, or
+  unsupported lockfiles fail `validate:release`.
 - MCP full/native adapters, runtime-live-agent transport, and broad cross-platform
   claims remain deferred until explicit evidence packs pass for those lanes.
 
@@ -142,13 +142,15 @@ choose commands, tools, rules, skills, or mutation paths.
 ### Coverage Gate Strategy
 
 - Program coverage minimum: **>= 80%** before implementation promotion.
-- Current live baseline that remains valid while TS/Bun stack is not yet implemented:
-  `.agents/scripts` with **83.24%** coverage.
-- TS/Bun/Bundler stack has a mandatory future coverage gate, scoped per
-  package and only activated after stack implementation starts.
-- Gate target is also 80%; each package must have explicit baseline
-  evidence and a recorded justification when temporarily below baseline in
-  transition.
+- The active Bun/TypeScript implementation has a mandatory **>=80%** lines and
+  functions gate enforced by `bun run coverage:check` inside
+  `bun run validate:release`.
+- `.agents/scripts` coverage is historical only; that runtime is retired and
+  is not a current baseline or fallback.
+- Current observed release evidence is retained under
+  `.afol/wb/260713_0733_final-observed-release/`; current observed short-path
+  benchmark evidence is under
+  `.afol/wb/260713_0724_final-observed-workbench-benchmark/`.
 
 ## 4) Test Matrix By Tool And Scenario
 

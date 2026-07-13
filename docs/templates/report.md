@@ -47,6 +47,12 @@ output_artifacts:
 
 - <high-level outcome>
 
+## Closure
+
+- Report status: `<created|existing|waived|missing>`
+- Summary source: `<flag|report|state|waiver>`
+- Waiver reason: `<reason_or_not_applicable>`
+
 ## Delivered Changes
 
 - <change 1>
@@ -72,6 +78,14 @@ output_artifacts:
 - Lint: `<command>` -> <pass/fail> -> Evidence: <snippet/link>
 - Additional checks:
   - <check> -> <result> -> Evidence: <snippet/link>
+
+### Release Evidence (when claiming release readiness)
+
+- Clean-checkout commit: `<full_commit_sha>`
+- `bun run validate:release`: `<exit_code>` -> `<observed_artifact_path>`
+- Security result: `<OSV status>` / `<Gitleaks status>` -> `<artifact_path>`
+- Binary checksum/provenance: `<sha256>` -> `<provenance_path>`
+- Installed binary smoke: `<command -v / non-symlink / version result>`
 
 ## Risks / Follow-ups
 

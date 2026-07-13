@@ -4,7 +4,7 @@ id: release_runbook_01
 status: active
 owners: ["orchestrator"]
 created_at: "2026-06-14T00:00:00+00:00"
-updated_at: "2026-06-14T00:00:00+00:00"
+updated_at: "2026-07-13T00:00:00+00:00"
 ---
 
 # RELEASE RUNBOOK
@@ -29,7 +29,7 @@ also run explicitly so command registry drift is caught before release.
 | Tool | Purpose | Required for Real Release |
 |------|---------|---------------------------|
 | `bun` | Runtime, test runner, bundler | Yes |
-| `afol` | Local CLI wrapper (resolves via `package.json` bin) | Yes |
+| `afol` | Compiled global CLI at `$HOME/.local/bin/afol` | Yes |
 | `osv-scanner` (or `osv`) | Dependency vulnerability scan | Yes |
 | `gitleaks` | Secret scan | Yes |
 
@@ -46,8 +46,9 @@ also run explicitly so command registry drift is caught before release.
 
 Use this order before any global update/install or release promotion:
 
-1. Check the running wrapper version with `afol --version` and compare it to
-   the repo release metadata.
+1. Check the installed binary with `command -v afol`, verify it is not a
+   symlink, and compare `afol --version` to the repo release metadata. `./afol`
+   and `dist/afol` are repository-local development/build surfaces only.
 2. Verify generated version metadata with `bun run version:check`.
 3. Install dependencies with `bun install --frozen-lockfile`.
 4. Run `bun run typecheck`.
@@ -55,10 +56,12 @@ Use this order before any global update/install or release promotion:
 6. Rebuild AFOL local state with `afol local-state rebuild --json`.
 7. Validate the project with `afol validate project --json`.
 8. Check release health with `afol health --release --json`.
-9. Generate release provenance with `bun run release:provenance:release`.
-10. Run the release gate with `bun run validate:release`.
-11. Run the clean checkout smoke with `bun run smoke:clean`.
-12. Record AFOL evidence for the gated session/task.
+9. Run `bun run validate:release` from a clean checkout of the exact product
+   commit; it generates the final security and provenance artifacts.
+10. Record the observed exit code and retained log/artifact as AFOL evidence.
+11. Install `dist/afol` as a real executable only after the artifact gate.
+12. Verify installed/artifact SHA-256 equality, non-symlink status, version,
+    and an outside-repository help smoke.
 13. Close the session only after evidence is attached and no tasks remain open.
 
 Do not run global update/install when `afol --version` diverges from the repo
@@ -74,6 +77,8 @@ afol validate project --json
 afol health --release --json
 bun run validate:release
 bun run smoke:clean
+test ! -L "$(command -v afol)"
+afol --version
 ```
 
 ### Artifacts Produced
@@ -81,6 +86,8 @@ bun run smoke:clean
 - `dist/afol` — standalone binary
 - `dist/afol.sha256` — checksum (format: `<sha256>  dist/afol`)
 - `dist/afol.provenance.json` — provenance including version, commit, lockfile hash, template hash, platform, arch, and security scanner outcomes
+- `dist/security-scan.release.json` — release scanner versions and pass/waiver
+  status. Required scanners may not be silently waived.
 
 ## Coverage Threshold
 

@@ -31,6 +31,15 @@ risk_level: high
 - Roadmap feature: `F-03` (extends F-01 kernel and F-11 validation gates).
 - Parent spec: `260521_0030_agent-command-design-system_spec_01`.
 
+## Current Evidence And Residual Scope
+
+- Observed `workbench-parity` evidence: session
+  `.afol/wb/260713_0724_final-observed-workbench-benchmark/` (8/8 scenarios;
+  short-path p50 65-70 ms, p95 66-71 ms; argv 6/24/12 characters).
+- Implementation slice: commit `2f5f42f`.
+- This child remains `draft` intentionally while the unchecked hint/default
+  verbosity and alias-snapshot acceptance items below remain open.
+
 ## Child Scope Rationale
 
 The parent F-03 closed with short grammar and compact defaults. Live audit
