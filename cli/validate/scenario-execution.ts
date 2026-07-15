@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	accessSync,
@@ -16,6 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import { outputTail } from "./output";
 import type { Scenario } from "./types";
 
@@ -209,14 +209,12 @@ function createSandboxRoot(projectRoot: string): string {
 		"set -euo pipefail;",
 		`tar -C ${shellQuote(projectRoot)} ${excludeFlags} -cf - . | tar -C ${shellQuote(sandboxRoot)} -xf -`,
 	].join(" ");
-	const exportResult = spawnSync("bash", ["-lc", exportCommand], {
-		stdio: ["ignore", "pipe", "pipe"],
+	const exportResult = boundedSpawn("bash", ["-lc", exportCommand], {
+		timeoutMs: 120_000,
 	});
-	if (exportResult.status !== 0 || exportResult.signal || exportResult.error) {
+	if (!exportResult.ok) {
 		throw new Error(
-			`Sandbox copy export failed: ${outputTail(
-				String((exportResult.stderr ?? exportResult.error?.message) || "tar"),
-			)}`,
+			`Sandbox copy export failed: ${outputTail(spawnFailureDetail(exportResult))}`,
 		);
 	}
 	const projectNodeModules = join(projectRoot, "node_modules");
@@ -234,7 +232,7 @@ function provisionSandboxBinary(
 	const targetDir = join(sandboxRoot, ".afol", "bin");
 	const targetBinary = join(targetDir, "afol");
 	mkdirSync(targetDir, { recursive: true });
-	const result = spawnSync(
+	const result = boundedSpawn(
 		"bun",
 		[
 			"build",
@@ -245,16 +243,13 @@ function provisionSandboxBinary(
 		],
 		{
 			cwd: REAL_REPO_ROOT,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
+			timeoutMs: 300_000,
 		},
 	);
-	if (result.status !== 0 || result.signal || result.error) {
+	if (!result.ok) {
 		return {
 			binaryPath: null,
-			error: `compiled-binary:${outputTail(
-				String((result.stderr ?? result.error?.message) || "bun build failed"),
-			)}`,
+			error: `compiled-binary:${outputTail(spawnFailureDetail(result))}`,
 		};
 	}
 	chmodSync(targetBinary, 0o755);
@@ -265,13 +260,13 @@ function gitStatusPorcelain(projectRoot: string): {
 	ok: boolean;
 	output: string;
 } {
-	const result = spawnSync("git", ["status", "--porcelain"], {
+	const result = boundedSpawn("git", ["status", "--porcelain"], {
 		cwd: projectRoot,
-		encoding: "utf8",
+		timeoutMs: 15_000,
 	});
 	return {
-		ok: result.status === 0 && !result.signal && !result.error,
-		output: (result.stdout ?? "").toString().trimEnd(),
+		ok: result.ok,
+		output: result.stdout.trimEnd(),
 	};
 }
 
@@ -456,10 +451,14 @@ function cleanupGitStatusDiff(
 			rmSync(join(projectRoot, entry.path), { recursive: true, force: true });
 			continue;
 		}
-		spawnSync("git", ["restore", "--worktree", "--staged", "--", entry.path], {
-			cwd: projectRoot,
-			encoding: "utf8",
-		});
+		boundedSpawn(
+			"git",
+			["restore", "--worktree", "--staged", "--", entry.path],
+			{
+				cwd: projectRoot,
+				timeoutMs: 30_000,
+			},
+		);
 	}
 }
 
@@ -487,19 +486,19 @@ function runScenarioSample(
 	invocation: CommandInvocation,
 ): ScenarioSampleRun {
 	const startedAt = performance.now();
-	const result = spawnSync(invocation.command, invocation.args, {
+	const result = boundedSpawn(invocation.command, invocation.args, {
 		cwd: projectRoot,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
+		timeoutMs: 120_000,
 	});
 	const durationMs = Math.max(1, Math.round(performance.now() - startedAt));
 	return {
 		duration_ms: durationMs,
 		exit_code: result.status,
 		signal: result.signal,
-		spawn_error: result.error ? result.error.message : null,
-		stdout: result.stdout ?? "",
-		stderr: result.error ? result.error.message : (result.stderr ?? ""),
+		spawn_error: result.spawnError ?? (result.timedOut ? "timed out" : null),
+		stdout: result.stdout,
+		stderr:
+			result.spawnError ?? (result.timedOut ? "timed out" : result.stderr),
 	};
 }
 

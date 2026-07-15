@@ -1,7 +1,7 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
+import { boundedSpawn } from "../../core/subprocess";
 import { validateAdmMigration } from "../adm";
 import { resolveProjectPaths } from "../project/paths";
 import { buildPstrIndexSnapshot, getPstrIndex } from "../pstr/builder";
@@ -84,16 +84,16 @@ function readGitChangedPaths(
 	args: string[],
 	parser: (line: string) => string | null,
 ): string[] {
-	const result = spawnSync("git", args, {
+	const result = boundedSpawn("git", args, {
 		cwd: root,
-		encoding: "utf8",
-		shell: false,
+		timeoutMs: 30_000,
 	});
-	if (result.error) {
-		throw result.error;
+	if (result.timedOut) {
+		throw new Error(`git ${args.join(" ")} timed out`);
 	}
-	if (result.status !== 0) {
+	if (!result.ok) {
 		const detail =
+			result.spawnError ||
 			result.stderr.trim() ||
 			result.stdout.trim() ||
 			`git ${args.join(" ")} exited with status ${result.status}`;

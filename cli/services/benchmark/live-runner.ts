@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
@@ -9,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { boundedSpawn } from "../../core/subprocess";
 import { normalizeCommandForBenchmark, parseEventStream } from "./metrics";
 import {
 	BENCH_SCHEMA_VERSION,
@@ -60,12 +60,11 @@ function copyMinimalWorkspace(root: string, sandboxRoot: string): void {
 }
 
 function gitCommit(root: string): string {
-	const result = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], {
+	const result = boundedSpawn("git", ["rev-parse", "--short=12", "HEAD"], {
 		cwd: root,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
+		timeoutMs: 15_000,
 	});
-	if (result.status === 0) {
+	if (result.ok) {
 		return result.stdout.trim() || "unknown";
 	}
 	return "unknown";
@@ -108,22 +107,27 @@ function verifyWorkbenchClosed(root: string): {
 	completed: boolean;
 	notes: string[];
 } {
-	const status = spawnSync("bun", ["run", "cli/main.ts", "status", "--json"], {
-		cwd: root,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-		maxBuffer: 2 * 1024 * 1024,
-	});
-	if (status.status !== 0) {
+	const status = boundedSpawn(
+		"bun",
+		["run", "cli/main.ts", "status", "--json"],
+		{
+			cwd: root,
+			timeoutMs: 60_000,
+			maxBuffer: 2 * 1024 * 1024,
+		},
+	);
+	if (!status.ok) {
 		return {
 			completed: false,
 			notes: [
-				`workbench-status-exit:${status.status}:${commandTail(status.stdout ?? "", status.stderr ?? "")}`,
+				status.timedOut
+					? "workbench-status-timed-out"
+					: `workbench-status-exit:${status.status}:${commandTail(status.stdout, status.spawnError ?? status.stderr)}`,
 			],
 		};
 	}
 
-	const statusPayload = parseJson(status.stdout ?? "");
+	const statusPayload = parseJson(status.stdout);
 	const statusData = isRecord(statusPayload?.data) ? statusPayload.data : null;
 	const statusClosed =
 		statusData?.status === "none" &&
@@ -138,26 +142,27 @@ function verifyWorkbenchClosed(root: string): {
 		};
 	}
 
-	const verify = spawnSync(
+	const verify = boundedSpawn(
 		"bun",
 		["run", "cli/main.ts", "verify-tasks", "--strict", "--json"],
 		{
 			cwd: root,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
+			timeoutMs: 60_000,
 			maxBuffer: 2 * 1024 * 1024,
 		},
 	);
-	if (verify.status !== 0) {
+	if (!verify.ok) {
 		return {
 			completed: false,
 			notes: [
-				`workbench-verify-exit:${verify.status}:${commandTail(verify.stdout ?? "", verify.stderr ?? "")}`,
+				verify.timedOut
+					? "workbench-verify-timed-out"
+					: `workbench-verify-exit:${verify.status}:${commandTail(verify.stdout, verify.spawnError ?? verify.stderr)}`,
 			],
 		};
 	}
 
-	const verifyPayload = parseJson(verify.stdout ?? "");
+	const verifyPayload = parseJson(verify.stdout);
 	if (verifyPayload?.ok !== true) {
 		return {
 			completed: false,
@@ -337,6 +342,51 @@ function buildResult(
 		],
 	};
 }
+/** @internal Exported as test seam: classifies a boundedSpawn result for bench scenarios. */
+export type SpawnClassification = "ok" | "missing" | "blocked" | "failed";
+
+/** @internal Exported as test seam, called by runLiveBenchmark. */
+export function _classifySpawnForBench(result: {
+	ok: boolean;
+	status: number | null;
+	timedOut: boolean;
+	signal: string | null;
+	spawnError: string | null;
+}): SpawnClassification {
+	if (result.ok) return "ok";
+	// Process ran (was spawned) but timed out, was killed, or exited non-zero
+	if (result.timedOut) return "failed";
+	if (result.signal) return "failed";
+	if (result.status !== null) return "failed";
+	// Process never started: ENOENT means binary not on PATH
+	if (result.spawnError?.startsWith("ENOENT")) return "missing";
+	// Permission failures mean the binary was found but cannot execute.
+	if (/^(?:EACCES|EPERM):/.test(result.spawnError ?? "")) return "blocked";
+	// Buffer, runtime, and unknown spawn failures are benchmark failures.
+	if (result.spawnError) return "failed";
+	// Fallback: no environmental diagnostic means the benchmark failed
+	return "failed";
+}
+
+/** @internal Exported as a test seam for failed Codex diagnostics. */
+export function _collectCodexFailureNotes(result: {
+	status: number | null;
+	timedOut: boolean;
+	spawnError: string | null;
+	stderr: string;
+}): string[] {
+	const notes: string[] = [];
+	if (result.spawnError) notes.push(`spawn-error:${result.spawnError}`);
+	if (result.stderr.trim().length > 0) {
+		notes.push(`codex-stderr:${tail(result.stderr)}`);
+	}
+	if (result.timedOut) {
+		notes.push("codex-timed-out");
+	} else if (result.status !== null) {
+		notes.push(`codex-exit:${result.status}`);
+	}
+	return notes;
+}
 
 export function runLiveBenchmark(
 	root: string,
@@ -352,7 +402,7 @@ export function runLiveBenchmark(
 		copyMinimalWorkspace(root, sandboxRoot);
 		scenario.setup?.(sandboxRoot);
 		const startedAt = Date.now();
-		const codex = spawnSync(
+		const codex = boundedSpawn(
 			"codex",
 			[
 				"exec",
@@ -368,17 +418,14 @@ export function runLiveBenchmark(
 			],
 			{
 				cwd: sandboxRoot,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
+				timeoutMs: Math.max(thresholds.max_duration_ms + 60_000, 180_000),
 				maxBuffer: 20 * 1024 * 1024,
 			},
 		);
 		const wallClockMs = Date.now() - startedAt;
+		const spawnClassification = _classifySpawnForBench(codex);
 
-		if (
-			codex.error &&
-			(codex.error as NodeJS.ErrnoException).code === "ENOENT"
-		) {
+		if (spawnClassification === "missing") {
 			const metrics = parseEventStream([]);
 			metrics.timing.wall_clock_ms = wallClockMs;
 			return buildResult(
@@ -426,15 +473,19 @@ export function runLiveBenchmark(
 			blockingNotes.length === 0
 		) {
 			status = "passed";
-		} else if (codex.status === null) {
+		} else if (spawnClassification === "blocked") {
 			status = "blocked";
-			notes.push("codex-status:null");
+			notes.push(`spawn-error:${codex.spawnError}`);
 		} else {
 			status = "failed";
-			if (stderr.trim().length > 0) {
-				notes.push(`codex-stderr:${tail(stderr)}`);
-			}
-			notes.push(`codex-exit:${codex.status}`);
+			notes.push(
+				..._collectCodexFailureNotes({
+					status: codex.status,
+					timedOut: codex.timedOut,
+					spawnError: codex.spawnError,
+					stderr,
+				}),
+			);
 		}
 		if (opts.keepArtifacts) {
 			notes.push(`sandbox-kept:${sandboxRoot}`);

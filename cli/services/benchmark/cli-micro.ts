@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { boundedSpawn, spawnFailureDetail } from "../../core/subprocess";
 import { DEFAULT_CLI_PACK_ID } from "./types";
 
 export type CliMicroResult = {
@@ -27,15 +27,13 @@ export function runCliMicroBenchmark(root: string): CliMicroResult[] {
 	const afolPath = join(root, "afol");
 	return MICRO_COMMANDS.map((args) => {
 		const startedAt = Date.now();
-		const result = spawnSync(afolPath, args, {
+		const result = boundedSpawn(afolPath, args, {
 			cwd: root,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
+			timeoutMs: 60_000,
 		});
 		const wallClockMs = Date.now() - startedAt;
-		const stdout = result.stdout ?? "";
-		const stderr = result.stderr ?? "";
-		const outputBytes = Buffer.byteLength(stdout, "utf8");
+		const outputBytes = Buffer.byteLength(result.stdout, "utf8");
+		const pass = result.ok && !result.timedOut && result.status === 0;
 		return {
 			command: "afol",
 			args,
@@ -43,15 +41,8 @@ export function runCliMicroBenchmark(root: string): CliMicroResult[] {
 			wall_clock_ms: wallClockMs,
 			output_bytes: outputBytes,
 			estimated_output_tokens: Math.ceil(outputBytes / 4),
-			status: result.status === 0 ? "passed" : "failed",
-			notes:
-				result.status === 0
-					? []
-					: [
-							stderr.trim().length > 0
-								? stderr.trim()
-								: `exit:${result.status ?? "null"}`,
-						],
+			status: pass ? "passed" : "failed",
+			notes: pass ? [] : [spawnFailureDetail(result)],
 		};
 	});
 }

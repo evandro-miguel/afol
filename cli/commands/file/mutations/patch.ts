@@ -162,7 +162,11 @@ function applyUndoPatchMutation(
 					...undoRecord,
 					status: "rolled_back",
 				});
-			} catch {}
+			} catch (journalError) {
+				throw new Error(
+					`INTEGRITY_ERROR: undo ${undoRecord.id} rolled back on disk but rollback journal write failed: ${(journalError as Error).message}. Original error: ${(error as Error).message}`,
+				);
+			}
 			throw error;
 		}
 	});
@@ -299,7 +303,11 @@ export function runPatchMutation(
 						...record,
 						status: "rolled_back",
 					});
-				} catch {}
+				} catch (journalError) {
+					throw new Error(
+						`INTEGRITY_ERROR: mutation ${record.id} rolled back on disk but rollback journal write failed: ${(journalError as Error).message}. Original error: ${(error as Error).message}`,
+					);
+				}
 				throw error;
 			}
 			return {

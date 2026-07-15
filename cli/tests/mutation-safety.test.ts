@@ -13,7 +13,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { runPatchMutation } from "../commands/file/mutations/patch";
+import type { PatchArgs } from "../commands/file/shared";
 import { normalizeHash } from "../commands/file/shared";
+import { mutationJournalPath } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -928,6 +931,110 @@ describe("mutation safety command family", () => {
 				"Mutation journal corruption",
 			);
 			expect(readFileSync(target, "utf8")).toBe("base-next");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runPatchMutation double fault: filesystem restored + INTEGRITY_ERROR on journal write failure", () => {
+		const root = mkProjectRoot();
+		const session = "S-DOUBLE";
+		const taskId = "T-DOUBLE";
+		try {
+			createMutationSession(root, session, taskId);
+			const target = join(root, "target.txt");
+			const originalContent = "original\n";
+			writeFileSync(target, originalContent, "utf8");
+
+			const args: PatchArgs = {
+				command: "pt",
+				path: "target.txt",
+				appendText: "\nappended\n",
+				dryRun: false,
+				json: false,
+				session,
+				taskId,
+				reason: "double-fault test",
+			};
+
+			const journalPath = mutationJournalPath(root);
+			// Ensure journal file exists by doing a successful mutation first
+			const setupResult = runPatchMutation(args, root);
+			expect(setupResult.status).toBe("write");
+			const setupMutationId = (setupResult as Record<string, unknown>)
+				.mutation_id as string;
+
+			// Now do a second mutation with afterPrepared that corrupts the journal.
+			// The afterPrepared hook runs AFTER the "prepared" record is written
+			// but BEFORE the actual file write + "committed" journal record.
+			// By replacing the journal with a directory, both the "committed"
+			// append and the subsequent "rolled_back" append will fail.
+			const args2: PatchArgs = { ...args };
+			// Capture journal state BEFORE the afterPrepared hook corrupts the file,
+			// so we can verify the "prepared" record without hitting EISDIR.
+			// Use a wrapper object so TypeScript can track the assignment through
+			// the closure and narrow correctly in the subsequent if-block.
+			const capturedJournal: { raw: string | null } = { raw: null };
+			let journalCorrupted = false;
+			let thrown: Error | null = null;
+			try {
+				runPatchMutation(args2, root, {
+					afterPrepared: () => {
+						capturedJournal.raw = readFileSync(journalPath, "utf8");
+						rmSync(journalPath, { force: true });
+						mkdirSync(journalPath, { recursive: true });
+						journalCorrupted = true;
+					},
+				});
+			} catch (error) {
+				thrown = error as Error;
+			}
+
+			expect(thrown).not.toBeNull();
+			if (thrown === null) {
+				throw new Error("Expected mutation to throw");
+			}
+			expect(thrown.message).toContain("INTEGRITY_ERROR");
+			// Must mention both the original error context and the journal failure
+			expect(thrown.message).toContain("rolled back on disk");
+			expect(thrown.message).toContain("rollback journal write failed");
+
+			// Filesystem must be restored to the pre-second-mutation content
+			// (state after the successful first mutation)
+			const afterFirstMutation = readFileSync(target, "utf8");
+			expect(afterFirstMutation).not.toBe(originalContent);
+			expect(afterFirstMutation).toContain("\nappended\n");
+
+			// Remove the directory that replaced the journal file
+			if (journalCorrupted) {
+				rmSync(journalPath, { recursive: true, force: true });
+			}
+			// Journal must NOT have "committed" or "rolled_back" for the corrupted
+			// mutation — only "prepared" survived the corruption.
+			// Use the pre-corruption capture because the journal file was replaced
+			// with a directory and its content cannot be recovered.
+			const journalAfter: Array<Record<string, unknown>> =
+				capturedJournal.raw !== null
+					? capturedJournal.raw
+							.split("\n")
+							.map((row) => row.trim())
+							.filter((row) => row.length > 0)
+							.map((row) => JSON.parse(row) as Record<string, unknown>)
+					: readMutationJournal(root);
+			const secondMutationRecords = journalAfter.filter(
+				(r) => r.id !== setupMutationId,
+			);
+			// The "prepared" record should exist
+			expect(secondMutationRecords.some((r) => r.status === "prepared")).toBe(
+				true,
+			);
+			// No "committed" or "rolled_back" for this mutation
+			expect(secondMutationRecords.some((r) => r.status === "committed")).toBe(
+				false,
+			);
+			expect(
+				secondMutationRecords.some((r) => r.status === "rolled_back"),
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

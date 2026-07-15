@@ -1,6 +1,6 @@
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { boundedSpawn } from "../core/subprocess";
 import {
 	asBoolean,
 	asOptionalNumber,
@@ -496,14 +496,14 @@ function failedRuntimeLiveResult(
 }
 
 function getGitCommit(projectRoot: string): string {
-	const result = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], {
+	const result = boundedSpawn("git", ["rev-parse", "--short=12", "HEAD"], {
 		cwd: projectRoot,
-		encoding: "utf8",
+		timeoutMs: 15_000,
 	});
-	if (result.status !== 0) {
-		return "unknown";
+	if (result.ok) {
+		return result.stdout.trim() || "unknown";
 	}
-	return (result.stdout || "").trim() || "unknown";
+	return "unknown";
 }
 
 export function collectThresholdNotes(

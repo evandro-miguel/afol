@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
 import { join, relative } from "node:path";
+import { boundedSpawn } from "../core/subprocess";
 import { type ParsedValidationArgs, parseValidationArgs } from "./args";
 import { saveBenchmarkPayload } from "./benchmark-files";
 import { runValidationCommands } from "./command-runner";
@@ -318,14 +318,14 @@ function resolveResultStatus(
 }
 
 function getGitCommit(projectRoot: string): string {
-	const result = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], {
+	const result = boundedSpawn("git", ["rev-parse", "--short=12", "HEAD"], {
 		cwd: projectRoot,
-		encoding: "utf8",
+		timeoutMs: 15_000,
 	});
-	if (result.status !== 0) {
-		return "unknown";
+	if (result.ok) {
+		return result.stdout.trim() || "unknown";
 	}
-	return (result.stdout || "").trim() || "unknown";
+	return "unknown";
 }
 
 function handleSelect(
