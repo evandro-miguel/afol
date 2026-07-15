@@ -318,26 +318,17 @@ export async function main(argv: string[]): Promise<number> {
 		return resolution.exitCode;
 	}
 
-	if (
-		resolution.kind === "new" &&
-		hasHelpArg(resolution.args)
-	) {
+	if (resolution.kind === "new" && hasHelpArg(resolution.args)) {
 		console.log(NEW_COMMAND_HELP);
 		return 0;
 	}
 
-	if (
-		resolution.kind === "start" &&
-		hasHelpArg(resolution.args)
-	) {
+	if (resolution.kind === "start" && hasHelpArg(resolution.args)) {
 		console.log(START_COMMAND_HELP);
 		return 0;
 	}
 
-	if (
-		resolution.kind === "close" &&
-		hasHelpArg(resolution.args)
-	) {
+	if (resolution.kind === "close" && hasHelpArg(resolution.args)) {
 		console.log(CLOSE_COMMAND_HELP);
 		return 0;
 	}

@@ -25,10 +25,15 @@ describe("governance command", () => {
 	test("returns the pending index through the command envelope", () => {
 		const stdout: string[] = [];
 		const stderr: string[] = [];
-		const exitCode = runGovernanceCommand("pending", ["--json"], createFixture(), {
-			stdout: (message) => stdout.push(message),
-			stderr: (message) => stderr.push(message),
-		});
+		const exitCode = runGovernanceCommand(
+			"pending",
+			["--json"],
+			createFixture(),
+			{
+				stdout: (message) => stdout.push(message),
+				stderr: (message) => stderr.push(message),
+			},
+		);
 
 		expect(exitCode).toBe(0);
 		expect(stderr).toEqual([]);

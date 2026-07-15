@@ -188,7 +188,9 @@ describe("help formatter", () => {
 			}
 			const directHelpCommands: (typeof kernelRegistry.commands)[number][] = [];
 			for (const kind of DIRECT_DISPATCH_KINDS) {
-				const spec = kernelRegistry.commands.find((entry) => entry.kind === kind);
+				const spec = kernelRegistry.commands.find(
+					(entry) => entry.kind === kind,
+				);
 				if (
 					spec &&
 					spec.kind !== "verifyTasks" &&
