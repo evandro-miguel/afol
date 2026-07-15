@@ -1445,6 +1445,18 @@ describe("kernel front-door", () => {
 		const script = "#!/usr/bin/env bash\necho LEGACY:$*";
 		const root = mkProjectRoot("new-governed-flags", script);
 		try {
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-00 Retirement bridge\n\n- Status: active\n- Governing spec: .afol/adm/specs/260531_parent_spec_01.md\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "260531_parent_spec_01.md"),
+				"---\ndoc_type: spec\nid: 260531_parent_spec_01\nstatus: active\nroadmap_feature: F-00\n---\n\n# Spec\n",
+				"utf8",
+			);
 			const proc = runKernel(root, [
 				"n",
 				"retirement-bridge",
@@ -1453,7 +1465,7 @@ describe("kernel front-door", () => {
 				"--feature-id",
 				"F-00",
 				"--parent-spec",
-				"260531_parent_spec_01",
+				".afol/adm/specs/260531_parent_spec_01.md",
 				"--task",
 				"Implement retirement bootstrap parity",
 			]);
@@ -1466,6 +1478,17 @@ describe("kernel front-door", () => {
 			const match = /session created:\s*(.*)/.exec(proc.stdout as string);
 			expect(match).not.toBeNull();
 			const session = (match?.[1] ?? "").trim();
+			const specCheck = runKernel(root, [
+				"spec",
+				"check",
+				"--session",
+				session,
+				"--task",
+				"T-01",
+				"--json",
+			]);
+			expect(specCheck.status).toBe(0);
+			expect(specCheck.stdout as string).toContain('"status":"compatible"');
 
 			const planPath = join(
 				root,

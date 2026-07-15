@@ -246,6 +246,18 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("cli-json");
 		try {
 			writeCliProjectContract(root);
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-01 CLI lifecycle\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-01.md\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "spec-01.md"),
+				"---\ndoc_type: spec\nid: spec-01\nstatus: active\nroadmap_feature: F-01\n---\n\n# Spec\n",
+				"utf8",
+			);
 
 			const newProc = runKernel(root, [
 				"new",
@@ -271,6 +283,36 @@ describe("workbench lifecycle service", () => {
 			expect(
 				(newEnvelope.data as Record<string, unknown>).governance_status,
 			).toBe("unbound");
+			const waivedWithBindings = runKernel(root, [
+				"new",
+				"waived with ignored bindings",
+				"--no-spec-required",
+				"--reason",
+				"explicit test waiver",
+				"--feature-id",
+				"F-404",
+				"--parent-spec",
+				"missing-spec",
+				"--json",
+			]);
+			expect(waivedWithBindings.status).toBe(2);
+			expect(waivedWithBindings.stdout as string).toContain(
+				"new governance binding and waiver are mutually exclusive",
+			);
+
+			const invalidGovernedNew = runKernel(root, [
+				"new",
+				"invalid governed",
+				"--feature-id",
+				"F-404",
+				"--parent-spec",
+				"missing-spec",
+				"--json",
+			]);
+			expect(invalidGovernedNew.status).toBe(2);
+			expect(invalidGovernedNew.stdout as string).toContain(
+				"Roadmap feature not found: F-404",
+			);
 
 			const humanNewProc = runKernel(root, [
 				"new",
@@ -551,6 +593,18 @@ describe("workbench lifecycle service", () => {
 			const resolvedEnvelope = parseEnvelope(resolved.stdout as string);
 			expect((resolvedEnvelope.data as Record<string, unknown>).status).toBe(
 				"waived",
+			);
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-02 After resolve\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-02.md\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "spec-02.md"),
+				"---\ndoc_type: spec\nid: spec-02\nstatus: active\nroadmap_feature: F-02\n---\n\n# Spec\n",
+				"utf8",
 			);
 
 			const next = runKernel(root, [
@@ -2152,7 +2206,7 @@ describe("workbench lifecycle service", () => {
 					);
 					writeFileSync(
 						join(root, ".afol", "adm", "specs", "spec-01.md"),
-						"---\nid: spec-01\nstatus: active\nroadmap_feature: F-01\n---\n\n# Spec\n",
+						"---\ndoc_type: spec\nid: spec-01\nstatus: active\nroadmap_feature: F-01\n---\n\n# Spec\n",
 						"utf8",
 					);
 				}

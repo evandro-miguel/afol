@@ -8,6 +8,7 @@ import {
 	formatSessionPendingSpecWarning,
 	getSessionPendingSpecNotice,
 	resolveGovernance,
+	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
 import {
 	appendTimelineEntry,
@@ -97,6 +98,18 @@ export async function runNewCommand(
 		assertWorkbenchMutationAllowed(ctx, "workbench.new");
 		const parsed = parseNewArgs(args);
 		const governance = resolveGovernance(parsed.metadata);
+		if (
+			governance.governanceStatus === "governed" &&
+			parsed.metadata.featureId &&
+			parsed.metadata.parentSpec
+		) {
+			const catalog = resolveGovernanceCatalog(
+				root,
+				parsed.metadata.featureId,
+				parsed.metadata.parentSpec,
+			);
+			parsed.metadata.parentSpec = catalog.specId;
+		}
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
 		const creationStatus =
 			created.warnings.length > 0 ? "created_with_warnings" : "created";
