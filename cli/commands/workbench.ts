@@ -432,7 +432,7 @@ export async function runDoneCommand(
 				parsed.testShellCommand ??
 				(verificationSpec?.mode === "argv"
 					? [verificationSpec.executable, ...verificationSpec.args].join(" ")
-					: verificationSpec?.command ?? "");
+					: (verificationSpec?.command ?? ""));
 			observedCompletion = completeObservedTask(root, {
 				session: parsed.session,
 				taskId: parsed.taskId,

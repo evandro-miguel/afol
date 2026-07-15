@@ -8,9 +8,9 @@ import type {
 	LogArgs,
 	NewCommandArgs,
 	SessionTaskJsonArgs,
+	VerificationSpec,
 	VerifyArgs,
 } from "./types";
-import type { VerificationSpec } from "./types";
 import {
 	resolveSession,
 	resolveVerifySessionPath,
@@ -350,7 +350,9 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		const value = args[i + 1];
 		if (arg === "--") {
 			if (testCommand || testShellCommand) {
-				throw new Error("Cannot combine positional verification with --test or --test-shell in done.");
+				throw new Error(
+					"Cannot combine positional verification with --test or --test-shell in done.",
+				);
 			}
 			const argv = args.slice(i + 1);
 			if (argv.length === 0) {

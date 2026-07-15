@@ -8,7 +8,9 @@ import {
 } from "../../services/spec-gate/checker";
 import type { SpecCheckResult } from "../../services/spec-gate/types";
 import type { VerificationSpec } from "./types";
+
 export type { VerificationSpec } from "./types";
+
 import {
 	defaultAllowGlobalFallback,
 	isCiMode,
