@@ -80,8 +80,17 @@ describe("router alias grammar", () => {
 		});
 	});
 
+	test("routes feedback aliases without rewriting action or option arguments", () => {
+		expect(resolveCommand(["fb", "last", "-m", "fixed", "-j"])).toEqual({
+			kind: "feedback",
+			args: ["last", "-m", "fixed", "-j"],
+		});
+	});
+
 	test("stops done flag normalization at the positional verification delimiter", () => {
-		expect(resolveCommand(["d", "T-01", "-x", "bun", "--", "-x", "--test"])).toEqual({
+		expect(
+			resolveCommand(["d", "T-01", "-x", "bun", "--", "-x", "--test"]),
+		).toEqual({
 			kind: "done",
 			args: ["T-01", "--test", "bun", "--", "-x", "--test"],
 		});

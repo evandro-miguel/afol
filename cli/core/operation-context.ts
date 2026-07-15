@@ -100,6 +100,16 @@ export function resolveCanonicalAction(
 		}
 		return { action: "workbench.done.record", sideEffect: "write" };
 	}
+	if (resolution.kind === "feedback") {
+		const action = args[0] ?? "status";
+		if (action === "annotate" || action === "purge" || action === "last") {
+			return { action: `feedback.${action}`, sideEffect: "write" };
+		}
+		if (action === "preview") {
+			return { action: "feedback.preview", sideEffect: "preview" };
+		}
+		return { action: `feedback.${action}`, sideEffect: "read" };
+	}
 
 	if (resolution.kind === "subcommand") {
 		const group = resolution.group ?? "";

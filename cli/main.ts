@@ -15,6 +15,7 @@ import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
 import { runDbCommand } from "./commands/db";
 import { runDoctorCommand } from "./commands/doctor";
+import { runFeedbackCommand } from "./commands/feedback";
 import { runFileCommand } from "./commands/file";
 import { runGovernanceCommand } from "./commands/governance";
 import { runHealthCommand } from "./commands/health";
@@ -117,6 +118,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"init",
 	"validate",
 	"status",
+	"feedback",
 	"new",
 	"start",
 	"evidence",
@@ -380,6 +382,11 @@ export async function main(argv: string[]): Promise<number> {
 			console.error(`err approval-required ${message}`);
 		}
 		return 2;
+	}
+
+	if (resolution.kind === "feedback") {
+		const [action = "status", ...feedbackArgs] = resolution.args;
+		return runFeedbackCommand(action, feedbackArgs);
 	}
 
 	if (resolution.kind === "bootstrap") {

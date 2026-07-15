@@ -4,6 +4,7 @@ import { kernelRegistry } from "./registry";
 export type CommandResolution =
 	| { kind: "help" }
 	| { kind: "status"; args: string[] }
+	| { kind: "feedback"; args: string[] }
 	| { kind: "validate"; args: string[] }
 	| { kind: "init"; args: string[] }
 	| { kind: "bootstrap"; args: string[] }
@@ -202,6 +203,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "status") {
 		return { kind: "status", args: normalizeStatusInvocation(normalized) };
+	}
+
+	if (topLevelKind === "feedback") {
+		return { kind: "feedback", args: rest };
 	}
 
 	if (topLevelKind === "bootstrap") {

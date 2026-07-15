@@ -281,6 +281,44 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("feedback status is root-free and supports the fb alias", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-feedback-no-project-"));
+		try {
+			const proc = runKernel(root, ["fb", "status", "--json"]);
+			expect(proc.status).toBe(0);
+			expect(proc.stderr).toBe("");
+			const payload = JSON.parse((proc.stdout as string).trim()) as {
+				action?: string;
+				ok?: boolean;
+			};
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("feedback.status");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restricted feedback mutations honor the operation policy before root loading", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-feedback-policy-"));
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"fb",
+				"purge",
+				"--confirm",
+				"--json",
+			]);
+			expect(proc.status).toBe(2);
+			expect(proc.stderr).toBe("");
+			const payload = JSON.parse((proc.stdout as string).trim()) as {
+				action?: string;
+			};
+			expect(payload.action).toBe("feedback.purge");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("--help --verbose prints expanded catalog without requiring project files", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-help-verbose-no-project-"));
 		try {

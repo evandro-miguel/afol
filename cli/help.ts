@@ -22,6 +22,7 @@ const CATEGORY_LABELS: Record<CommandCategory, string> = {
 
 const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	status: "project status",
+	feedback: "feedback reports",
 	validate: "validation gates",
 	init: "install scaffold",
 	new: "create session",

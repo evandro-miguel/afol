@@ -1,5 +1,6 @@
 export type CommandKind =
 	| "status"
+	| "feedback"
 	| "validate"
 	| "init"
 	| "bootstrap"
@@ -43,7 +44,12 @@ export type CommandKind =
 	| "adapter"
 	| "telemetry"
 	| "session";
-export type CommandSideEffect = "read" | "write" | "append" | "generated";
+export type CommandSideEffect =
+	| "read"
+	| "preview"
+	| "write"
+	| "append"
+	| "generated";
 
 export type CommandCategory = "core" | "workflow" | "inspect" | "ops";
 
@@ -94,6 +100,51 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--task-id <task-id>",
 				sideEffect: "read",
 				description: "Resolve a specific task in the selected session",
+			},
+		],
+	},
+	{
+		command: "feedback",
+		aliases: ["fb"],
+		kind: "feedback",
+		sideEffect: "read",
+		description: "Inspect and manage local feedback reports",
+		category: "inspect",
+		subcommands: [
+			{
+				usage: "status",
+				sideEffect: "read",
+				description: "Show feedback mode and count",
+			},
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List feedback reports",
+			},
+			{
+				usage: "show --id <report-id>",
+				sideEffect: "read",
+				description: "Show one feedback report",
+			},
+			{
+				usage: "preview",
+				sideEffect: "preview",
+				description: "Preview redacted feedback",
+			},
+			{
+				usage: "annotate --note <text>",
+				sideEffect: "write",
+				description: "Annotate a feedback report",
+			},
+			{
+				usage: "purge --confirm",
+				sideEffect: "write",
+				description: "Purge feedback reports",
+			},
+			{
+				usage: "last -m <text>",
+				sideEffect: "write",
+				description: "Annotate the latest report",
 			},
 		],
 	},
