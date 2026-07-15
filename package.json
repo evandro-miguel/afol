@@ -34,7 +34,7 @@
 		"validate:template": "bun run template:check",
 		"validate:bootstrap": "bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts",
 		"kernel": "bun run cli/main.ts",
-		"build": "bun run version:generate && bun build --compile ./cli/main.ts --outfile dist/afol",
+		"build": "bun run version:generate && bun build --compile --no-compile-autoload-dotenv --no-compile-autoload-bunfig ./cli/main.ts --outfile dist/afol",
 		"build:deterministic": "bun install --frozen-lockfile && bun run build",
 		"validate:security": "bun run security:scan:informative",
 		"security:deps:informative": "bun run cli/dev/security-scan.ts deps",
@@ -54,6 +54,7 @@
 		"release:provenance": "bun run cli/dev/release-provenance.ts",
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
 		"smoke:dist": "bun run build && bun run cli/dev/dist-smoke.ts",
+		"smoke:wsl2": "bun run build && bun run cli/dev/dist-smoke.ts --wsl2",
 		"smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
 	},
 	"dependencies": {

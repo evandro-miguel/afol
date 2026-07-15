@@ -15,6 +15,19 @@ import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const distPath = join(repoRoot, "dist", "afol");
+const requireWsl2 = process.argv.includes("--wsl2");
+
+if (requireWsl2) {
+	if (process.platform !== "linux" || process.arch !== "x64") {
+		throw new Error(
+			`WSL2 smoke requires Linux x64; observed ${process.platform}/${process.arch}`,
+		);
+	}
+	const procVersion = readFileSync("/proc/version", "utf8");
+	if (!/microsoft|wsl/i.test(procVersion)) {
+		throw new Error("WSL2 smoke requires an observed Microsoft WSL kernel");
+	}
+}
 
 type SpawnResult = ReturnType<typeof spawnSync>;
 type TemplatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
@@ -244,7 +257,13 @@ try {
 		);
 	}
 
+	writeFileSync(
+		join(lifecycleTarget, ".env"),
+		"AFOL_SESSION=dotenv-must-not-load\n",
+		"utf8",
+	);
 	const start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
+	rmSync(join(lifecycleTarget, ".env"), { force: true });
 	assertOk(start, "dist start");
 
 	const done = runDist(lifecycleTarget, [

@@ -212,6 +212,12 @@ bun run validate:project-benchmarks
 bun run validate:release
 ```
 
+Release evidence is scoped to the observed Linux x64 path. The CI release
+runner is Ubuntu 24.04 x64; that evidence must not be generalized to Windows,
+macOS, or ARM. Run `bun run smoke:wsl2` separately from an observed Linux x64
+WSL2 shell when recording WSL2 evidence. The standalone build disables Bun
+`.env` and `bunfig.toml` autoloading.
+
 For release or scaffold-boundary work, run the broader release gates from
 `.afol/adm/doctrine/RELEASE-RUNBOOK.md`.
 
