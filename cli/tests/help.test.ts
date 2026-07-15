@@ -10,7 +10,7 @@ import {
 	formatCommandHelp,
 	formatHelpText,
 } from "../help";
-import { SUBCOMMAND_DISPATCH_GROUPS } from "../main";
+import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
@@ -186,8 +186,20 @@ describe("help formatter", () => {
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain("Usage: afol");
 			}
-			for (const command of ["status", "evidence", "done", "log"] as const) {
-				const result = spawnSync("bun", [cliPath, command, "--help"], {
+			const directHelpCommands: (typeof kernelRegistry.commands)[number][] = [];
+			for (const kind of DIRECT_DISPATCH_KINDS) {
+				const spec = kernelRegistry.commands.find((entry) => entry.kind === kind);
+				if (
+					spec &&
+					spec.kind !== "verifyTasks" &&
+					!["new", "start", "close"].includes(spec.command)
+				) {
+					directHelpCommands.push(spec);
+				}
+			}
+			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length - 4);
+			for (const spec of directHelpCommands) {
+				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
 					cwd: tempRoot,
 					encoding: "utf8",
 					shell: false,
@@ -195,8 +207,16 @@ describe("help formatter", () => {
 
 				expect(result.status).toBe(0);
 				expect(result.stderr).toBe("");
-				expect(result.stdout).toContain(`Command: ${command}`);
+				expect(result.stdout).toContain(`Command: ${spec.command}`);
 			}
+			const shortStartHelp = spawnSync("bun", [cliPath, "st", "--help"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(shortStartHelp.status).toBe(0);
+			expect(shortStartHelp.stderr).toBe("");
+			expect(shortStartHelp.stdout).toContain("Usage: afol start");
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],

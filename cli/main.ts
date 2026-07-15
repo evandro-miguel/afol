@@ -320,8 +320,7 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (
 		resolution.kind === "new" &&
-		resolution.args.length === 1 &&
-		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
+		hasHelpArg(resolution.args)
 	) {
 		console.log(NEW_COMMAND_HELP);
 		return 0;
@@ -329,8 +328,7 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (
 		resolution.kind === "start" &&
-		resolution.args.length === 1 &&
-		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
+		hasHelpArg(resolution.args)
 	) {
 		console.log(START_COMMAND_HELP);
 		return 0;
@@ -338,26 +336,20 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (
 		resolution.kind === "close" &&
-		resolution.args.length === 1 &&
-		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
+		hasHelpArg(resolution.args)
 	) {
 		console.log(CLOSE_COMMAND_HELP);
 		return 0;
 	}
 
-	const topLevelHelpArgs =
-		resolution.kind === "status"
-			? resolution.args.filter((arg) => arg !== "status")
-			: resolution.args;
-	if (
-		(resolution.kind === "status" ||
-			resolution.kind === "evidence" ||
-			resolution.kind === "done" ||
-			resolution.kind === "log") &&
-		topLevelHelpArgs.length === 1 &&
-		kernelRegistry.isHelpAlias(topLevelHelpArgs[0] ?? "")
-	) {
-		const help = formatCommandHelp(resolution.kind, kernelRegistry);
+	const directHelpCommand =
+		resolution.kind !== "subcommand" &&
+		resolution.kind !== "verifyTasks" &&
+		hasHelpArg(resolution.args)
+			? registryHelpCommandForGroup(resolution.kind)
+			: null;
+	if (directHelpCommand) {
+		const help = formatCommandHelp(directHelpCommand, kernelRegistry);
 		if (help) {
 			console.log(help);
 			return 0;
