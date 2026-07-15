@@ -490,14 +490,14 @@ describe("validation command family", () => {
 			expect(payload.status).toBe("passed");
 			expect(payload.pass).toBe(true);
 			expect(payload.summary).toEqual({
-				total: 6,
-				passed: 6,
+				total: 8,
+				passed: 8,
 				failed: 0,
 				skipped: 0,
 				baseline_missing: 0,
 			});
 			const results = payload.results as Array<Record<string, unknown>>;
-			expect(results.length).toBeGreaterThanOrEqual(6);
+			expect(results.length).toBeGreaterThanOrEqual(8);
 			const first = results[0];
 			if (!first) {
 				throw new Error("Expected at least one benchmark result");
@@ -766,7 +766,7 @@ describe("validation command family", () => {
 			),
 		).toBe(true);
 		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.failed).toBe(6);
+		expect(summary.failed).toBe(8);
 		expect(summary.skipped).toBe(0);
 	});
 
