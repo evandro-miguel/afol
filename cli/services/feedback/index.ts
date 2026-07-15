@@ -43,6 +43,7 @@ const SECRET_KEY =
 const SECRET_VALUE = /(bearer\s+)[a-z0-9._~+/=-]+/gi;
 const KEYED_SECRET =
 	/(token|password|secret|cookie|authorization|api[_-]?key|credential|private[_-]?key)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)/gi;
+const CONTROL_CHARACTER = /\p{Cc}/gu;
 
 function cap(value: string, max = MAX_TEXT): string {
 	return value.length > max ? `${value.slice(0, max)}…` : value;
@@ -51,9 +52,7 @@ function cap(value: string, max = MAX_TEXT): string {
 function redactString(value: string): string {
 	return cap(
 		value
-			.replaceAll("\n", " ")
-			.replaceAll("\r", " ")
-			.replaceAll("\t", " ")
+			.replace(CONTROL_CHARACTER, " ")
 			.replace(SECRET_VALUE, "$1[REDACTED]")
 			.replace(KEYED_SECRET, "$1$2[REDACTED]"),
 	);
@@ -177,10 +176,13 @@ export function openFeedbackDb(env: NodeJS.ProcessEnv = process.env): Database {
 	mkdirSync(dirname(path), { recursive: true });
 	const db = new Database(path);
 	try {
-		db.exec(
-			`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=${BUSY_TIMEOUT_MS}; PRAGMA foreign_keys=ON;`,
+		db.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT_MS};`);
+		withRetry(() =>
+			db.exec(
+				"PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;",
+			),
 		);
-		ensureSchema(db);
+		withRetry(() => ensureSchema(db));
 		return db;
 	} catch (error) {
 		db.close();
@@ -214,10 +216,13 @@ function rowToReport(row: Record<string, unknown>): FeedbackReport {
 	};
 }
 
-export function previewFeedback(input: FeedbackInput): FeedbackReport {
+export function previewFeedback(
+	input: FeedbackInput,
+	reportId = id(),
+): FeedbackReport {
 	const clean = redactFeedbackInput(input);
 	return {
-		report_id: id(),
+		report_id: reportId,
 		created_at: new Date().toISOString(),
 		kind: clean.kind ?? "unexpected",
 		message: clean.message ?? "local feedback",
@@ -232,9 +237,10 @@ export function previewFeedback(input: FeedbackInput): FeedbackReport {
 export function recordFeedback(
 	input: FeedbackInput,
 	env: NodeJS.ProcessEnv = process.env,
+	reportId?: string,
 ): FeedbackReport | null {
 	if (feedbackMode(env) !== "local") return null;
-	const report = previewFeedback(input);
+	const report = previewFeedback(input, reportId);
 	const db = openFeedbackDb(env);
 	try {
 		withRetry(() => {

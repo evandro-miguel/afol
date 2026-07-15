@@ -25,6 +25,6 @@ spec_waiver_reason: ""
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | pending | worker | Add thin unexpected and integrity boundary with redacted diagnostic metadata |
+| T-01 | done | worker | Add thin unexpected and integrity boundary with redacted diagnostic metadata attempt=1 |
 | T-02 | done | worker | Implement offline feedback SQLite storage and root-free commands attempt=1 |
-| T-03 | pending | worker | Prove redaction, contention bounds, and fault atomicity |
+| T-03 | done | worker | Prove redaction, contention bounds, and fault atomicity attempt=1 |

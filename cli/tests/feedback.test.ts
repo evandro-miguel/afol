@@ -51,7 +51,7 @@ describe("offline feedback backend", () => {
 					"preview",
 					[
 						"--message",
-						"token=never-print",
+						"token=never-print\u001b]0;spoofed",
 						"--stack",
 						"Authorization: Bearer abc",
 						"--json",
@@ -65,6 +65,7 @@ describe("offline feedback backend", () => {
 			else process.env.AFOL_STATE_HOME = previousHome;
 			expect(captured.stdout[0]).not.toContain("never-print");
 			expect(captured.stdout[0]).not.toContain("Bearer abc");
+			expect(captured.stdout[0]).not.toContain("\u001b");
 			expect(captured.stdout[0]).toContain("[REDACTED]");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
