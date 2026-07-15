@@ -439,9 +439,12 @@ export async function validateProjectStructure(
 				};
 			}
 			const hasDuplicates = warnings.some((w) => w.type === "duplicate_theme");
+			const hasUnavailableSession = warnings.some(
+				(w) => w.type === "unreadable_session_directory",
+			);
 			return {
 				id: "session_health" as const,
-				ok: !hasDuplicates,
+				ok: !hasDuplicates && !hasUnavailableSession,
 				message: warnings.map((w) => w.message).join("; "),
 			};
 		})(),

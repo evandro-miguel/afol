@@ -39,6 +39,7 @@ export type WorkbenchIndexSession = {
 	open: number;
 	problem: number;
 	touched_at: string;
+	degraded?: boolean;
 };
 
 export type WorkbenchIndexSnapshot = {
@@ -63,12 +64,7 @@ type WorkbenchIndexSnapshotInput = Omit<WorkbenchIndexSnapshot, "tasks"> & {
 };
 
 const TASK_FILE_RE = /^.+_task_\d+\.md$/;
-const STATE_BOARD_HEADER_RE =
-	/^\s*\|\s*Task\s*\|\s*State\s*\|\s*Owner\s*\|\s*Notes\s*\|?\s*$/i;
-const TASK_ROW_RE =
-	/^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|?\s*$/;
-const TASK_TABLE_SEPARATOR_RE =
-	/^\s*\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|?\s*$/;
+const STATE_BOARD_HEADING_RE = /^#{2,6}\s+State Board\b/i;
 const TASK_HEADING_RE = /^#{2,6}\s+(T-\d{2,3})\b/i;
 const CHECKPOINT_HEADING_RE = /^#{2,6}\s+.+checkpoint\b/i;
 const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
@@ -137,15 +133,25 @@ function sessionDirExists(root: string, session: string): boolean {
 	}
 }
 
-function sessionTaskFiles(sessionDir: string): string[] {
+function readSessionTaskFiles(sessionDir: string): {
+	files: string[];
+	readFailed: boolean;
+} {
 	try {
-		return readdirSync(sessionDir, { withFileTypes: true })
-			.filter((entry) => entry.isFile() && TASK_FILE_RE.test(entry.name))
-			.map((entry) => resolve(sessionDir, entry.name))
-			.sort();
+		return {
+			files: readdirSync(sessionDir, { withFileTypes: true })
+				.filter((entry) => entry.isFile() && TASK_FILE_RE.test(entry.name))
+				.map((entry) => resolve(sessionDir, entry.name))
+				.sort(),
+			readFailed: false,
+		};
 	} catch {
-		return [];
+		return { files: [], readFailed: true };
 	}
+}
+
+function sessionTaskFiles(sessionDir: string): string[] {
+	return readSessionTaskFiles(sessionDir).files;
 }
 
 function escapeRegex(value: string): string {
@@ -461,24 +467,151 @@ function parseTaskFileClaim(
 	};
 }
 
+type StateBoardTable = {
+	columnCount: number;
+	taskColumn: number;
+	stateColumn: number;
+	ownerColumn: number;
+	notesColumn: number | null;
+};
+
+type ParsedStateBoardTasks = {
+	tasks: Array<Omit<WorkbenchIndexTask, "planned_files" | "touched_files">>;
+	malformed: boolean;
+};
+
+/**
+ * Split a Markdown table row body (after leading `|`, without trailing `|`)
+ * into cells. A pipe `|` is a column delimiter only when preceded by an even
+ * number of consecutive backslashes. Backslashes and escaped pipes are
+ * preserved in the cell value.
+ *
+ * Example: `a\\|b|c` -> ["a\\", "b", "c"]  (two backslashes, even, pipe is delimiter)
+ * Example: `a\\\|b|c` -> ["a\\\|b", "c"] (three backslashes, odd, pipe is content)
+ * Example: `a\|b|c`    -> ["a\|b", "c"]    (one backslash, odd, pipe is content)
+ */
+function isMarkdownPipeDelimiter(body: string, index: number): boolean {
+	let backslashCount = 0;
+	for (let cursor = index - 1; cursor >= 0 && body[cursor] === "\\"; cursor--) {
+		backslashCount++;
+	}
+	return backslashCount % 2 === 0;
+}
+
+function splitMarkdownTableCells(body: string): string[] {
+	const cells: string[] = [];
+	let current = "";
+	let i = 0;
+	while (i < body.length) {
+		const ch = body[i];
+		if (ch === "|" && isMarkdownPipeDelimiter(body, i)) {
+			cells.push(current);
+			current = "";
+			i++;
+			continue;
+		}
+		current += ch;
+		i++;
+	}
+	cells.push(current);
+	return cells;
+}
+
+function parseMarkdownTableCells(line: string): string[] | null {
+	const trimmed = line.trim();
+	if (!trimmed.startsWith("|")) {
+		return null;
+	}
+	let body = trimmed.slice(1);
+	if (body.endsWith("|") && isMarkdownPipeDelimiter(body, body.length - 1)) {
+		body = body.slice(0, -1);
+	}
+	return splitMarkdownTableCells(body).map((cell) => cell.trim());
+}
+
+function parseStateBoardTableHeader(
+	line: string,
+	allowExtraColumns: boolean,
+): StateBoardTable | null {
+	const cells = parseMarkdownTableCells(line);
+	if (!cells) {
+		return null;
+	}
+	const labels = cells.map((cell) => cell.toLowerCase());
+	const canonical = ["task", "state", "owner", "notes"];
+	if (
+		labels.length === canonical.length &&
+		labels.every((label, index) => label === canonical[index])
+	) {
+		return {
+			columnCount: labels.length,
+			taskColumn: 0,
+			stateColumn: 1,
+			ownerColumn: 2,
+			notesColumn: 3,
+		};
+	}
+	if (!allowExtraColumns) {
+		return null;
+	}
+
+	const columns = new Map<string, number>();
+	for (const [index, label] of labels.entries()) {
+		if (
+			columns.has(label) &&
+			["task", "state", "owner", "notes"].includes(label)
+		) {
+			return null;
+		}
+		if (!columns.has(label)) {
+			columns.set(label, index);
+		}
+	}
+	const taskColumn = columns.get("task");
+	const stateColumn = columns.get("state");
+	const ownerColumn = columns.get("owner");
+	if (
+		taskColumn === undefined ||
+		stateColumn === undefined ||
+		ownerColumn === undefined
+	) {
+		return null;
+	}
+
+	return {
+		columnCount: labels.length,
+		taskColumn,
+		stateColumn,
+		ownerColumn,
+		notesColumn: columns.get("notes") ?? null,
+	};
+}
+
+function isTableSeparator(cells: string[], table: StateBoardTable): boolean {
+	return (
+		cells.length === table.columnCount &&
+		cells.every((cell) => /^:?-+:?$/.test(cell))
+	);
+}
+
 function parseStateBoardTasks(
 	session: string,
 	file: string,
 	lines: string[],
-): Array<Omit<WorkbenchIndexTask, "planned_files" | "touched_files">> {
+): ParsedStateBoardTasks {
 	const tasks: Array<
 		Omit<WorkbenchIndexTask, "planned_files" | "touched_files">
 	> = [];
-	let stateBoard = false;
+	let afterStateBoard = false;
+	let table: StateBoardTable | null = null;
+	let malformed = false;
 	let insideCodeBlock = false;
 
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index] ?? "";
 		const trimmed = line.trim();
 		if (!trimmed) {
-			if (stateBoard) {
-				stateBoard = false;
-			}
+			table = null;
 			continue;
 		}
 
@@ -490,38 +623,68 @@ function parseStateBoardTasks(
 			continue;
 		}
 
-		if (!stateBoard && STATE_BOARD_HEADER_RE.test(trimmed)) {
-			stateBoard = true;
+		if (STATE_BOARD_HEADING_RE.test(trimmed)) {
+			afterStateBoard = true;
+			table = null;
 			continue;
 		}
-		if (!stateBoard) {
-			continue;
-		}
-		if (TASK_TABLE_SEPARATOR_RE.test(trimmed)) {
-			continue;
-		}
-		if (!trimmed.startsWith("|")) {
+		if (trimmed.startsWith("#")) {
+			afterStateBoard = false;
+			table = null;
 			continue;
 		}
 
-		const match = trimmed.match(TASK_ROW_RE);
-		if (!match?.[1]) {
+		const header = parseStateBoardTableHeader(trimmed, afterStateBoard);
+		if (header) {
+			table = header;
+			continue;
+		}
+		if (!table) {
+			if (afterStateBoard && trimmed.startsWith("|")) {
+				malformed = true;
+			}
+			continue;
+		}
+
+		const cells = parseMarkdownTableCells(trimmed);
+		if (!cells) {
+			continue;
+		}
+		if (isTableSeparator(cells, table)) {
+			continue;
+		}
+
+		const taskId = cells[table.taskColumn]?.trim() ?? "";
+		const state = cells[table.stateColumn]?.trim() ?? "";
+		const owner = cells[table.ownerColumn]?.trim() ?? "";
+		if (
+			table.taskColumn >= cells.length ||
+			table.stateColumn >= cells.length ||
+			table.ownerColumn >= cells.length ||
+			!/^T-\d{2,3}$/.test(taskId) ||
+			!state
+		) {
+			// Keep valid rows, but surface partial table corruption as degraded.
+			malformed = true;
 			continue;
 		}
 
 		tasks.push({
 			session,
-			task_id: match[1],
-			state: (match[2] ?? "").trim().toLowerCase(),
-			owner: (match[3] ?? "").trim(),
-			notes: (match[4] ?? "").trim(),
+			task_id: taskId,
+			state: state.toLowerCase(),
+			owner,
+			notes:
+				table.notesColumn === null
+					? ""
+					: (cells[table.notesColumn] ?? "").trim(),
 			file,
 			line: index + 1,
 			touched_at: parseTouchedAt(file),
 		});
 	}
 
-	return tasks;
+	return { tasks, malformed };
 }
 
 function parseTaskClaims(
@@ -607,24 +770,30 @@ function parseTaskClaims(
 	return parsed;
 }
 
-function parseTaskRows(session: string, file: string): WorkbenchIndexTask[] {
+function parseTaskRows(
+	session: string,
+	file: string,
+): { tasks: WorkbenchIndexTask[]; malformed: boolean } {
 	try {
 		const lines = readFileSync(file, "utf8").split("\n");
-		const tasks = parseStateBoardTasks(session, file, lines);
+		const parsedBoard = parseStateBoardTasks(session, file, lines);
 		const parsedClaims = parseTaskClaims(
 			lines,
-			tasks.map((task) => task.task_id),
+			parsedBoard.tasks.map((task) => task.task_id),
 		);
-		return tasks.map((task) => {
-			const claims = parsedClaims.get(task.task_id) ?? emptyTaskClaims();
-			return {
-				...task,
-				planned_files: dedupeClaims(claims.planned_files),
-				touched_files: dedupeClaims(claims.touched_files),
-			};
-		});
+		return {
+			tasks: parsedBoard.tasks.map((task) => {
+				const claims = parsedClaims.get(task.task_id) ?? emptyTaskClaims();
+				return {
+					...task,
+					planned_files: dedupeClaims(claims.planned_files),
+					touched_files: dedupeClaims(claims.touched_files),
+				};
+			}),
+			malformed: parsedBoard.malformed,
+		};
 	} catch {
-		return [];
+		return { tasks: [], malformed: true };
 	}
 }
 
@@ -637,6 +806,10 @@ function summarizeSession(
 	const open = tasks.filter(
 		(task) => task.state !== "done" && task.state !== "moved",
 	).length;
+	const touchedAt = tasks.reduce((latest, task) => {
+		const current = Date.parse(task.touched_at);
+		return Number.isFinite(current) ? Math.max(latest, current) : latest;
+	}, 0);
 	return {
 		session,
 		task_count: tasks.length,
@@ -644,7 +817,9 @@ function summarizeSession(
 		open,
 		problem,
 		touched_at:
-			tasks.length > 0 ? (tasks.at(-1)?.touched_at ?? ZERO_TIME) : ZERO_TIME,
+			tasks.length > 0 && touchedAt > 0
+				? new Date(touchedAt).toISOString()
+				: ZERO_TIME,
 	};
 }
 
@@ -682,12 +857,45 @@ function buildSessionsSnapshot(
 			continue;
 		}
 		const sessionTasks: WorkbenchIndexTask[] = [];
+		const taskFileRead = readSessionTaskFiles(sessionDir);
+		const taskFiles = taskFileRead.files;
+		let readError = taskFileRead.readFailed;
+		let parseError = false;
+		let duplicateTaskId = false;
+		const seenTaskIds = new Set<string>();
 
-		for (const file of sessionTaskFiles(sessionDir)) {
-			sessionTasks.push(...parseTaskRows(session, file));
+		for (const file of taskFiles) {
+			// Pre-check readability to surface I/O errors as degraded state.
+			try {
+				readFileSync(file, "utf8");
+			} catch {
+				readError = true;
+				continue;
+			}
+			const parsed = parseTaskRows(session, file);
+			parseError ||= parsed.malformed;
+			for (const task of parsed.tasks) {
+				if (seenTaskIds.has(task.task_id)) {
+					duplicateTaskId = true;
+					continue;
+				}
+				seenTaskIds.add(task.task_id);
+				sessionTasks.push(task);
+			}
 		}
 
-		snapshotSessions.push(summarizeSession(session, sessionTasks));
+		// If task files exist but no tasks could be parsed, the session is degraded.
+		const summary = summarizeSession(session, sessionTasks);
+		if (
+			readError ||
+			parseError ||
+			duplicateTaskId ||
+			(taskFiles.length > 0 && sessionTasks.length === 0)
+		) {
+			summary.degraded = true;
+		}
+
+		snapshotSessions.push(summary);
 		allTasks.push(...sessionTasks);
 	}
 
@@ -742,6 +950,142 @@ function writeSnapshot(
 	return snapshot;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isWorkbenchIndexFileClaim(
+	value: unknown,
+): value is WorkbenchIndexFileClaim {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		typeof value.path === "string" &&
+		value.path.length > 0 &&
+		(value.kind === "exact" || value.kind === "glob") &&
+		(value.source === "planned" || value.source === "touched") &&
+		isPositiveInteger(value.line)
+	);
+}
+
+function isWorkbenchIndexTaskInput(
+	value: unknown,
+): value is WorkbenchIndexSnapshotInput["tasks"][number] {
+	if (!isRecord(value)) {
+		return false;
+	}
+	const plannedFiles = value.planned_files;
+	const touchedFiles = value.touched_files;
+	return (
+		typeof value.session === "string" &&
+		value.session.length > 0 &&
+		typeof value.task_id === "string" &&
+		value.task_id.length > 0 &&
+		typeof value.state === "string" &&
+		value.state.length > 0 &&
+		typeof value.owner === "string" &&
+		typeof value.notes === "string" &&
+		typeof value.file === "string" &&
+		value.file.length > 0 &&
+		isPositiveInteger(value.line) &&
+		typeof value.touched_at === "string" &&
+		isIsoDate(value.touched_at) &&
+		(plannedFiles === undefined ||
+			plannedFiles === null ||
+			(Array.isArray(plannedFiles) &&
+				plannedFiles.every(isWorkbenchIndexFileClaim))) &&
+		(touchedFiles === undefined ||
+			touchedFiles === null ||
+			(Array.isArray(touchedFiles) &&
+				touchedFiles.every(isWorkbenchIndexFileClaim)))
+	);
+}
+
+function isWorkbenchIndexSession(
+	value: unknown,
+): value is WorkbenchIndexSession {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		typeof value.session === "string" &&
+		value.session.length > 0 &&
+		isNonNegativeInteger(value.task_count) &&
+		isNonNegativeInteger(value.completed) &&
+		isNonNegativeInteger(value.open) &&
+		isNonNegativeInteger(value.problem) &&
+		typeof value.touched_at === "string" &&
+		isIsoDate(value.touched_at) &&
+		(value.degraded === undefined || typeof value.degraded === "boolean")
+	);
+}
+
+function isWorkbenchIndexSnapshotInput(
+	value: unknown,
+): value is WorkbenchIndexSnapshotInput {
+	if (!isRecord(value) || !isRecord(value.source)) {
+		return false;
+	}
+	if (
+		value.kind !== "workbench_index_v1" ||
+		value.version !== 1 ||
+		typeof value.generated_at !== "string" ||
+		typeof value.source.wb_dir !== "string" ||
+		typeof value.source.event_log !== "string" ||
+		!Array.isArray(value.sessions) ||
+		!Array.isArray(value.tasks) ||
+		!value.sessions.every(isWorkbenchIndexSession) ||
+		!value.tasks.every(isWorkbenchIndexTaskInput)
+	) {
+		return false;
+	}
+	const sessionNames = new Set(
+		value.sessions.map((session) => session.session),
+	);
+	const tasks = value.tasks;
+	if (sessionNames.size !== value.sessions.length) {
+		return false;
+	}
+
+	const taskKeys = new Set<string>();
+	for (const task of value.tasks) {
+		if (!sessionNames.has(task.session)) {
+			return false;
+		}
+		const taskKey = `${task.session}\0${task.task_id}`;
+		if (taskKeys.has(taskKey)) {
+			return false;
+		}
+		taskKeys.add(taskKey);
+	}
+
+	return value.sessions.every((session) => {
+		const sessionTasks = tasks.filter(
+			(task) => task.session === session.session,
+		);
+		return (
+			session.task_count === sessionTasks.length &&
+			session.completed ===
+				sessionTasks.filter((task) => task.state === "done").length &&
+			session.open ===
+				sessionTasks.filter(
+					(task) => task.state !== "done" && task.state !== "moved",
+				).length &&
+			session.problem ===
+				sessionTasks.filter((task) => task.state === "problem").length
+		);
+	});
+}
+
 function normalizeWorkbenchTask(
 	task: WorkbenchIndexSnapshotInput["tasks"][number],
 ): WorkbenchIndexTask {
@@ -772,18 +1116,10 @@ export function loadWorkBenchIndexSnapshot(
 		const parsed = JSON.parse(
 			readFileSync(indexPath, "utf8"),
 		) as Partial<WorkbenchIndexSnapshot>;
-		if (
-			parsed.kind !== "workbench_index_v1" ||
-			parsed.version !== 1 ||
-			typeof parsed.generated_at !== "string" ||
-			!Array.isArray(parsed.sessions) ||
-			!Array.isArray(parsed.tasks) ||
-			typeof parsed.source !== "object" ||
-			parsed.source === null
-		) {
+		if (!isWorkbenchIndexSnapshotInput(parsed)) {
 			return null;
 		}
-		return normalizeWorkbenchSnapshot(parsed as WorkbenchIndexSnapshotInput);
+		return normalizeWorkbenchSnapshot(parsed);
 	} catch {
 		return null;
 	}
@@ -848,7 +1184,127 @@ function latestSourceMtime(root: string): number {
 }
 
 function isIsoDate(value: unknown): boolean {
-	return Number.isFinite(Date.parse(value as string));
+	return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function normalizedMtime(path: string): number | null {
+	try {
+		const timestamp = statSync(path).mtime.toISOString();
+		const parsed = Date.parse(timestamp);
+		return Number.isFinite(parsed) ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+function isSessionSnapshotFresh(
+	root: string,
+	snapshot: WorkbenchIndexSnapshot,
+	session: string,
+): boolean {
+	const persistedSessions = snapshot.sessions.filter(
+		(entry) => entry.session === session,
+	);
+	if (persistedSessions.length !== 1 || !sessionDirExists(root, session)) {
+		return false;
+	}
+
+	const persistedSession = persistedSessions[0];
+	if (!persistedSession) {
+		return false;
+	}
+	const persistedTasks = snapshot.tasks.filter(
+		(task) => task.session === session,
+	);
+	if (persistedSession.task_count !== persistedTasks.length) {
+		return false;
+	}
+
+	const sessionDir = resolve(resolveWorkbenchRoot(root), session);
+	const taskFiles = sessionTaskFiles(sessionDir);
+	const generatedAt = Date.parse(snapshot.generated_at);
+	if (!Number.isFinite(generatedAt)) {
+		return false;
+	}
+
+	if (persistedTasks.length === 0) {
+		if (persistedSession.touched_at !== ZERO_TIME) {
+			return false;
+		}
+		const sourceTimes = [
+			normalizedMtime(sessionDir),
+			...taskFiles.map(normalizedMtime),
+		];
+		return sourceTimes.every(
+			(timestamp) => timestamp !== null && timestamp <= generatedAt,
+		);
+	}
+
+	const persistedByFile = new Map<string, number[]>();
+	for (const task of persistedTasks) {
+		const touchedAt = Date.parse(task.touched_at);
+		if (!Number.isFinite(touchedAt)) {
+			return false;
+		}
+		const timestamps = persistedByFile.get(task.file) ?? [];
+		timestamps.push(touchedAt);
+		persistedByFile.set(task.file, timestamps);
+	}
+
+	const currentFiles = new Set(taskFiles);
+	if (
+		currentFiles.size !== persistedByFile.size ||
+		[...currentFiles].some((file) => !persistedByFile.has(file)) ||
+		[...persistedByFile.keys()].some((file) => !currentFiles.has(file))
+	) {
+		return false;
+	}
+
+	let latestTaskMtime = 0;
+	for (const file of taskFiles) {
+		const currentMtime = normalizedMtime(file);
+		const persistedMtimes = persistedByFile.get(file);
+		if (currentMtime === null || !persistedMtimes) {
+			return false;
+		}
+		latestTaskMtime = Math.max(latestTaskMtime, currentMtime);
+		if (persistedMtimes.some((timestamp) => timestamp !== currentMtime)) {
+			return false;
+		}
+	}
+
+	return Date.parse(persistedSession.touched_at) === latestTaskMtime;
+}
+
+function canMergeScopedWorkbenchSnapshot(
+	root: string,
+	snapshot: WorkbenchIndexSnapshot,
+	sessionScope: string,
+): boolean {
+	const diskSessions = new Set(collectSessionIds(root));
+	const snapshotSessions = new Set(
+		snapshot.sessions.map((session) => session.session),
+	);
+
+	for (const session of diskSessions) {
+		if (session !== sessionScope && !snapshotSessions.has(session)) {
+			return false;
+		}
+	}
+	for (const session of snapshotSessions) {
+		if (session !== sessionScope && !diskSessions.has(session)) {
+			return false;
+		}
+	}
+	for (const session of diskSessions) {
+		if (
+			session !== sessionScope &&
+			!isSessionSnapshotFresh(root, snapshot, session)
+		) {
+			return false;
+		}
+	}
+	return true;
 }
 
 export function rebuildWorkBenchIndex(
@@ -861,6 +1317,16 @@ export function rebuildWorkBenchIndex(
 		const current = loadWorkBenchIndexSnapshot(root);
 
 		if (sessionScope) {
+			if (!current) {
+				// Existing snapshot is missing or malformed — fall back to full rebuild
+				// to avoid silently dropping unaffected sessions.
+				return writeSnapshot(root, collectWorkBenchSnapshot(root));
+			}
+			if (!canMergeScopedWorkbenchSnapshot(root, current, sessionScope)) {
+				// An unaffected session changed since the persisted snapshot. Rebuild
+				// all sessions so the scoped write cannot mask that source change.
+				return writeSnapshot(root, collectWorkBenchSnapshot(root));
+			}
 			const targetSnapshot = buildSessionsSnapshot(root, [sessionScope]);
 			const hasSession = sessionDirExists(root, sessionScope);
 
@@ -933,6 +1399,15 @@ export function validateWorkBenchIndex(root: string): {
 		};
 	}
 
+	const degradedSessions = snapshot.sessions.filter((s) => s.degraded);
+	if (degradedSessions.length > 0) {
+		const degradedNames = degradedSessions.map((s) => s.session).join(", ");
+		return {
+			ok: false,
+			message: `degraded sessions in workbench index: ${degradedNames}. Task sources may be unreadable, have malformed or empty State Boards, or contain duplicate task IDs. Repair the named session task source, then run afol local-state rebuild.`,
+		};
+	}
+
 	const generatedAt = Date.parse(snapshot.generated_at);
 	const sourceLatest = latestSourceMtime(root);
 	if (!Number.isFinite(sourceLatest)) {
@@ -949,7 +1424,11 @@ export function validateWorkBenchIndex(root: string): {
 }
 
 export type SessionHealthWarning = {
-	type: "duplicate_theme" | "stale_open_tasks" | "missing_session_directory";
+	type:
+		| "duplicate_theme"
+		| "stale_open_tasks"
+		| "missing_session_directory"
+		| "unreadable_session_directory";
 	session: string;
 	message: string;
 };
@@ -986,7 +1465,16 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 		if (!existsSync(sessionDir)) {
 			continue;
 		}
-		const taskFiles = sessionTaskFiles(sessionDir);
+		const taskFileRead = readSessionTaskFiles(sessionDir);
+		if (taskFileRead.readFailed) {
+			warnings.push({
+				type: "unreadable_session_directory",
+				session,
+				message: `unavailable: session directory unreadable: ${session}`,
+			});
+			continue;
+		}
+		const taskFiles = taskFileRead.files;
 		if (taskFiles.length === 0) {
 			continue;
 		}
@@ -994,7 +1482,7 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 		let hasOpen = false;
 		let touchedAt = 0;
 		for (const file of taskFiles) {
-			const tasks = parseTaskRows(session, file);
+			const tasks = parseTaskRows(session, file).tasks;
 			for (const task of tasks) {
 				if (task.state !== "done" && task.state !== "moved") {
 					hasOpen = true;

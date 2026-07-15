@@ -266,6 +266,31 @@ describe("health system", () => {
 		}
 	});
 
+	test("checkHealth fails when a child session directory is unreadable", () => {
+		const root = createFixture();
+		const session = "260715_1500_unreadable-health";
+		const sessionDir = join(root, ".afol", "wb", session);
+		try {
+			mkdirSync(sessionDir, { recursive: true });
+			rebuildWorkBenchIndex(root);
+			chmodSync(sessionDir, 0o000);
+
+			const report = checkHealth(root, {});
+			expect(report.ok).toBe(false);
+			expect(
+				report.findings.some(
+					(finding) =>
+						finding.area === "wb" &&
+						finding.severity === "fail" &&
+						finding.message.includes("session directory unreadable"),
+				),
+			).toBe(true);
+		} finally {
+			chmodSync(sessionDir, 0o700);
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("checkHealth detects stale PSTR", () => {
 		const root = createFixture();
 		try {

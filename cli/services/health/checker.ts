@@ -231,6 +231,17 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 			);
 			continue;
 		}
+		if (warning.type === "unreadable_session_directory") {
+			findings.push(
+				makeFinding(
+					"wb",
+					"fail",
+					warning.message,
+					"restore read access to the session directory",
+				),
+			);
+			continue;
+		}
 		findings.push(
 			makeFinding(
 				"wb",

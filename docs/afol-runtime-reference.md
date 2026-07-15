@@ -3,7 +3,7 @@ doc_type: reference
 id: afol_runtime_reference
 status: active
 created_at: '2026-06-17T00:00:00Z'
-updated_at: '2026-07-13T00:00:00Z'
+updated_at: '2026-07-15T00:00:00Z'
 ---
 
 # AFOL Runtime Reference
@@ -26,6 +26,7 @@ Core:
 
 ```bash
 afol status
+afol catchup [--session <session-id>]
 afol validate project
 afol init
 afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
@@ -47,6 +48,29 @@ afol st T-01
 afol d T-01 -x "<cmd>"
 afol c -m "<summary>"
 ```
+
+`afol status` has an optional `--catchup` flag to include the same session
+freshness checks as `afol catchup`.
+
+### Hardening behavior
+
+- `catchup` and `status --catchup` report:
+  - `git_changed_files_degraded: true` when the Git status query fails, even
+    when supplemental diff results remain available
+  - `degraded: git unavailable, state unknown` when git cannot be queried
+  - `degraded: git status query failed, state uncertain` when the porcelain
+    status query fails
+- `afol catchup` output marks the change count as `(degraded)` when git query
+  health is uncertain.
+- If session-health collection fails as a whole, `afol status` reports
+  `SESSIONS: unavailable` and a warning entry:
+  - `unavailable: session health collection failed`
+- `afol status --json` exposes that collection-wide failure as
+  `session_count: null` and `session_health_warnings`, both under `data` and
+  through the legacy root keys.
+- If one child session directory is unreadable but the workbench root remains
+  listable, the session count stays numeric and `session_health_warnings`
+  includes `unavailable: session directory unreadable: <session-id>`.
 
 Declared `evidence --result passed` is useful for recording claims, but only
 observed exit-zero evidence authorizes completion. `d -x "<argv command>"`
