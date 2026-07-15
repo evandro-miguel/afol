@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,6 +15,10 @@ import { runUpdateCommand } from "../commands/update";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import {
+	loadMutationJournalStrict,
+	type MutationRecord,
+} from "../services/mutations/journal";
 import { newWorkstream, startTask } from "../services/workbench/lifecycle";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
@@ -87,6 +92,25 @@ function capture() {
 			stderr: (message: string) => stderr.push(message),
 		},
 	};
+}
+
+function expectUpdateJsonError(
+	output: ReturnType<typeof capture>,
+	exitCode = 2,
+): Record<string, unknown> {
+	expect(output.stdout).toHaveLength(1);
+	const payload = JSON.parse(output.stdout[0] ?? "{}") as Record<
+		string,
+		unknown
+	>;
+	expect(payload).toMatchObject({
+		schema: "afol.result/v1",
+		ok: false,
+		action: "update",
+		exit_code: exitCode,
+	});
+	expect(output.stderr).toHaveLength(0);
+	return payload;
 }
 
 function restoreEnv(key: string, value: string | undefined): void {
@@ -221,6 +245,70 @@ describe("update command", () => {
 			};
 			expect(parsed.ok).toBe(true);
 			expect(parsed.action).toBe("update.check");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply preserves stale vendored paths without a managed hash contract", async () => {
+		const root = mkRoot();
+		const staleSkillPath = join(
+			root,
+			".agents",
+			"skills",
+			"agentic-folder-sys",
+		);
+		const staleSourcePath = join(
+			root,
+			".afol",
+			"adm",
+			"source",
+			"universal-skills",
+			"skills",
+			"agentic-folder-sys",
+		);
+		try {
+			mkdirSync(staleSkillPath, { recursive: true });
+			writeFileSync(join(staleSkillPath, "SKILL.md"), "# stale\n", "utf8");
+			mkdirSync(staleSourcePath, { recursive: true });
+			writeFileSync(join(staleSourcePath, "SKILL.md"), "# stale\n", "utf8");
+
+			const check = capture();
+			expect(
+				await runUpdateCommand(
+					["check", "--json", "--verbose"],
+					root,
+					check.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(check.stdout[0] ?? "{}") as {
+				data?: { operations?: Array<{ kind: string; path: string }> };
+			};
+			const staleRemovals =
+				payload.data?.operations?.filter(
+					(operation) =>
+						operation.kind === "remove-stale" &&
+						operation.path.includes("agentic-folder-sys"),
+				) ?? [];
+			expect(staleRemovals).toHaveLength(0);
+
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"remove stale vendored global skill",
+							"--allow-unbound-context",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(4);
+			});
+			expect(existsSync(staleSkillPath)).toBe(true);
+			expect(existsSync(staleSourcePath)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -479,7 +567,7 @@ describe("update command", () => {
 					paths: expect.arrayContaining([".agents/manifest.json"]),
 				},
 			});
-			expect(parsed.data?.ownershipSource?.managed).toBe(0);
+			expect(parsed.data?.ownershipSource?.managed).toBeGreaterThan(0);
 
 			const previewJson = capture();
 			expect(
@@ -581,28 +669,17 @@ describe("update command", () => {
 	test("apply dry-run permits project-owned preserves without writes", async () => {
 		const root = mkRoot();
 		try {
-			mkdirSync(join(root, ".afol"), { recursive: true });
+			const currentLock =
+				templateJson<Record<string, unknown>>(".agents/lock.json");
+			currentLock.revision = "old";
 			writeFileSync(
-				join(root, ".afol", "config.json"),
-				'{"local":true}\n',
+				join(root, ".agents", "lock.json"),
+				JSON.stringify(currentLock, null, 2),
 				"utf8",
 			);
 			writeFileSync(
 				join(root, ".agents", "manifest.json"),
-				JSON.stringify(
-					{
-						version: 1,
-						commands: { status: ["s", "status"] },
-						ownership: {
-							"project-owned": [".afol/config.json", ".agents/manifest.json"],
-							generated: [],
-							ignored: [],
-							conflict: [],
-						},
-					},
-					null,
-					2,
-				),
+				templateText(".agents/manifest.json"),
 				"utf8",
 			);
 
@@ -610,13 +687,23 @@ describe("update command", () => {
 			expect(
 				await runUpdateCommand(["apply", "--dry-run"], root, dryRun.io),
 			).toBe(0);
-			expect(dryRun.stdout.join("\n")).toContain("preserve=2");
-			expect(readFileSync(join(root, ".afol", "config.json"), "utf8")).toBe(
-				'{"local":true}\n',
-			);
+			expect(dryRun.stdout.join("\n")).toContain("preserve=");
 
 			const realApply = capture();
-			expect(await runUpdateCommand(["apply"], root, realApply.io)).toBe(4);
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"apply compatible managed updates",
+							"--allow-unbound-context",
+						],
+						root,
+						realApply.io,
+					),
+				).toBe(0);
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -636,10 +723,6 @@ describe("update command", () => {
 					await runUpdateCommand(
 						[
 							"apply",
-							"--session",
-							"S-01",
-							"--task-id",
-							"T-01",
 							"--reason",
 							"binary provenance",
 							"--allow-unbound-context",
@@ -660,6 +743,16 @@ describe("update command", () => {
 			);
 			expect(lockAfter).toContain('"revision":');
 			expect(lockAfter).not.toContain('"revision": "old"');
+			const journal = loadMutationJournalStrict(root);
+			expect(journal.issues).toHaveLength(0);
+			expect(
+				journal.records
+					.filter((record) => record.kind === "update")
+					.every(
+						(record) =>
+							record.session === "__ci__" && record.taskId === "__unbound__",
+					),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });
@@ -776,6 +869,7 @@ describe("update command", () => {
 			expect(output.stdout.join("\n")).toContain(
 				"update apply: changes available",
 			);
+			expect(output.stdout.join("\n")).toContain("batch_id: M-");
 
 			const journalPath = join(
 				root,
@@ -797,6 +891,8 @@ describe("update command", () => {
 							backupPath: string | null;
 							source?: string;
 							batchId?: string;
+							session?: string;
+							taskId?: string;
 						},
 				);
 			const ruleEntry = journalRows.find(
@@ -812,12 +908,67 @@ describe("update command", () => {
 			expect(ruleEntry?.source).toBe("afol-update");
 			expect(lockEntry?.source).toBe("afol-update");
 			expect(ruleEntry?.batchId).toBeTruthy();
+			expect(ruleEntry?.session).toBe(session);
+			expect(ruleEntry?.taskId).toBe(taskId);
 			expect(lockEntry?.batchId).toBe(ruleEntry?.batchId);
 			expect(lockEntry?.backupPath).toBeTruthy();
 			expect(readFileSync(ruleEntry?.backupPath ?? "", "utf8")).toBe(
 				downstreamRuleReadme,
 			);
 			expect(existsSync(lockEntry?.backupPath ?? "")).toBe(true);
+
+			const batchId = ruleEntry?.batchId ?? "";
+			const appliedLockContent = readFileSync(
+				join(root, ".agents", "lock.json"),
+				"utf8",
+			);
+			writeFileSync(join(root, ".agents", "lock.json"), "drift\n", "utf8");
+			const driftRollback = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"drift check",
+						"--json",
+					],
+					root,
+					driftRollback.io,
+				),
+			).toBe(4);
+			writeFileSync(
+				join(root, ".agents", "lock.json"),
+				appliedLockContent,
+				"utf8",
+			);
+			const rollback = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"restore batch",
+						"--json",
+					],
+					root,
+					rollback.io,
+				),
+			).toBe(0);
+			expect(
+				readFileSync(join(root, ".afol", "adm", "rules", "README.md"), "utf8"),
+			).toBe(downstreamRuleReadme);
+			const secondRollback = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", batchId, "--reason", "repeat", "--json"],
+					root,
+					secondRollback.io,
+				),
+			).toBe(4);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -994,7 +1145,8 @@ describe("update command", () => {
 				"mutations",
 				"mutations.jsonl",
 			);
-			expect(existsSync(journalPath)).toBe(false);
+			expect(existsSync(journalPath)).toBe(true);
+			expect(loadMutationJournalStrict(root).issues).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1045,7 +1197,733 @@ describe("update command", () => {
 			);
 			expect(
 				existsSync(join(root, ".afol", "data", "mutations", "mutations.jsonl")),
-			).toBe(false);
+			).toBe(true);
+			expect(loadMutationJournalStrict(root).issues).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("update transactional public contract", () => {
+	test("apply journals the full prepared batch before a fault and rolls it back", async () => {
+		const root = mkRoot();
+		try {
+			const originalLock = readFileSync(
+				join(root, ".agents", "lock.json"),
+				"utf8",
+			);
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						["apply", "--reason", "prepared fault", "--allow-unbound-context"],
+						root,
+						output.io,
+						{ failAfterPrepared: true },
+					),
+				).toBe(2);
+			});
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+				originalLock,
+			);
+			const rows = readFileSync(
+				join(root, ".afol", "data", "mutations", "mutations.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as { status: string; id: string });
+			const firstTerminal = rows.findIndex(
+				(row) => row.status === "rolled_back",
+			);
+			expect(firstTerminal).toBeGreaterThan(0);
+			expect(
+				rows.slice(0, firstTerminal).every((row) => row.status === "prepared"),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("safe managed stale file removal rolls back and journal failure preserves absence", async () => {
+		const root = mkRoot();
+		const staleRelative = "obsolete-managed.txt";
+		const stalePath = join(root, staleRelative);
+		try {
+			writeFileSync(stalePath, "managed-old\n", "utf8");
+			const manifest = templateJson<Record<string, unknown>>(
+				".agents/manifest.json",
+			);
+			manifest.managed_hashes = {
+				...(manifest.managed_hashes as Record<string, string> | undefined),
+				[staleRelative]: sha256Hex("managed-old\n"),
+			};
+			writeFileSync(
+				join(root, ".agents", "manifest.json"),
+				JSON.stringify(manifest, null, 2),
+				"utf8",
+			);
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"safe stale removal",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						apply.io,
+						{ removedTemplatePaths: [staleRelative] },
+					),
+				).toBe(0);
+			});
+			expect(existsSync(stalePath)).toBe(false);
+			const batchId =
+				(
+					JSON.parse(apply.stdout[0] ?? "{}") as {
+						data?: { batch_id?: string };
+					}
+				).data?.batch_id ?? "";
+			const failedRollback = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"journal fault",
+						"--json",
+					],
+					root,
+					failedRollback.io,
+					{ failBeforeJournalAppend: true },
+				),
+			).toBe(2);
+			expect(existsSync(stalePath)).toBe(false);
+			const rollback = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"restore stale",
+						"--json",
+					],
+					root,
+					rollback.io,
+				),
+			).toBe(0);
+			expect(readFileSync(stalePath, "utf8")).toBe("managed-old\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply replans under the global lock before writing", async () => {
+		const root = mkRoot();
+		try {
+			const manifestPath = join(root, ".agents", "manifest.json");
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						["apply", "--reason", "locked replan", "--allow-unbound-context"],
+						root,
+						output.io,
+						{
+							beforeLockedReplan: () =>
+								writeFileSync(manifestPath, '{"local":"drift"}\n', "utf8"),
+						},
+					),
+				).toBe(2);
+			});
+			expect(output.stderr.join("\n")).toContain(
+				"update-conflict-after-replan",
+			);
+			expect(readFileSync(manifestPath, "utf8")).toBe('{"local":"drift"}\n');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("mixed preserve skip still applies compatible managed updates", async () => {
+		const root = mkRoot();
+		try {
+			const manifest = templateJson<Record<string, unknown>>(
+				".agents/manifest.json",
+			);
+			writeFileSync(
+				join(root, ".agents", "manifest.json"),
+				JSON.stringify(manifest, null, 2),
+				"utf8",
+			);
+			const before = readFileSync(join(root, ".agents", "lock.json"), "utf8");
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"mixed preserve apply",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+					),
+				).toBe(0);
+			});
+			expect(output.stdout.join("\n")).toContain("preserve=");
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).not.toBe(
+				before,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("unbound apply emits batch ids and strict-readable CI identities", async () => {
+		const root = mkRoot();
+		try {
+			const json = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"unbound json",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						json.io,
+					),
+				).toBe(0);
+			});
+			const envelope = JSON.parse(json.stdout[0] ?? "{}") as {
+				data?: { batch_id?: string };
+			};
+			expect(envelope.data?.batch_id).toMatch(/^M-/);
+			const strict = loadMutationJournalStrict(root);
+			expect(strict.issues).toHaveLength(0);
+			const updates = strict.records.filter(
+				(record) => record.kind === "update",
+			);
+			expect(updates.length).toBeGreaterThan(0);
+			expect(
+				updates.every(
+					(record) =>
+						record.session === "__ci__" && record.taskId === "__unbound__",
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rollback restores create and update, blocks batch drift, and is single-use", async () => {
+		const root = mkRoot();
+		try {
+			const lockPath = join(root, ".agents", "lock.json");
+			const createdPath = join(root, ".afol", "adm", "rules", "README.md");
+			const originalLock = readFileSync(lockPath, "utf8");
+			expect(existsSync(createdPath)).toBe(false);
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"rollback fixture",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(0);
+			});
+			const batchId =
+				(
+					JSON.parse(apply.stdout[0] ?? "{}") as {
+						data?: { batch_id?: string };
+					}
+				).data?.batch_id ?? "";
+			expect(existsSync(createdPath)).toBe(true);
+			const appliedLock = readFileSync(lockPath, "utf8");
+			writeFileSync(createdPath, "drift\n", "utf8");
+			const beforeBlockedLock = readFileSync(lockPath, "utf8");
+			const drift = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", batchId, "--reason", "drift", "--json"],
+					root,
+					drift.io,
+				),
+			).toBe(4);
+			expect(readFileSync(lockPath, "utf8")).toBe(beforeBlockedLock);
+			writeFileSync(
+				createdPath,
+				templateText(".afol/adm/rules/README.md"),
+				"utf8",
+			);
+			writeFileSync(lockPath, appliedLock, "utf8");
+			const rollback = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", batchId, "--reason", "restore", "--json"],
+					root,
+					rollback.io,
+				),
+			).toBe(0);
+			expect(readFileSync(lockPath, "utf8")).toBe(originalLock);
+			expect(existsSync(createdPath)).toBe(false);
+			const journalBeforeRepeat = readFileSync(
+				join(root, ".afol", "data", "mutations", "mutations.jsonl"),
+				"utf8",
+			);
+			const repeated = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", batchId, "--reason", "repeat", "--json"],
+					root,
+					repeated.io,
+				),
+			).toBe(4);
+			expect(repeated.stdout.join("\n")).toContain("already-rolled-back");
+			expect(
+				readFileSync(
+					join(root, ".afol", "data", "mutations", "mutations.jsonl"),
+					"utf8",
+				),
+			).toBe(journalBeforeRepeat);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("locked replan reruns write context and runtime guards", async () => {
+		const root = mkRoot();
+		const managedPath = join(root, ".agents", "lock.json");
+		const output = capture();
+		try {
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"locked guard",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						output.io,
+						{
+							beforeLockedReplan: () => {
+								delete process.env.AFOL_TEST;
+								rmSync(managedPath);
+							},
+						},
+					),
+				).toBe(2);
+			});
+			expect(output.stdout.join("\n")).toContain(
+				"requires AFOL_CI=1 or AFOL_TEST=1",
+			);
+			expect(existsSync(managedPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rollback dry-run is read-only and runtime provenance gates real rollback", async () => {
+		const root = mkRoot();
+		const lockPath = join(root, ".agents", "lock.json");
+		const original = readFileSync(lockPath, "utf8");
+		try {
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"rollback guards",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(0);
+			});
+			const batchId =
+				(
+					JSON.parse(apply.stdout[0] ?? "{}") as {
+						data?: { batch_id?: string };
+					}
+				).data?.batch_id ?? "";
+			const applied = readFileSync(lockPath, "utf8");
+			const journalPath = join(
+				root,
+				".afol",
+				"data",
+				"mutations",
+				"mutations.jsonl",
+			);
+			const journalBefore = readFileSync(journalPath, "utf8");
+			const dryRun = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"preview",
+						"--dry-run",
+						"--json",
+					],
+					root,
+					dryRun.io,
+				),
+			).toBe(0);
+			expect(readFileSync(lockPath, "utf8")).toBe(applied);
+			expect(readFileSync(journalPath, "utf8")).toBe(journalBefore);
+
+			const staleRuntime = mkCliRuntimeRoot({ packageVersion: "9.9.9" });
+			const blocked = capture();
+			try {
+				expect(
+					await runUpdateCommand(
+						["rollback", "--batch-id", batchId, "--reason", "real", "--json"],
+						root,
+						blocked.io,
+						{
+							cliRoot: staleRuntime,
+							invocationPath: join(staleRuntime, "dist", "afol"),
+						},
+					),
+				).toBe(2);
+				expect(readFileSync(lockPath, "utf8")).toBe(applied);
+				expect(readFileSync(journalPath, "utf8")).toBe(journalBefore);
+			} finally {
+				rmSync(staleRuntime, { recursive: true, force: true });
+			}
+			expect(original).not.toBe(applied);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rollback rejects backup paths outside the backup jail and through symlinks", async () => {
+		for (const mode of ["outside", "symlink"] as const) {
+			const root = mkRoot();
+			const outside = mkdtempSync(join(tmpdir(), "update-rollback-outside-"));
+			try {
+				const apply = capture();
+				await withAfolTestEnv(async () => {
+					expect(
+						await runUpdateCommand(
+							[
+								"apply",
+								"--reason",
+								"backup jail",
+								"--allow-unbound-context",
+								"--json",
+							],
+							root,
+							apply.io,
+						),
+					).toBe(0);
+				});
+				const batchId =
+					(
+						JSON.parse(apply.stdout[0] ?? "{}") as {
+							data?: { batch_id?: string };
+						}
+					).data?.batch_id ?? "";
+				const journalPath = join(
+					root,
+					".afol",
+					"data",
+					"mutations",
+					"mutations.jsonl",
+				);
+				const rows = readFileSync(journalPath, "utf8")
+					.trim()
+					.split("\n")
+					.map((line) => JSON.parse(line) as Record<string, unknown>);
+				const committed = rows.find(
+					(row) =>
+						row.kind === "update" &&
+						row.status === "committed" &&
+						row.beforeExisted === true,
+				);
+				expect(committed).toBeTruthy();
+				const externalBackup = join(outside, "backup.txt");
+				writeFileSync(externalBackup, "outside\n", "utf8");
+				if (!committed) throw new Error("missing committed update fixture");
+				if (mode === "outside") committed.backupPath = externalBackup;
+				else {
+					const originalBackup = String(committed.backupPath);
+					rmSync(originalBackup, { force: true });
+					symlinkSync(externalBackup, originalBackup);
+				}
+				writeFileSync(
+					journalPath,
+					`${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+					"utf8",
+				);
+				const before = readFileSync(join(root, ".agents", "lock.json"), "utf8");
+				const rollback = capture();
+				expect(
+					await runUpdateCommand(
+						["rollback", "--batch-id", batchId, "--reason", "jail", "--json"],
+						root,
+						rollback.io,
+					),
+				).toBe(4);
+				expect(rollback.stdout.join("\n")).toContain("rollback-backup-unsafe");
+				expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+					before,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("rollback revalidates targets and backup bytes inside resource locks", async () => {
+		const root = mkRoot();
+		const outside = mkdtempSync(join(tmpdir(), "update-rollback-race-"));
+		try {
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"race fixture",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(0);
+			});
+			const batchId =
+				(
+					JSON.parse(apply.stdout[0] ?? "{}") as {
+						data?: { batch_id?: string };
+					}
+				).data?.batch_id ?? "";
+			const target = join(root, ".agents", "lock.json");
+			const drift = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"target race",
+						"--json",
+					],
+					root,
+					drift.io,
+					{
+						beforeRollbackLockedValidation: () =>
+							writeFileSync(target, "locked drift\n", "utf8"),
+					},
+				),
+			).toBe(4);
+			expect(drift.stdout.join("\n")).toContain("rollback-drift");
+			expect(readFileSync(target, "utf8")).toBe("locked drift\n");
+
+			const committed = loadMutationJournalStrict(root).records.find(
+				(record) =>
+					record.kind === "update" &&
+					record.status === "committed" &&
+					record.batchId === batchId &&
+					record.beforeExisted,
+			) as
+				| (MutationRecord & {
+						backupPath?: string | null;
+						afterHash?: string | null;
+				  })
+				| undefined;
+			if (!committed?.backupPath || !committed.afterHash)
+				throw new Error("missing rollback backup fixture");
+			writeFileSync(
+				join(root, committed.sourcePath),
+				templateText(committed.sourcePath as TemplateUpdatePath),
+				"utf8",
+			);
+			const external = join(outside, "external.txt");
+			writeFileSync(external, "external secret\n", "utf8");
+			const backup = committed.backupPath;
+			const swapped = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"rollback",
+						"--batch-id",
+						batchId,
+						"--reason",
+						"backup race",
+						"--json",
+					],
+					root,
+					swapped.io,
+					{
+						beforeRollbackLockedValidation: () => {
+							rmSync(backup, { force: true });
+							symlinkSync(external, backup);
+						},
+					},
+				),
+			).toBe(4);
+			expect(swapped.stdout.join("\n")).toContain("rollback-backup-unsafe");
+			expect(readFileSync(join(root, committed.sourcePath), "utf8")).not.toBe(
+				"external secret\n",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
+	test("rollback fails closed on mutation journal corruption", async () => {
+		const root = mkRoot();
+		try {
+			const journalPath = join(
+				root,
+				".afol",
+				"data",
+				"mutations",
+				"mutations.jsonl",
+			);
+			mkdirSync(join(root, ".afol", "data", "mutations"), { recursive: true });
+			writeFileSync(journalPath, "{corrupt\n", "utf8");
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", "B", "--reason", "strict", "--json"],
+					root,
+					output.io,
+				),
+			).toBe(2);
+			expect(output.stdout.join("\n")).toContain("Mutation journal corruption");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("human apply includes batch_id", async () => {
+		const root = mkRoot();
+		try {
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						["apply", "--reason", "human batch", "--allow-unbound-context"],
+						root,
+						output.io,
+					),
+				).toBe(0);
+			});
+			expect(output.stdout.join("\n")).toContain("batch_id: M-");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("update JSON failure envelopes", () => {
+	test("parse failure emits one machine-readable envelope", async () => {
+		const root = mkRoot();
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					["apply", "--unknown", "--json"],
+					root,
+					output.io,
+				),
+			).toBe(2);
+			expectUpdateJsonError(output);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runtime preflight failure emits one machine-readable envelope", async () => {
+		const root = mkRoot();
+		const cliRoot = mkCliRuntimeRoot({ packageVersion: "9.9.9" });
+		try {
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--allow-unbound-context",
+							"--reason",
+							"json runtime failure",
+							"--json",
+						],
+						root,
+						output.io,
+						{ cliRoot, invocationPath: join(cliRoot, "cli", "main.ts") },
+					),
+				).toBe(2);
+			});
+			expectUpdateJsonError(output);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("apply failure emits one machine-readable envelope after rollback", async () => {
+		const root = mkRoot();
+		const before = readFileSync(join(root, ".agents", "lock.json"), "utf8");
+		try {
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--allow-unbound-context",
+							"--reason",
+							"json apply failure",
+							"--json",
+						],
+						root,
+						output.io,
+						{ failAfterWriteCount: 1 },
+					),
+				).toBe(2);
+			});
+			expectUpdateJsonError(output);
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+				before,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

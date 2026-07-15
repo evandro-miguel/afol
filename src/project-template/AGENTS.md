@@ -10,15 +10,15 @@ Replace this section after bootstrap with real product purpose and constraints.
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
   `.afol/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
-  `.afol/adm/hooks/`, `.afol/adm/rules/`, `.agents/skills/` baseline,
+  `.afol/adm/hooks/`, `.afol/adm/rules/`, optional `.agents/skills/` baseline,
   `.afol/wb/` baseline, and minimal docs.
 - The template must not include a project-local `afol` executable, shell
   wrapper, symlink, package bin, shortcut alias, task-runner shim, or command
   runner.
   `afol` must resolve from the operator environment outside this project.
 - Some sandbox providers make `.agents/` read-only. When this project was
-  initialized with `afol init --provider-compatible` or
-  `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
+  initialized with `afol init --provider-compatible`, mutable agent state lives
+  under `.afol/`.
   Always read `.afol/config.json` `paths.*` before hardcoding state paths.
 - The configured plan directory in a downstream project is that project's
   durable governed plan state. It defaults to `.afol/wb/`. Active-session
@@ -27,6 +27,9 @@ Replace this section after bootstrap with real product purpose and constraints.
   and must not include factory repo history, root workbench sessions,
   active-session pointers, caches, telemetry events, benchmark results, or
   development-only evidence.
+- `.afol/state/afol.db` is SQLite v1 and materializes workbench sessions, task
+  rows, source hashes, and evidence only. Broader `adm/pstr/memory/library/ctx`
+  materialization belongs to State DB v2/future.
 - If a future update proposes broad docs, source seeds, factory tests, caches,
   or root `.agents/wb/` legacy history, treat that as export drift and reject it until
   the scaffold manifest and docs explicitly justify the payload.
@@ -36,13 +39,16 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Use the configured plan directory when work includes implementation,
   validation, or delivery.
 - Before product edits: create/target a session and move task to `in_progress`.
-- Canonical path:
-  1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol start --session {session-id} --task-id T-01 --brief --json`
+- Canonical agent fast path (prefer when active/bound session resolves):
+  1. `afol n {theme} -F {F-id} -P {spec-id} -t "<task>"`
+  2. `afol st T-01`
   3. Edit and run named verification.
-  4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
-  5. `afol done --session {session-id} --task-id T-01`
-  6. `afol close --session {session-id}`
+  4. `afol d T-01 -x "<verification command>"`
+  5. `afol c`
+- Explicit multi-agent/CI path when session is ambiguous:
+  `afol st -S {session-id} -T T-01`, then `afol d -S {session-id} -T T-01 -x "…"`,
+  then `afol c -S {session-id}`.
+- Prefer short commands; long forms remain valid for humans/audits.
 - Use `afol` as the only downstream front door.
   It is an external command, not a repository-local file.
 - Planning-only or read-only questions stay in chat unless durable artifacts
@@ -67,7 +73,7 @@ afol local-state rebuild --json
 - `afol status --task-id <task-id> --json` exits `1` with
   `task-not-found` when the explicit task id is absent.
 - `afol new ... --json` includes `governance_status` with value
-  `"governed"` or `"unbound"`.
+  `"governed"`, `"pending_spec"`, or `"unbound"`.
 - `afol project-benchmark ... --json` includes `catalog_source` with value
   `"project"` or `"builtin"`.
 
@@ -77,6 +83,10 @@ afol local-state rebuild --json
 - Roadmap feature -> map to one governing parent spec under `.afol/adm/specs/`.
 - Implementation decomposition needed -> use child specs.
 - Workbench sessions must carry `roadmap_feature` and `parent_spec`.
+- Current `pending_spec` sessions may continue with warnings, but new sessions
+  are blocked while any pending spec is open. Resolve with
+  `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
+  or waive with `--no-spec-required --reason "<reason>"`.
 - Plans/tasks execute approved intent. They do not replace roadmap/spec
   definition.
 - Non-trivial work -> use `.afol/wb/` for durable execution artifacts.
@@ -124,7 +134,7 @@ afol local-state rebuild --json
   context messages and advisory refs; they must not execute scripts or mutate
   AFOL state.
 - `.afol/adm/rules/`: local operational contracts only.
-- `.agents/skills/`: project-local provider skills only when needed.
+- `.agents/skills/`: optional project-local provider skills only when needed.
   `paths.skills_dir` must stay here or in a child path; do not create
   `.afol/skills/`.
 - `.afol/wb/` or configured `paths.wb_dir`: durable governed plan sessions
@@ -185,6 +195,8 @@ afol local-state rebuild --json
 - Workbench task state lives in the `State Board` and AFOL lifecycle commands.
   Do not use `T-xx` checklist markers or checkbox-done language for lifecycle
   state.
+- Governed sessions may enter `pending_spec`, but new sessions are blocked
+  while open pending specs exist until they are resolved or waived.
 - Use `afol start`, `afol evidence`, `afol done`, and `afol close`; `done`
   requires valid task-scoped evidence.
 - Finalize optional artifacts before closure.
@@ -218,11 +230,11 @@ afol local-state rebuild --json
   or explicitly justified.
 - Local `.env` files -> allowed only as ignored, non-versioned files.
 - Screenshots/images -> `.afol/wb/screenshots/` or `tests/screenshots/`.
-- Temp files -> `tmp/` or `.tmp_<name>/`.
+- Temp files -> configured `paths.tmp_dir` (default `.afol/tmp/`).
 - Build artifacts -> `dist/`.
 - Workbench artifacts -> `.afol/wb/<session>/`.
-- Local auxiliary worktrees -> grouped Worktrunk siblings such as
-  `~/01_projects/dev/<repo>/<repo>.dev`, unversioned.
+- Local auxiliary worktrees -> use the repository owner's configured external
+  worktree root; do not create new nested worktrees inside this project.
 - Legacy nested `.worktree/` directories may stay ignored during migration; do
   not create new nested worktrees.
 - Script incidental output -> never root. If it happens, treat as script bug and
@@ -254,6 +266,8 @@ afol local-state rebuild --json
   adapter is disabled, do not create or sync its mirror files.
 - Keep enabled adapters thin and traceable.
 - Prefer project-local skills only for project-specific behavior.
+- Use global Codex skills for universal AFOL behavior when available; do not
+  vendor `agentic-folder-sys` under `.agents/skills/`.
 - Project-local skills are optional; use a native downstream sync command only
   when this repo provides one.
 - External skill source updates are branch/PR flow; never direct to universal

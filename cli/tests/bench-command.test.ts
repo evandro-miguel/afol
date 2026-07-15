@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runBenchCommand } from "../commands/bench";
+import { runBenchCommand, saveRuntimeLiveSnapshot } from "../commands/bench";
 import { runCliMicroBenchmark } from "../services/benchmark/cli-micro";
 import {
 	collectExpectationNotes,
@@ -12,8 +18,9 @@ import {
 	classifyCommand,
 	parseEventStream,
 } from "../services/benchmark/metrics";
+import { buildReport } from "../services/benchmark/report";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
-import type { BenchScenario } from "../services/benchmark/types";
+import type { BenchResult, BenchScenario } from "../services/benchmark/types";
 
 type CapturedIo = {
 	stdout: string[];
@@ -431,6 +438,36 @@ describe("bench command surfaces", () => {
 		}
 	});
 
+	test("saved all-scenario runs write a compliant runtime-live snapshot", () => {
+		const root = createProjectRoot();
+		try {
+			const result = validSavedBenchResult({
+				scenario_id: "governed-task-lifecycle",
+			}) as BenchResult;
+			const report = buildReport([result], null);
+			const snapshotPath = saveRuntimeLiveSnapshot(
+				root,
+				report,
+				".afol/data/benchmarks/results/run.json",
+			);
+			const snapshot = JSON.parse(
+				readFileSync(join(root, snapshotPath), "utf8"),
+			) as Record<string, unknown>;
+			expect(snapshot.schema_version).toBe("1.0.0");
+			expect(snapshot.stale_after_days).toBe(7);
+			expect(Date.parse(String(snapshot.generated_at))).not.toBeNaN();
+			expect(snapshot.scenarios).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						id: "live-implement-start-complete-evidence",
+					}),
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("report filters malformed saved run rows", async () => {
 		const root = createProjectRoot();
 		try {
@@ -485,6 +522,90 @@ describe("bench command surfaces", () => {
 		}
 	});
 
+	test("report emits a JSON error envelope for a missing run", async () => {
+		const root = createProjectRoot();
+		try {
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--json", "--run", "missing-run.json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.report",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: expect.stringContaining("missing-run.json"),
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report emits a JSON error envelope for a missing run argument", async () => {
+		const root = createProjectRoot();
+		try {
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--json", "--run"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.report",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: "Missing value for --run in bench report.",
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report recognizes the short JSON alias on parser failures", async () => {
+		const root = createProjectRoot();
+		try {
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["-j", "--unknown"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.report",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: "Unknown bench argument: --unknown",
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("baseline rejects malformed baseline JSON", async () => {
 		const root = createProjectRoot();
 		try {
@@ -507,10 +628,19 @@ describe("bench command surfaces", () => {
 				captured.io,
 			);
 			expect(code).toBe(2);
-			expect(captured.stdout).toHaveLength(0);
-			expect(captured.stderr).toHaveLength(1);
-			expect(captured.stderr[0]).toContain("Malformed benchmark JSON");
-			expect(captured.stderr[0]).toContain("baseline-v1.json");
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.baseline",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: expect.stringContaining("Malformed benchmark JSON"),
+				},
+			});
+			expect(captured.stdout[0]).toContain("baseline-v1.json");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	chmodSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -8,7 +9,13 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import {
+	isMainThread,
+	parentPort,
+	Worker,
+	workerData,
+} from "node:worker_threads";
 import { runLocalStateCommand } from "../commands/local-state";
 import { agentOperationContext } from "../core/operation-context";
 import {
@@ -36,6 +43,8 @@ import {
 	validateSpecsIndex,
 } from "../services/local-state/project-indexes";
 import {
+	detectSessionHealth,
+	loadWorkBenchIndexSnapshot,
 	rebuildWorkBenchIndex,
 	validateWorkBenchIndex,
 } from "../services/local-state/workbench-index";
@@ -43,6 +52,92 @@ import {
 	appendMutationRecord,
 	type MutationRecord,
 } from "../services/mutations/journal";
+
+if (!isMainThread) {
+	if (workerData?.kind !== "workbench-rebuild") {
+		process.exit(0);
+	}
+
+	const { root, sessionScope, coordination } = workerData as {
+		kind: string;
+		root: string;
+		sessionScope: string;
+		coordination: SharedArrayBuffer;
+	};
+	const signals = new Int32Array(coordination);
+	const arrival = Atomics.add(signals, 0, 1) + 1;
+	if (arrival === 1) {
+		const waitStatus = Atomics.wait(signals, 1, 0, 5_000);
+		if (waitStatus === "timed-out") {
+			throw new Error(
+				"rebuildWorkBenchIndex concurrency test barrier timed out waiting for peer",
+			);
+		}
+	} else {
+		Atomics.store(signals, 1, 1);
+		Atomics.notify(signals, 1, 1);
+	}
+
+	rebuildWorkBenchIndex(root, sessionScope);
+	parentPort?.postMessage("done");
+	process.exit(0);
+}
+
+function runRebuildInWorker(
+	root: string,
+	sessionScope: string,
+	coordination: SharedArrayBuffer,
+	kind = "workbench-rebuild",
+) {
+	return new Promise<void>((resolve, reject) => {
+		const worker = new Worker(new URL(import.meta.url), {
+			workerData: {
+				kind,
+				root,
+				sessionScope,
+				coordination,
+			},
+		});
+		worker.on("error", reject);
+		worker.on("exit", (code) => {
+			if (code === 0) {
+				resolve();
+			} else {
+				reject(new Error(`Worker exited with code ${code}`));
+			}
+		});
+	});
+}
+
+function runRebuildInWorkerForKind(
+	root: string,
+	sessionScope: string,
+	coordination: SharedArrayBuffer,
+	kind: string,
+) {
+	return new Promise<{ message: unknown }>((resolve, reject) => {
+		const worker = new Worker(new URL(import.meta.url), {
+			workerData: {
+				kind,
+				root,
+				sessionScope,
+				coordination,
+			},
+		});
+		let message: unknown;
+		worker.on("message", (value) => {
+			message = value;
+		});
+		worker.on("error", reject);
+		worker.on("exit", (code) => {
+			if (code === 0) {
+				resolve({ message });
+			} else {
+				reject(new Error(`Worker exited with code ${code}`));
+			}
+		});
+	});
+}
 
 function buildFixture() {
 	const root = mkdtempSync(join(tmpdir(), "proj-indexes-"));
@@ -367,6 +462,450 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("rebuildWorkBenchIndex parses legacy State Board table shapes conservatively", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-legacy-state-board-"));
+		try {
+			const expandedSession = join(root, ".afol", "wb", "260618_expanded");
+			const noNotesSession = join(root, ".afol", "wb", "260618_no-notes");
+			const pstrToolingSession = join(
+				root,
+				".afol",
+				"wb",
+				"260618_pstr-tooling-watch",
+			);
+			const releaseGovernanceSession = join(
+				root,
+				".afol",
+				"wb",
+				"260620_release-version-governance",
+			);
+			const testGateSession = join(
+				root,
+				".afol",
+				"wb",
+				"260619_test-gate-hardening",
+			);
+			const partialSession = join(root, ".afol", "wb", "260618_partial");
+			const malformedSession = join(root, ".afol", "wb", "260618_malformed");
+			for (const sessionDir of [
+				expandedSession,
+				noNotesSession,
+				pstrToolingSession,
+				releaseGovernanceSession,
+				testGateSession,
+				partialSession,
+				malformedSession,
+			]) {
+				mkdirSync(sessionDir, { recursive: true });
+			}
+
+			writeFileSync(
+				join(expandedSession, "260618_expanded_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Target files | Notes | Commands |",
+					"|------|-------|-------|--------------|-------|----------|",
+					"| T-01 | done | alice | cli/a.ts | expanded notes | bun test |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(noNotesSession, "260618_no-notes_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | Target files | State | Owner |",
+					"|------|--------------|-------|-------|",
+					"| T-01 | cli/a.ts | in_progress | bob |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(pstrToolingSession, "260618_pstr-tooling-watch_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Write Scope | Validation Target | Evidence |",
+					"|------|-------|-------|-------------|-------------------|----------|",
+					"| T-01 | done | planner | .afol/wb/** | freeze contract | plan docs |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(
+					releaseGovernanceSession,
+					"260620_release-version-governance_task_01.md",
+				),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Write scope | Validate | Evidence |",
+					"|------|-------|-------|-------------|----------|----------|",
+					"| T-01 | done | worker | package.json | bun test | evidence entry |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(testGateSession, "260619_test-gate-hardening_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Target files | Commands | Output contract | Notes |",
+					"|------|-------|-------|--------------|----------|-----------------|-------|",
+					"| T-01 | done | worker | cli/dev/coverage-check.ts | bun test | gate passes | explicit notes |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(partialSession, "260618_partial_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes | Extra |",
+					"|------|-------|-------|-------|-------|",
+					"| T-01 | done | carol | keep valid task | value |",
+					"| T-02 | blocked |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(malformedSession, "260618_malformed_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Notes |",
+					"|------|-------|-------|",
+					"| T-01 | done | missing owner column |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const snapshot = rebuildWorkBenchIndex(root);
+			const expandedTask = snapshot.tasks.find(
+				(task) => task.session === "260618_expanded" && task.task_id === "T-01",
+			);
+			const noNotesTask = snapshot.tasks.find(
+				(task) => task.session === "260618_no-notes" && task.task_id === "T-01",
+			);
+			const pstrToolingTask = snapshot.tasks.find(
+				(task) =>
+					task.session === "260618_pstr-tooling-watch" &&
+					task.task_id === "T-01",
+			);
+			const releaseGovernanceTask = snapshot.tasks.find(
+				(task) =>
+					task.session === "260620_release-version-governance" &&
+					task.task_id === "T-01",
+			);
+			const testGateTask = snapshot.tasks.find(
+				(task) =>
+					task.session === "260619_test-gate-hardening" &&
+					task.task_id === "T-01",
+			);
+			const partialTasks = snapshot.tasks.filter(
+				(task) => task.session === "260618_partial",
+			);
+
+			expect(expandedTask).toMatchObject({
+				state: "done",
+				owner: "alice",
+				notes: "expanded notes",
+			});
+			expect(noNotesTask?.notes).toBe("");
+			expect(pstrToolingTask?.notes).toBe("");
+			expect(releaseGovernanceTask?.notes).toBe("");
+			expect(testGateTask?.notes).toBe("explicit notes");
+			expect(partialTasks.map((task) => task.task_id)).toEqual(["T-01"]);
+			expect(
+				snapshot.sessions.find(
+					(session) => session.session === "260618_partial",
+				)?.degraded,
+			).toBe(true);
+			expect(
+				snapshot.sessions.find(
+					(session) => session.session === "260618_malformed",
+				)?.degraded,
+			).toBe(true);
+			expect(
+				snapshot.sessions.find(
+					(session) => session.session === "260618_malformed",
+				)?.task_count,
+			).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("loaded workbench snapshots reject deeply malformed entries", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-malformed-snapshot-"));
+		const sessionA = "260618_alpha";
+		const sessionB = "260618_beta";
+		try {
+			for (const session of [sessionA, sessionB]) {
+				mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			}
+			for (const [session, owner] of [
+				[sessionA, "alice"],
+				[sessionB, "bob"],
+			] as const) {
+				writeFileSync(
+					join(root, ".afol", "wb", session, `${session}_task_01.md`),
+					[
+						"| Task | State | Owner | Notes |",
+						"|------|-------|-------|-------|",
+						`| T-01 | done | ${owner} | valid |`,
+					].join("\n"),
+					"utf8",
+				);
+			}
+
+			rebuildWorkBenchIndex(root);
+			const touchedAt = new Date().toISOString();
+			const malformedSnapshot = {
+				kind: "workbench_index_v1",
+				version: 1,
+				generated_at: touchedAt,
+				source: { wb_dir: ".afol/wb", event_log: ".afol/events.jsonl" },
+				sessions: [
+					{
+						session: sessionA,
+						task_count: 1,
+						completed: 1,
+						open: 0,
+						problem: 0,
+						touched_at: touchedAt,
+					},
+					{
+						session: null,
+						task_count: 0,
+						completed: 0,
+						open: 0,
+						problem: 0,
+						touched_at: touchedAt,
+					},
+				],
+				tasks: [
+					{
+						session: sessionA,
+						task_id: "T-01",
+						state: "done",
+						owner: "alice",
+						notes: "valid",
+						file: join(root, ".afol", "wb", sessionA, `${sessionA}_task_01.md`),
+						line: 3,
+						touched_at: touchedAt,
+						planned_files: [
+							{
+								path: "cli/a.ts",
+								kind: "exact",
+								source: "planned",
+								line: "bad",
+							},
+						],
+						touched_files: [],
+					},
+				],
+			};
+			const indexPath = join(root, ".afol", "data", "index", "workbench.json");
+			writeFileSync(
+				indexPath,
+				`${JSON.stringify(malformedSnapshot)}\n`,
+				"utf8",
+			);
+
+			expect(loadWorkBenchIndexSnapshot(root)).toBeNull();
+			const rebuilt = rebuildWorkBenchIndex(root, sessionB);
+			expect(rebuilt.sessions.map((session) => session.session)).toEqual([
+				sessionA,
+				sessionB,
+			]);
+			expect(rebuilt.tasks).toHaveLength(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("loaded workbench snapshots reject duplicate identities and inconsistent counters", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-inconsistent-snapshot-"));
+		const session = "260618_alpha";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | valid |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const valid = rebuildWorkBenchIndex(root);
+			const corruptSnapshots = [
+				{
+					...valid,
+					sessions: [{ ...valid.sessions[0], task_count: 0 }],
+				},
+				{
+					...valid,
+					sessions: [...valid.sessions, { ...valid.sessions[0] }],
+				},
+				{
+					...valid,
+					tasks: [...valid.tasks, { ...valid.tasks[0] }],
+				},
+			];
+			const indexPath = join(root, ".afol", "data", "index", "workbench.json");
+			for (const corruptSnapshot of corruptSnapshots) {
+				writeFileSync(
+					indexPath,
+					`${JSON.stringify(corruptSnapshot)}\n`,
+					"utf8",
+				);
+				expect(loadWorkBenchIndexSnapshot(root)).toBeNull();
+				expect(validateWorkBenchIndex(root).ok).toBe(false);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuild omits duplicate source task IDs and marks the session degraded", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-duplicate-source-task-"));
+		const session = "260618_duplicate";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | first |",
+					"| T-01 | problem | bob | duplicate |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const rebuilt = rebuildWorkBenchIndex(root);
+			expect(rebuilt.tasks).toHaveLength(1);
+			expect(rebuilt.tasks[0]).toMatchObject({
+				task_id: "T-01",
+				state: "done",
+				owner: "alice",
+			});
+			expect(rebuilt.sessions[0]).toMatchObject({
+				task_count: 1,
+				completed: 1,
+				problem: 0,
+				degraded: true,
+			});
+			expect(loadWorkBenchIndexSnapshot(root)).not.toBeNull();
+			const validation = validateWorkBenchIndex(root);
+			expect(validation.ok).toBe(false);
+			expect(validation.message).toContain("duplicate task IDs");
+			expect(validation.message).toContain(
+				"Repair the named session task source",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("empty State rows are rejected while empty Owner rows remain valid", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-empty-state-"));
+		const session = "260618_empty-state";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 |  | alice | malformed state |",
+					"| T-02 | done |  | empty owner is allowed |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const snapshot = rebuildWorkBenchIndex(root);
+			expect(snapshot.tasks).toHaveLength(1);
+			expect(snapshot.tasks[0]).toMatchObject({
+				task_id: "T-02",
+				state: "done",
+				owner: "",
+			});
+			expect(snapshot.sessions[0]).toMatchObject({
+				task_count: 1,
+				degraded: true,
+			});
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("scoped rebuild falls back when a non-target session becomes stale", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-stale-peer-"));
+		const sessionA = "260618_alpha";
+		const sessionB = "260618_beta";
+		try {
+			for (const session of [sessionA, sessionB]) {
+				mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			}
+			const taskRows = (owner: string, notes: string) =>
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					`| T-01 | done | ${owner} | ${notes} |`,
+				].join("\n");
+			writeFileSync(
+				join(root, ".afol", "wb", sessionA, `${sessionA}_task_01.md`),
+				taskRows("alice", "baseline"),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", sessionB, `${sessionB}_task_01.md`),
+				taskRows("bob", "baseline"),
+				"utf8",
+			);
+			rebuildWorkBenchIndex(root);
+
+			writeFileSync(
+				join(root, ".afol", "wb", sessionA, `${sessionA}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 |  | alice | corrupted state |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", sessionB, `${sessionB}_task_01.md`),
+				taskRows("bob", "scoped rebuild"),
+				"utf8",
+			);
+
+			const snapshot = rebuildWorkBenchIndex(root, sessionB);
+			expect(snapshot.sessions).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						session: sessionA,
+						task_count: 0,
+						degraded: true,
+					}),
+					expect.objectContaining({ session: sessionB, task_count: 1 }),
+				]),
+			);
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rebuildWorkBenchIndex(sessionScope) updates only scoped session", () => {
 		const root = mkdtempSync(join(tmpdir(), "wb-scope-update-"));
 		try {
@@ -470,6 +1009,123 @@ describe("local-state project indexer", () => {
 			expect(
 				snapshot.tasks.some((task) => task.session === "260618_beta"),
 			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex(sessionScope) preserves concurrent scoped updates", async () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-concurrent-"));
+		try {
+			const sessionA = join(root, ".afol", "wb", "260618_alpha");
+			const sessionB = join(root, ".afol", "wb", "260618_beta");
+			mkdirSync(sessionA, { recursive: true });
+			mkdirSync(sessionB, { recursive: true });
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | baseline |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | bob | baseline |",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildWorkBenchIndex(root);
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | baseline |",
+					"| T-02 | implemented_untested | alice | concurrent |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | bob | baseline |",
+					"| T-02 | implemented_untested | bob | concurrent |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const coordination = new SharedArrayBuffer(
+				Int32Array.BYTES_PER_ELEMENT * 2,
+			);
+			const alphaRunner = runRebuildInWorker(
+				root,
+				"260618_alpha",
+				coordination,
+			);
+			const betaRunner = runRebuildInWorker(root, "260618_beta", coordination);
+
+			await Promise.all([alphaRunner, betaRunner]);
+
+			const snapshot = loadWorkBenchIndexSnapshot(root);
+			if (!snapshot) {
+				throw new Error("Expected persisted workbench index snapshot");
+			}
+			const alphaSession = snapshot.sessions.find(
+				(session) => session.session === "260618_alpha",
+			);
+			const betaSession = snapshot.sessions.find(
+				(session) => session.session === "260618_beta",
+			);
+			expect(alphaSession?.task_count).toBe(2);
+			expect(betaSession?.task_count).toBe(2);
+
+			const alphaTasks = snapshot.tasks
+				.filter((task) => task.session === "260618_alpha")
+				.map((task) => task.task_id)
+				.sort();
+			const betaTasks = snapshot.tasks
+				.filter((task) => task.session === "260618_beta")
+				.map((task) => task.task_id)
+				.sort();
+			expect(alphaTasks).toEqual(["T-01", "T-02"]);
+			expect(betaTasks).toEqual(["T-01", "T-02"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("worker harness ignores non-workbench-rebuild worker kinds", async () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-worker-kind-"));
+		try {
+			const coordination = new SharedArrayBuffer(
+				Int32Array.BYTES_PER_ELEMENT * 2,
+			);
+			const result = await runRebuildInWorkerForKind(
+				root,
+				"260618_alpha",
+				coordination,
+				"unrelated-worker",
+			);
+
+			expect(result).toEqual({ message: undefined });
+			expect(loadWorkBenchIndexSnapshot(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -805,6 +1461,11 @@ describe("local-state project indexer", () => {
 	test("files index excludes generated version source", () => {
 		const root = buildFixture();
 		try {
+			writeFileSync(
+				join(root, ".git"),
+				"gitdir: ../.git/worktrees/example\n",
+				"utf8",
+			);
 			const generatedDir = join(root, "cli", "generated");
 			mkdirSync(generatedDir, { recursive: true });
 			const templatePath = join(generatedDir, "template.ts");
@@ -823,10 +1484,100 @@ describe("local-state project indexer", () => {
 					(entry) => entry.path === "cli/generated/version.ts",
 				),
 			).toBe(false);
+			expect(snapshot.files.some((entry) => entry.path === ".git")).toBe(false);
 
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(versionPath, future, future);
 			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index excludes local runtime cache and scratch directories", () => {
+		const root = buildFixture();
+		try {
+			const excludedPaths = [
+				".codex/session.json",
+				".coverage-trace/agent_memory_system.cover",
+				".memory/graph-cache/cache.json",
+				".qwen/history.json",
+				".tools/uv-cache/archive",
+				".venv/lib/site-packages/pkg.py",
+				"tmp/repo-canibalize/snapshot.md",
+				"src/__pycache__/module.pyc",
+			];
+
+			for (const relativePath of excludedPaths) {
+				const fullPath = join(root, ...relativePath.split("/"));
+				mkdirSync(dirname(fullPath), { recursive: true });
+				writeFileSync(fullPath, "runtime", "utf8");
+			}
+
+			const snapshot = rebuildFilesIndex(root);
+			const indexedPaths = snapshot.files.map((entry) => entry.path);
+
+			for (const relativePath of excludedPaths) {
+				expect(indexedPaths).not.toContain(relativePath);
+			}
+
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(join(root, ".tools", "uv-cache", "archive"), future, future);
+			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index excludes private and sensitive named paths", () => {
+		const root = buildFixture();
+		try {
+			const excludedPaths = [
+				"anotacoes_ozy_d_v2/20_areas/21-Evandro-Miguel/private/Chave Caixa.md",
+				"anotacoes_ozy_d_v2/20_areas/21-Evandro-Miguel/private/Endereco Casa.md",
+				"anotacoes_ozy_d_v2/90_archive/93-Legacy/Xurupita - Archive.md",
+				"docs/Private/client.md",
+				"docs/PRIVATE/upper.md",
+				"docs/Chave/client.md",
+				"docs/Endereco/data.md",
+				"archive/Xurupita/note.md",
+				"docs/credentials.prod.md",
+				"src/agent_memory_system.egg-info/PKG-INFO",
+			];
+			const safePath = "docs/security/secret-scan-runbook.md";
+
+			for (const relativePath of [...excludedPaths, safePath]) {
+				const fullPath = join(root, ...relativePath.split("/"));
+				mkdirSync(dirname(fullPath), { recursive: true });
+				writeFileSync(fullPath, "content", "utf8");
+			}
+
+			const snapshot = rebuildFilesIndex(root);
+			const indexedPaths = snapshot.files.map((entry) => entry.path);
+
+			for (const relativePath of excludedPaths) {
+				expect(indexedPaths).not.toContain(relativePath);
+			}
+			expect(indexedPaths).toContain(safePath);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index keeps authored files under ambiguous directory names", () => {
+		const root = buildFixture();
+		try {
+			const authoredPath = join(root, "docs", "logs", "decision.md");
+			mkdirSync(dirname(authoredPath), { recursive: true });
+			writeFileSync(authoredPath, "# Decision\n", "utf8");
+
+			const snapshot = rebuildFilesIndex(root);
+			const indexedPaths = snapshot.files.map((entry) => entry.path);
+			expect(indexedPaths).toContain("docs/logs/decision.md");
+
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(authoredPath, future, future);
+			expect(validateFilesIndex(root).ok).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1151,6 +1902,274 @@ describe("local-state project indexer", () => {
 				ok: false,
 				message: expect.stringContaining("invalid workbench index snapshot"),
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex marks session degraded when task files exist but have no parseable tasks", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-degraded-"));
+		const session = "260714_1200_degraded-test";
+		const emptyBoardSession = "260714_1200_empty-board";
+		try {
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", emptyBoardSession), {
+				recursive: true,
+			});
+			mkdirSync(join(root, ".afol", "state"), { recursive: true });
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			// Write a task file that parseTaskRows cannot parse (no state board)
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"# Tasks\n\nNo state board here.\n",
+				"utf8",
+			);
+			// Another task file with no state board rows
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_02.md`),
+				"# More tasks\n\nStill no state board.\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					emptyBoardSession,
+					`${emptyBoardSession}_task_01.md`,
+				),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+				].join("\n"),
+				"utf8",
+			);
+
+			// Full rebuild — the sessions should appear but degraded
+			const snapshot = rebuildWorkBenchIndex(root);
+			const degradedSession = snapshot.sessions.find(
+				(s) => s.session === session,
+			);
+			expect(degradedSession).toBeDefined();
+			expect(degradedSession?.degraded).toBe(true);
+			expect(degradedSession?.task_count).toBe(0);
+			const emptyBoardEntry = snapshot.sessions.find(
+				(s) => s.session === emptyBoardSession,
+			);
+			expect(emptyBoardEntry).toMatchObject({
+				session: emptyBoardSession,
+				task_count: 0,
+				degraded: true,
+			});
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+
+			// Also verify a healthy session is not degraded
+			const healthy = "260714_1200_healthy";
+			mkdirSync(join(root, ".afol", "wb", healthy), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", healthy, `${healthy}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | fine |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const fullSnapshot = rebuildWorkBenchIndex(root);
+			const healthyEntry = fullSnapshot.sessions.find(
+				(s) => s.session === healthy,
+			);
+			expect(healthyEntry).toBeDefined();
+			expect(healthyEntry?.degraded).toBeUndefined();
+			expect(healthyEntry?.task_count).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex scoped rebuild falls back to full when no existing snapshot", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scoped-fallback-"));
+		const session = "260714_1200_scoped-test";
+		const other = "260714_1200_other";
+		try {
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", other), { recursive: true });
+			mkdirSync(join(root, ".afol", "state"), { recursive: true });
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | fine |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", other, `${other}_task_01.md`),
+				[
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | also fine |",
+				].join("\n"),
+				"utf8",
+			);
+
+			// Scoped rebuild with no existing snapshot — must fall back to full
+			// rebuild so unaffected sessions ("other") are not dropped.
+			const beforeWriteScopes: (string | undefined)[] = [];
+			const scopedResult = rebuildWorkBenchIndex(root, session, {
+				beforeWrite: (scope) => beforeWriteScopes.push(scope),
+			});
+			expect(scopedResult.sessions.length).toBe(2);
+			expect(scopedResult.sessions.map((s) => s.session).sort()).toEqual([
+				other,
+				session,
+			]);
+			expect(scopedResult.tasks.length).toBe(2);
+			expect(beforeWriteScopes).toEqual([session]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validateWorkBenchIndex flags degraded sessions", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-validatedegraded-"));
+		const session = "260715_1200_degraded-validate";
+		try {
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			mkdirSync(join(root, ".afol", "state"), { recursive: true });
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			// Task files with no parseable state board
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"# No state board\n",
+				"utf8",
+			);
+
+			// Rebuild to populate the index with degraded flag
+			rebuildWorkBenchIndex(root);
+
+			// Validation must flag degraded sessions
+			const result = validateWorkBenchIndex(root);
+			expect(result.ok).toBe(false);
+			expect(result.message).toContain("degraded sessions");
+			expect(result.message).toContain(session);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex marks unreadable session directories degraded", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-unreadable-session-"));
+		const session = "260715_1300_unreadable-session";
+		const sessionDir = join(root, ".afol", "wb", session);
+		try {
+			mkdirSync(sessionDir, { recursive: true });
+			mkdirSync(join(root, ".afol", "state"), { recursive: true });
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			chmodSync(sessionDir, 0o000);
+
+			const snapshot = rebuildWorkBenchIndex(root);
+			const indexedSession = snapshot.sessions.find(
+				(entry) => entry.session === session,
+			);
+			expect(indexedSession?.degraded).toBe(true);
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+			expect(detectSessionHealth(root)).toContainEqual(
+				expect.objectContaining({
+					type: "unreadable_session_directory",
+					session,
+				}),
+			);
+		} finally {
+			chmodSync(sessionDir, 0o700);
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex preserves escaped pipes in state board cells (odd backslash)", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-escaped-pipes-"));
+		const session = "260618_escaped-pipes";
+		try {
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			mkdirSync(join(root, ".afol", "state"), { recursive: true });
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					String.raw`| T-01 | done | worker | ref\|42 |`,
+					"| T-02 | in_progress | me | note |",
+					String.raw`| T-03 | pending | worker | note\|`,
+				].join("\n"),
+				"utf8",
+			);
+			const snapshot = rebuildWorkBenchIndex(root);
+			expect(snapshot.tasks).toHaveLength(3);
+			const t1 = snapshot.tasks.find((task) => task.task_id === "T-01");
+			expect(t1?.notes).toBe(String.raw`ref\|42`);
+			const t2 = snapshot.tasks.find((task) => task.task_id === "T-02");
+			expect(t2?.notes).toBe("note");
+			const t3 = snapshot.tasks.find((task) => task.task_id === "T-03");
+			expect(t3?.notes).toBe(String.raw`note\|`);
+			// No degradation from escaped-pipe parsing
+			expect(
+				snapshot.sessions.find((s) => s.session === session)?.degraded,
+			).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex handles even backslash before pipe as column delimiter", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-escaped-pipes-even-"));
+		const session = "260618_escaped-pipes-even";
+		try {
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			mkdirSync(join(root, ".afol", "state"), { recursive: true });
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			// Two backslashes before pipe: even count, so pipe is a real delimiter.
+			// "worker\\|owner" splits into cells: "worker\\" and "owner".
+			// So owner column (index 2) = "worker\\", notes column (index 3) = "owner",
+			// and "the note" is an extra column (index 4) ignored by parser.
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					String.raw`| T-01 | done | worker\\|owner | the note |`,
+				].join("\n"),
+				"utf8",
+			);
+			const snapshot = rebuildWorkBenchIndex(root);
+			expect(snapshot.tasks).toHaveLength(1);
+			const t1 = snapshot.tasks.find((task) => task.task_id === "T-01");
+			// Even backslashes: pipe at column boundary splits into two cells:
+			// owner column gets "worker\\" (two backslashes preserved)
+			expect(t1?.owner).toBe(String.raw`worker\\`);
+			// notes column gets the cell that was meant as "owner"
+			expect(t1?.notes).toBe("owner");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

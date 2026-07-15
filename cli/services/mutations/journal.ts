@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { withSessionLock } from "../io/session-lock";
@@ -5,7 +6,12 @@ import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 
 export type MutationKind = "patch" | "move" | "archive" | "update";
-export type MutationStatus = "applied" | "noop";
+export type MutationStatus =
+	| "prepared"
+	| "applied"
+	| "committed"
+	| "rolled_back"
+	| "noop";
 export type MutationSource = "afol-update";
 
 const MUTATION_JOURNAL_LOCK_SESSION = "__mutation-journal__";
@@ -50,8 +56,6 @@ type MutationUndoRecord = {
 
 export type MutationRecord = MutationBase | MutationUndoRecord;
 
-let mutationCounter = 0;
-
 function resolveJournalPath(projectRoot: string): string {
 	const root = resolve(projectRoot);
 	const projectPaths = resolveProjectPaths(root);
@@ -66,8 +70,7 @@ function resolveJournalPath(projectRoot: string): string {
 }
 
 function generateMutationId(now = new Date()): string {
-	mutationCounter = (mutationCounter + 1) % 1_000_000;
-	return `M-${now.toISOString()}-${mutationCounter.toString().padStart(6, "0")}`;
+	return `M-${now.toISOString()}-${randomUUID()}`;
 }
 
 function parseRecord(raw: string): MutationRecord | null {
@@ -81,10 +84,15 @@ function parseRecord(raw: string): MutationRecord | null {
 		const id = typeof record.id === "string" ? record.id : "";
 		const ts = typeof record.ts === "string" ? record.ts : "";
 		const kind = typeof record.kind === "string" ? record.kind : "";
-		const statusValue =
-			record.status === "applied" || record.status === "noop"
-				? record.status
-				: null;
+		const statusValue = [
+			"prepared",
+			"applied",
+			"committed",
+			"rolled_back",
+			"noop",
+		].includes(String(record.status))
+			? (record.status as MutationStatus)
+			: null;
 		if (statusValue === null) {
 			return null;
 		}
@@ -115,10 +123,7 @@ function parseRecord(raw: string): MutationRecord | null {
 			return null;
 		}
 
-		if (
-			kind === "undo" &&
-			(statusValue === "applied" || statusValue === "noop")
-		) {
+		if (kind === "undo" && statusValue) {
 			if (
 				typeof record.targetMutationId !== "string" ||
 				destinationPath === undefined
@@ -147,7 +152,7 @@ function parseRecord(raw: string): MutationRecord | null {
 				kind === "move" ||
 				kind === "archive" ||
 				kind === "update") &&
-			(statusValue === "applied" || statusValue === "noop")
+			statusValue
 		) {
 			return {
 				id,
@@ -201,6 +206,13 @@ export function mutationJournalPath(projectRoot: string): string {
 	return resolveJournalPath(projectRoot);
 }
 
+export function withMutationJournalLock<T>(
+	projectRoot: string,
+	action: () => T,
+): T {
+	return withSessionLock(projectRoot, MUTATION_JOURNAL_LOCK_SESSION, action);
+}
+
 export function appendMutationRecords(
 	projectRoot: string,
 	records: MutationRecord[],
@@ -209,7 +221,7 @@ export function appendMutationRecords(
 		return;
 	}
 	const path = resolveJournalPath(projectRoot);
-	withSessionLock(projectRoot, MUTATION_JOURNAL_LOCK_SESSION, () => {
+	withMutationJournalLock(projectRoot, () => {
 		mkdirSync(resolve(path, ".."), { recursive: true });
 		const payload = records
 			.map((record) =>
@@ -231,13 +243,46 @@ export function appendMutationRecord(
 }
 
 export function loadMutationJournal(projectRoot: string): MutationRecord[] {
+	const result = loadMutationJournalStrict(projectRoot);
+	if (result.issues.length > 0) {
+		throw new Error(`Mutation journal corruption: ${result.issues.join("; ")}`);
+	}
+	return result.records.filter((record) =>
+		["applied", "committed", "noop"].includes(record.status),
+	);
+}
+
+export function assertMutationJournalIntegrity(projectRoot: string): void {
+	const result = loadMutationJournalStrict(projectRoot);
+	if (result.issues.length > 0) {
+		throw new Error(`Mutation journal corruption: ${result.issues.join("; ")}`);
+	}
+}
+
+export type MutationJournalReadResult = {
+	records: MutationRecord[];
+	issues: string[];
+};
+
+export function loadMutationJournalStrict(
+	projectRoot: string,
+): MutationJournalReadResult {
+	return withMutationJournalLock(projectRoot, () =>
+		loadMutationJournalStrictLocked(projectRoot),
+	);
+}
+
+function loadMutationJournalStrictLocked(
+	projectRoot: string,
+): MutationJournalReadResult {
 	const path = resolveJournalPath(projectRoot);
 	if (!existsSync(path)) {
-		return [];
+		return { records: [], issues: [] };
 	}
 	const rows = readFileSync(path, "utf8").split("\n");
 	const records: MutationRecord[] = [];
-	for (const row of rows) {
+	const issues: string[] = [];
+	for (const [index, row] of rows.entries()) {
 		const trimmed = row.trim();
 		if (trimmed.length === 0) {
 			continue;
@@ -245,9 +290,23 @@ export function loadMutationJournal(projectRoot: string): MutationRecord[] {
 		const parsed = parseRecord(trimmed);
 		if (parsed) {
 			records.push(parsed);
+		} else {
+			issues.push(`${path}:${index + 1}: invalid mutation record`);
 		}
 	}
-	return records;
+	const terminalIds = new Set(
+		records
+			.filter((record) =>
+				["applied", "committed", "rolled_back"].includes(record.status),
+			)
+			.map((record) => record.id),
+	);
+	for (const record of records) {
+		if (record.status === "prepared" && !terminalIds.has(record.id)) {
+			issues.push(`unmatched-prepared:${record.id}`);
+		}
+	}
+	return { records, issues };
 }
 
 function isUndoRecord(record: MutationRecord): record is MutationUndoRecord {
@@ -263,14 +322,22 @@ export function findLatestSupportedMutation(
 	const undone = new Set<string>();
 
 	for (const record of records) {
-		if (isUndoRecord(record)) {
+		if (
+			isUndoRecord(record) &&
+			["applied", "committed"].includes(record.status)
+		) {
 			undone.add(record.targetMutationId);
 		}
 	}
 
 	for (let index = records.length - 1; index >= 0; index -= 1) {
 		const record = records[index];
-		if (!record || isUndoRecord(record) || record.status !== "applied") {
+		if (
+			!record ||
+			isUndoRecord(record) ||
+			!["applied", "committed"].includes(record.status) ||
+			!["patch", "move", "archive"].includes(record.kind)
+		) {
 			continue;
 		}
 		if (record.session !== session || record.taskId !== taskId) {
@@ -290,12 +357,25 @@ export function findMutationById(
 	mutationId: string,
 ): MutationRecord | null {
 	const records = loadMutationJournal(projectRoot);
+	if (
+		records.some(
+			(record) =>
+				isUndoRecord(record) &&
+				["applied", "committed"].includes(record.status) &&
+				record.targetMutationId === mutationId,
+		)
+	) {
+		throw new Error(`already-undone:${mutationId}`);
+	}
 	for (let index = records.length - 1; index >= 0; index -= 1) {
 		const record = records[index];
 		if (!record) {
 			continue;
 		}
-		if (isUndoRecord(record)) {
+		if (
+			isUndoRecord(record) ||
+			!["applied", "committed"].includes(record.status)
+		) {
 			continue;
 		}
 		if (record.id === mutationId) {

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { boundedSpawn } from "../core/subprocess";
 import { outputTail } from "./output";
 import type {
 	PackId,
@@ -176,17 +176,31 @@ function expectsJsonReport(command: readonly string[]): boolean {
 }
 
 function isValidationCommandPassing(
-	result: ReturnType<typeof spawnSync>,
+	result: {
+		ok: boolean;
+		status: number | null;
+		signal: NodeJS.Signals | null;
+		timedOut: boolean;
+	},
 	report: ValidationCommandReport,
 ): boolean {
 	return (
+		result.ok &&
+		!result.timedOut &&
 		result.status === 0 &&
 		!result.signal &&
-		!result.error &&
 		!report.parseFailed &&
 		report.reportedPass !== false &&
 		report.reportedStatus !== "failed"
 	);
+}
+
+// Test seam: allows tests to replace boundedSpawn for deterministic timeout/spy coverage.
+let boundedSpawnImpl = boundedSpawn;
+export function setBoundedSpawnForTests(
+	impl: typeof boundedSpawn | null,
+): void {
+	boundedSpawnImpl = impl ?? boundedSpawn;
 }
 
 function runPackCommand(
@@ -199,14 +213,13 @@ function runPackCommand(
 	if (!command) {
 		throw new Error(`Empty validation command for pack: ${packId}`);
 	}
-	const result = spawnSync(command, args, {
+	const result = boundedSpawnImpl(command, args, {
 		cwd: projectRoot,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
+		timeoutMs: 120_000,
 	});
 	const durationMs = Math.round(performance.now() - startedAt);
 	const report = parseValidationCommandReport(
-		result.stdout ?? "",
+		result.stdout,
 		expectsJsonReport(spec.command),
 	);
 	const passed = isValidationCommandPassing(result, report);
@@ -215,11 +228,11 @@ function runPackCommand(
 		command: spec.command,
 		status: passed ? "passed" : "failed",
 		exit_code: result.status,
-		signal: result.signal,
+		signal: result.timedOut ? "SIGKILL" : result.signal,
 		duration_ms: durationMs,
-		stdout_tail: outputTail(result.stdout ?? ""),
+		stdout_tail: outputTail(result.stdout),
 		stderr_tail: outputTail(
-			result.error ? result.error.message : (result.stderr ?? ""),
+			result.spawnError ?? (result.timedOut ? "timed out" : result.stderr),
 		),
 	};
 	if (report.reportedStatus !== undefined) {
@@ -256,7 +269,27 @@ export function runValidationCommands(
 	const commandOutcomes: ValidationCommandOutcome[] = [];
 	const commandResults: ValidationCommandResult[] = [];
 	for (const packId of selectedPacks) {
-		for (const spec of VALIDATION_COMMANDS_BY_PACK[packId] ?? []) {
+		const specs = VALIDATION_COMMANDS_BY_PACK[packId];
+		if (!specs || specs.length === 0) {
+			// A selected pack with zero command specs cannot pass as zero coverage.
+			const noopResult: ValidationCommandResult = {
+				pack_id: packId,
+				command: [],
+				status: "failed",
+				exit_code: null,
+				signal: null,
+				duration_ms: 0,
+				stdout_tail: "",
+				stderr_tail: `no commands defined for pack: ${packId}`,
+			};
+			commandOutcomes.push({
+				commandResult: noopResult,
+				countsAsPassed: false,
+			});
+			commandResults.push(noopResult);
+			continue;
+		}
+		for (const spec of specs) {
 			const outcome = runPackCommand(projectRoot, packId, spec);
 			commandOutcomes.push(outcome);
 			commandResults.push(outcome.commandResult);

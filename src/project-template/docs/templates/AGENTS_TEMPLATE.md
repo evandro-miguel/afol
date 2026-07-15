@@ -141,7 +141,7 @@ work and keep this template focused on the stored data and docs contract.
   or explicitly justified.
 - Local `.env` files -> allowed only as ignored, non-versioned files.
 - Screenshots/images -> `.afol/wb/screenshots/` or `tests/screenshots/`.
-- Temp files -> `tmp/` or `.tmp_<name>/`.
+- Temp files -> configured `paths.tmp_dir` (default `.afol/tmp/`).
 - Workbench artifacts -> `.afol/wb/<session>/`.
 - User data -> never delete or move vault content, backups, keys, secrets,
   archives, Windows profile data, or other user data without explicit approval.

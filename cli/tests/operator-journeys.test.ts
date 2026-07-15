@@ -95,6 +95,9 @@ describe("operator UX journeys", () => {
 				"ux contract",
 				"--task",
 				"Verify operator recovery",
+				"--no-spec-required",
+				"--reason",
+				"operator journey fixture",
 				"--json",
 			]);
 			expect(createdProc.status).toBe(0);
@@ -135,21 +138,8 @@ describe("operator UX journeys", () => {
 			]);
 			expect(prematureDone.status).toBe(2);
 			expect(prematureDone.stdout as string).toContain(
-				"Task T-01 requires passed evidence before done.",
+				"authorization must be observed with exit_code 0",
 			);
-
-			const passingEvidence = runKernel(root, [
-				"evidence",
-				"--session",
-				session,
-				"--task-id",
-				"T-01",
-				"--command",
-				"bun test operator-recovery",
-				"--result",
-				"passed",
-			]);
-			expect(passingEvidence.status).toBe(0);
 
 			const doneProc = runKernel(root, [
 				"done",
@@ -157,6 +147,8 @@ describe("operator UX journeys", () => {
 				session,
 				"--task-id",
 				"T-01",
+				"--test",
+				"true",
 				"--json",
 			]);
 			expect(doneProc.status).toBe(0);

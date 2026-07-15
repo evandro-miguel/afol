@@ -48,6 +48,7 @@ export interface Scenario {
 	deterministic_metrics: Record<string, number>;
 	implementation_status?: "implemented" | "skipped";
 	live_runner_scenario_id?: string;
+	compiled_binary?: boolean;
 }
 
 export interface ToolCoverageExemption {
@@ -137,6 +138,7 @@ export interface BenchmarkResult {
 	output_tokens: number;
 	context_bytes: number;
 	output_bytes: number;
+	argv_chars?: number;
 	tool_call_count: number;
 	tool_success_rate: number;
 	git_commit: string;

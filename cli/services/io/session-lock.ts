@@ -1,22 +1,43 @@
+import { createHash } from "node:crypto";
 import {
 	closeSync,
 	existsSync,
+	fstatSync,
 	fsyncSync,
 	mkdirSync,
 	openSync,
 	readFileSync,
+	realpathSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { hostname, tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 
 const SESSION_LOCK_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const LOCK_RETRY_MS = 25;
 const LOCK_TIMEOUT_MS = 30_000;
+const LOCK_STALE_AGE_MS = 30_000;
+const LOCK_OWNERLESS_STALE_AGE_MS = 120_000;
 const LOCK_WAIT_BUFFER = new Int32Array(new SharedArrayBuffer(4));
 const heldLocks = new Map<string, number>();
+const HOSTNAME = hostname().toLowerCase();
+
+interface LockIdentity {
+	dev: bigint;
+	ino: bigint;
+}
+
+interface SessionLockMetadata extends LockIdentity {
+	isParsed: boolean;
+	pid?: number;
+	acquiredAtMs: number | null;
+	host?: string;
+	raw: string | null;
+	mtimeMs: number;
+}
 
 function sleepSync(ms: number): void {
 	if (ms <= 0) {
@@ -76,18 +97,233 @@ function readExistingLockHint(lockPath: string): string {
 		return lockPath;
 	}
 	try {
-		const payload = JSON.parse(readFileSync(lockPath, "utf8")) as {
+		const raw = readFileSync(lockPath, "utf8");
+		const parsed = parseLockMetadataText(raw);
+		if (
+			typeof parsed !== "object" ||
+			parsed === null ||
+			Array.isArray(parsed)
+		) {
+			return lockPath;
+		}
+		const payload = parsed as {
 			pid?: unknown;
 			acquired_at?: unknown;
+			host?: unknown;
 		};
 		const pid = typeof payload.pid === "number" ? ` pid=${payload.pid}` : "";
 		const acquiredAt =
 			typeof payload.acquired_at === "string"
 				? ` acquired_at=${payload.acquired_at}`
 				: "";
-		return `${lockPath}${pid}${acquiredAt}`;
+		const host =
+			typeof payload.host === "string" ? ` host=${payload.host}` : "";
+		return `${lockPath}${pid}${acquiredAt}${host}`;
 	} catch {
 		return lockPath;
+	}
+}
+
+function parseLockMetadataText(raw: string): unknown {
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return null;
+	}
+}
+
+function readFdIdentity(fd: number): LockIdentity {
+	const stats = fstatSync(fd, { bigint: true });
+	return { dev: stats.dev, ino: stats.ino };
+}
+
+function identitiesMatch(left: LockIdentity, right: LockIdentity): boolean {
+	return left.dev === right.dev && left.ino === right.ino;
+}
+
+function unlinkIfIdentityMatches(
+	lockPath: string,
+	expected: LockIdentity,
+): boolean {
+	let fd: number | null = null;
+	try {
+		fd = openSync(lockPath, "r");
+		if (!identitiesMatch(readFdIdentity(fd), expected)) {
+			return false;
+		}
+		unlinkSync(lockPath);
+		return true;
+	} catch {
+		return false;
+	} finally {
+		if (fd !== null) {
+			closeSync(fd);
+		}
+	}
+}
+
+function readLockMetadata(lockPath: string): SessionLockMetadata | null {
+	let fd: number | null = null;
+	try {
+		fd = openSync(lockPath, "r");
+		const raw = readFileSync(fd, "utf8");
+		const parsed = parseLockMetadataText(raw);
+		const stats = fstatSync(fd, { bigint: true });
+		const identity = { dev: stats.dev, ino: stats.ino };
+		const mtimeMs = Number(stats.mtimeMs);
+		if (
+			typeof parsed !== "object" ||
+			parsed === null ||
+			Array.isArray(parsed)
+		) {
+			return {
+				acquiredAtMs: null,
+				...identity,
+				isParsed: false,
+				raw: raw.trim().length > 0 ? raw : null,
+				mtimeMs,
+			};
+		}
+		const payload = parsed as {
+			pid?: unknown;
+			acquired_at?: unknown;
+			host?: unknown;
+		};
+		const pidRaw = payload.pid;
+		const pid =
+			typeof pidRaw === "number" && Number.isInteger(pidRaw) && pidRaw > 0
+				? pidRaw
+				: undefined;
+		const acquiredAtRaw = payload.acquired_at;
+		const acquiredAtMs =
+			typeof acquiredAtRaw === "string" &&
+			Number.isFinite(Date.parse(acquiredAtRaw))
+				? Date.parse(acquiredAtRaw)
+				: null;
+		const host =
+			typeof payload.host === "string"
+				? payload.host.trim().toLowerCase()
+				: undefined;
+		return {
+			acquiredAtMs,
+			...identity,
+			...(host?.length ? { host } : {}),
+			isParsed: true,
+			...(pid !== undefined ? { pid } : {}),
+			raw: raw,
+			mtimeMs,
+		};
+	} catch {
+		return null;
+	} finally {
+		if (fd !== null) {
+			closeSync(fd);
+		}
+	}
+}
+
+function metadataSignature(metadata: SessionLockMetadata): string {
+	return `${metadata.pid ?? ""}|${metadata.host ?? ""}|${
+		metadata.acquiredAtMs ?? ""
+	}|${metadata.raw ?? ""}|${metadata.mtimeMs}|${metadata.dev}|${metadata.ino}`;
+}
+
+function isProcessAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			(error as { code?: unknown }).code === "ESRCH"
+		) {
+			return false;
+		}
+		return true;
+	}
+}
+
+function shouldRecoverStaleLock(
+	lockPath: string,
+	nowMs: number,
+): SessionLockMetadata | null {
+	const metadata = readLockMetadata(lockPath);
+	if (metadata === null) {
+		return null;
+	}
+
+	const mtimeAgeMs = nowMs - metadata.mtimeMs;
+	if (metadata.isParsed && metadata.pid !== undefined) {
+		if (metadata.host === undefined || metadata.host !== HOSTNAME) {
+			return null;
+		}
+		if (isProcessAlive(metadata.pid)) {
+			return null;
+		}
+		const ageMs =
+			metadata.acquiredAtMs === null
+				? mtimeAgeMs
+				: nowMs - metadata.acquiredAtMs;
+		if (ageMs < LOCK_STALE_AGE_MS) {
+			return null;
+		}
+		return metadata;
+	}
+
+	if (mtimeAgeMs < LOCK_OWNERLESS_STALE_AGE_MS) {
+		return null;
+	}
+	return metadata;
+}
+
+function tryReclaimStaleLock(
+	lockPath: string,
+	expected: SessionLockMetadata,
+): boolean {
+	const reclaimPath = `${lockPath}.reclaim`;
+	let reclaimFd: number | null = null;
+	let reclaimIdentity: LockIdentity | null = null;
+	try {
+		reclaimFd = openSync(reclaimPath, "wx");
+		reclaimIdentity = readFdIdentity(reclaimFd);
+		writeFileSync(
+			reclaimFd,
+			`${JSON.stringify({
+				pid: process.pid,
+				acquired_at: new Date().toISOString(),
+				host: HOSTNAME,
+			})}\n`,
+			"utf8",
+		);
+		fsyncSync(reclaimFd);
+	} catch (error) {
+		if (reclaimFd !== null) closeSync(reclaimFd);
+		if (isAlreadyExistsError(error)) {
+			const staleMarker = shouldRecoverStaleLock(reclaimPath, Date.now());
+			if (staleMarker !== null) {
+				return unlinkIfIdentityMatches(reclaimPath, staleMarker);
+			}
+		}
+		return false;
+	}
+
+	try {
+		const rechecked = readLockMetadata(lockPath);
+		const expectedSignature = metadataSignature(expected);
+		if (
+			rechecked === null ||
+			metadataSignature(rechecked) !== expectedSignature
+		) {
+			return false;
+		}
+		return unlinkIfIdentityMatches(lockPath, expected);
+	} finally {
+		if (reclaimIdentity !== null) {
+			unlinkIfIdentityMatches(reclaimPath, reclaimIdentity);
+		}
+		if (reclaimFd !== null) closeSync(reclaimFd);
 	}
 }
 
@@ -118,7 +354,15 @@ export function withSessionLock<T>(
 			if (!isAlreadyExistsError(error)) {
 				throw error;
 			}
-			if (Date.now() - startedAt >= LOCK_TIMEOUT_MS) {
+			const now = Date.now();
+			const staleMetadata = shouldRecoverStaleLock(lockPath, now);
+			if (
+				staleMetadata !== null &&
+				tryReclaimStaleLock(lockPath, staleMetadata)
+			) {
+				continue;
+			}
+			if (now - startedAt >= LOCK_TIMEOUT_MS) {
 				throw new Error(
 					`Timed out waiting for session lock: ${readExistingLockHint(lockPath)}`,
 				);
@@ -128,12 +372,15 @@ export function withSessionLock<T>(
 	}
 
 	heldLocks.set(lockPath, 1);
+	let ownedIdentity: LockIdentity | null = null;
 	try {
+		ownedIdentity = readFdIdentity(fd);
 		writeFileSync(
 			fd,
 			`${JSON.stringify({
 				pid: process.pid,
 				acquired_at: new Date().toISOString(),
+				host: HOSTNAME,
 				session,
 			})}\n`,
 			"utf8",
@@ -142,11 +389,90 @@ export function withSessionLock<T>(
 		return action();
 	} finally {
 		releaseHeldLock(lockPath);
+		if (ownedIdentity !== null) {
+			unlinkIfIdentityMatches(lockPath, ownedIdentity);
+		}
 		if (fd !== null) {
 			closeSync(fd);
 		}
-		try {
-			unlinkSync(lockPath);
-		} catch {}
 	}
+}
+
+export function resolveExternalPathLockPath(canonicalPath: string): string {
+	const resolvedPath = resolve(canonicalPath);
+	const physicalPath = existsSync(resolvedPath)
+		? realpathSync(resolvedPath)
+		: resolvedPath;
+	const key = createHash("sha256").update(physicalPath).digest("hex");
+	return join(tmpdir(), "afol-external-locks", `${key}.lock`);
+}
+
+export async function withExternalPathLock<T>(
+	canonicalPath: string,
+	action: () => Promise<T>,
+): Promise<T> {
+	const lockPath = resolveExternalPathLockPath(canonicalPath);
+	mkdirSync(dirname(lockPath), { recursive: true });
+	const startedAt = Date.now();
+	let fd: number | null = null;
+	while (fd === null) {
+		try {
+			fd = openSync(lockPath, "wx");
+		} catch (error) {
+			if (!isAlreadyExistsError(error)) throw error;
+			const now = Date.now();
+			const staleMetadata = shouldRecoverStaleLock(lockPath, now);
+			if (
+				staleMetadata !== null &&
+				tryReclaimStaleLock(lockPath, staleMetadata)
+			) {
+				continue;
+			}
+			if (now - startedAt >= LOCK_TIMEOUT_MS) {
+				throw new Error(
+					`Timed out waiting for external path lock: ${readExistingLockHint(lockPath)}`,
+				);
+			}
+			sleepSync(LOCK_RETRY_MS);
+		}
+	}
+
+	let ownedIdentity: LockIdentity | null = null;
+	try {
+		ownedIdentity = readFdIdentity(fd);
+		writeFileSync(
+			fd,
+			`${JSON.stringify({
+				pid: process.pid,
+				acquired_at: new Date().toISOString(),
+				host: HOSTNAME,
+				resource: resolve(canonicalPath),
+			})}\n`,
+			"utf8",
+		);
+		fsyncSync(fd);
+		return await action();
+	} finally {
+		if (ownedIdentity !== null)
+			unlinkIfIdentityMatches(lockPath, ownedIdentity);
+		if (fd !== null) closeSync(fd);
+	}
+}
+
+export function withResourceLocks<T>(
+	root: string,
+	canonicalPaths: readonly string[],
+	action: () => T,
+): T {
+	const normalizedPaths = [
+		...new Set(canonicalPaths.map((path) => resolve(root, path))),
+	].sort();
+	const keys = normalizedPaths.map(
+		(path) => `__resource_${createHash("sha256").update(path).digest("hex")}`,
+	);
+	const acquire = (index: number): T =>
+		index >= keys.length
+			? action()
+			: withSessionLock(root, keys[index] as string, () => acquire(index + 1));
+	return acquire(0);
 }

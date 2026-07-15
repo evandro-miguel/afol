@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	runSessionCommand,
 	setCoordinationRadarReaderForTests,
 } from "../commands/session";
-import { remoteOperationContext } from "../core/operation-context";
+import {
+	defaultOperationContext,
+	remoteOperationContext,
+} from "../core/operation-context";
 import { readActiveSession } from "../services/workbench/lifecycle";
 import {
 	bindSession,
@@ -94,7 +103,32 @@ function createStateBoardSession(
 }
 
 function createClosedSession(root: string, session: string): void {
-	createStateBoardSession(root, session, "done");
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		[
+			"---",
+			'doc_type: "workbench_task"',
+			`id: "${session}_task_01"`,
+			`session_id: "${session}"`,
+			'status: "closed"',
+			'created_at: "2026-07-09T22:30:00.000Z"',
+			'updated_at: "2026-07-09T22:30:00.000Z"',
+			'closed_at: "2026-07-09T22:30:00.000Z"',
+			"---",
+			"",
+			"# Tasks",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | done | worker | task state fixture |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
 }
 
 function initGitRepo(root: string, branch = "parallel-session-test"): void {
@@ -141,6 +175,34 @@ afterEach(() => {
 });
 
 describe("session context service", () => {
+	test("malformed context fails closed and is not overwritten", () => {
+		const root = createProjectRoot("malformed-context");
+		const path = join(root, ".afol", "wb", "session-context.json");
+		try {
+			writeFileSync(path, "{broken", "utf8");
+			expect(() => bindSession(root, { session: "S-01" })).toThrow(
+				"Invalid session context",
+			);
+			expect(readFileSync(path, "utf8")).toBe("{broken");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("serialized independent binds preserve both bindings", () => {
+		const root = createProjectRoot("serialized-binds");
+		try {
+			bindSession(root, { session: "S-01", branch: "one" });
+			bindSession(root, { session: "S-02", branch: "two" });
+			expect(
+				readSessionContext(root)
+					.bindings.map((item) => item.session)
+					.sort(),
+			).toEqual(["S-01", "S-02"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("readSessionContext returns empty when file is missing", () => {
 		const root = createProjectRoot("missing");
 		try {
@@ -352,6 +414,41 @@ describe("afol session command", () => {
 		}
 	});
 
+	test("switch restores active pointer and context when binding fails", async () => {
+		const root = createProjectRoot("switch-rollback");
+		createSessionFixture(root, "OLD");
+		createSessionFixture(root, "NEXT");
+		writeFileSync(
+			join(root, ".afol", "wb", ".active_session"),
+			"OLD\n",
+			"utf8",
+		);
+		bindSession(root, { session: "OLD", branch: "old" });
+		const contextPath = join(root, ".afol", "wb", "session-context.json");
+		const before = readFileSync(contextPath, "utf8");
+		const captured = captureIo();
+		try {
+			expect(
+				await runSessionCommand(
+					"switch",
+					["NEXT"],
+					root,
+					captured.io,
+					defaultOperationContext(),
+					{
+						beforeSwitchBinding: () => {
+							throw new Error("injected binding failure");
+						},
+					},
+				),
+			).toBe(2);
+			expect(readActiveSession(root)).toBe("OLD");
+			expect(readFileSync(contextPath, "utf8")).toBe(before);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("bind rejects a missing session folder", async () => {
 		const root = createProjectRoot("bind-missing");
 		initGitRepo(root);
@@ -412,7 +509,7 @@ describe("afol session command", () => {
 			const code = await runSessionCommand("switch", ["BROKEN"], root, io.io);
 			expect(code).toBe(2);
 			expect(io.stderr.join("\n")).toContain(
-				"session not found: BROKEN (missing task file",
+				"session corrupt: BROKEN (missing canonical task file)",
 			);
 			expect(readActiveSession(root)).toBeNull();
 		} finally {
@@ -420,7 +517,7 @@ describe("afol session command", () => {
 		}
 	});
 
-	test("bind rejects a closed session with all tasks done", async () => {
+	test("bind rejects a session with durable close metadata", async () => {
 		const root = createProjectRoot("bind-closed");
 		initGitRepo(root);
 		try {
@@ -433,7 +530,9 @@ describe("afol session command", () => {
 				io.io,
 			);
 			expect(code).toBe(2);
-			expect(io.stderr.join("\n")).toContain("session closed: DONE");
+			expect(io.stderr.join("\n")).toContain(
+				"session closed: DONE (durable close metadata present)",
+			);
 			expect(readSessionContext(root).bindings).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -462,16 +561,19 @@ describe("afol session command", () => {
 			expect(payload.ok).toBe(false);
 			expect(payload.exit_code).toBe(2);
 			expect(payload.error?.code).toBe("SESSION_ERROR");
-			expect(payload.error?.message).toContain("session closed: DONE");
+			expect(payload.error?.message).toContain(
+				"session closed: DONE (durable close metadata present)",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("bind accepts sessions awaiting validation", async () => {
+	test("bind accepts sessions without durable close metadata", async () => {
 		for (const state of [
 			"implemented_untested",
 			"tested_needs_spec_validation",
+			"done",
 		] as const) {
 			const root = createProjectRoot(`bind-${state}`);
 			initGitRepo(root);
@@ -493,7 +595,7 @@ describe("afol session command", () => {
 		}
 	});
 
-	test("switch rejects a closed session with all tasks done", async () => {
+	test("switch rejects a session with durable close metadata", async () => {
 		const root = createProjectRoot("switch-closed");
 		initGitRepo(root);
 		try {
@@ -501,17 +603,20 @@ describe("afol session command", () => {
 			const io = captureIo();
 			const code = await runSessionCommand("switch", ["DONE"], root, io.io);
 			expect(code).toBe(2);
-			expect(io.stderr.join("\n")).toContain("session closed: DONE");
+			expect(io.stderr.join("\n")).toContain(
+				"session closed: DONE (durable close metadata present)",
+			);
 			expect(readActiveSession(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("switch accepts sessions awaiting validation", async () => {
+	test("switch accepts sessions without durable close metadata", async () => {
 		for (const state of [
 			"implemented_untested",
 			"tested_needs_spec_validation",
+			"done",
 		] as const) {
 			const root = createProjectRoot(`switch-${state}`);
 			initGitRepo(root);

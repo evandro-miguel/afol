@@ -61,7 +61,33 @@ describe("workbench parseCloseArgs", () => {
 		expect(parsed.session).toBe("260530_2256_cli-native");
 		expect(parsed.allowNoReport).toBe(true);
 		expect(parsed.reason).toBe("research-only session");
+		expect(parsed.summary).toBe("");
 		expect(parsed.json).toBe(false);
+	});
+
+	test("accepts close summary short flag", () => {
+		const parsed = parseCloseArgs(
+			["--session", "260530_2256_cli-native", "-m", "verified close"],
+			process.cwd(),
+		);
+		expect(parsed.summary).toBe("verified close");
+	});
+
+	test("rejects a summary combined with a no-report waiver", () => {
+		expect(() =>
+			parseCloseArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"--allow-no-report",
+					"--reason",
+					"research-only session",
+					"--summary",
+					"different summary",
+				],
+				process.cwd(),
+			),
+		).toThrow("Cannot combine --summary with --allow-no-report.");
 	});
 });
 

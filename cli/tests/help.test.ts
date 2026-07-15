@@ -10,7 +10,7 @@ import {
 	formatCommandHelp,
 	formatHelpText,
 } from "../help";
-import { SUBCOMMAND_DISPATCH_GROUPS } from "../main";
+import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
@@ -93,7 +93,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(360);
+		expect(lines.length).toBeLessThanOrEqual(365);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -105,9 +105,7 @@ describe("help formatter", () => {
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
-		expect(help).toContain(
-			"  --verbose  Expanded human catalog with subcommands",
-		);
+		expect(help).toContain("  --verbose  Show subcommands");
 	});
 
 	test("formats per-command help from registry metadata", () => {
@@ -188,6 +186,39 @@ describe("help formatter", () => {
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain("Usage: afol");
 			}
+			const directHelpCommands: (typeof kernelRegistry.commands)[number][] = [];
+			for (const kind of DIRECT_DISPATCH_KINDS) {
+				const spec = kernelRegistry.commands.find(
+					(entry) => entry.kind === kind,
+				);
+				if (
+					spec &&
+					spec.kind !== "verifyTasks" &&
+					!["new", "start", "close"].includes(spec.command)
+				) {
+					directHelpCommands.push(spec);
+				}
+			}
+			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length - 4);
+			for (const spec of directHelpCommands) {
+				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain(`Command: ${spec.command}`);
+			}
+			const shortStartHelp = spawnSync("bun", [cliPath, "st", "--help"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(shortStartHelp.status).toBe(0);
+			expect(shortStartHelp.stderr).toBe("");
+			expect(shortStartHelp.stdout).toContain("Usage: afol start");
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],
@@ -217,7 +248,7 @@ describe("help formatter", () => {
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });
 		}
-	});
+	}, 15_000);
 
 	test("expands per-command help with tool-specific options and guidance", () => {
 		const validateHelp = formatCommandHelp("validate", kernelRegistry);
@@ -263,10 +294,10 @@ describe("help formatter", () => {
 		expect(help).toContain("Category: ops");
 		expect(help).toContain("Side effect: write");
 		expect(help).toContain(
-			"Description: Safely patch, move, archive, and undo files; supports dry-run",
+			"Description: Safely append, move, archive, and undo files; supports dry-run",
 		);
-		expect(help).toContain("pt|patch --path <path> --dry-run [read]");
-		expect(help).toContain("pt|patch --path <path> [write]");
+		expect(help).toContain("append|patch --path <path> --dry-run [read]");
+		expect(help).toContain("append|patch --path <path> [write]");
 		expect(help).toContain("ud|undo --mutation-id <id> [write]");
 	});
 

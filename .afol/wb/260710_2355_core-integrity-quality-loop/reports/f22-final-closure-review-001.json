@@ -1,0 +1,79 @@
+{
+  "schema": "codex-quality-loop.final-closure-review/v1",
+  "review_id": "f22-final-closure-review-001",
+  "reviewer": "independent auditor",
+  "verdict": "PASS",
+  "confidence": "high",
+  "reviewed_commit": "2f81465760b00499cce7146f79d53af03557eba2",
+  "scope": "F-22 core-readiness closure evidence only",
+  "test_gate": {
+    "passed": 1095,
+    "failed": 0,
+    "result": "PASS"
+  },
+  "release_gate": {
+    "result": "PASS",
+    "commit_bound": true
+  },
+  "project_benchmarks": {
+    "packs": {
+      "passed": 15,
+      "total": 15
+    },
+    "checks": {
+      "passed": 68,
+      "total": 68
+    },
+    "live_scenarios": {
+      "passed": 5,
+      "total": 5
+    },
+    "result": "PASS"
+  },
+  "mutation": {
+    "killed": 16,
+    "total": 16,
+    "survived": 0,
+    "result": "PASS",
+    "policy": "ADR-006 report-only selective mutation policy"
+  },
+  "reviews": {
+    "security": "PASS",
+    "backend": "PASS",
+    "governance": "PASS"
+  },
+  "gitnexus": {
+    "fresh": true,
+    "impact_scale": "critical",
+    "source_confirmed_by_focused_evidence": true,
+    "result": "PASS"
+  },
+  "artifact_integrity": {
+    "global_real_elf_hash_parity": "fa5cc38ca0ebbc891261a5294c4fbe37e78834f633259d4d415444adc4dfdfc0",
+    "result": "PASS"
+  },
+  "exclusions": {
+    "authority": "ADR-006",
+    "accepted": [
+      "Windows-native F-26",
+      "F-23 through F-28 future-feature scope",
+      "SQLite State DB v2 and broader persistence migration scope"
+    ],
+    "note": "These exclusions are not silently implemented or closed by this review."
+  },
+  "authorization": {
+    "deploy": false,
+    "main_branch": false,
+    "commit_or_push": false,
+    "task_completion": false,
+    "session_closure": false
+  },
+  "task_state": {
+    "session": "260710_2355_core-integrity-quality-loop",
+    "task": "T-05",
+    "state": "in_progress",
+    "note": "This report records independent PASS evidence only; it does not mark T-05 done or close the session."
+  },
+  "report_path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/f22-final-closure-review-001.json",
+  "recorded_at": "2026-07-12T20:18:27-03:00"
+}

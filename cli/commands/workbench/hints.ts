@@ -73,7 +73,7 @@ export function repairHintForStep(
 		case "log":
 			return `afol log --session ${sessionId(ctx)} --message "<text>"`;
 		case "quick-task":
-			return `afol quick-task <theme> --command "<cmd>" --result passed`;
+			return `afol quick-task <theme> --command "<cmd>" --no-spec-required --reason "<reason>"`;
 		case "session-show":
 			return `afol session show --session ${sessionId(ctx)}`;
 	}

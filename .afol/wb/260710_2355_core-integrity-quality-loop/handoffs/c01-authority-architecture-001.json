@@ -1,0 +1,63 @@
+{
+  "schema": "afol.c01-authority-architecture/v1",
+  "slice": "STOP-C01-AUTHORITY",
+  "agent": "architect",
+  "runtime": "gpt-5.6-terra max read-only",
+  "recommendation": "honest-local-operator deployment boundary",
+  "decision": "Direct AFOL invocation is the local-operator authority path. Explicit agent and remote contexts are restrictive policy modes only. Flags, environment values, task owners, and session actors are not authenticated identity or authority credentials.",
+  "rationale": [
+    "The CLI cannot isolate a process with ordinary write access under the same Unix account through in-process checks alone.",
+    "The current red tests prove explicit restricted-mode behavior only. They do not prove caller identity or omitted-marker safety.",
+    "A launcher-issued artifact would require an external trust root, protected issuer state, revocation, replay state, and prevention of direct AFOL execution. None exists in this repository.",
+    "Adding a token, daemon, key system, or wrapper without that external boundary would rename self-attestation instead of creating authority."
+  ],
+  "required_fields": {
+    "issuer_trust_boundary": "The deployment local-operator entry path is the authority source. AFOL does not authenticate it in-process. Same-account processes with project write access are outside the CLI isolation boundary.",
+    "audience": "Direct AFOL invocation for the local operator. Managed agent and remote entries are restrictive-mode invocations only.",
+    "expiry_renewal": "Policy mode is per-process and ends with the process. No durable grant or renewal protocol exists.",
+    "revocation": "Deployment removes the constrained tool entry, generic shell access, or project write access. AFOL has no same-account in-process revocation mechanism.",
+    "replay_protection": "Not applicable because C01 introduces no bearer artifact. Locks, task IDs, owners, and actors are not replay protection.",
+    "verification": "AFOL resolves one canonical action policy before dispatch and applies it to an immutable execution-mode context. Explicit restricted inputs may reduce access only.",
+    "audit": "C01 creates no persistent policy-decision audit. A denial returns the existing structured approval-required envelope with the normalized action and exit code 2 before handler I/O. Allowed actions retain existing command-specific evidence behavior.",
+    "local_operator_fallback": "Direct invocation is the local-operator path, not an agent fallback. Restricted mode cannot upgrade itself through flags, environment, owner, or actor labels.",
+    "test_shell_policy": "done --test-shell remains local-operator-only and absent from agent or remote tool catalogs, including generic shell entries. Command persistence needs separate redaction scope."
+  },
+  "classifications": {
+    "direct_invocation": "local-operator deployment boundary, not authenticated human identity",
+    "omitted_markers": "select the direct local-operator path; they do not prove that an agent is absent",
+    "self_issued_credentials": "not authority"
+  },
+  "implementation_boundary": {
+    "allowed_after_separate_scope_acceptance": [
+      "cli/core/operation-context.ts",
+      "cli/main.ts",
+      "cli/registry.ts",
+      "cli/router.ts",
+      "cli/commands/file.ts",
+      "cli/commands/file/shared.ts",
+      "cli/services/workbench/lifecycle.ts",
+      "cli/tests/kernel.test.ts",
+      "cli/tests/operation-context.test.ts",
+      "cli/tests/registry.test.ts",
+      "cli/tests/router.test.ts",
+      "cli/tests/file-command-unit.test.ts",
+      "cli/tests/mutation-safety.test.ts"
+    ],
+    "forbidden": [
+      "daemon, service, key store, launcher binary, host-account or container configuration",
+      "downstream project-local AFOL wrapper",
+      "src/project-template/**, generated payloads, manifests, provider credentials, and legacy runtime surfaces",
+      "agent-facing test-shell exposure",
+      "cli/commands/adapter.ts; adapter denial is enforced by the central pre-dispatch policy"
+    ],
+    "denial_record": "non-persistent structured approval-required envelope with exit code 2"
+  },
+  "acceptance_limits": [
+    "R-02 and SEC-001, SEC-003, and SEC-004 explicit restricted-mode tests may become green.",
+    "SEC-006 needs separate persistence-redaction scope.",
+    "SEC-002 must not be claimed as an identity guarantee.",
+    "Same-account isolation, authentication, cross-host ownership, revocation, and replay protection remain unclaimed."
+  ],
+  "unresolved_owner_choices": [],
+  "confidence": "high"
+}

@@ -3,7 +3,7 @@ doc_type: standard
 id: agents-usage-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-06-07T12:30:00-03:00'
+updated_at: '2026-07-13T00:00:00Z'
 ---
 
 # AFOL Agent Usage
@@ -26,10 +26,21 @@ afol status
 afol validate project
 afol new auth-refactor --feature-id F-01 --parent-spec <spec-id>
 afol start --session <session-id> --task-id T-01
-afol evidence --session <session-id> --task-id T-01 --command "afol validate project" --result passed
-afol done --session <session-id> --task-id T-01
-afol close --session <session-id>
+afol done --session <session-id> --task-id T-01 --test-shell "afol validate project"
+afol close --session <session-id> --summary "Validation passed"
 ```
+
+When the active/bound session is unambiguous, use the low-token path:
+
+```bash
+afol st T-01
+afol d T-01 -x "afol validate project"
+afol c -m "Validation passed"
+```
+
+`d -x` executes an argv command without shell parsing. Use
+`afol done --test-shell "<shell expression>"` explicitly for `&&`, pipes,
+redirection, or other shell syntax.
 
 ## Command Reference
 
@@ -40,7 +51,8 @@ command surface.
 
 - Create or target a session before product edits.
 - Move the executable task to `in_progress` before editing.
-- Record task-scoped evidence before marking the task done.
+- Complete tasks with observed exit-zero evidence (`done --test-shell` or
+  `d -x`). Declared `evidence --result passed` alone cannot authorize `done`.
 - Close sessions only after validation evidence exists.
 - Keep factory workbench state out of downstream template payloads.
 - Store mutable execution state under `.afol/wb/**`, not `.agents/wb/**`.

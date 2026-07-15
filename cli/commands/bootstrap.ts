@@ -1,12 +1,23 @@
 import { createHash } from "node:crypto";
 import {
 	chmodSync,
+	cpSync,
 	existsSync,
+	lstatSync,
 	mkdirSync,
+	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
+	rmSync,
+	writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { filterClaudeAdapterFiles } from "../services/adapter/claude";
 import {
@@ -18,6 +29,7 @@ import type {
 	ManagedOwnership,
 } from "../services/bootstrap/planner";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
+import { withExternalPathLock } from "../services/io/session-lock";
 import {
 	CANONICAL_PROJECT_CONFIG_PATH,
 	normalizeProjectRelativePath,
@@ -48,7 +60,112 @@ type RawManifest = Record<string, unknown>;
 type BootstrapRuntime = {
 	cliRoot?: string | undefined;
 	invocationPath?: string | undefined;
+	beforeLockedPlan?: (() => void) | undefined;
+	failAfterTemplateWrite?: boolean | undefined;
+	failAfterCleanup?: boolean | undefined;
+	failAfterMutableBaseline?: boolean | undefined;
+	failAfterProviderMigration?: boolean | undefined;
 };
+
+function canonicalTargetRoot(targetRoot: string): string {
+	let current = resolve(targetRoot);
+	const unresolved: string[] = [];
+	while (true) {
+		try {
+			const stats = lstatSync(current);
+			if (stats.isSymbolicLink()) {
+				throw new Error(`Bootstrap target must not be a symlink: ${current}`);
+			}
+			return join(realpathSync(current), ...unresolved.reverse());
+		} catch (error) {
+			if (
+				typeof error !== "object" ||
+				error === null ||
+				!("code" in error) ||
+				(error as { code?: unknown }).code !== "ENOENT"
+			) {
+				throw error;
+			}
+			const parent = dirname(current);
+			if (parent === current) throw error;
+			unresolved.push(basename(current));
+			current = parent;
+		}
+	}
+}
+
+type TargetSnapshot = {
+	container: string;
+	existed: boolean;
+	snapshotPath: string;
+};
+
+function nearestExistingDirectory(path: string): string {
+	let current = dirname(resolve(path));
+	while (!existsSync(current)) {
+		const parent = dirname(current);
+		if (parent === current) return current;
+		current = parent;
+	}
+	return realpathSync(current);
+}
+
+function snapshotTarget(targetRoot: string): TargetSnapshot {
+	const container = mkdtempSync(
+		join(nearestExistingDirectory(targetRoot), ".afol-bootstrap-transaction-"),
+	);
+	try {
+		const snapshotPath = join(container, "before");
+		const existed = existsSync(targetRoot);
+		if (existed) {
+			cpSync(targetRoot, snapshotPath, {
+				recursive: true,
+				preserveTimestamps: true,
+			});
+		}
+		return { container, existed, snapshotPath };
+	} catch (error) {
+		rmSync(container, { recursive: true, force: true });
+		throw error;
+	}
+}
+
+function restoreTarget(targetRoot: string, snapshot: TargetSnapshot): void {
+	rmSync(targetRoot, { recursive: true, force: true });
+	if (snapshot.existed) {
+		cpSync(snapshot.snapshotPath, targetRoot, {
+			recursive: true,
+			preserveTimestamps: true,
+		});
+	}
+}
+
+function validateTemplateStaging(
+	templateFiles: TemplateFileMap,
+	targetRoot: string,
+): string {
+	const staging = mkdtempSync(
+		join(nearestExistingDirectory(targetRoot), ".afol-bootstrap-staging-"),
+	);
+	try {
+		for (const [path, entry] of Object.entries(templateFiles)) {
+			const payload = Buffer.from(entry.contentBase64, "base64");
+			if (
+				sha256Hex(payload) !== entry.sha256 ||
+				payload.byteLength !== entry.bytes
+			) {
+				throw new Error(`Invalid generated template payload: ${path}`);
+			}
+			const stagedPath = join(staging, path);
+			mkdirSync(dirname(stagedPath), { recursive: true });
+			writeFileSync(stagedPath, payload);
+		}
+		return staging;
+	} catch (error) {
+		rmSync(staging, { recursive: true, force: true });
+		throw error;
+	}
+}
 
 type MutableBaselineOperation = {
 	kind: "create" | "skip-existing";
@@ -139,7 +256,13 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 			if (!value) {
 				throw new Error("Missing value for --mutable-dir");
 			}
-			mutableDir = normalizeProjectRelativePath(value, ".agents");
+			const normalized = normalizeProjectRelativePath(value, ".afol");
+			if (normalized !== ".afol") {
+				throw new Error(
+					"Unsupported bootstrap argument: --mutable-dir only accepts .afol. Custom mutable roots are not supported.",
+				);
+			}
+			mutableDir = normalized;
 			index += 1;
 			continue;
 		}
@@ -579,168 +702,230 @@ function resolveBootstrapWritePath(targetRoot: string, path: string): string {
 export async function runBootstrapCommand(
 	args: string[],
 	runtime: BootstrapRuntime = {},
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
-	let parsed: BootstrapArgs;
 	try {
-		parsed = parseBootstrapArgs(args);
-	} catch (error) {
-		console.error((error as Error).message);
-		return 2;
-	}
-
-	const templateFiles = buildBootstrapTemplateFiles(
-		parsed.mutableDir,
-		parsed.withoutClaude,
-	);
-	const templatePaths = Object.keys(templateFiles).sort();
-	const currentFiles = readTargetFiles(parsed.targetRoot, templatePaths);
-	const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
-	const plan = planBootstrapOperations({
-		templateFiles,
-		currentFiles,
-		manifest,
-	});
-	const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
-	const mutableBaselinePlan = planMutableBaselines(
-		parsed.targetRoot,
-		parsed.mutableDir,
-	);
-	const providerCompatibleCleanupPlan =
-		planProviderCompatibleAgentsMutableCleanup(
-			parsed.targetRoot,
-			parsed.mutableDir,
-		);
-
-	const conflicts = plan.operations.filter(
-		(operation) => operation.kind === "conflict",
-	);
-	const writable = plan.operations.filter(
-		(operation) =>
-			operation.kind === "create" || operation.kind === "update-managed",
-	);
-
-	console.log(
-		[
-			`bootstrap: target=${parsed.targetRoot}`,
-			`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
-			`mutable=${parsed.mutableDir}`,
-			`without-claude=${parsed.withoutClaude}`,
-			`files=${Object.keys(templateFiles).length}`,
-			`operations=${plan.operations.length}`,
-			`conflicts=${conflicts.length}`,
-			`cleanup=${cleanupPlan.candidates.length}`,
-			`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
-			parsed.verbose ? "details=verbose" : "details=run-with---verbose",
-		].join(" "),
-	);
-
-	if (parsed.verbose) {
-		for (const operation of plan.operations) {
-			console.log(`${operation.kind} ${operation.path} ${operation.reason}`);
+		const parsed = parseBootstrapArgs(args);
+		if (!parsed.dryRun && requiresApproval(ctx)) {
+			throw new Error("bootstrap requires local interactive approval");
 		}
-		for (const candidate of cleanupPlan.candidates) {
-			console.log(`cleanup-pending ${candidate.path} ${candidate.reason}`);
-		}
-		for (const operation of mutableBaselinePlan) {
-			console.log(
-				`mutable-baseline-${operation.kind} ${operation.path} source=${operation.sourcePath} ${operation.reason}`,
-			);
-		}
-		for (const operation of providerCompatibleCleanupPlan) {
-			console.log(
-				`provider-compatible-cleanup-pending ${operation.path} ${operation.reason}`,
-			);
-		}
-	}
-
-	if (parsed.dryRun) {
-		return conflicts.length > 0 ? 4 : 0;
-	}
-
-	if (conflicts.length > 0 && !parsed.forceManaged) {
-		console.error(
-			"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
-		);
-		return 4;
-	}
-
-	const hasRealMutations =
-		writable.length > 0 ||
-		(parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) ||
-		(parsed.forceManaged && conflicts.length > 0) ||
-		mutableBaselinePlan.some((operation) => operation.kind === "create") ||
-		(parsed.cleanupProviderCompatibleMutable &&
-			parsed.confirmProviderMigration &&
-			providerCompatibleCleanupPlan.length > 0);
-	if (hasRealMutations) {
-		const runtimeValidation = validateMutationRuntime({
-			cliRoot: runtime.cliRoot,
-			invocationPath: runtime.invocationPath,
-			operation: "bootstrap",
-		});
-		if (!runtimeValidation.ok) {
-			console.error(runtimeValidation.message);
-			return 2;
-		}
-	}
-
-	try {
-		if (hasRealMutations) {
-			mkdirSync(parsed.targetRoot, { recursive: true });
-		}
-		for (const operation of writable) {
-			await writeTemplateFile(parsed.targetRoot, operation.path, templateFiles);
-		}
-		if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
-			cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
-			if (parsed.verbose) {
-				for (const candidate of cleanupPlan.candidates) {
-					console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
+		const initialCanonicalTarget = parsed.dryRun
+			? ""
+			: canonicalTargetRoot(parsed.targetRoot);
+		const execute = async (): Promise<number> => {
+			runtime.beforeLockedPlan?.();
+			if (!parsed.dryRun) {
+				let lockedCanonicalTarget = "";
+				try {
+					lockedCanonicalTarget = canonicalTargetRoot(parsed.targetRoot);
+				} catch {
+					throw new Error(
+						`Bootstrap target changed while waiting for lock: ${parsed.targetRoot}`,
+					);
 				}
-			}
-		}
-		if (parsed.forceManaged) {
-			for (const operation of conflicts) {
-				await writeTemplateFile(
-					parsed.targetRoot,
-					operation.path,
-					templateFiles,
-				);
-			}
-		}
-		await writeMutableBaselines(parsed.targetRoot, mutableBaselinePlan);
-		if (
-			parsed.cleanupProviderCompatibleMutable &&
-			parsed.confirmProviderMigration
-		) {
-			const archived = cleanupProviderCompatibleAgentsMutable(
-				parsed.targetRoot,
-				providerCompatibleCleanupPlan,
-			);
-			if (parsed.verbose) {
-				for (const operation of archived) {
-					console.log(
-						`provider-compatible-cleanup-archived ${operation.path} archive=${operation.archivePath} ${operation.reason}`,
+				if (lockedCanonicalTarget !== initialCanonicalTarget) {
+					throw new Error(
+						`Bootstrap target changed while waiting for lock: ${parsed.targetRoot}`,
 					);
 				}
 			}
-		} else {
+			const templateFiles = buildBootstrapTemplateFiles(
+				parsed.mutableDir,
+				parsed.withoutClaude,
+			);
+			const templatePaths = Object.keys(templateFiles).sort();
+			const currentFiles = readTargetFiles(parsed.targetRoot, templatePaths);
+			const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
+			const plan = planBootstrapOperations({
+				templateFiles,
+				currentFiles,
+				manifest,
+			});
+			const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
+			const mutableBaselinePlan = planMutableBaselines(
+				parsed.targetRoot,
+				parsed.mutableDir,
+			);
+			const providerCompatibleCleanupPlan =
+				planProviderCompatibleAgentsMutableCleanup(
+					parsed.targetRoot,
+					parsed.mutableDir,
+				);
+
+			const conflicts = plan.operations.filter(
+				(operation) => operation.kind === "conflict",
+			);
+			const writable = plan.operations.filter(
+				(operation) =>
+					operation.kind === "create" || operation.kind === "update-managed",
+			);
+
+			console.log(
+				[
+					`bootstrap: target=${parsed.targetRoot}`,
+					`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
+					`mutable=${parsed.mutableDir}`,
+					`without-claude=${parsed.withoutClaude}`,
+					`files=${Object.keys(templateFiles).length}`,
+					`operations=${plan.operations.length}`,
+					`conflicts=${conflicts.length}`,
+					`cleanup=${cleanupPlan.candidates.length}`,
+					`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
+					parsed.verbose ? "details=verbose" : "details=run-with---verbose",
+				].join(" "),
+			);
+
 			if (parsed.verbose) {
+				for (const operation of plan.operations) {
+					console.log(
+						`${operation.kind} ${operation.path} ${operation.reason}`,
+					);
+				}
+				for (const candidate of cleanupPlan.candidates) {
+					console.log(`cleanup-pending ${candidate.path} ${candidate.reason}`);
+				}
+				for (const operation of mutableBaselinePlan) {
+					console.log(
+						`mutable-baseline-${operation.kind} ${operation.path} source=${operation.sourcePath} ${operation.reason}`,
+					);
+				}
 				for (const operation of providerCompatibleCleanupPlan) {
 					console.log(
-						`provider-compatible-cleanup-preserved ${operation.path} ${
-							parsed.cleanupProviderCompatibleMutable
-								? "requires-confirm-provider-migration"
-								: "requires-explicit-opt-in"
-						}`,
+						`provider-compatible-cleanup-pending ${operation.path} ${operation.reason}`,
 					);
 				}
 			}
-		}
+
+			if (parsed.dryRun) return conflicts.length > 0 ? 4 : 0;
+
+			if (conflicts.length > 0 && !parsed.forceManaged) {
+				console.error(
+					"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
+				);
+				return 4;
+			}
+
+			const hasRealMutations =
+				writable.length > 0 ||
+				(parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) ||
+				(parsed.forceManaged && conflicts.length > 0) ||
+				mutableBaselinePlan.some((operation) => operation.kind === "create") ||
+				(parsed.cleanupProviderCompatibleMutable &&
+					parsed.confirmProviderMigration &&
+					providerCompatibleCleanupPlan.length > 0);
+			if (hasRealMutations) {
+				const runtimeValidation = validateMutationRuntime({
+					cliRoot: runtime.cliRoot,
+					invocationPath: runtime.invocationPath,
+					operation: "bootstrap",
+				});
+				if (!runtimeValidation.ok) {
+					console.error(runtimeValidation.message);
+					return 2;
+				}
+			}
+
+			if (!hasRealMutations) return 0;
+			let snapshot: TargetSnapshot | null = null;
+			let staging = "";
+			let preserveSnapshot = false;
+			try {
+				snapshot = snapshotTarget(parsed.targetRoot);
+				staging = validateTemplateStaging(templateFiles, parsed.targetRoot);
+				if (hasRealMutations) {
+					mkdirSync(parsed.targetRoot, { recursive: true });
+				}
+				for (const operation of writable) {
+					await writeTemplateFile(
+						parsed.targetRoot,
+						operation.path,
+						templateFiles,
+					);
+					if (runtime.failAfterTemplateWrite)
+						throw new Error("Injected bootstrap failure after template write");
+				}
+				if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
+					cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
+					if (runtime.failAfterCleanup)
+						throw new Error("Injected bootstrap failure after cleanup");
+					if (parsed.verbose) {
+						for (const candidate of cleanupPlan.candidates) {
+							console.log(
+								`cleanup-removed ${candidate.path} ${candidate.reason}`,
+							);
+						}
+					}
+				}
+				if (parsed.forceManaged) {
+					for (const operation of conflicts) {
+						await writeTemplateFile(
+							parsed.targetRoot,
+							operation.path,
+							templateFiles,
+						);
+					}
+				}
+				await writeMutableBaselines(parsed.targetRoot, mutableBaselinePlan);
+				if (runtime.failAfterMutableBaseline)
+					throw new Error("Injected bootstrap failure after mutable baseline");
+				if (
+					parsed.cleanupProviderCompatibleMutable &&
+					parsed.confirmProviderMigration
+				) {
+					const archived = cleanupProviderCompatibleAgentsMutable(
+						parsed.targetRoot,
+						providerCompatibleCleanupPlan,
+					);
+					if (runtime.failAfterProviderMigration)
+						throw new Error(
+							"Injected bootstrap failure after provider migration",
+						);
+					if (parsed.verbose) {
+						for (const operation of archived) {
+							console.log(
+								`provider-compatible-cleanup-archived ${operation.path} archive=${operation.archivePath} ${operation.reason}`,
+							);
+						}
+					}
+				} else {
+					if (parsed.verbose) {
+						for (const operation of providerCompatibleCleanupPlan) {
+							console.log(
+								`provider-compatible-cleanup-preserved ${operation.path} ${
+									parsed.cleanupProviderCompatibleMutable
+										? "requires-confirm-provider-migration"
+										: "requires-explicit-opt-in"
+								}`,
+							);
+						}
+					}
+				}
+				return 0;
+			} catch (error) {
+				if (snapshot !== null) {
+					try {
+						restoreTarget(parsed.targetRoot, snapshot);
+					} catch (rollbackError) {
+						preserveSnapshot = true;
+						throw new Error(
+							`Bootstrap failed and rollback failed; recovery snapshot preserved at ${snapshot.container}: ${(rollbackError as Error).message}`,
+							{ cause: error },
+						);
+					}
+				}
+				throw error;
+			} finally {
+				if (staging) rmSync(staging, { recursive: true, force: true });
+				if (snapshot !== null && !preserveSnapshot) {
+					rmSync(snapshot.container, { recursive: true, force: true });
+				}
+			}
+		};
+		return parsed.dryRun
+			? await execute()
+			: await withExternalPathLock(initialCanonicalTarget, execute);
 	} catch (error) {
 		console.error((error as Error).message);
 		return 2;
 	}
-
-	return 0;
 }

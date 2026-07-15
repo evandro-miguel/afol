@@ -1,0 +1,50 @@
+{
+  "schema": "codex-quality-loop.mutation-policy/v1",
+  "decision": "ADR-006",
+  "owner": "F-22 governance owner",
+  "method": {
+    "runner": "StrykerJS",
+    "version": "9.4.0",
+    "mode": "command",
+    "workspace": ".afol/tmp/stryker-runner",
+    "target": "cli/core/operation-context.ts:142-148",
+    "test_command": "bun test cli/tests/operation-context.test.ts cli/tests/kernel.test.ts",
+    "invocation": ".afol/tmp/stryker-runner/node_modules/.bin/stryker run .afol/tmp/stryker-c01.json"
+  },
+  "immutable_inputs": {
+    "base_commit": "25089a5",
+    "temp_config_sha256": "7c9d5406273f493b47f4d31d5e051645c4a7d3da6e38f71757576bed29eda0f8",
+    "temp_report_sha256": "0a88cd6b94f3344d91ff35a04acd686ab055e0a89e8c7fff503f7c3f50d450a1",
+    "production_sha256": "40b05f26292a9d3157bc3da46b853b5e3e36a5d456a8dfb6061c0f7884164d51",
+    "test_sha256": "a6137d9a9225c6cdb37506ee8a63cb28022c36f553a83b542ee89524f39a9575"
+  },
+  "durable_artifacts": {
+    "config": { "path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c08-stryker-config-001.json", "sha256": "792c27d21cff3d0c35c902893a9b35affa12ea1260341f32ebdafcaa78dd1f94" },
+    "report": { "path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c08-stryker-report-001.json", "sha256": "f5aca11c553bdb940986572971f51cd48ddaf2e7f7699a2948ba81fb3d2cf2b2" }
+  },
+  "thresholds": { "authorization": 90, "central_rules": 85, "critical_untriaged_survivors": 0 },
+  "result": { "initial": { "killed": 10, "total": 16, "score": 62.5 }, "final": { "killed": 16, "total": 16, "score": 100, "survived": 0, "elapsed_seconds": 22.5 } },
+  "exceptions": "Only equivalent, invalid, or irrelevant survivors with exact rationale and independent review; none recorded.",
+  "release_policy": "report-only; no permanent dependency or global gate until runtime stability is demonstrated",
+  "authorization": "F-22 governance owner amendment dated 2026-07-12 under the user's explicit core-readiness directive; evidence-only validation, no new production scope",
+  "platform": "one Linux/WSL host per worktree; no Windows-native, cross-host, or takeover claim",
+  "route_results": {
+    "base_commit": "25089a5",
+    "observed_at": "2026-07-12T18:59:34-03:00",
+    "provenance": "declared AFOL route evidence backed by read-only test-agent execution",
+    "final_gate": "A final observed aggregate gate for the closure commit is still required.",
+    "routes": [
+      { "route": "C02A", "afol_evidence_id": "E-20260712175853524-12cbd1", "command": "bun test cli/tests/context-system.test.ts cli/tests/spec-gate-system.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts", "passed": 139, "failed": 0 },
+      { "route": "C02B/C03", "afol_evidence_id": "E-20260712175854085-b99a1e", "command": "bun test cli/tests/kernel.test.ts cli/tests/session-command.test.ts cli/tests/workbench-lifecycle.test.ts cli/tests/workbench-verify.test.ts cli/tests/state-sqlite.test.ts", "passed": 192, "failed": 0, "supporting_run": { "command": "bun test cli/tests/quick-task-command.test.ts", "passed": 17, "failed": 0 } },
+      { "route": "C03B", "afol_evidence_id": "E-20260712175854652-9e2644", "command": "bun test cli/tests/bootstrap.test.ts cli/tests/update-command.test.ts", "passed": 58, "failed": 0 },
+      { "route": "C03W", "afol_evidence_id": "E-20260712175855246-840c53", "command": "bun test cli/tests/local-state-indexes.test.ts cli/tests/workbench-lifecycle.test.ts cli/tests/session-command.test.ts", "passed": 131, "failed": 0 },
+      { "route": "C04A", "afol_evidence_id": "E-20260712175855781-98e433", "boundary": "SQLite State DB v1 completeness only", "command": "bun test cli/tests/state-sqlite.test.ts", "passed": 12, "failed": 0 },
+      { "route": "C05", "afol_evidence_id": "E-20260712175856346-29dcdf", "boundary": "one Linux/WSL host per worktree", "command": "bun test cli/tests/operation-context.test.ts cli/tests/session-lock.test.ts cli/tests/workbench-lifecycle.test.ts cli/tests/operator-journeys.test.ts", "passed": 136, "failed": 0 },
+      { "route": "C07A", "afol_evidence_id": "E-20260712175856885-d5b88c", "command": "bun test cli/tests/envelope.test.ts cli/tests/spec-gate-system.test.ts cli/tests/adm-paths.test.ts", "passed": 42, "failed": 0 },
+      { "route": "C07B", "afol_evidence_id": "E-20260712175857443-fb101e", "command": "bun test cli/tests/local-state-indexes.test.ts cli/tests/telemetry-command.test.ts", "passed": 31, "failed": 0 },
+      { "route": "project-benchmark", "afol_evidence_id": "E-20260712175904340-a8abd4", "command": "bun run kernel -- pb validate --strict --json", "issues": 0 }
+    ]
+  },
+  "exclusions": { "closure_prerequisites": false, "features": ["F-23", "F-24", "F-25", "F-26", "F-27", "F-28"], "note": "separately governed future features; Windows-native belongs to F-26" },
+  "rerun": ["bun test cli/tests/operation-context.test.ts cli/tests/kernel.test.ts", "bun run typecheck", "bun run manifest:check", "bun run validate:project-benchmarks", "bun run validate:release", "afol local-state rebuild --json", "afol validate project --json", "afol verify-tasks .afol/wb/260710_2355_core-integrity-quality-loop --strict"]
+}

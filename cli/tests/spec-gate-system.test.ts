@@ -7,10 +7,14 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runAdrCommand } from "../commands/adr";
 import { runChangelogCommand } from "../commands/changelog";
 import { runSpecCommand } from "../commands/spec";
+import {
+	resolveGovernanceCatalog,
+	resolvePendingSpec,
+} from "../services/governance/pending-specs";
 import {
 	abandonAdr,
 	acceptAdr,
@@ -126,6 +130,39 @@ function writeSpec(root: string, id: string, status: string): string {
 	return path;
 }
 
+function writePendingGovernanceFixture(
+	root: string,
+	specStatus = "active",
+	specFeature = "F-22",
+) {
+	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+		"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-22.md\n",
+		"utf8",
+	);
+	const taskPath = writeTask(root, "S-GOV", "T-01");
+	writeFileSync(
+		join(root, ".afol", "adm", "specs", "spec-22.md"),
+		`---\ndoc_type: spec\nid: spec-22\nstatus: ${specStatus}\nroadmap_feature: ${specFeature}\n---\n\n# Spec\n`,
+		"utf8",
+	);
+	const indexPath = join(
+		root,
+		".afol",
+		"data",
+		"governance",
+		"pending-specs.json",
+	);
+	mkdirSync(join(root, ".afol", "data", "governance"), { recursive: true });
+	writeFileSync(
+		indexPath,
+		`${JSON.stringify({ schema_version: 1, entries: [{ session_id: "S-GOV", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", status: "open", theme: "test", task_ids: ["T-01"], missing: ["roadmap_feature", "parent_spec"], resolution_hint: "resolve" }] }, null, 2)}\n`,
+		"utf8",
+	);
+	return { taskPath, indexPath };
+}
+
 function writeLegacySpec(root: string, id: string, status: string): string {
 	const path = join(root, "docs", "arc", "SPECS", `${id}.md`);
 	writeFileSync(
@@ -145,6 +182,88 @@ function writeLegacySpec(root: string, id: string, status: string): string {
 }
 
 describe("spec-gate system", () => {
+	test("governance catalog requires an active canonical roadmap feature section", () => {
+		for (const roadmap of [
+			"# Roadmap\n\nF-22 appears only in prose.\n",
+			"# Roadmap\n\n### F-22 Integrity\n\n- Status: final\n- Governing spec: .afol/adm/specs/spec-22.md\n",
+		]) {
+			const root = createFixture();
+			try {
+				writePendingGovernanceFixture(root);
+				writeFileSync(
+					join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+					roadmap,
+					"utf8",
+				);
+				expect(() =>
+					resolveGovernanceCatalog(root, "F-22", "spec-22"),
+				).toThrow();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("governance catalog requires explicit Governing spec for the feature", () => {
+		const root = createFixture();
+		try {
+			writePendingGovernanceFixture(root);
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Why this feature mentions spec-22 in prose only.\n",
+				"utf8",
+			);
+			expect(() => resolveGovernanceCatalog(root, "F-22", "spec-22")).toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance resolution rejects fake, inactive, and mismatched catalog bindings", () => {
+		for (const variant of [
+			"fake-feature",
+			"fake-spec",
+			"inactive",
+			"mismatch",
+		] as const) {
+			const root = createFixture();
+			try {
+				writePendingGovernanceFixture(
+					root,
+					variant === "inactive" ? "archived" : "active",
+					variant === "mismatch" ? "F-99" : "F-22",
+				);
+				const input = {
+					session: "S-GOV",
+					featureId: variant === "fake-feature" ? "F-404" : "F-22",
+					parentSpec: variant === "fake-spec" ? "missing" : "spec-22",
+				};
+				expect(() => resolvePendingSpec(root, input)).toThrow();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("governance resolution rolls back frontmatter and index after an injected failure", () => {
+		const root = createFixture();
+		try {
+			const { taskPath, indexPath } = writePendingGovernanceFixture(root);
+			const taskBefore = readFileSync(taskPath, "utf8");
+			const indexBefore = readFileSync(indexPath, "utf8");
+			expect(() =>
+				resolvePendingSpec(
+					root,
+					{ session: "S-GOV", featureId: "F-22", parentSpec: "spec-22" },
+					{ failAfterFrontmatter: true },
+				),
+			).toThrow("Injected governance failure");
+			expect(readFileSync(taskPath, "utf8")).toBe(taskBefore);
+			expect(readFileSync(indexPath, "utf8")).toBe(indexBefore);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("checkSpecCompatibility returns not_applicable when no spec linked", () => {
 		const root = createFixture();
 		try {
@@ -153,6 +272,250 @@ describe("spec-gate system", () => {
 			expect(result.status).toBe("not_applicable");
 			expect(result.spec_id).toBe("");
 			expect(getSpecCheck(root, "session-a", "T-01")).toEqual(result);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore throws on malformed JSON, never silently returns empty", () => {
+		const root = createFixture();
+		try {
+			// Create a session with a task so that checkSpecCompatibility/waiveSpecCheck
+			// can reach readStore before failing on task lookup.
+			writeTask(root, "session-a", "T-01", "spec-001");
+			writeSpec(root, "spec-001", "active");
+
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+
+			// Write a valid store with one waiver first
+			writeFileSync(
+				storePath,
+				JSON.stringify({
+					version: 1,
+					results: {
+						"session-a::T-01": {
+							task_id: "T-01",
+							session_id: "session-a",
+							spec_id: "spec-001",
+							status: "waived",
+							checked_at: "2026-01-01T00:00:00.000Z",
+							waiver_reason: "existing waiver",
+						},
+					},
+				}),
+				"utf8",
+			);
+
+			// Verify existing waiver is readable
+			const before = getSpecCheck(root, "session-a", "T-01");
+			expect(before).not.toBeNull();
+			if (before === null) {
+				throw new Error("Expected existing spec waiver");
+			}
+			expect(before.status).toBe("waived");
+
+			// Corrupt the store — write invalid JSON
+			writeFileSync(storePath, "{invalid json\n", "utf8");
+
+			// readStore is called internally by checkSpecCompatibility / getSpecCheck
+			// — must throw instead of silently returning empty
+			const expectedMsg = "Malformed spec-gate store";
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				expectedMsg,
+			);
+			expect(() => checkSpecCompatibility(root, "session-a", "T-01")).toThrow(
+				expectedMsg,
+			);
+			expect(() =>
+				waiveSpecCheck(root, "session-a", "T-01", "override"),
+			).toThrow(expectedMsg);
+
+			// Original file content is preserved
+			const stored = readFileSync(storePath, "utf8");
+			expect(stored).toBe("{invalid json\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore throws on empty file (fail closed), nonexistent file is valid first-run", () => {
+		const root = createFixture();
+		try {
+			writeTask(root, "session-a", "T-01");
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+
+			// Nonexistent file is valid first-run — readStore returns empty store
+			const noFile = getSpecCheck(root, "session-a", "T-01");
+			expect(noFile).toBeNull();
+
+			// Write an empty file — must fail closed like malformed content
+			writeFileSync(storePath, "", "utf8");
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+			expect(() => checkSpecCompatibility(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+
+			// File content is preserved
+			expect(readFileSync(storePath, "utf8")).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore throws on invalid structure, never silently returns empty", () => {
+		const root = createFixture();
+		try {
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+
+			// Valid JSON but wrong shape (not a SpecStore)
+			writeFileSync(
+				storePath,
+				JSON.stringify({ version: 2, data: [] }),
+				"utf8",
+			);
+
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore rejects malformed result entries", () => {
+		const root = createFixture();
+		try {
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+			writeFileSync(
+				storePath,
+				JSON.stringify({ version: 1, results: { "session-a::T-01": "bad" } }),
+				"utf8",
+			);
+
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+			expect(() =>
+				waiveSpecCheck(root, "session-a", "T-01", "override"),
+			).toThrow("Malformed spec-gate store");
+
+			writeFileSync(
+				storePath,
+				JSON.stringify({
+					version: 1,
+					results: {
+						"session-a::T-01": {
+							session_id: "other-session",
+							task_id: "T-99",
+							spec_id: "spec-001",
+							status: "waived",
+							checked_at: "2026-07-15T00:00:00.000Z",
+							waiver_reason: "mismatched key",
+						},
+					},
+				}),
+				"utf8",
+			);
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkSpecCompatibility returns conflict for open pending_spec", () => {
+		const root = createFixture();
+		try {
+			const sessionDir = join(root, ".afol", "wb", "session-pending");
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, "session-pending_task_01.md"),
+				[
+					"---",
+					'feature_id: ""',
+					'parent_spec: ""',
+					"governance_status: pending_spec",
+					"pending_spec: true",
+					"pending_spec_status: open",
+					"---",
+					"",
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | missing governing spec |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			const result = checkSpecCompatibility(root, "session-pending", "T-01");
+			expect(result.status).toBe("conflict");
+			expect(result.spec_id).toBe("pending_spec");
+			expect(getSpecCheck(root, "session-pending", "T-01")).toEqual(result);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkSpecCompatibility reads open pending_spec from governance index", () => {
+		const root = createFixture();
+		try {
+			const sessionDir = join(root, ".afol", "wb", "session-index-pending");
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, "session-index-pending_task_01.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | missing governing spec |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			mkdirSync(join(root, ".afol", "data", "governance"), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(root, ".afol", "data", "governance", "pending-specs.json"),
+				JSON.stringify(
+					{
+						schema_version: 1,
+						entries: [
+							{
+								session_id: "session-index-pending",
+								created_at: "2026-07-05T00:00:00.000Z",
+								updated_at: "2026-07-05T00:00:00.000Z",
+								status: "open",
+								theme: "index pending",
+								task_ids: ["T-01"],
+								missing: ["roadmap_feature", "parent_spec"],
+								resolution_hint:
+									"run afol governance resolve-spec --session <session>",
+							},
+						],
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const result = checkSpecCompatibility(
+				root,
+				"session-index-pending",
+				"T-01",
+			);
+			expect(result.status).toBe("conflict");
+			expect(result.spec_id).toBe("pending_spec");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

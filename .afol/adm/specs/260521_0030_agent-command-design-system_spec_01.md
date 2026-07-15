@@ -6,18 +6,20 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:30:00+08:00'
-updated_at: '2026-05-29T14:10:48-03:00'
+updated_at: '2026-07-12T21:20:00Z'
 roadmap_feature: F-03
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
 links:
   roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
+  living_child: .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
 scope:
   repo_areas:
   - cli
-  - src/project-template/a
+  - src/project-template
   - docs/standards
+  - AGENTS.md
   packages:
   - agentic-cli
 risk_level: high
@@ -27,193 +29,242 @@ risk_level: high
 
 ## 1) Feature Intent
 
-Define a command design system optimized for agents.
+Define a command design system optimized for **agents first**.
 
-The goal is to reduce repeated command tokens and manual file edits while
-keeping every operation auditable by humans.
+AFOL must make governed execution:
 
-The intended simple operator surface includes `afol s`, `afol ck`, and
-`afol b <repo> --partial`. The workbench shortcuts `afol st`, `afol d -x "..."`,
-and `afol c` route to existing governed command paths and remain part of the
-simple operator surface. Long aliases remain available for human readability.
+1. **Extremely easy to use** — the correct next command is obvious and short.
+2. **Extremely low latency** — hot-path commands return in tens to low hundreds
+   of milliseconds.
+3. **Low write-token consumption** — agents must not author giant CLI strings.
+4. **Very high reliability** — short forms are as safe as long forms.
+5. **Low forced read tokens** — default stdout is compact; detail is opt-in or
+   file-first.
+
+**Write tokens are more expensive than read tokens.** Command text is model
+output on every step and is often retried. Prefer omit-able context, short
+aliases, positional args, and collapsed lifecycle steps over repeating long
+session ids and flag names.
+
+Living refinement of residual gaps (hints, docs dual-path, input budgets, flag
+drift): `.afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md`
 
 ## 2) Problem
 
 Long commands are expensive when agents execute them repeatedly. Manual file
-edits for routine state are more expensive and more error-prone.
+edits for routine state are more expensive and more error-prone. Verbose default
+output forces agents to burn context on every tool result.
 
-The command grammar must be short, stable, and testable.
+If docs and hints teach only long forms (`--session <long-id> --task-id …`),
+agents will keep paying that cost even when short grammar exists.
+
+The command grammar must be short, stable, dual-path (fast vs explicit), and
+testable.
 
 ## 3) Grammar Contract
 
 ```text
-afol <domain> <action> [target] [flags]
+afol <command|alias> [positional-target] [flags]
 ```
 
-Examples:
+### 3.1 Agent fast path (active / bound / env session)
+
+Canonical for single-session agent work:
 
 ```bash
 afol s
-afol new auth-refactor -F F-02 -S auth-spec
-afol st -T T-01
-afol d -T T-01 -x "bun test"
-afol evidence add -t T-01 -c "bun test" -r pass
-afol log add -t T-01 -m "Added validation"
-afol rule get frontend
-afol skill update
-afol query search -t T-02 -f research.md -m "Summary"
-afol ck
+afol st T-01
+afol e T-01 -c "bun test" -o passed
+afol d T-01 -x "bun test"
 afol c
-afol update check
+afol l -m "progress note"
+afol n my-theme -t "do the thing" --no-spec-required --reason "scratch"
+afol qt fix-x -t "fix" -c "bun test" -o passed --no-spec-required --reason "scratch"
+afol v project
 ```
 
-Short aliases are canonical for agents. Long aliases are canonical for humans
-and docs. `afol` is the canonical front door; `afol` remains a compatibility
-alias during migration.
+### 3.2 Explicit path (CI / multi-agent / ambiguous)
 
-## 4) Locked Domain Aliases
+```bash
+afol st -S <session-id> -T T-01
+afol e -S <session-id> -T T-01 -c "bun test" -o passed
+afol d -S <session-id> -T T-01 -x "bun test"
+afol c -S <session-id>
+```
+
+### 3.3 Human long path
+
+Long command names remain valid for humans and audits:
+
+```bash
+afol status
+afol start --session <session-id> --task-id T-01
+afol evidence --session <session-id> --task-id T-01 --command "bun test" --result passed
+afol done --session <session-id> --task-id T-01
+afol close --session <session-id>
+```
+
+**Policy:** short aliases and omit-able session are **canonical for agents**.
+Long names and explicit session are **canonical for humans, CI, and multi-agent
+safety**. Agent-facing docs must lead with the fast path.
+
+## 4) High-Frequency Command Aliases (live)
 
 | Short | Long | Purpose |
 | --- | --- | --- |
 | `s` | `status` | compact project/session state |
-| `n` | `new` | create session/task/artifact |
-| `p` | `plan` | plan operations |
-| `t` | `task` | task operations |
-| `l` | `log` | log operations |
-| `e` | `evidence` | evidence operations |
-| `r` | `rule` | rule resolution |
-| `sk` | `skill` | skill operations |
-| `q` | `query` | research and knowledge operations |
-| `f` | `file` | safe file operations |
-| `v` | `verify` | validation |
-| `c` | `close` | session closure |
-| `u` | `undo` | mutation undo |
-| `up` | `update` | local system update |
-| `b` | `bootstrap` | bootstrap or install |
-| `ix` | `index` | local index operations |
-| `ev` | `event` | event-log operations |
+| `n` | `new` | create session |
+| `st` | `start` | start task |
+| `e` | `evidence` | record evidence |
+| `d` | `done` | complete task |
+| `c` | `close` | close session |
+| `l` | `log` | append log |
+| `qt` | `quick-task` | one-shot lifecycle |
+| `v` / `ck` | `validate` | validation gates |
+| `ss` | `session` | session bind/list/switch |
+| `up` | `update` | scaffold update |
+| `cx` | `ctx` | context bundles |
+| `ht` | `health` | health checks |
+| `b` | `bootstrap` | install elsewhere |
+| `f` | `file` | safe file ops |
+| `r` | `rule` | rules |
+| `sk` | `skill` | skills |
 
-## 5) Locked Action Aliases
+Historical domain/action tables from early F-03 drafts that conflict with the
+live registry are **superseded** by `cli/registry.ts`, `cli/aliases.ts`, and the
+living child spec.
 
-| Short | Long |
-| --- | --- |
-| `a` | `add` |
-| `d` | `done` |
-| `s` | `start` |
-| `g` | `get` |
-| `ls` | `list` |
-| `rm` | `remove` |
-| `mv` | `move` |
-| `ck` | `check` |
-| `ap` | `apply` |
-| `st` | `status` |
-| `pt` | `patch` |
-| `ar` | `archive` |
+## 5) High-Frequency Flag Aliases (live)
 
-## 6) Flag Aliases
+| Flag | Long | Notes |
+| --- | --- | --- |
+| `-S` | `--session` | Prefer omit on active-session fast path |
+| `-T` | `--task-id` | start / done / evidence |
+| `-t` / `-T` | `--task` | new / quick-task summary |
+| `-c` | `--command` | verification command |
+| `-o` | `--result` | evidence result (`passed` / `failed`) |
+| `-x` | `--test` | done: verify + evidence + complete |
+| `-m` | `--message` | log message |
+| `-F` | `--feature-id` | governed new |
+| `-P` | `--parent-spec` | governed new |
+| `-j` | `--json` | machine envelope |
+| `-a` | `--artifact` | optional evidence artifact |
+| `-n` | `--note` | optional evidence note |
 
-| Flag | Meaning |
-| --- | --- |
-| `-s` | session |
-| `-t` | task |
-| `-e` | evidence |
-| `-f` | file |
-| `-m` | message |
-| `-c` | command |
-| `-r` | result |
-| `-F` | feature |
-| `-S` | spec |
-| `-j` | json |
-| `-q` | quiet |
-| `-y` | yes or confirm |
+Authoritative implementation: `cli/aliases.ts` and workbench parsers. Spec
+examples must not invent short flags that the CLI rejects (for example evidence
+does not accept `-r` for result; use `-o`).
 
-## 7) Output Contract
+## 6) Output Contract (forced read tokens)
 
 Default output is compact and line-oriented.
 
 ```text
-ok task=T-01 state=done evidence=E-01
+task started: T-01
+evidence recorded: E-…
+task done: T-01
 ```
 
-JSON output uses the same typed result envelope.
+JSON output uses the typed result envelope and is opt-in (`-j` / `--json`).
 
-```json
-{
-  "ok": true,
-  "task": "T-01",
-  "state": "done",
-  "evidence": "E-01"
-}
-```
+Project rule (also enforced in validate bench):
 
-Error output must include the next useful command when possible.
+- **> 5 000** estimated output tokens → non-ideal (warn)
+- **> 10 000** estimated output tokens → prohibited (fail)
+
+Verbose / full / preview dumps are **never** the agent default.
+
+Error output must include the next useful **short** command when possible:
 
 ```text
-err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r pass"
+err missing-evidence task=T-01 hint="run afol e T-01 -c <cmd> -o passed"
 ```
 
-## 8) Help Rules
+When session is not resolvable, hints may include `-S <session-id>`.
 
-- `afol -h` must fit in 25 lines or fewer.
-- Help must show short and long aliases.
+## 7) Write-Token Contract (agent-authored argv)
+
+| Requirement | Detail |
+| --- | --- |
+| Omit session when unambiguous | Active session, bind, or `AFOL_SESSION` |
+| Prefer aliases | `st` / `e` / `d` / `c` over long names in agent tool calls |
+| Prefer collapse | `d -x "…"` over separate evidence + done when valid |
+| Prefer one-shot | `qt` for true micro tasks |
+| No forced long teaching | Hints and AGENTS lead with fast path |
+
+See living child for numeric argv budgets and acceptance checks.
+
+## 8) Latency Contract
+
+Hot-path agent commands (`s`, `st`, `e`, `d`, `c`, `l`, session list) target:
+
+- p50 ≤ 100 ms
+- p95 ≤ 300 ms
+
+on a local warm host. Validation may be higher but should stay sub-second for
+compact project checks. Do not “fix” latency by expanding default output.
+
+## 9) Reliability Contract
+
+- Short and long forms share one state machine and the same gates.
+- Evidence-required done remains enforced.
+- Ambiguous session fails closed in CI / multi-agent modes.
+- High-frequency workbench updates never require manual State Board edits.
+- Alias resolution is deterministic and snapshot-tested.
+
+## 10) Help Rules
+
+- `afol -h` stays compact (token-economy gated; prefer ≤ ~550 est. tokens).
+- Help shows short and long aliases.
 - Full docs are not printed by default.
-- Unknown commands must return a focused hint, not a long manual.
+- Unknown commands return a focused short hint, not a long manual.
 
-## 8.1) Parser And Interaction Policy
+## 11) Parser And Interaction Policy
 
-- Command definitions live in the local registry/router. Parser libraries are
-  implementation helpers, not the source of truth.
-- `citty` is the preferred parser helper for registry-backed commands because
-  this system needs aliases, generated help, async handlers, and typed command
-  metadata.
-- `util.parseArgs` is acceptable for narrow internal scripts that do not need
-  command discovery or generated help.
-- Prompt/TUI/spinner behavior must be opt-in human-mode behavior. Default
-  agent-mode commands must not block on interactive input, must keep compact
-  output stable, and must expose the same semantic result in JSON mode.
-- Framework-style scaffolding CLIs such as Bunli, meow-based starter CLIs, or
-  Ace CLI/Bejibun remain reference material unless a future spike proves they
-  reduce local code without expanding runtime scope.
+- Command definitions live in the local registry/router.
+- Parser libraries are implementation helpers, not the source of truth.
+- Default agent-mode commands must not block on interactive input.
+- Interactive affordances, when added, need noninteractive bypass tests.
 
-## 9) Testable Invariants
+## 12) Testable Invariants
 
 - Alias resolution is one hop: short and long resolve to one canonical command.
-- No two aliases can resolve ambiguously in the same position.
-- Compact output and JSON output carry the same semantic fields.
-- Negative paths are actionable.
-- High-frequency workbench updates do not require manual file edits.
-- Parser/help snapshots prove that short aliases, long aliases, and generated
-  help stay synchronized.
-- Interactive affordances, when added, have noninteractive bypass tests.
+- No two aliases resolve ambiguously in the same position.
+- Compact and JSON output carry the same semantic fields.
+- Negative paths are actionable with short next commands.
+- Active-session lifecycle works without repeating session id.
+- Explicit-session lifecycle works when required for safety.
+- Parser/help snapshots keep short aliases and generated help synchronized.
+- Token economy measures **stdout** and tracks **argv** targets for lifecycle
+  scenarios (see living child + F-11).
 
-## 10) Acceptance
+## 13) Acceptance
+
+### Closed (initial F-03 delivery)
 
 - `afol status` and `afol s` have semantic parity.
-- `afol -j status` emits valid JSON.
-- `afol -h` remains compact.
-- `afol ck`, `afol st`, `afol d -x`, `afol c`, and `afol b` have parity with
-  their long forms.
-- Unknown commands fail with an actionable hint.
-- The alias table is snapshot-tested.
+- Compact help and alias tables exist.
+- `afol st`, `afol d -x`, `afol c` exist with parity to long forms.
 - Agents can perform routine workbench updates without opening raw files.
-
-## 11) Closure
-
 - Accepted implementation evidence: `E-20260529134101240986`.
-- Closeout session: `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`
-- Strict verification:
-  `./.agents/agents verify-tasks --strict .afol/wb/260529_1336_f03-kernel-grammar-alias-help/`
-  passed.
+- Closeout session: `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`.
 
-## 12) Hermes Benchmark Decisions
+### Residual (living child — required for “excellent agent CLI”)
+
+Tracked in `260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01`:
+
+- Hints and agent docs lead with fast path.
+- Flag/example tables stay aligned with live CLI.
+- Input argv budgets and latency budgets are validated.
+- Forced output stays within project token rules on agent defaults.
+
+## 14) Hermes Benchmark Decisions
 
 - Pattern: generate help, catalogs, and capability views from one registry.
-- Hermes source concept: toolsets/capabilities group tool specs into
-  discoverable surfaces.
-- Local decision: adapt as command groups and generated help/catalog output
-  backed by the CLI registry.
-- Acceptance criteria: aliases, command metadata, help, and capability listings
-  resolve from the registry; `ResultEnvelope` remains the output contract for
-  both compact and JSON modes.
-- Non-goals: no dynamic marketplace discovery, no progressive tool discovery
-  before command groups and help snapshots prove the need.
+- Local decision: command groups and generated help/catalog output are backed
+  by the CLI registry.
+- Acceptance: aliases, command metadata, help, and capability listings resolve
+  from the registry; `ResultEnvelope` remains the output contract for compact
+  and JSON modes.
+- Non-goals: no dynamic marketplace discovery before command groups and help
+  snapshots prove the need.

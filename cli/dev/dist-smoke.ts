@@ -163,6 +163,9 @@ try {
 		"smoke",
 		"--task",
 		"Dist smoke proof",
+		"--no-spec-required",
+		"--reason",
+		"dist smoke fixture",
 	]);
 	assertOk(created, "dist new");
 	const session = sessionFrom(created.stdout as string);
@@ -244,21 +247,19 @@ try {
 	const start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
 	assertOk(start, "dist start");
 
-	const evidence = runDist(lifecycleTarget, [
-		"evidence",
+	const done = runDist(lifecycleTarget, [
+		"done",
+		"--task-id",
 		"T-01",
-		"--command",
-		"smoke",
-		"--result",
-		"passed",
+		"--test",
+		"true",
 	]);
-	assertOk(evidence, "dist evidence");
-
-	const done = runDist(lifecycleTarget, ["done", "--task-id", "T-01"]);
 	assertOk(done, "dist done");
 
 	const taskDoc = readFileSync(lifecycleTaskPath, "utf8");
-	if (!taskDoc.includes("| T-01 | done | worker | Dist smoke proof |")) {
+	if (
+		!taskDoc.includes("| T-01 | done | worker | Dist smoke proof attempt=1 |")
+	) {
 		throw new Error(`task doc missing done row\n${taskDoc}`);
 	}
 
@@ -269,7 +270,7 @@ try {
 	if (!evidenceDoc.includes('"task_id":"T-01"')) {
 		throw new Error(`evidence doc missing task id\n${evidenceDoc}`);
 	}
-	if (!evidenceDoc.includes('"command":"smoke"')) {
+	if (!evidenceDoc.includes('"command":"true"')) {
 		throw new Error(`evidence doc missing command\n${evidenceDoc}`);
 	}
 	if (!evidenceDoc.includes('"result":"passed"')) {

@@ -47,11 +47,14 @@ function formatArtifact(
 	return `${name}: ${artifact.present ? "present" : "missing"} mtime=${artifact.mtime ?? "none"} lines=${artifact.lines}`;
 }
 
-function formatCatchup(report: CatchupReport): string {
+export function formatCatchup(report: CatchupReport): string {
 	const changed = report.git_changed_files.length;
-	const changedLabel = report.git_changed_files_overflow
+	const countLabel = report.git_changed_files_overflow
 		? `${changed}+`
 		: String(changed);
+	const changedLabel = report.git_changed_files_degraded
+		? `${countLabel} (degraded)`
+		: countLabel;
 	const lines = [
 		`session: ${report.session ?? "none"} (${report.session_status})`,
 		`branch: ${report.git_branch ?? "none"}`,

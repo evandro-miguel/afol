@@ -5,6 +5,7 @@ import {
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
+import { collectSessionIds } from "../services/local-state/workbench-index";
 import { hydrateSession } from "../services/state/session-state";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -13,16 +14,31 @@ type HydrateJsonData = {
 	snapshot?: ReturnType<typeof hydrateSession>;
 };
 
-function parseHydrateArgs(args: string[]): {
-	json: boolean;
-	sessionId: string;
-} {
+type HydrateAllJsonData = {
+	session_count: number;
+	summary: {
+		source_files: number;
+		task_rows: number;
+		evidence_entries: number;
+	};
+};
+
+function parseHydrateArgs(
+	args: string[],
+):
+	| { json: boolean; all: true }
+	| { json: boolean; all: false; sessionId: string } {
 	let json = false;
+	let all = false;
 	let sessionId = "";
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
 		if (value === "--json" || value === "-j") {
 			json = true;
+			continue;
+		}
+		if (value === "--all") {
+			all = true;
 			continue;
 		}
 		if (value === "--session" || value === "-S") {
@@ -36,10 +52,13 @@ function parseHydrateArgs(args: string[]): {
 		}
 		throw new Error(`Unknown hydrate argument: ${value}`);
 	}
-	if (!sessionId) {
-		throw new Error("Missing --session for hydrate.");
+	if (all && sessionId) {
+		throw new Error("Use either --all or --session for hydrate, not both.");
 	}
-	return { json, sessionId };
+	if (!all && !sessionId) {
+		throw new Error("Missing --session or --all for hydrate.");
+	}
+	return all ? { json, all: true } : { json, all: false, sessionId };
 }
 
 function formatResult(snapshot: ReturnType<typeof hydrateSession>): string {
@@ -67,13 +86,63 @@ function writeHydrateJson(
 	io.stdout(stringifyEnvelope(envelope));
 }
 
+function summarizeSnapshots(
+	snapshots: ReturnType<typeof hydrateSession>[],
+): HydrateAllJsonData {
+	return {
+		session_count: snapshots.length,
+		summary: {
+			source_files: snapshots.reduce(
+				(total, snapshot) => total + snapshot.sourceFiles.length,
+				0,
+			),
+			task_rows: snapshots.reduce(
+				(total, snapshot) => total + snapshot.summary.taskRows,
+				0,
+			),
+			evidence_entries: snapshots.reduce(
+				(total, snapshot) => total + snapshot.summary.evidenceEntries,
+				0,
+			),
+		},
+	};
+}
+
+function writeHydrateAllResult(
+	io: CommandIo,
+	data: HydrateAllJsonData,
+	json: boolean,
+): void {
+	if (json) {
+		io.stdout(
+			stringifyEnvelope(
+				envelopeWithLegacyKeys(envelopeOk(data, { action: "hydrate.all" }), [
+					"session_count",
+					"summary",
+				]),
+			),
+		);
+		return;
+	}
+	io.stdout(
+		[
+			"hydrate all: ok",
+			`sessions: ${data.session_count}`,
+			`source_files: ${data.summary.source_files}`,
+			`task_rows: ${data.summary.task_rows}`,
+			`evidence_entries: ${data.summary.evidence_entries}`,
+		].join("\n"),
+	);
+}
+
 function writeHydrateError(
 	io: CommandIo,
 	sessionId: string,
 	message: string,
+	action: "hydrate" | "hydrate.all" = "hydrate",
 ): void {
 	const envelope = envelopeErr("HYDRATE_FAILED", message, {
-		action: "hydrate",
+		action,
 		exitCode: 1,
 	}) as ResultEnvelope<HydrateJsonData>;
 	envelope.data = { session: sessionId };
@@ -97,8 +166,31 @@ export async function runHydrateCommand(
 			throw new Error(`Unknown hydrate action: ${action}`);
 		}
 		const parsed = parseHydrateArgs(hydrateArgs);
+		if (parsed.all) {
+			const snapshots: ReturnType<typeof hydrateSession>[] = [];
+			for (const sessionId of collectSessionIds(projectRoot)) {
+				try {
+					snapshots.push(hydrateSession(projectRoot, sessionId));
+				} catch (error) {
+					if (parsed.json) {
+						writeHydrateError(
+							io,
+							sessionId,
+							(error as Error).message,
+							"hydrate.all",
+						);
+						return 1;
+					}
+					throw error;
+				}
+			}
+			writeHydrateAllResult(io, summarizeSnapshots(snapshots), parsed.json);
+			return 0;
+		}
+
+		const sessionId = parsed.sessionId;
 		try {
-			const snapshot = hydrateSession(projectRoot, parsed.sessionId);
+			const snapshot = hydrateSession(projectRoot, sessionId);
 			if (parsed.json) {
 				writeHydrateJson(io, snapshot);
 			} else {
@@ -106,7 +198,7 @@ export async function runHydrateCommand(
 			}
 		} catch (error) {
 			if (parsed.json) {
-				writeHydrateError(io, parsed.sessionId, (error as Error).message);
+				writeHydrateError(io, sessionId, (error as Error).message);
 			} else {
 				throw error;
 			}

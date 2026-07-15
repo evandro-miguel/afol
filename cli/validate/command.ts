@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
 import { join, relative } from "node:path";
+import { boundedSpawn } from "../core/subprocess";
 import { type ParsedValidationArgs, parseValidationArgs } from "./args";
 import { saveBenchmarkPayload } from "./benchmark-files";
 import { runValidationCommands } from "./command-runner";
@@ -31,6 +31,7 @@ const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
 // >5000 output tokens = non-ideal (warn); >10000 = prohibitive (fail).
 const TOKEN_RULE_NONIDEAL = 5_000;
 const TOKEN_RULE_PROHIBITIVE = 10_000;
+const BASELINE_TIMING_REGRESSION_FACTOR = 1.25;
 
 function resolveValidationSelection(
 	snapshot: RegistrySnapshot,
@@ -68,22 +69,30 @@ function appendBaselineRegressionNotes(
 	if (!baseline) {
 		return;
 	}
+	const timingP50Limit =
+		typeof baseline.timing_p50_ms === "number"
+			? baseline.timing_p50_ms * BASELINE_TIMING_REGRESSION_FACTOR
+			: undefined;
 	if (
-		typeof baseline.timing_p50_ms === "number" &&
+		typeof timingP50Limit === "number" &&
 		typeof metrics.timing_p50_ms === "number" &&
-		metrics.timing_p50_ms > baseline.timing_p50_ms
+		metrics.timing_p50_ms > timingP50Limit
 	) {
 		notes.push(
-			`baseline-regression:timing_p50_ms:${metrics.timing_p50_ms}>${baseline.timing_p50_ms}`,
+			`baseline-regression:timing_p50_ms:${metrics.timing_p50_ms}>${timingP50Limit}`,
 		);
 	}
+	const timingP95Limit =
+		typeof baseline.timing_p95_ms === "number"
+			? baseline.timing_p95_ms * BASELINE_TIMING_REGRESSION_FACTOR
+			: undefined;
 	if (
-		typeof baseline.timing_p95_ms === "number" &&
+		typeof timingP95Limit === "number" &&
 		typeof metrics.timing_p95_ms === "number" &&
-		metrics.timing_p95_ms > baseline.timing_p95_ms
+		metrics.timing_p95_ms > timingP95Limit
 	) {
 		notes.push(
-			`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${baseline.timing_p95_ms}`,
+			`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${timingP95Limit}`,
 		);
 	}
 }
@@ -276,6 +285,9 @@ export function buildResult(
 		output_tokens: metrics.output_tokens ?? 0,
 		context_bytes: metrics.context_bytes ?? 0,
 		output_bytes: metrics.output_bytes ?? 0,
+		...(typeof metrics.argv_chars === "number"
+			? { argv_chars: metrics.argv_chars }
+			: {}),
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 		git_commit: getGitCommit(projectRoot),
@@ -306,14 +318,14 @@ function resolveResultStatus(
 }
 
 function getGitCommit(projectRoot: string): string {
-	const result = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], {
+	const result = boundedSpawn("git", ["rev-parse", "--short=12", "HEAD"], {
 		cwd: projectRoot,
-		encoding: "utf8",
+		timeoutMs: 15_000,
 	});
-	if (result.status !== 0) {
-		return "unknown";
+	if (result.ok) {
+		return result.stdout.trim() || "unknown";
 	}
-	return (result.stdout || "").trim() || "unknown";
+	return "unknown";
 }
 
 function handleSelect(

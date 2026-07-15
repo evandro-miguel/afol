@@ -4,6 +4,14 @@
   "scenario_version": "1.0.0",
   "pack_id": "pstr-integrity",
   "command": "afol ps rebuild",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const {rmSync}=require('node:fs'); const {join}=require('node:path'); rmSync(join(process.cwd(),'.afol','pstr'),{recursive:true,force:true});"
+    ]
+  ],
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

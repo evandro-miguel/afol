@@ -7,6 +7,7 @@ export type CommandKind =
 	| "start"
 	| "evidence"
 	| "done"
+	| "transition"
 	| "close"
 	| "log"
 	| "quickTask"
@@ -24,6 +25,7 @@ export type CommandKind =
 	| "library"
 	| "memory"
 	| "adm"
+	| "governance"
 	| "spec"
 	| "ux"
 	| "adr"
@@ -192,7 +194,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Complete a task session",
 		category: "workflow",
 		guidance: [
-			"Record evidence before done, or use --test/--command to record evidence while closing.",
+			"Record authorizing evidence before done, or use --test to execute verification while closing.",
 		],
 		subcommands: [
 			{
@@ -207,14 +209,29 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 					"Run a verification command, record evidence, then complete",
 			},
 			{
-				usage: '--command "<cmd>" --result passed',
-				sideEffect: "write",
-				description: "Record explicit evidence while completing the task",
-			},
-			{
 				usage: "--require-spec-check",
 				sideEffect: "write",
 				description: "Block done when the linked spec check conflicts",
+			},
+		],
+	},
+	{
+		command: "transition",
+		aliases: [],
+		kind: "transition",
+		sideEffect: "write",
+		description: "Transition a task through the lifecycle state machine",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "--session <session-id> --task-id <task-id> --state <state>",
+				sideEffect: "write",
+				description: "Apply one validated task-state transition",
+			},
+			{
+				usage: "--completion-policy execution|artifact|waiver",
+				sideEffect: "write",
+				description: "Set typed completion authority in State Board Notes",
 			},
 		],
 	},
@@ -235,6 +252,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "<theme> --feature-id <F-id> --parent-spec <spec-id>",
 				sideEffect: "write",
 				description: "Create a governed session linked to feature/spec",
+			},
+			{
+				usage: "<theme> --no-spec-required --reason <text>",
+				sideEffect: "write",
+				description: "Create a waived unbound session",
 			},
 			{
 				usage: "<theme> --intent <text>",
@@ -279,9 +301,40 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 					"Create, start, verify, record evidence, and close one task",
 			},
 			{
-				usage: "--result passed --artifact <path> --note <text>",
+				usage: "--feature-id <F-id> --parent-spec <spec-id>",
 				sideEffect: "write",
-				description: "Attach explicit evidence metadata to the quick task",
+				description: "Create the quick task as a governed session",
+			},
+		],
+	},
+	{
+		command: "governance",
+		aliases: ["gov"],
+		kind: "governance",
+		sideEffect: "write",
+		description: "Resolve governance metadata gaps",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "pending [--all] [--json]",
+				sideEffect: "read",
+				description: "List open pending_spec entries",
+			},
+			{
+				usage:
+					"resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+				sideEffect: "write",
+				description: "Link roadmap feature/spec",
+			},
+			{
+				usage: "resolve-spec --session <id> --no-spec-required --reason <text>",
+				sideEffect: "write",
+				description: "Waive with an explicit reason",
+			},
+			{
+				usage: "repair-index",
+				sideEffect: "write",
+				description: "Rebuild the pending_spec index explicitly",
 			},
 		],
 	},
@@ -399,9 +452,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "--session <session-id>",
+				usage: "--session <session-id> [-m|--summary <text>]",
 				sideEffect: "write",
 				description: "Close a specific session after its tasks are complete",
+			},
+			{
+				usage: "--allow-no-report --reason <text>",
+				sideEffect: "write",
+				description: "Close without a report with an explicit waiver",
 			},
 			{
 				usage: "--json",
@@ -416,18 +474,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "file",
 		sideEffect: "write",
 		description:
-			"Safely patch, move, archive, and undo files; supports dry-run",
+			"Safely append, move, archive, and undo files; supports dry-run",
 		category: "ops",
 		subcommands: [
 			{
-				usage: "pt|patch --path <path> --dry-run",
+				usage: "append|patch --path <path> --dry-run",
 				sideEffect: "read",
-				description: "Preview patch diff without writing",
+				description: "Preview appended text diff without writing",
 			},
 			{
-				usage: "pt|patch --path <path>",
+				usage: "append|patch --path <path>",
 				sideEffect: "write",
-				description: "Patch file with backup and mutation journal",
+				description: "Append text with backup and mutation journal",
 			},
 			{
 				usage: "mv|move --from <path> --to <path>",
@@ -478,6 +536,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "apply --session <id> --task-id <id> --reason <text>",
 				sideEffect: "write",
 				description: "Apply managed updates and record mutation metadata",
+			},
+			{
+				usage: "rollback --batch-id <id> --reason <text>",
+				sideEffect: "write",
+				description:
+					"Rollback a committed update batch after hash verification",
 			},
 		],
 	},
@@ -642,6 +706,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "generated",
 		description: "Generate hydrated project state",
 		category: "inspect",
+		guidance: [
+			"Use --session <id> to hydrate one session.",
+			"Use --all to hydrate every canonical workbench session.",
+		],
 	},
 	{
 		command: "render",

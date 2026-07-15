@@ -1,0 +1,189 @@
+{
+  "objective": "Provide a provisional, dependency-aware execution route for the proposed F22-C01..C08 remediation set without certifying audit claims or changing AFOL plans/specs.",
+  "non_goals": [
+    "No product, AFOL lifecycle, spec, roadmap, dependency, release, or runtime changes.",
+    "No claim that the attachment's static findings reproduce on current dev.",
+    "No F-22 closure, version change, install, deployment, commit, or push."
+  ],
+  "facts": [
+    {
+      "evidence": ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:96-129, 148-184, 221-253",
+      "fact": "The active F-22 parent already covers fail-closed lifecycle, mutation/update/bootstrap/governance integrity, strict readers, JSON envelopes, and cross-process identifiers; it requires independently reviewable and reversible phases."
+    },
+    {
+      "evidence": "AGENTS.md:74-76",
+      "fact": "State DB v1 materializes workbench sessions, task rows, source hashes, and evidence only; broader materialization is explicitly State DB v2/future."
+    },
+    {
+      "evidence": ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:117-122",
+      "fact": "F-22 excludes reopening final F-04, F-08, F-09, F-18, and F-20 delivery records."
+    },
+    {
+      "evidence": "/home/ozy/.codex/attachments/6d65fcaf-7549-4d92-971c-3c06ca365657/pasted-text-1.txt:728-984",
+      "fact": "The attachment proposes C01..C08 and its own dependency graph, but it is static untrusted evidence and not a current-runtime certification."
+    },
+    {
+      "evidence": "git show --stat 90cc8b4; git show --stat 26103e7; git show --stat ccb3d48",
+      "fact": "Registry/router, workbench lifecycle, governance, file mutation, update/bootstrap, session locks, generated manifests, and their tests were changed together in the committed F-22 work; these are coupled integration surfaces."
+    },
+    {
+      "evidence": ".afol/wb/260710_2121_final-core-integrity-validation/260710_2121_final-core-integrity-validation_report_01.md:42-58",
+      "fact": "Historical final F-22 evidence reports 1062 passing tests plus lint, typecheck, manifest/template, and informative security gates. The report limits that proof to its evidence timestamp."
+    },
+    {
+      "evidence": "package.json:scripts; .github/workflows/agents-scaffold-ci.yml:1-78",
+      "fact": "Release automation exposes validate:release, clean-checkout smoke, provenance, project-benchmark, and release security gates. CI is Ubuntu-only and installs pinned Gitleaks and OSV Scanner before validate:release."
+    },
+    {
+      "evidence": "package.json:scripts; cli/tests/mutation-safety.test.ts path inventory",
+      "fact": "The repository has a mutation-safety test file but no package script that establishes a mutation-testing runner or threshold."
+    },
+    {
+      "evidence": ".afol/wb/260710_2355_core-integrity-quality-loop/260710_2355_core-integrity-quality-loop_task_01.md:22-30",
+      "fact": "Current governed session T-01 is in progress and is limited to baselining and validating audit claims; T-02 creates child specs and executable slices after that evidence exists."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "The attachment's individual defects have not yet been independently reproduced against HEAD.",
+      "impact": "Treat every candidate defect as a test hypothesis; a failing proof is required before a builder changes a handler."
+    },
+    {
+      "assumption": "A trustworthy launcher/capability issuer is not yet specified in the approved F-22 parent spec.",
+      "impact": "C01 may add a fail-closed authorization interface, but credential issuance, replay protection, revocation, and trusted-launcher integration require an explicit design decision."
+    },
+    {
+      "assumption": "C04 State DB v2, the broad C06 families, and much of C07 are intended scope expansions rather than already-approved F-22 child work.",
+      "impact": "Do not create those child specs or make them release blockers until the parent/roadmap decision records the scope change."
+    }
+  ],
+  "provisional_slices": [
+    {
+      "id": "F22-C01-P0",
+      "classification": "smallest-first prerequisite",
+      "objective": "Prove or reject the protected-file bypass, action classification gaps, and agent shell/capability hypotheses; if proven, add only a fail-closed ActionSpec boundary and protected-path denial for file writes.",
+      "requires_child_spec": "yes: F22-C01 command authorization and protected file boundary",
+      "write_scope": ["cli/registry.ts", "cli/router.ts", "cli/core/operation-context.ts", "cli/commands/file/**", "cli/tests/operation-context.test.ts", "cli/tests/registry.test.ts", "cli/tests/router.test.ts", "cli/tests/file-command-unit.test.ts", "cli/tests/mutation-safety.test.ts"],
+      "dependencies": ["Current baseline evidence must name each reproducible command/action and expected denial."],
+      "out_of_scope": ["Trusted launcher implementation", "task leases", "general store hardening", "DB v2", "broad output migration"],
+      "exit_gate": ["Focused reproducer first, then focused tests pass.", "bun run typecheck", "bun run manifest:check", "bun run template:check", "independent critic verifies the changed action metadata and generated-contract impact."],
+      "commit_boundary": "One reviewed commit only after capability semantics and file-deny behavior have observed evidence."
+    },
+    {
+      "id": "F22-C02A",
+      "classification": "parallel after C01-P0",
+      "objective": "Make context authority explicit and fail closed for selected sources; keep tool-catalog parity separate unless registry metadata changes make it inseparable.",
+      "requires_child_spec": "yes: F22-C02A context authority and catalog parity",
+      "write_scope": ["cli/commands/context.ts", "cli/services/context/**", "cli/commands/catalog.ts", "cli/tests/context-system.test.ts", "cli/tests/registry.test.ts", "cli/tests/help.test.ts", "cli/tests/envelope.test.ts"],
+      "dependencies": ["C01-P0 ActionSpec/context contract", "explicit acceptance decision for whether tools.json/help parity is part of F-22 rather than a template/catalog feature"],
+      "parallelism": "May run in a separate worktree from C03 only for context-index and catalog work. Do not concurrently edit registry/router.",
+      "exit_gate": ["Authority/history and stale-source fixtures pass.", "Any generated manifest/template change passes bun run manifest:check and bun run template:check.", "Critic checks that trusted output never silently falls back to arbitrary history."],
+      "commit_boundary": "One commit for context authority; a separate commit for catalog generation if it survives scope review."
+    },
+    {
+      "id": "F22-C02B+C03",
+      "classification": "serialized core lifecycle slice",
+      "objective": "Bind governance authority at session creation and make session/evidence transitions transactionally tied to a pre-execution authorization snapshot.",
+      "requires_child_spec": "yes: F22-C02B governance binding; yes: F22-C03 workbench and evidence integrity",
+      "write_scope": ["cli/commands/governance.ts", "cli/commands/session.ts", "cli/commands/workbench/**", "cli/services/governance/**", "cli/services/workbench/**", "cli/services/state/**", "cli/tests/spec-gate-system.test.ts", "cli/tests/session-command.test.ts", "cli/tests/workbench-lifecycle.test.ts", "cli/tests/workbench-verify.test.ts", "cli/tests/state-sqlite.test.ts"],
+      "dependencies": ["C01-P0", "a compatibility decision for existing evidence/session records", "one integration writer because start/done/close and session context overlap"],
+      "parallelism": "C02B must not run independently from C03. C02A may remain parallel only on disjoint files.",
+      "scope_warning": "The attachment's request to implement F-18 command-error events conflicts with the F-22 explicit non-goal. Keep it out unless governance approves a new feature/spec decision.",
+      "exit_gate": ["Focused governance, lifecycle, verification, session, and SQLite tests pass.", "New fault-injection/retry tests prove no partial session, stale attempt, or incomplete evidence authorizes done.", "Independent critic reviews the combined lifecycle/governance diff before integration."],
+      "commit_boundary": "Keep governance-binding and evidence-transaction commits separately reviewable, but integrate only after their combined focused gate passes."
+    },
+    {
+      "id": "F22-C04",
+      "classification": "scope-decision prerequisite; not ready to schedule",
+      "objective": "Decide whether durable-state gaps require a new State DB v2 feature or whether bounded v1 integrity fixes meet F-22 acceptance.",
+      "requires_child_spec": "blocked until a parent/roadmap amendment explicitly permits State DB v2",
+      "dependencies": ["Verified failure of current v1 materialization against a named F-22 acceptance clause", "migration/versioning, downgrade, recovery, and data-retention decision"],
+      "overreach": ["Versioned SQLite migrations and broad state/events/journal materialization contradict the current AGENTS DB-v2-future boundary without an approved scope change."],
+      "exit_gate": ["If approved: migration fixtures from every supported schema version, corruption/recovery fixtures, and state/journal/event consistency tests.", "If not approved: record the failed/accepted v1 proof and remove C04 as a dependency for C05."],
+      "commit_boundary": "No implementation commit before scope approval and migration rollback policy."
+    },
+    {
+      "id": "F22-C05",
+      "classification": "post-core multi-agent enforcement",
+      "objective": "Enforce actor/session/worktree ownership only after the action identity and execution snapshot are trustworthy.",
+      "requires_child_spec": "yes: F22-C05 multi-agent execution isolation",
+      "write_scope": ["cli/core/operation-context.ts", "cli/commands/session.ts", "cli/commands/workbench/**", "cli/services/workbench/**", "cli/services/io/session-lock.ts", "cli/tests/operation-context.test.ts", "cli/tests/session-lock.test.ts", "cli/tests/workbench-lifecycle.test.ts", "cli/tests/operator-journeys.test.ts"],
+      "dependencies": ["C01-P0 trusted actor model", "C02B+C03 execution authorization and canonical session resolver", "C04 only if approved persistence is chosen for leases; otherwise it is not a hard dependency"],
+      "parallelism": "No concurrent integration writer with C02B+C03. Separate-worktree experiments may proceed only after the shared contract is frozen.",
+      "exit_gate": ["Independent-process same-task, different-task, same-path, expired-lease, takeover, missing-session, and same-worktree host-rejection tests pass.", "The temporary one-mutation-host-per-worktree rule remains until those tests pass.", "Critic validates no fallback reintroduces ambient session authority."],
+      "commit_boundary": "One commit for canonical resolver/deny behavior; one separately reviewed commit for leases/takeover if both are approved."
+    },
+    {
+      "id": "F22-C06",
+      "classification": "overreach; route by approved owner feature",
+      "objective": "Do not absorb broad ADM, ADR, changelog, memory, library, adapter, or migration work into F-22 without a feature-level decision.",
+      "requires_child_spec": "no F-22 child spec until scope approval; create separate parent/children by domain if accepted",
+      "evidence_for_separation": ["F-22 parent scope lists governance/state but not these broad command families.", "The attachment bundles independent data models and rollback paths, defeating the F-22 requirement for bounded, reversible phases."],
+      "narrow_exception": "A specific state/hydrate write that independently fails a C01 or C03 acceptance test may be added to that owning slice with a focused reproducer.",
+      "exit_gate": ["Per-domain corruption, concurrent-write, rollback, and OperationContext tests before any integration.", "No cross-domain consolidation commit."],
+      "commit_boundary": "Domain-specific accepted slices only; no omnibus C06 commit."
+    },
+    {
+      "id": "F22-C07",
+      "classification": "split into measured hardening and deferred portability",
+      "objective": "Keep only proven F-22 contract gaps; do not schedule index rewrites, parser replacement, broad output migration, or Windows support from static findings alone.",
+      "requires_child_spec": "conditional after quantified baseline and a scope decision",
+      "dependencies": ["C01-P0 for JSON/action-contract changes", "C02B+C03 for lifecycle-index measurements", "C05 for multi-agent performance claims"],
+      "missing_proof": ["No current benchmark baseline demonstrates full-repository scans on lifecycle transitions.", "CI has no Windows job, so Linux-only evidence cannot prove Windows/WSL behavior.", "Package scripts do not establish a mutation-testing runner or threshold."],
+      "safe_parallel_work": "Read-only benchmark design and portable fixture definition may be prepared after C03, but no shared implementation work should start.",
+      "exit_gate": ["Measured before/after lifecycle benchmark with bounded fixtures.", "Focused envelope/project-root/bootstrap/index tests pass.", "Windows evidence is from a defined runner or is explicitly a release blocker, not inferred from Linux."],
+      "commit_boundary": "Commit only a proven targeted fix with its measurement; defer broad rewrites."
+    },
+    {
+      "id": "F22-C08",
+      "classification": "release-only; final integration and closure",
+      "objective": "Revalidate the accepted F-22 scope at one release candidate commit and obtain independent closure review."
+      ,"requires_child_spec": "no new product child spec; requires all approved in-scope child specs to be final with task-scoped evidence",
+      "dependencies": ["Accepted C01/C02B/C03/C05 slices", "Any C04/C06/C07 scope decisions resolved", "independent critic for every accepted slice", "final large review"],
+      "required_gates": ["./afol local-state rebuild --json", "./afol validate project --json", "bun run manifest:check", "bun run typecheck", "bun test", "bun run validate:release", "CI agents-scaffold-ci green for the release commit", "explicit project benchmark result", "approved mutation-testing method and threshold", "Gitleaks history/worktree redacted scan and OSV result meeting AGENTS.md policy", "clean external global-install smoke only with explicit authorization", "separate-worktree multi-agent dogfood", "defined Windows/WSL evidence or an explicit support deferral"],
+      "release_constraints": ["Current package version is 0.1.0-alpha.1.", "Version progression, release-candidate dogfood, final version bump, and main PR merge require explicit release authority and are not implied by this plan."],
+      "commit_boundary": "No release commit or push until all gates and final council evidence are recorded."
+    }
+  ],
+  "dependencies": {
+    "accepted_graph": ["C01-P0 -> C02A", "C01-P0 -> C02B+C03", "C02B+C03 -> C05", "C01-P0 -> any approved C06 domain slice", "C01-P0 + C02B+C03 + C05 + resolved scope decisions -> C08"],
+    "rejected_or_conditional_edges": ["C03 -> C04 is conditional, because C04 currently requests unapproved DB v2 work.", "C04 -> C05 is conditional on choosing DB persistence for leases.", "C02 and C06 are not wholly parallel: C02B overlaps C03 lifecycle writes, and C06 is out of F-22 scope pending approval.", "C07 is not a release prerequisite until a measured, accepted defect proves it is needed for F-22 acceptance."],
+    "integration_policy": "Until C05 is accepted, use separate worktrees for writers and one integration writer; re-read shared files immediately before integration."
+  },
+  "write_ownership": {
+    "planner": "Only this handoff artifact.",
+    "builders": "One builder owns one accepted child slice and its focused tests in an isolated worktree.",
+    "integration": "A single owner integrates slices that touch registry/router, lifecycle/session context, generated manifests, or template payloads.",
+    "reviewers": "Read-only independent critic before a slice is accepted and again for final closure."
+  },
+  "validation_gates": {
+    "per_slice_minimum": ["Focused reproducer for the alleged defect", "Focused affected tests", "bun run typecheck", "git diff --check", "Relevant manifest/template check when public registry/template payload changes"],
+    "required_release_surface": ["bun run validate:release", "bun run smoke:clean", "CI workflow .github/workflows/agents-scaffold-ci.yml", "project benchmark validation", "security release scan"],
+    "missing_gates_to_define": ["Mutation-testing tool/method and threshold", "Windows/WSL execution runner and acceptance fixture", "Trusted launcher credential lifecycle", "DB v2 migration/recovery matrix if C04 is approved"]
+  },
+  "review_gates": [
+    "Before builders: independent source/runtime evidence must classify each attachment claim as reproduced, rejected, or insufficient.",
+    "Before each commit/push: critic confirms scope, regression tests, generated artifacts, and no overlap with an unresolved slice.",
+    "Before C08: a large read-only council reviews cumulative diff, evidence ledgers, benchmark/mutation/security evidence, release provenance, and unresolved exceptions."
+  ],
+  "commit_policy": [
+    "Commit and push only an accepted, independently reviewed slice to dev; do not mix workbench planning artifacts with product remediation commits.",
+    "Do not commit generated manifest/template/benchmark changes separately from the public contract change that requires them.",
+    "Keep C02B+C03 cross-surface edits reviewable but do not claim either finalized until their combined lifecycle gate passes."
+  ],
+  "stop_conditions": [
+    "Stop C01 after the tests if the trusted launcher/capability model is undefined; obtain the explicit authority decision before issuing credentials.",
+    "Stop C04 until State DB v2 is approved against the AGENTS.md future boundary and a migration/rollback policy exists.",
+    "Stop any C03 work that reopens F-18 command-error delivery records; route it to a new approved feature/spec instead.",
+    "Stop C06 unless a named F-22 acceptance failure proves the narrow exception; otherwise route it to its owning feature.",
+    "Stop C07 implementation when no measured regression or cross-platform runner exists.",
+    "Stop release closure for any failed, absent, stale, or non-independent evidence; historic evidence does not authorize later changes."
+  ],
+  "questions": [
+    "Who is the trusted issuer for agent capabilities, and what are the capability format, audience, expiry, revocation, replay, and local-operator fallback rules?",
+    "Should F-22 be amended to own State DB v2, tool-catalog parity, and the C06 domains, or should these move to new roadmap features?",
+    "Which explicit F-22 acceptance clause makes Windows/WSL support release-blocking for this version, and who supplies the runner?",
+    "Which mutation-testing method and minimum score are required for C08, given no current package script establishes one?",
+    "Which C01 attachment claims reproduce against HEAD with a minimal command/test fixture, and which are rejected by current behavior?"
+  ]
+}

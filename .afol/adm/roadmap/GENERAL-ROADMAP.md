@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-20T00:00:00-04:00'
+updated_at: '2026-07-12T21:20:00Z'
 ---
 
 # GENERAL ROADMAP
@@ -40,31 +40,40 @@ universal CLI plus minimal local project state.
 
 ## 3) Strategic Priorities
 
-1. Low-token command execution.
-2. Minimal local template.
-3. Bun/TypeScript as the system core.
-4. Smart routing of rules and skills.
-5. File-first, chat-light handoffs.
-6. Safe file operations with mutation tracking.
-7. Updateable downstream project installations.
-8. Strong validation and closure gates.
-9. Future public distribution.
+1. **Extreme agent ease of use** — obvious short happy path; low friction.
+2. **Extremely low latency** — hot-path CLI in tens to low hundreds of ms.
+3. **Low write-token consumption** — agents must not author giant `afol`
+   strings; active-session fast path is first-class (worse to waste model
+   output on commands than on compact CLI stdout).
+4. **Low forced output tokens** — compact defaults; verbose/full opt-in;
+   file-first detail (F-06).
+5. **Very high reliability** — short and long forms share one state machine;
+   fail closed when session is ambiguous.
+6. Minimal local template.
+7. Bun/TypeScript as the system core.
+8. Smart routing of rules and skills.
+9. Safe file operations with mutation tracking.
+10. Updateable downstream project installations.
+11. Strong validation and closure gates.
+12. Future public distribution.
 
 ## 4) Current-State Reconciliation
 
-This repository already has useful Python, Bash, uv, Just, workbench, MCP, safe
-mutation, and validation behavior. That behavior is compatibility contract, not
-disposable history.
+This section is superseded by the current AFOL-only runtime policy.
 
-The Bun/TypeScript reformulation must be staged:
+The active contract is:
 
-1. Keep `afol` as the project-local and downstream front door.
-2. Keep legacy `.agents/agents`, Python, Bash, uv, and just surfaces
-   factory-only until parity tests prove safe retirement.
-3. Implement one typed Bun/TypeScript command family at a time.
-4. Keep Python/Bash paths until parity tests prove the replacement.
-5. Shrink src/project-template only after bootstrap/export validation proves
-   downstream installs still work.
+1. `afol` is the only supported public CLI surface.
+2. Legacy `.agents/agents`, `.agents/scripts`, `.agents/runtime`,
+   `.agents/wb`, `.agents/z-arq`, `agents.config`, and `legacy:` routing must
+   not be restored or extended.
+3. Retained `.agents/**` content is limited to static provider metadata and
+   optional project-local skills. Universal AFOL skills such as
+   `agentic-folder-sys` are global Codex skills, not vendored template payload.
+4. Python, Bash, uv, and Just references are historical migration context, not
+   active runtime surfaces.
+5. `src/project-template` must export the AFOL config/governance/state payload
+   without reintroducing legacy runtime files.
 
 ## 4.1) DR 2026-05-31 Consolidation (incremental)
 
@@ -197,18 +206,26 @@ Minimum acceptance:
 
 ### F-03 Agent Command Design System
 
-- Status: final
+- Status: final (initial delivery) with **open residual child**
 - Governing spec:
   .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
-- Why: Agents should use short, predictable commands to reduce repeated token
-  cost.
-- Exit criteria: short grammar exists; long aliases exist; high-frequency
-  operations use 1-3 letter commands; compact output is default; JSON output is
-  available.
+- Living residual:
+  .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
+- Why: Agents need extreme ease of use, extremely low latency, low
+  **write-token** cost for CLI argv, low forced stdout, and very high
+  reliability. Long commands and long default output train agents to waste
+  model tokens; write tokens are worse than read tokens.
+- Exit criteria (initial, done): short grammar exists; long aliases exist;
+  high-frequency operations use 1-3 letter commands; compact output is default;
+  JSON output is available.
+- Residual exit criteria (child): agent docs/hints lead with active-session
+  fast path (`st T-01`, `d T-01 -x "…"`, `c`); explicit `-S` path retained for
+  CI/multi-agent; flag tables match live CLI; input argv + latency budgets
+  validated; default agent commands stay under output token rules.
 - Closure note: accepted implementation evidence is
   `E-20260529134101240986`; closeout session
   `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
-  passed.
+  passed. Residual tracked by the 2026-07-12 child spec.
 
 ### F-04 Governance Workbench System
 
@@ -222,6 +239,9 @@ Minimum acceptance:
   closure validation catches drift.
 - Closure note: accepted implementation evidence is `E-20260528084521802724`;
   closeout session `.afol/wb/260528_0833_f04-workbench-core-review-fix/`.
+- Current close/report semantics were revalidated in
+  `.afol/wb/260713_0716_close-waiver-summary-conflict/`; historical strict
+  evidence does not replace current release-readiness gates.
 
 ### F-05 Smart Rules and Skills Routing
 
@@ -315,6 +335,13 @@ Minimum acceptance:
   `runtime-live-agent` in
   `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
   (`status=skipped`, `all-scenarios-skipped:not-implemented-live-runner`).
+- Clean-checkout release evidence for historical product commit `af160f8` is
+  retained in `.afol/wb/260713_0733_final-observed-release/`. Current evidence
+  for product commit `81a3a34` is retained in
+  `.afol/wb/260713_0753_documentation-and-template-freshness/` with the
+  `validate-release-clean.log` artifact. Observed short-path benchmark evidence
+  is retained in
+  `.afol/wb/260713_0724_final-observed-workbench-benchmark/`.
 - Exit criteria: type checks; unit tests; schema tests; command parity tests;
   template export tests; workbench validation; MCP parity tests; benchmark
   packs for accuracy, speed, safety, quality, and token cost on risky changes.
@@ -485,9 +512,11 @@ Minimum acceptance:
 - Why: AFOL needs fast local execution state, FTS, source hashes, and bundle
   generation without making JSON files or SQLite the human authoring surface.
 - Exit criteria:
-  - `.afol/state/afol.db` materializes adm, pstr, wb, memory, library,
-    evidence, events, sections, tools, and context bundle state.
-  - Source hashes and stale checks fail closed before trusted bundle generation.
+  - SQLite v1 materializes workbench sessions, task rows, source hashes, and
+    evidence.
+  - Adm, pstr, memory, library, events, sections, tools, and context bundle
+    state remain file-backed unless and until a State DB v2 feature implements
+    their tables and migrations.
   - SQLite is rebuildable from canonical Markdown/YAML/evidence sources.
   - JSON output remains command/export/debug format, not a live competing
     source of truth.
@@ -723,6 +752,116 @@ Follow-on slices under this direction:
   - Overly strict fallback removal can make quick local commands noisy.
   - Under-strict fallback can let remote/CI agents mutate the wrong session.
   - Session binding must remain visible and reversible for operators.
+
+### F-21 TypeScript 7 Toolchain Adoption
+
+- Status: final
+- Governing spec:
+  .afol/adm/specs/260710_1256_typescript-7-toolchain-adoption_spec_01.md
+- Why: the repository already uses a blocking local typecheck, but its
+  `typecheck:ts7:informative` lane hides compiler failures and resolves
+  `typescript@next`, which now tracks TypeScript 7.1 nightlies instead of the
+  stable TypeScript 7 release. Adopting an exact stable compiler makes the
+  release contract deterministic and removes a false-positive validation path.
+- Scope:
+  - Pin the local development compiler to exact TypeScript `7.0.2` and update
+    the Bun lockfile without changing Bun runtime or bundling behavior.
+  - Remove the masked informative TS7 lane.
+  - Keep `bun run typecheck` as a standalone release preflight and a blocking CI
+    step after dependency installation and before release validation.
+  - Add a focused CI contract test for that ordering and blocking behavior.
+  - Preserve the current `tsconfig.json` unless the stable compiler proves that
+    a configuration change is required.
+- Exit criteria:
+  - `package.json` and `bun.lock` resolve exact TypeScript `7.0.2`.
+  - No script catches or converts TypeScript compiler failures into success.
+  - CI installs from the frozen lockfile, runs the blocking typecheck, and only
+    then enters release validation.
+  - Focused toolchain tests, the full test suite, build, clean smoke, AFOL
+    validation, and required security scans pass.
+- Validation targets:
+  - `bun install --frozen-lockfile`
+  - `bun run typecheck`
+  - `bunx tsc --noEmit -p tsconfig.json --skipLibCheck false`
+  - `bun test cli/tests/release-toolchain.test.ts cli/tests/validate-internals.test.ts`
+  - `bun test`
+  - `bun run build`
+  - `bun run validate:release`
+  - `bun run smoke:clean`
+  - `afol local-state rebuild --json`
+  - `afol validate project --json`
+  - `bun run validate:security:required`
+- Rollback:
+  - Restore the local compiler to exact TypeScript `6.0.3` and regenerate only
+    the dependency lockfile.
+  - Keep the blocking typecheck and CI contract test.
+  - Do not restore the masked informative lane.
+- Risks:
+  - TypeScript 7 has no stable programmatic compiler API; AFOL must continue to
+    avoid compiler API dependencies until a later version provides one.
+  - Faster typechecking does not improve Bun runtime or standalone binary
+    performance because Bun remains the runtime, transpiler, and bundler.
+  - Editor `tsgo` activation is a separate host configuration change and is not
+    part of this repository feature.
+
+### F-22 Core Integrity and Transaction Safety
+
+- Status: active
+- Governing spec:
+  .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md
+- Why: AFOL must fail closed when agents complete tasks, mutate shared files,
+  update scaffolds, bootstrap projects, or resolve governance. Current gaps can
+  admit declared-only completion, stale concurrent writes, destructive undo,
+  partial commits, and nominal governance bindings.
+- Scope:
+  - Enforce a formal task-state transition model and authorize completion only
+    through observed successful execution or an explicit typed artifact or
+    waiver policy.
+  - Serialize shared-resource mutation by canonical path, revalidate hashes at
+    commit time, make journal state auditable, and block destructive undo on
+    drift, missing backups, duplicate undo, or journal corruption.
+  - Replan scaffold updates inside one global lock, preserve project-owned
+    content, constrain stale-path removal by ownership and hash, and support
+    guarded rollback by update batch.
+  - Make bootstrap/init approval-gated, target-locked, staged, and recoverable.
+  - Validate real roadmap feature/spec bindings and protect governance,
+    pending-spec, session-context, hydration, and verification state against
+    partial failure or silent corruption.
+  - Require explicit safe inputs for quick tasks and produce consistent JSON
+    errors and collision-resistant cross-process identifiers.
+- Exit criteria:
+  - An executable task cannot reach `done` from declared-only evidence, stale
+    evidence, `n/a`, or an illegal prior state; the result identifies the
+    evidence or typed policy that authorized completion.
+  - Concurrent processes cannot lose a file mutation or scaffold update because
+    locks and hash preconditions cover the actual shared resources.
+  - Mutation, undo, update, bootstrap, governance, and session-context flows
+    either commit coherently or return a structured recoverable failure without
+    destroying newer state.
+  - Governance resolution proves that feature and active parent spec exist and
+    are linked; pending governance blocks the affected session at `start`, not
+    unrelated future work.
+  - Corrupt journal, workbench, evidence, or materialization inputs are reported
+    as integrity failures instead of being silently skipped or classified as
+    closed/fresh.
+  - Focused multi-process concurrency, fault-injection, lifecycle, update,
+    bootstrap, state hydration, strict verification, typecheck, full tests,
+    release validation, and required security scans pass.
+- Delivery phases:
+  1. Lifecycle transitions and completion authorization.
+  2. Resource locks, hash preconditions, mutation transactions, and safe undo.
+  3. Update locking, internal replan, ownership safety, and batch rollback.
+  4. Bootstrap approval, staging, target locking, and rollback.
+  5. Governance validation and transactional state integrity.
+  6. Quick-task, hydration, verifier, JSON error, and identifier hardening.
+- Risks:
+  - Tightening completion can expose historical evidence that never met the new
+    policy; compatibility must remain explicit and must not weaken new writes.
+  - Cross-cutting transaction work can become a framework rewrite; delivery
+    should share only the smallest proven lock, hash, journal, and rollback
+    primitives.
+  - Locks without deterministic ordering can deadlock; multi-resource locks
+    must use canonical paths and stable ordering.
 
 ## 6) Recommended Delivery Phases
 

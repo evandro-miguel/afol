@@ -1,0 +1,29 @@
+{
+  "schema": "codex-quality-loop.authority-critic/v1",
+  "verdict": "GO",
+  "confidence": "high",
+  "blocking_findings": [],
+  "non_blocking_concerns": [
+    "Before rollout, the deployment owner must evidence that agent and remote catalogs expose only constrained AFOL entries and no unrestricted AFOL or generic-shell route."
+  ],
+  "accepted_authority_fields": [
+    "issuer and trust boundary",
+    "audience",
+    "expiry and renewal",
+    "revocation",
+    "replay protection",
+    "verification",
+    "audit",
+    "local-operator fallback",
+    "test-shell policy"
+  ],
+  "accepted_implementation_scope": true,
+  "allowed_next_action": "Submit STOP-C01-AUTHORITY to the F-22 governance owner; after acceptance, assign one C01-I writer to the exact scope.",
+  "forbidden_until": [
+    "production before governance-owner acceptance",
+    "caller-authentication claims",
+    "agent-facing test-shell or unrestricted AFOL shell exposure",
+    "adapter transaction or host/deployment changes"
+  ],
+  "report_path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c01-authority-critic-005.json"
+}

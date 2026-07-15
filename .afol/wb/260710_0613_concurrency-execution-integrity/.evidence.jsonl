@@ -1,0 +1,13 @@
+{"id":"E-20260710062852017-b87678","task_id":"T-01","created_at":"2026-07-10T10:28:52.017Z","command":"bun test cli/tests/file-command-unit.test.ts","result":"passed"}
+{"id":"E-20260710063926735-467f19","task_id":"T-02","created_at":"2026-07-10T10:39:26.735Z","command":"bun test cli/tests/local-state-indexes.test.ts","result":"passed","provenance":"observed","exit_code":0}
+{"id":"E-20260710063930720-9d60d8","task_id":"T-03","created_at":"2026-07-10T10:39:30.720Z","command":"bun test cli/tests/health-system.test.ts","result":"passed","provenance":"observed","exit_code":0}
+{"id":"E-20260710063935954-4bb85b","task_id":"T-04","created_at":"2026-07-10T10:39:35.954Z","command":"bun test cli/tests/session-lock.test.ts","result":"passed","provenance":"observed","exit_code":0}
+{"id":"E-20260710063944786-a8218b","task_id":"T-05","created_at":"2026-07-10T10:39:44.786Z","command":"bun test cli/tests/workbench-lifecycle.test.ts cli/tests/quick-task-command.test.ts","result":"passed","provenance":"observed","exit_code":0}
+{"id":"E-20260710064800758-c5f0f7","task_id":"T-05","created_at":"2026-07-10T10:48:00.758Z","command":"bun test cli/tests/workbench-lifecycle.test.ts cli/tests/quick-task-command.test.ts && git diff --check","result":"passed","provenance":"declared","note":"Post-audit correction: declared evidence emits no tool_exec; 76 tests passed."}
+{"id":"E-20260710064839900-6632d0","task_id":"T-07","created_at":"2026-07-10T10:48:39.900Z","command":"bun test cli/tests/validation.test.ts -t \"bench --pack aliases to validation benchmark contract\"","result":"passed","provenance":"observed","exit_code":0}
+{"id":"E-20260710064953618-832a80","task_id":"T-06","created_at":"2026-07-10T10:49:53.618Z","command":"bun run kernel -- project-benchmark validate --strict --json","result":"passed","provenance":"observed","exit_code":0}
+{"id":"E-20260710072240111-2f6a7d","task_id":"T-08","created_at":"2026-07-10T11:22:40.111Z","command":"bun run lint:biome","result":"passed","provenance":"declared"}
+{"id":"E-20260710072240303-a8b17c","task_id":"T-08","created_at":"2026-07-10T11:22:40.303Z","command":"bun run typecheck","result":"passed","provenance":"declared"}
+{"id":"E-20260710072240501-c1e932","task_id":"T-08","created_at":"2026-07-10T11:22:40.501Z","command":"bun test","result":"passed","provenance":"declared"}
+{"id":"E-20260710072240699-f7faad","task_id":"T-08","created_at":"2026-07-10T11:22:40.699Z","command":"git diff --check","result":"passed","provenance":"declared"}
+{"id":"E-20260710072340381-f5a826","task_id":"T-08","created_at":"2026-07-10T11:23:40.381Z","command":"bun run validate:release","result":"passed","provenance":"declared"}

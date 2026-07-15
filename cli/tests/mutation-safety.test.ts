@@ -8,10 +8,15 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { runPatchMutation } from "../commands/file/mutations/patch";
+import type { PatchArgs } from "../commands/file/shared";
+import { normalizeHash } from "../commands/file/shared";
+import { mutationJournalPath } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -43,6 +48,17 @@ function expectFileEnvelope(
 		expect(payload[key]).toEqual(value);
 	}
 	return payload as Record<string, unknown> & { data: Record<string, unknown> };
+}
+
+function expectRestrictedFileError(proc: ReturnType<typeof runKernel>): void {
+	expect(proc.status).toBe(2);
+	expect(proc.stderr as string).toBe("");
+	const payload = parseJsonOutput(proc.stdout as string);
+	expect(payload.schema).toBe("afol.result/v1");
+	expect(payload.ok).toBe(false);
+	expect(payload.exit_code).toBe(2);
+	expect(payload.action).toBe("file.patch.preview");
+	expect(payload.error).toBeTruthy();
 }
 
 function mkProjectRoot(): string {
@@ -98,7 +114,182 @@ function readMutationJournal(root: string): Array<Record<string, unknown>> {
 		.map((row) => JSON.parse(row) as Record<string, unknown>);
 }
 
+function assertRestrictedControlPlanePreview(
+	relativePath: string,
+	marker: string,
+): void {
+	const root = mkProjectRoot();
+	const target = join(root, relativePath);
+	mkdirSync(dirname(target), { recursive: true });
+	writeFileSync(target, `${marker}\n`, "utf8");
+	const journalPath = join(
+		resolveProjectPaths(root).abs.mutationsDir,
+		"mutations.jsonl",
+	);
+	const beforeTarget = readFileSync(target).toString("base64");
+	const beforeJournal = existsSync(journalPath)
+		? readFileSync(journalPath).toString("base64")
+		: null;
+	try {
+		const proc = runKernel(root, [
+			"--agent",
+			"f",
+			"pt",
+			"--path",
+			relativePath,
+			"--append",
+			"\nsynthetic control-plane append\n",
+			"--dry-run",
+			"--json",
+		]);
+
+		expectRestrictedFileError(proc);
+		expect(`${proc.stdout as string}\n${proc.stderr as string}`).not.toContain(
+			marker,
+		);
+		expect(readFileSync(target).toString("base64")).toBe(beforeTarget);
+		if (beforeJournal === null) {
+			expect(existsSync(journalPath)).toBe(false);
+		} else {
+			expect(readFileSync(journalPath).toString("base64")).toBe(beforeJournal);
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+}
+
 describe("mutation safety command family", () => {
+	test("SEC-001 restricted file dry-run denies .env before preview or persistence", () => {
+		const root = mkProjectRoot();
+		const sensitivePath = join(root, ".env");
+		const fixtureText = "NON_SECRET_FIXTURE_MARKER=synthetic-only\n";
+		writeFileSync(sensitivePath, fixtureText, "utf8");
+		const journalPath = join(
+			resolveProjectPaths(root).abs.mutationsDir,
+			"mutations.jsonl",
+		);
+		const before = readFileSync(sensitivePath).toString("base64");
+		try {
+			const proc = runKernel(root, [
+				"--agent",
+				"f",
+				"pt",
+				"--path",
+				".env",
+				"--append",
+				"\nsynthetic append only\n",
+				"--dry-run",
+				"--json",
+			]);
+
+			expectRestrictedFileError(proc);
+			expect(
+				`${proc.stdout as string}\n${proc.stderr as string}`,
+			).not.toContain(fixtureText);
+			expect(readFileSync(sensitivePath).toString("base64")).toBe(before);
+			expect(existsSync(journalPath)).toBe(false);
+			expect(existsSync(resolveProjectPaths(root).abs.mutationBackupsDir)).toBe(
+				false,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("SEC-004 restricted file preview denies .afol/wb targets", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/wb/protected-control-plane.txt",
+			"CONTROL_PLANE_FIXTURE_WB",
+		);
+	});
+
+	test("SEC-004 restricted file preview denies .afol/adm targets", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/adm/protected-control-plane.txt",
+			"CONTROL_PLANE_FIXTURE_ADM",
+		);
+	});
+
+	test("SEC-004 restricted file preview denies .afol/state targets", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/state/protected-control-plane.txt",
+			"CONTROL_PLANE_FIXTURE_STATE",
+		);
+	});
+
+	test("SEC-004 restricted file preview denies the mutation journal", () => {
+		assertRestrictedControlPlanePreview(
+			".afol/data/mutations/mutations.jsonl",
+			"CONTROL_PLANE_FIXTURE_JOURNAL",
+		);
+	});
+
+	test("SEC-004 symlink operands cannot bypass protected-resource admission", () => {
+		for (const relativeTarget of [
+			".env",
+			".afol/adm/protected-control-plane.txt",
+		]) {
+			for (const restricted of [true, false]) {
+				const root = mkProjectRoot();
+				const target = join(root, relativeTarget);
+				const alias = join(
+					root,
+					"notes",
+					`${restricted ? "agent" : "local"}-${relativeTarget.replaceAll("/", "-")}`,
+				);
+				mkdirSync(dirname(target), { recursive: true });
+				mkdirSync(dirname(alias), { recursive: true });
+				writeFileSync(target, "SYNTHETIC_SYMLINK_TARGET\n", "utf8");
+				symlinkSync(target, alias);
+				const before = readFileSync(target).toString("base64");
+				const journalPath = join(
+					resolveProjectPaths(root).abs.mutationsDir,
+					"mutations.jsonl",
+				);
+				try {
+					if (!restricted) createMutationSession(root, "S-SYMLINK", "T-01");
+					const proc = runKernel(root, [
+						...(restricted ? ["--agent"] : []),
+						"file",
+						"patch",
+						"--path",
+						join("notes", alias.split("/").at(-1) ?? ""),
+						"--append",
+						"synthetic append",
+						...(restricted
+							? ["--dry-run"]
+							: [
+									"--session",
+									"S-SYMLINK",
+									"--task-id",
+									"T-01",
+									"--reason",
+									"synthetic symlink check",
+								]),
+						"--json",
+					]);
+
+					expect(proc.status).toBe(2);
+					expect(readFileSync(target).toString("base64")).toBe(before);
+					expect(existsSync(journalPath)).toBe(false);
+					expect(
+						`${proc.stdout as string}${proc.stderr as string}`,
+					).not.toContain("SYNTHETIC_SYMLINK_TARGET");
+					const payload = parseJsonOutput(proc.stdout as string);
+					expect(payload.error).toBeTruthy();
+					if (restricted) {
+						expect(payload.action).toBe("file.patch.preview");
+						expect((payload.error as { code: string }).code).toBe(
+							"approval-required",
+						);
+					}
+				} finally {
+					rmSync(root, { recursive: true, force: true });
+				}
+			}
+		}
+	});
+
 	test("pt dry-run shows diff and hashes without mutating", () => {
 		const root = mkProjectRoot();
 		try {
@@ -174,9 +365,13 @@ describe("mutation safety command family", () => {
 			expect(readFileSync(target, "utf8")).toBe("v1+v2");
 
 			const journal = readMutationJournal(root);
-			expect(journal.length).toBe(1);
+			expect(journal.length).toBe(2);
+			expect(journal.map((row) => row.status)).toEqual([
+				"prepared",
+				"committed",
+			]);
 			expect(journal[0]?.kind).toBe("patch");
-			expect(journal[0]?.status).toBe("applied");
+			expect(journal[1]?.status).toBe("committed");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -205,6 +400,10 @@ describe("mutation safety command family", () => {
 				"mut/source.txt",
 				"--to",
 				"mut/destination.txt",
+				"--expected-destination-exists",
+				"true",
+				"--expected-destination-hash",
+				normalizeHash("existing"),
 				"--json",
 			]);
 			expect(moveProc.status).toBe(0);
@@ -261,8 +460,8 @@ describe("mutation safety command family", () => {
 			]);
 
 			expect(proc.status).toBe(2);
-			expect(proc.stdout as string).toBe("");
-			expect(proc.stderr as string).toContain(
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain(
 				"Source file not found: mut/missing.txt",
 			);
 			expect(readMutationJournal(root)).toEqual([]);
@@ -385,7 +584,32 @@ describe("mutation safety command family", () => {
 			]);
 
 			expect(proc.status).toBe(2);
-			expect(proc.stderr as string).toContain("protected-path");
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain("protected-path");
+
+			const boundaryProc = runKernel(root, [
+				"f",
+				"pt",
+				"--session",
+				"S-04",
+				"--task-id",
+				"T-04",
+				"--reason",
+				"boundary target",
+				"--path",
+				".afol/config.json.example",
+				"--append",
+				"safe",
+				"--dry-run",
+				"--json",
+			]);
+
+			expect(boundaryProc.status).toBe(0);
+			const boundaryResult = expectFileEnvelope(
+				parseJsonOutput(boundaryProc.stdout as string),
+			);
+			expect(boundaryResult.status).toBe("dry-run");
+			expect(boundaryResult.path).toBe(".afol/config.json.example");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -500,6 +724,10 @@ describe("mutation safety command family", () => {
 				"mut/undo-source.txt",
 				"--to",
 				"mut/undo-destination.txt",
+				"--expected-destination-exists",
+				"true",
+				"--expected-destination-hash",
+				normalizeHash("existing"),
 				"--json",
 			]);
 			expect(moveProc.status).toBe(0);
@@ -528,7 +756,7 @@ describe("mutation safety command family", () => {
 			expect(blockedResult.message).toBe(
 				"Undo blocked: source already exists: mut/undo-source.txt",
 			);
-			expect(readMutationJournal(root)).toHaveLength(1);
+			expect(readMutationJournal(root)).toHaveLength(2);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -559,7 +787,7 @@ describe("mutation safety command family", () => {
 			]);
 			expect(writeProc.status).toBe(0);
 			const beforeUndoJournal = readMutationJournal(root);
-			expect(beforeUndoJournal.length).toBe(1);
+			expect(beforeUndoJournal.length).toBe(2);
 
 			const dryRunUndo = runKernel(root, [
 				"f",
@@ -587,7 +815,75 @@ describe("mutation safety command family", () => {
 		}
 	});
 
-	test("journal loader ignores truncated trailing rows and preserves applied mutations", () => {
+	test("undo blocks drift and a second undo without changing files", () => {
+		const root = mkProjectRoot();
+		try {
+			const target = join(root, "notes", "undo-once.txt");
+			mkdirSync(join(root, "notes"), { recursive: true });
+			writeFileSync(target, "base", "utf8");
+			createMutationSession(root, "S-11", "T-11");
+			const common = [
+				"--session",
+				"S-11",
+				"--task-id",
+				"T-11",
+				"--reason",
+				"safety",
+				"--json",
+			];
+			const patchProc = runKernel(root, [
+				"f",
+				"pt",
+				"--path",
+				"notes/undo-once.txt",
+				"--append",
+				"next",
+				...common,
+			]);
+			const mutationId = String(
+				expectFileEnvelope(parseJsonOutput(patchProc.stdout as string))
+					.mutation_id,
+			);
+			writeFileSync(target, "later-change", "utf8");
+			const conflict = runKernel(root, [
+				"f",
+				"ud",
+				"--id",
+				mutationId,
+				...common,
+			]);
+			expect(conflict.status).toBe(4);
+			expect(readFileSync(target, "utf8")).toBe("later-change");
+			writeFileSync(target, "basenext", "utf8");
+			const firstUndo = runKernel(root, [
+				"f",
+				"ud",
+				"--id",
+				mutationId,
+				...common,
+			]);
+			expect(firstUndo.status).toBe(0);
+			const journalPath = join(
+				resolveProjectPaths(root).abs.mutationsDir,
+				"mutations.jsonl",
+			);
+			const journalBeforeSecond = readFileSync(journalPath, "utf8");
+			const secondUndo = runKernel(root, [
+				"f",
+				"ud",
+				"--id",
+				mutationId,
+				...common,
+			]);
+			expect(secondUndo.status).toBe(4);
+			expect(readFileSync(target, "utf8")).toBe("base");
+			expect(readFileSync(journalPath, "utf8")).toBe(journalBeforeSecond);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal corruption blocks undo without mutating files", () => {
 		const root = mkProjectRoot();
 		try {
 			const target = join(root, "notes", "loader.txt");
@@ -629,12 +925,116 @@ describe("mutation safety command family", () => {
 				"undo after truncated row",
 				"--json",
 			]);
-			expect(undoProc.status).toBe(0);
-			const undoResult = expectFileEnvelope(
-				parseJsonOutput(undoProc.stdout as string),
+			expect(undoProc.status).toBe(2);
+			expect(undoProc.stderr as string).toBe("");
+			expect(undoProc.stdout as string).toContain(
+				"Mutation journal corruption",
 			);
-			expect(undoResult.status).toBe("write");
-			expect(readFileSync(target, "utf8")).toBe("base");
+			expect(readFileSync(target, "utf8")).toBe("base-next");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runPatchMutation double fault: filesystem restored + INTEGRITY_ERROR on journal write failure", () => {
+		const root = mkProjectRoot();
+		const session = "S-DOUBLE";
+		const taskId = "T-DOUBLE";
+		try {
+			createMutationSession(root, session, taskId);
+			const target = join(root, "target.txt");
+			const originalContent = "original\n";
+			writeFileSync(target, originalContent, "utf8");
+
+			const args: PatchArgs = {
+				command: "pt",
+				path: "target.txt",
+				appendText: "\nappended\n",
+				dryRun: false,
+				json: false,
+				session,
+				taskId,
+				reason: "double-fault test",
+			};
+
+			const journalPath = mutationJournalPath(root);
+			// Ensure journal file exists by doing a successful mutation first
+			const setupResult = runPatchMutation(args, root);
+			expect(setupResult.status).toBe("write");
+			const setupMutationId = (setupResult as Record<string, unknown>)
+				.mutation_id as string;
+
+			// Now do a second mutation with afterPrepared that corrupts the journal.
+			// The afterPrepared hook runs AFTER the "prepared" record is written
+			// but BEFORE the actual file write + "committed" journal record.
+			// By replacing the journal with a directory, both the "committed"
+			// append and the subsequent "rolled_back" append will fail.
+			const args2: PatchArgs = { ...args };
+			// Capture journal state BEFORE the afterPrepared hook corrupts the file,
+			// so we can verify the "prepared" record without hitting EISDIR.
+			// Use a wrapper object so TypeScript can track the assignment through
+			// the closure and narrow correctly in the subsequent if-block.
+			const capturedJournal: { raw: string | null } = { raw: null };
+			let journalCorrupted = false;
+			let thrown: Error | null = null;
+			try {
+				runPatchMutation(args2, root, {
+					afterPrepared: () => {
+						capturedJournal.raw = readFileSync(journalPath, "utf8");
+						rmSync(journalPath, { force: true });
+						mkdirSync(journalPath, { recursive: true });
+						journalCorrupted = true;
+					},
+				});
+			} catch (error) {
+				thrown = error as Error;
+			}
+
+			expect(thrown).not.toBeNull();
+			if (thrown === null) {
+				throw new Error("Expected mutation to throw");
+			}
+			expect(thrown.message).toContain("INTEGRITY_ERROR");
+			// Must mention both the original error context and the journal failure
+			expect(thrown.message).toContain("rolled back on disk");
+			expect(thrown.message).toContain("rollback journal write failed");
+
+			// Filesystem must be restored to the pre-second-mutation content
+			// (state after the successful first mutation)
+			const afterFirstMutation = readFileSync(target, "utf8");
+			expect(afterFirstMutation).not.toBe(originalContent);
+			expect(afterFirstMutation).toContain("\nappended\n");
+
+			// Remove the directory that replaced the journal file
+			if (journalCorrupted) {
+				rmSync(journalPath, { recursive: true, force: true });
+			}
+			// Journal must NOT have "committed" or "rolled_back" for the corrupted
+			// mutation — only "prepared" survived the corruption.
+			// Use the pre-corruption capture because the journal file was replaced
+			// with a directory and its content cannot be recovered.
+			const journalAfter: Array<Record<string, unknown>> =
+				capturedJournal.raw !== null
+					? capturedJournal.raw
+							.split("\n")
+							.map((row) => row.trim())
+							.filter((row) => row.length > 0)
+							.map((row) => JSON.parse(row) as Record<string, unknown>)
+					: readMutationJournal(root);
+			const secondMutationRecords = journalAfter.filter(
+				(r) => r.id !== setupMutationId,
+			);
+			// The "prepared" record should exist
+			expect(secondMutationRecords.some((r) => r.status === "prepared")).toBe(
+				true,
+			);
+			// No "committed" or "rolled_back" for this mutation
+			expect(secondMutationRecords.some((r) => r.status === "committed")).toBe(
+				false,
+			);
+			expect(
+				secondMutationRecords.some((r) => r.status === "rolled_back"),
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

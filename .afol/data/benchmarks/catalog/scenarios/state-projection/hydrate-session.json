@@ -4,6 +4,7 @@
   "scenario_version": "1.0.0",
   "pack_id": "state-projection",
   "command": "afol hydrate -S 260613_1811_public-readiness-release-validation",
+  "sandbox": true,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

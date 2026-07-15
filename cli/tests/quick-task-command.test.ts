@@ -1,30 +1,52 @@
 import { describe, expect, test } from "bun:test";
 import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
 	parseQuickTaskArgs,
 	runQuickTaskCommand,
 } from "../commands/quick-task";
 import { agentOperationContext } from "../core/operation-context";
 
 describe("quick-task parseQuickTaskArgs", () => {
-	test("parses theme and defaults", () => {
-		const parsed = parseQuickTaskArgs(["alpha"]);
-		expect(parsed.theme).toBe("alpha");
-		expect(parsed.json).toBe(false);
-		expect(parsed.command).toBe("quick-task");
-		expect(parsed.result).toBe("passed");
-		expect(parsed.metadata).toEqual({});
-		expect(parsed.artifact).toBeUndefined();
-		expect(parsed.note).toBeUndefined();
+	test("requires an explicit command before any session can be created", () => {
+		expect(() =>
+			parseQuickTaskArgs(["alpha", "--no-spec-required", "--reason", "test"]),
+		).toThrow("requires --command");
 	});
 
 	test("parses --json flag", () => {
-		const parsed = parseQuickTaskArgs(["alpha", "--json"]);
+		const parsed = parseQuickTaskArgs([
+			"alpha",
+			"--json",
+			"--command",
+			"true",
+			"--no-spec-required",
+			"--reason",
+			"test",
+		]);
 		expect(parsed.theme).toBe("alpha");
 		expect(parsed.json).toBe(true);
 	});
 
 	test("parses -j shorthand", () => {
-		const parsed = parseQuickTaskArgs(["alpha", "-j"]);
+		const parsed = parseQuickTaskArgs([
+			"alpha",
+			"-j",
+			"--command",
+			"true",
+			"--no-spec-required",
+			"--reason",
+			"test",
+		]);
 		expect(parsed.theme).toBe("alpha");
 		expect(parsed.json).toBe(true);
 	});
@@ -38,6 +60,8 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"SPEC-001",
 			"--task",
 			"implement foo",
+			"--command",
+			"true",
 		]);
 		expect(parsed.theme).toBe("alpha");
 		expect(parsed.metadata.featureId).toBe("F-01");
@@ -54,6 +78,9 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"dist/out",
 			"--note",
 			"first run",
+			"--no-spec-required",
+			"--reason",
+			"test",
 		]);
 		expect(parsed.command).toBe("bun test");
 		expect(parsed.artifact).toBe("dist/out");
@@ -76,9 +103,9 @@ describe("quick-task parseQuickTaskArgs", () => {
 		);
 	});
 
-	test("throws on --result that is not passed", () => {
-		expect(() => parseQuickTaskArgs(["alpha", "--result", "failed"])).toThrow(
-			"quick-task requires --result passed",
+	test("rejects the removed --result authority flag", () => {
+		expect(() => parseQuickTaskArgs(["alpha", "--result", "passed"])).toThrow(
+			"Unknown quick-task argument",
 		);
 	});
 
@@ -100,8 +127,6 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"run tests",
 			"--command",
 			"echo ok",
-			"--result",
-			"passed",
 			"--artifact",
 			"dist/result.json",
 			"--note",
@@ -110,18 +135,11 @@ describe("quick-task parseQuickTaskArgs", () => {
 		expect(parsed.theme).toBe("my-theme");
 		expect(parsed.json).toBe(true);
 		expect(parsed.command).toBe("echo ok");
-		expect(parsed.result).toBe("passed");
 		expect(parsed.metadata.featureId).toBe("F-42");
 		expect(parsed.metadata.parentSpec).toBe("SPEC-X");
 		expect(parsed.metadata.task).toBe("run tests");
 		expect(parsed.artifact).toBe("dist/result.json");
 		expect(parsed.note).toBe("smoke check");
-	});
-
-	test("happy path --result passed is valid", () => {
-		const parsed = parseQuickTaskArgs(["beta", "--result", "passed"]);
-		expect(parsed.theme).toBe("beta");
-		expect(parsed.result).toBe("passed");
 	});
 
 	test("happy path -j shorthand with metadata", () => {
@@ -132,6 +150,8 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"F-10",
 			"--command",
 			"ls",
+			"--parent-spec",
+			"SPEC-10",
 		]);
 		expect(parsed.theme).toBe("gamma");
 		expect(parsed.json).toBe(true);
@@ -141,6 +161,73 @@ describe("quick-task parseQuickTaskArgs", () => {
 });
 
 describe("quick-task runQuickTaskCommand", () => {
+	test("normalizes a governed spec path through task completion", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-spec-path-"));
+		try {
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-01 Quick task\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-01.md\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "spec-01.md"),
+				"---\ndoc_type: spec\nid: spec-01\nstatus: active\nroadmap_feature: F-01\n---\n\n# Spec\n",
+				"utf8",
+			);
+
+			const exitCode = await runQuickTaskCommand(
+				[
+					"path-governed",
+					"--command",
+					"true",
+					"--feature-id",
+					"F-01",
+					"--parent-spec",
+					".afol/adm/specs/spec-01.md",
+				],
+				root,
+			);
+			expect(exitCode).toBe(0);
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0] as string;
+			const task = readFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"utf8",
+			);
+			expect(task).toContain('parent_spec: "spec-01"');
+			expect(task).toContain("| T-01 | done |");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects fake governance bindings before creating a session", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-governance-"));
+		try {
+			const exitCode = await runQuickTaskCommand(
+				[
+					"fake-governance",
+					"--command",
+					"true",
+					"--feature-id",
+					"F-404",
+					"--parent-spec",
+					"missing-spec",
+				],
+				root,
+			);
+			expect(exitCode).toBe(2);
+			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("denies restricted agent callers before filesystem mutation", async () => {
 		const exitCode = await runQuickTaskCommand(
 			["alpha"],

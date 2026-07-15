@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -13,7 +14,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { DEFAULT_BENCH_MODEL } from "../services/benchmark/types";
+import { saveRuntimeLiveSnapshot } from "../commands/bench";
+import { buildReport, saveRunArchive } from "../services/benchmark/report";
+import {
+	type BenchResult,
+	DEFAULT_BENCH_MODEL,
+} from "../services/benchmark/types";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
 import { buildResult } from "../validate/command";
 import {
@@ -138,6 +144,21 @@ function createFixtureRoot(): string {
 function createBenchExecutionFixtureRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-bench-exec-"));
 	mkdirSync(root, { recursive: true });
+	mkdirSync(join(root, ".afol"), { recursive: true });
+	writeFileSync(join(root, ".afol", ".keep"), "\n", "utf8");
+	writeFileSync(
+		join(root, ".gitignore"),
+		`${[
+			".afol/state/",
+			".afol/data/events/",
+			".afol/data/index/",
+			".afol/data/mutations/",
+			".afol/pstr/",
+			".afol/wb/.active_session",
+			".afol/wb/session-context.json",
+		].join("\n")}\n`,
+		"utf8",
+	);
 	writeFileSync(join(root, "tracked.txt"), "initial\n", "utf8");
 	writeFileSync(
 		join(root, "mutate.js"),
@@ -157,7 +178,15 @@ function createBenchExecutionFixtureRoot(): string {
 		["init"],
 		["config", "user.email", "bench@example.com"],
 		["config", "user.name", "Bench User"],
-		["add", "tracked.txt", "mutate.js", "afol", "cli"],
+		[
+			"add",
+			".gitignore",
+			".afol/.keep",
+			"tracked.txt",
+			"mutate.js",
+			"afol",
+			"cli",
+		],
 		["commit", "-m", "fixture"],
 	] as const;
 	for (const args of gitSteps) {
@@ -434,6 +463,30 @@ describe("validate registry", () => {
 			expect(snapshot.scenariosByPack["library-knowledge"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["governance-history"]).toHaveLength(7);
 			expect(snapshot.scenariosByPack["adm-governance"]).toHaveLength(4);
+			const shortWorkbenchCommands = [
+				"wb-short-start",
+				"wb-short-done",
+				"wb-short-close",
+			]
+				.map((scenarioId) =>
+					snapshot.scenariosByPack["workbench-parity"]?.find(
+						(scenario) => scenario.scenario_id === scenarioId,
+					),
+				)
+				.filter((scenario): scenario is Scenario => scenario !== undefined);
+			expect(shortWorkbenchCommands).toHaveLength(3);
+			expect(
+				shortWorkbenchCommands.reduce(
+					(total, scenario) =>
+						total + Array.from(scenario.command ?? "").length,
+					0,
+				),
+			).toBeLessThanOrEqual(120);
+			for (const scenario of shortWorkbenchCommands) {
+				expect(scenario.thresholds.max_p95_ms).toBeLessThanOrEqual(300);
+				expect(scenario.thresholds.max_argv_chars).toBeDefined();
+				expect(scenario.compiled_binary).toBe(true);
+			}
 			expect(snapshot.coverage?.exemptions).toHaveLength(0);
 			expect(snapshot.coverage?.subcommand_exemptions).toHaveLength(0);
 			expect(
@@ -453,6 +506,10 @@ describe("validate registry", () => {
 			expect(featureSpecScenario?.coverage?.features).toContain("F-19");
 			expect(featureSpecScenario?.coverage?.specs).toContain(
 				"260627_1655_canonical-afol-configuration-rehome_spec_01",
+			);
+			expect(featureSpecScenario?.coverage?.features).toContain("F-21");
+			expect(featureSpecScenario?.coverage?.specs).toContain(
+				"260710_1256_typescript-7-toolchain-adoption_spec_01",
 			);
 			const uxRegistryScenario = snapshot.scenariosByPack[
 				"governance-history"
@@ -648,7 +705,7 @@ describe("validate registry", () => {
 			if (!featureSpecScenario.coverage.specs?.length) {
 				throw new Error("Expected spec coverage scenario fixture");
 			}
-			const withoutF20FeatureCoverage: RegistrySnapshot = {
+			const withoutF21FeatureCoverage: RegistrySnapshot = {
 				...snapshot,
 				scenariosByPack: {
 					...snapshot.scenariosByPack,
@@ -661,7 +718,7 @@ describe("validate registry", () => {
 										subcommands: scenario.coverage?.subcommands ?? [],
 										journeys: scenario.coverage?.journeys ?? [],
 										features: (scenario.coverage?.features ?? []).filter(
-											(entry) => entry !== "F-20",
+											(entry) => entry !== "F-21",
 										),
 										specs: scenario.coverage?.specs ?? [],
 									},
@@ -670,12 +727,11 @@ describe("validate registry", () => {
 					),
 				},
 			};
-			expect(validateRegistryContract(withoutF20FeatureCoverage)).toContain(
-				"scenario-feature-coverage-missing:F-20",
+			expect(validateRegistryContract(withoutF21FeatureCoverage)).toContain(
+				"scenario-feature-coverage-missing:F-21",
 			);
-			const f19SpecId =
-				"260627_1655_canonical-afol-configuration-rehome_spec_01";
-			const withoutF19SpecCoverage: RegistrySnapshot = {
+			const f21SpecId = "260710_1256_typescript-7-toolchain-adoption_spec_01";
+			const withoutF21SpecCoverage: RegistrySnapshot = {
 				...snapshot,
 				scenariosByPack: {
 					...snapshot.scenariosByPack,
@@ -689,7 +745,7 @@ describe("validate registry", () => {
 										journeys: scenario.coverage?.journeys ?? [],
 										features: scenario.coverage?.features ?? [],
 										specs: (scenario.coverage?.specs ?? []).filter(
-											(entry) => entry !== f19SpecId,
+											(entry) => entry !== f21SpecId,
 										),
 									},
 								}
@@ -697,8 +753,8 @@ describe("validate registry", () => {
 					),
 				},
 			};
-			expect(validateRegistryContract(withoutF19SpecCoverage)).toContain(
-				`scenario-spec-coverage-missing:${f19SpecId}`,
+			expect(validateRegistryContract(withoutF21SpecCoverage)).toContain(
+				`scenario-spec-coverage-missing:${f21SpecId}`,
 			);
 			const roadmapPath = join(
 				root,
@@ -927,6 +983,21 @@ describe("scenario benchmark execution", () => {
 			expect(success.result.output_bytes).toBeGreaterThan(0);
 			expect(success.result.tool_success_rate).toBe(1);
 			expect(success.result.error_count).toBe(0);
+			expect(success.result.argv_chars).toBe(
+				Array.from(successScenario.command?.trim() ?? "").length,
+			);
+
+			const unicodeScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-unicode-argv",
+				command: `  node -e 'console.log("😀")'  `,
+				thresholds: { ...successScenario.thresholds, max_argv_chars: 100 },
+			};
+			const unicode = withCapturedConsoleError(() =>
+				buildResult(root, unicodeScenario, baselinePath, baseline),
+			);
+			expect(unicode.result.status).toBe("passed");
+			expect(unicode.result.argv_chars).toBe(26);
 
 			writeFileSync(join(root, "preexisting-dirty.txt"), "dirty\n", "utf8");
 			const dirtySuccess = withCapturedConsoleError(() =>
@@ -1008,6 +1079,21 @@ describe("scenario benchmark execution", () => {
 				),
 			).toBe("side-effect-leak:tracked.txt");
 
+			const ignoredRuntimeScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-ignored-runtime-mutation",
+				command: `node -e 'const fs=require("node:fs"); fs.mkdirSync(".afol/wb",{recursive:true}); fs.writeFileSync(".afol/wb/session-context.json", JSON.stringify({session:"mutated"}) + "\\n", "utf8");'`,
+			};
+			const ignoredRuntime = withCapturedConsoleError(() =>
+				buildResult(root, ignoredRuntimeScenario, baselinePath, baseline),
+			);
+			expect(ignoredRuntime.result.status).toBe("failed");
+			expect(
+				ignoredRuntime.result.notes.find((note) =>
+					note.startsWith("side-effect-leak:"),
+				),
+			).toBe("side-effect-leak:.afol/wb/session-context.json");
+
 			const sandboxScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-sandbox",
@@ -1045,6 +1131,9 @@ describe("scenario benchmark execution", () => {
 			expect(sandbox.result.status).toBe("passed");
 			expect(sandbox.result.tool_call_count).toBe(1);
 			expect(sandbox.result.timing_p50_ms).toBeGreaterThan(0);
+			expect(sandbox.result.argv_chars).toBe(
+				Array.from(sandboxScenario.command?.trim() ?? "").length,
+			);
 			expect(
 				sandbox.result.notes.some((note) => note.startsWith("sample-failed:")),
 			).toBe(false);
@@ -1065,12 +1154,190 @@ describe("scenario benchmark execution", () => {
 				),
 			).toBe(true);
 
+			const staleSandboxBinaryScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-sandbox-does-not-trust-project-binary",
+				sandbox: true,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const fs=require('node:fs'); fs.mkdirSync('.afol/bin',{recursive:true}); fs.writeFileSync('.afol/bin/afol','#!/bin/sh\\nexit 7\\n','utf8'); fs.chmodSync('.afol/bin/afol',0o755);",
+					],
+				],
+				command: "afol --version",
+			};
+			const staleSandboxBinary = withCapturedConsoleError(() =>
+				buildResult(root, staleSandboxBinaryScenario, baselinePath, baseline),
+			);
+			expect(staleSandboxBinary.result.status).toBe("passed");
+			expect(staleSandboxBinary.result.output_bytes).toBeGreaterThan(0);
+
+			const compiledSandboxScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-sandbox-trusts-fresh-compiled-binary",
+				sandbox: true,
+				compiled_binary: true,
+				command: "afol --version",
+			};
+			const compiledSandbox = withCapturedConsoleError(() =>
+				buildResult(root, compiledSandboxScenario, baselinePath, baseline),
+			);
+			expect(compiledSandbox.result.status).toBe("passed");
+			expect(compiledSandbox.result.output_bytes).toBeGreaterThan(0);
+
 			const sandboxStatusAfter = spawnSync("git", ["status", "--porcelain"], {
 				cwd: root,
 				encoding: "utf8",
 			});
 			expect(sandboxStatusAfter.status).toBe(0);
 			expect(sandboxStatusAfter.stdout).toBe(sandboxStatusBefore.stdout);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("applies the documented timing tolerance to baseline comparisons", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 200,
+				timing_p95_ms: 300,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "baseline-timing-tolerance",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 1_000,
+					max_p95_ms: 1_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {
+					duration_ms: 250,
+					timing_p50_ms: 250,
+					timing_p95_ms: 375,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 1,
+					context_bytes: 0,
+					output_bytes: 4,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+
+			const withinTolerance = buildResult(
+				root,
+				scenario,
+				baselinePath,
+				baseline,
+			);
+			expect(withinTolerance.status).toBe("passed");
+
+			const p50Regression = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 251,
+						timing_p50_ms: 251,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(p50Regression.status).toBe("failed");
+			expect(p50Regression.notes).toContain(
+				"baseline-regression:timing_p50_ms:251>250",
+			);
+
+			const p95Regression = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						timing_p95_ms: 376,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(p95Regression.status).toBe("failed");
+			expect(p95Regression.notes).toContain(
+				"baseline-regression:timing_p95_ms:376>375",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const counterPath = join(root, "sandbox-sample-count.txt");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-sample-count",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: `node -e 'require("node:fs").appendFileSync(${JSON.stringify(counterPath)},"x")'`,
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {
+					duration_ms: 1,
+					timing_p50_ms: 1,
+					timing_p95_ms: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 0,
+					context_bytes: 0,
+					output_bytes: 0,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+
+			const result = buildResult(
+				root,
+				scenario,
+				join(root, "baseline.json"),
+				baseline,
+			);
+			expect(result.status).toBe("passed");
+			expect(readFileSync(counterPath, "utf8")).toBe("xxxx");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1238,7 +1505,9 @@ describe("runtime live validation helpers", () => {
 					max_output_tokens: 400,
 					min_tool_success_rate: 0.5,
 					max_p95_ms: 50,
+					max_p50_ms: 8,
 					min_p50_ms: 10,
+					max_argv_chars: 4,
 					min_unknown_value: 1,
 					median_latency_ms: 1,
 				},
@@ -1246,6 +1515,7 @@ describe("runtime live validation helpers", () => {
 					duration_ms: 120,
 					timing_p50_ms: 9,
 					timing_p95_ms: 60,
+					argv_chars: 5,
 					output_tokens: 401,
 					tool_success_rate: 0.25,
 				},
@@ -1256,6 +1526,8 @@ describe("runtime live validation helpers", () => {
 				"threshold-exceeded:max_output_tokens:401>400",
 				"threshold-below-min:min_tool_success_rate:0.25<0.5",
 				"threshold-exceeded:max_p95_ms:60>50",
+				"threshold-exceeded:max_p50_ms:9>8",
+				"threshold-exceeded:max_argv_chars:5>4",
 				"threshold-below-min:min_p50_ms:9<10",
 				"threshold-metric-missing:min_unknown_value",
 				"unsupported-threshold:median_latency_ms",
@@ -1303,6 +1575,16 @@ describe("runtime live validation helpers", () => {
 			);
 
 			unlinkSync(savedResultPath);
+			const snapshotPath = getRuntimeLiveSnapshotPath(root);
+			const trackedSnapshot = readJson(snapshotPath);
+			trackedSnapshot.schema_version = "1.0.0";
+			trackedSnapshot.generated_at = new Date().toISOString();
+			trackedSnapshot.stale_after_days = 7;
+			delete trackedSnapshot.saved_result_path;
+			writeFileSync(
+				snapshotPath,
+				`${JSON.stringify(trackedSnapshot, null, 2)}\n`,
+			);
 			const missingSavedResult = buildRuntimeLiveAgentResults(
 				root,
 				scenarios,
@@ -1310,18 +1592,92 @@ describe("runtime live validation helpers", () => {
 			);
 			expect(missingSavedResult.results).toHaveLength(4);
 			expect(
-				missingSavedResult.results.every((entry) => entry.status === "failed"),
+				missingSavedResult.results.every((entry) => entry.status === "passed"),
 			).toBe(true);
 			expect(missingSavedResult.notes).toContain(
-				`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
+				"runtime-live-agent-evidence-source:snapshot",
 			);
 			expect(
 				missingSavedResult.results.every((entry) =>
-					entry.notes.includes(
-						`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
-					),
+					entry.notes.includes("live-runner-evidence-source:snapshot"),
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validates a saved v2 archive through its fresh normalized snapshot", () => {
+		const root = createFixtureRoot();
+		try {
+			const ids = [
+				"governed-task-lifecycle",
+				"file-inspection-vs-command",
+				"validation-flow",
+				"maintenance-cadence-review",
+			];
+			const results = ids.map((scenarioId, index) => ({
+				schema_version: "2.0.0",
+				run_id: `run-${index}`,
+				scenario_id: scenarioId,
+				pack_id: "comprehensive-live",
+				status: "passed",
+				mode: "live",
+				git_commit: "fixture",
+				model: DEFAULT_BENCH_MODEL,
+				timestamp: new Date().toISOString(),
+				tokens: {
+					input: 10,
+					output: 10,
+					cached_input: 0,
+					reasoning_output: 0,
+					total: 20,
+				},
+				timing: { wall_clock_ms: 10 },
+				tools: {
+					total_calls: 1,
+					success_rate: 1,
+					by_type: {
+						file_read: 0,
+						afol_command: 1,
+						shell: 0,
+						agent_message: 0,
+					},
+					error_count: 0,
+				},
+				effectiveness: { task_completed: true, error_count: 0 },
+				plan_quality: { meta_planning_detected: false, direct_execution: true },
+				thresholds: {
+					max_output_tokens: 4000,
+					max_duration_ms: 60000,
+					min_tool_success_rate: 0.98,
+				},
+				pass: true,
+				notes: [],
+			})) as BenchResult[];
+			const report = buildReport(results, null);
+			const runPath = saveRunArchive(root, report);
+			saveRuntimeLiveSnapshot(root, report, runPath);
+			const registry = loadRegistry(root);
+			const scenarios = registry.scenariosByPack["runtime-live-agent"] ?? [];
+			const baselinePath = join(
+				root,
+				".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
+			);
+			const valid = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
+			expect(valid.results.every((entry) => entry.status === "passed")).toBe(
+				true,
+			);
+
+			const snapshotPath = getRuntimeLiveSnapshotPath(root);
+			const snapshot = readJson(snapshotPath);
+			snapshot.generated_at = "2020-01-01T00:00:00.000Z";
+			writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+			const stale = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
+			expect(stale.results.every((entry) => entry.status === "failed")).toBe(
+				true,
+			);
+			expect(stale.notes[0]).toStartWith("runtime-live-snapshot-stale:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1398,7 +1754,7 @@ describe("runtime live validation helpers", () => {
 			thresholdScenario.retry_count = 0;
 			thresholdScenario.context_bytes = 1024;
 			thresholdScenario.prompt_bytes = 240;
-			thresholdScenario.output_tokens = 401;
+			thresholdScenario.output_tokens = 4001;
 			writeFileSync(
 				savedResultPath,
 				`${JSON.stringify(savedResult, null, 2)}\n`,
@@ -1720,16 +2076,25 @@ describe("validation command entrypoint", () => {
 		const root = createFixtureRoot();
 		try {
 			const cliKernelPaths = getCliKernelPaths(root);
-			const originalScenario = readJson(cliKernelPaths.scenarioPath);
-			const skippedScenario = {
-				...originalScenario,
-				implementation_status: "skipped",
-			};
-			writeFileSync(
-				cliKernelPaths.scenarioPath,
-				`${JSON.stringify(skippedScenario, null, 2)}\n`,
-				"utf8",
-			);
+			const scenarioDir = dirname(cliKernelPaths.scenarioPath);
+			const originalScenarios = new Map<string, string>();
+			for (const name of readdirSync(scenarioDir)) {
+				if (!name.endsWith(".json")) {
+					continue;
+				}
+				const scenarioPath = join(scenarioDir, name);
+				originalScenarios.set(scenarioPath, readFileSync(scenarioPath, "utf8"));
+				const scenario = readJson(scenarioPath);
+				writeFileSync(
+					scenarioPath,
+					`${JSON.stringify(
+						{ ...scenario, implementation_status: "skipped" },
+						null,
+						2,
+					)}\n`,
+					"utf8",
+				);
+			}
 
 			const skipped = withCapturedStdout(() =>
 				runValidationCommand(root, [
@@ -1739,19 +2104,20 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(skipped.result).toBe(0);
+			expect(skipped.result).toBe(2);
 			const skippedPayload = JSON.parse(skipped.stdout[0] ?? "{}") as {
+				pass: boolean;
+				status: string;
 				results: Array<{ status: string }>;
 			};
+			expect(skippedPayload.status).toBe("skipped");
+			expect(skippedPayload.pass).toBe(false);
 			expect(
 				skippedPayload.results.some((entry) => entry.status === "skipped"),
 			).toBe(true);
-
-			writeFileSync(
-				cliKernelPaths.scenarioPath,
-				`${JSON.stringify(originalScenario, null, 2)}\n`,
-				"utf8",
-			);
+			for (const [scenarioPath, originalScenario] of originalScenarios) {
+				writeFileSync(scenarioPath, originalScenario, "utf8");
+			}
 
 			const baseline = readJson(cliKernelPaths.baselinePath);
 			baseline.timing_p50_ms = 1;

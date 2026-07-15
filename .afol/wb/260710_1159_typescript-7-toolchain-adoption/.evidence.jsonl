@@ -1,0 +1,16 @@
+{"id":"E-20260710120400950-5c620a","task_id":"T-01","created_at":"2026-07-10T16:04:00.950Z","command":"bun test cli/tests/validate-internals.test.ts","result":"passed"}
+{"id":"E-20260710120401130-c235d9","task_id":"T-01","created_at":"2026-07-10T16:04:01.130Z","command":"bun run template:check","result":"passed"}
+{"id":"E-20260710120401296-98e293","task_id":"T-01","created_at":"2026-07-10T16:04:01.296Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260710120631066-5ae309","task_id":"T-02","created_at":"2026-07-10T16:06:31.066Z","command":"bun install --frozen-lockfile","result":"passed"}
+{"id":"E-20260710120631235-fbd244","task_id":"T-02","created_at":"2026-07-10T16:06:31.235Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260710120631409-2cd3ea","task_id":"T-02","created_at":"2026-07-10T16:06:31.409Z","command":"bunx tsc --noEmit -p tsconfig.json --skipLibCheck false","result":"passed"}
+{"id":"E-20260710120631568-67c2ef","task_id":"T-02","created_at":"2026-07-10T16:06:31.568Z","command":"bun test cli/tests/release-toolchain.test.ts","result":"passed"}
+{"id":"E-20260710120631721-3eeff5","task_id":"T-02","created_at":"2026-07-10T16:06:31.721Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260710122815382-5b8fd2","task_id":"T-03","created_at":"2026-07-10T16:28:15.382Z","command":"bun run lint:biome && bun run lint:oxlint && bun run lint:knip","result":"passed"}
+{"id":"E-20260710122815556-8f584a","task_id":"T-03","created_at":"2026-07-10T16:28:15.556Z","command":"bun test","result":"passed"}
+{"id":"E-20260710122815719-67d0b9","task_id":"T-03","created_at":"2026-07-10T16:28:15.719Z","command":"bun run build && bun run manifest:check","result":"passed"}
+{"id":"E-20260710122815891-175452","task_id":"T-03","created_at":"2026-07-10T16:28:15.891Z","command":"afol local-state rebuild --json && afol validate project --json","result":"passed"}
+{"id":"E-20260710122816093-d8a977","task_id":"T-03","created_at":"2026-07-10T16:28:16.093Z","command":"bun run validate:security:required","result":"passed"}
+{"id":"E-20260710122816269-e3f227","task_id":"T-03","created_at":"2026-07-10T16:28:16.269Z","command":"bun run validate:release (exact clean disposable snapshot)","result":"passed"}
+{"id":"E-20260710122816436-a2dc6e","task_id":"T-03","created_at":"2026-07-10T16:28:16.436Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260710122816604-c3a7f0","task_id":"T-03","created_at":"2026-07-10T16:28:16.604Z","command":"independent council review: review_lead + security_reviewer","result":"passed"}

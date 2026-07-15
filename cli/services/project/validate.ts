@@ -7,6 +7,11 @@ import {
 	TEMPLATE_ROOT,
 } from "../../schemas/template-policy";
 import {
+	findClaudeArtifacts,
+	readClaudeAdapterEnabled,
+} from "../adapter/claude";
+import { listOpenPendingSpecs } from "../governance/pending-specs";
+import {
 	validateFilesIndex,
 	validateRulesIndex,
 	validateSkillsIndex,
@@ -32,12 +37,14 @@ export type ProjectValidationCheck = {
 		| "skills_dir"
 		| "wb_dir"
 		| "agents_payload_clean"
+		| "adapter_consistency"
 		| "template_forbidden"
 		| "rules_local_state_index"
 		| "skills_local_state_index"
 		| "specs_local_state_index"
 		| "files_local_state_index"
 		| "wb_local_state_index"
+		| "governance_pending_specs"
 		| "session_evidence"
 		| "session_health"
 		| "index_drift"
@@ -185,6 +192,8 @@ function validateAgentsPayloadClean(
 		".agents/source",
 		".agents/tools",
 		".agents/tools.json",
+		".agents/skills/agentic-folder-sys",
+		".afol/adm/source/universal-skills/skills/agentic-folder-sys",
 		".agents/skills-sync.manifest.json",
 	].filter((path) => existsSync(join(projectRoot, path)));
 
@@ -200,6 +209,28 @@ function validateAgentsPayloadClean(
 		id: "agents_payload_clean",
 		ok: true,
 		message: "ok .agents contains provider-safe static payload only",
+	};
+}
+
+function validateAdapterConsistency(
+	projectRoot: string,
+): ProjectValidationCheck {
+	const claudeEnabled = readClaudeAdapterEnabled(projectRoot);
+	const claudeArtifacts = findClaudeArtifacts(projectRoot);
+	if (!claudeEnabled && claudeArtifacts.length > 0) {
+		return {
+			id: "adapter_consistency",
+			ok: false,
+			message: `claude adapter is disabled but owned artifacts are present: ${claudeArtifacts.join(", ")}`,
+		};
+	}
+
+	return {
+		id: "adapter_consistency",
+		ok: true,
+		message: claudeEnabled
+			? "ok claude adapter enabled"
+			: "ok claude adapter disabled with no owned artifacts",
 	};
 }
 
@@ -301,6 +332,7 @@ export async function validateProjectStructure(
 		validateDirectory(projectRoot, "skills_dir", projectPaths.abs.skillsDir),
 		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
 		validateAgentsPayloadClean(projectRoot),
+		validateAdapterConsistency(projectRoot),
 		(() => {
 			const result = validateWorkBenchIndex(projectRoot);
 			return {
@@ -341,11 +373,33 @@ export async function validateProjectStructure(
 				message: result.message,
 			};
 		})(),
+		(() => {
+			const open = listOpenPendingSpecs(projectRoot);
+			return {
+				id: "governance_pending_specs" as const,
+				ok: true,
+				message:
+					open.length === 0
+						? "no open pending_spec entries"
+						: `warning: ${open.length} open pending_spec entr${open.length === 1 ? "y" : "ies"}`,
+			};
+		})(),
 		await validateTemplateForbidden(projectRoot),
 		(() => {
 			// Session evidence check: run strict verify per session
 			const results = verifyAllSessions(projectRoot, true);
-			const totalIssues = results.reduce((sum, r) => sum + r.issues.length, 0);
+			const totalIssues = results.reduce(
+				(sum, result) =>
+					sum +
+					(result.openTasks.length === 0
+						? result.issues.filter(
+								(issue) =>
+									issue.type !== "missing_evidence" &&
+									issue.type !== "failed_evidence",
+							).length
+						: result.issues.length),
+				0,
+			);
 			const openTaskSessions = results.filter((r) => r.openTasks.length > 0);
 			if (results.length === 0) {
 				return {
@@ -385,9 +439,12 @@ export async function validateProjectStructure(
 				};
 			}
 			const hasDuplicates = warnings.some((w) => w.type === "duplicate_theme");
+			const hasUnavailableSession = warnings.some(
+				(w) => w.type === "unreadable_session_directory",
+			);
 			return {
 				id: "session_health" as const,
-				ok: !hasDuplicates,
+				ok: !hasDuplicates && !hasUnavailableSession,
 				message: warnings.map((w) => w.message).join("; "),
 			};
 		})(),

@@ -41,10 +41,9 @@ sessions via commands.
 
 ## 4) Product Boundary
 
-The universal CLI owns reusable behavior. The project-local template owns local
-state, rules, skills, workbench artifacts, specs, evidence, logs, config, and
-update metadata. Current Python/uv/Bash behavior remains compatibility contract
-until Bun/TypeScript parity is proven by focused tests.
+The compiled Bun/TypeScript CLI owns reusable behavior. The project-local
+template owns config, governance, provider metadata, and mutable AFOL state; it
+must not receive a project-local executable, wrapper, or retired Python runtime.
 
 ## 5) Scope
 
@@ -72,7 +71,13 @@ missing required state.
 
 - Accepted implementation evidence: `E-20260528084521802724`.
 - Closeout session: `.afol/wb/260528_0833_f04-workbench-core-review-fix/`.
-- Strict verification: `./.agents/agents verify-tasks --strict .afol/wb/260528_0833_f04-workbench-core-review-fix/` passed.
+- Historical strict verification used the now-retired `.agents/agents` wrapper.
+  Current verification is `afol verify-tasks
+  .afol/wb/260528_0833_f04-workbench-core-review-fix --strict`; the historical
+  evidence remains provenance, not proof of current release readiness.
+- Current close hardening creates or preserves reports, requires explicit
+  waiver reasons, and distinguishes `missing` from `waived`; see session
+  `.afol/wb/260713_0716_close-waiver-summary-conflict/`.
 
 ## 9) Hermes Benchmark Decisions
 

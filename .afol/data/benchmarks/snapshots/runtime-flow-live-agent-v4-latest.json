@@ -1,9 +1,9 @@
 {
-  "version": 1,
-  "updated_at": "2026-06-07T16:29:56.087634Z",
+  "schema_version": "1.0.0",
   "pack_id": "runtime-flow-live-agent-v4",
-  "generated_at": "2026-06-07T16:29:56.085574Z",
-  "saved_result_path": ".afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json",
+  "generated_at": "2026-07-12T22:48:33.054Z",
+  "stale_after_days": 7,
+  "saved_result_path": ".afol/data/benchmarks/results/2026-07-12T22-48-33.054Z_comprehensive-live.json",
   "benchmark_profile": {
     "runtime": "codex",
     "model": "gpt-5.4-mini",
@@ -11,200 +11,75 @@
   },
   "summary": {
     "pass": true,
-    "scenario_count": 11,
-    "duration_ms": 281779,
-    "tool_call_count": 68,
-    "tool_success_count": 64,
-    "tool_success_rate": 0.9412,
-    "checks_total": 218,
-    "checks_passed": 218,
-    "accuracy": 1.0,
-    "error_count": 4,
-    "retry_count": 0,
-    "context_bytes_total": 267725,
-    "prompt_bytes_total": 14564,
-    "usage_units_total": 1368177,
-    "token_usage_available": true
-  },
-  "comparison_to_previous": {
-    "status": "not_comparable",
-    "reason": "scenario_set_changed",
-    "baseline_saved_result_path": ".afol/data/benchmarks/catalog/results/20260607_130116_runtime-flow-live-agent-v4.json",
-    "baseline_generated_at": "2026-06-07T16:01:16.953600Z",
-    "scenario_ids": [
-      "live-afol-provider-compatible-delivery",
-      "live-afol-python-code-task-orchestrated",
-      "live-autonomous-agentic-folder-delivery",
-      "live-implement-next-governance-preflight",
-      "live-implement-start-complete-evidence",
-      "live-tools-benchmark-discovery",
-      "live-wb-session-create-scripted-progress",
-      "live-wb-update-link",
-      "live-wb-update-status-touch",
-      "live-wb-update-task-evidence-timeline",
-      "maintenance-cadence-review"
-    ],
-    "baseline_scenario_ids": [
-      "live-afol-provider-compatible-delivery",
-      "live-afol-python-code-task-orchestrated",
-      "live-autonomous-agentic-folder-delivery",
-      "live-implement-next-governance-preflight",
-      "live-implement-start-complete-evidence",
-      "live-tools-benchmark-discovery",
-      "live-wb-session-create-scripted-progress",
-      "live-wb-update-link",
-      "live-wb-update-status-touch",
-      "live-wb-update-task-evidence-timeline"
-    ],
-    "delta": {
-      "duration_ms": -64183,
-      "tool_call_count": 2,
-      "tool_success_rate": -0.0302,
-      "error_count": 2,
-      "accuracy": 0.0,
-      "context_bytes_total": 145,
-      "prompt_bytes_total": 0,
-      "usage_units_total": -195150
-    },
-    "delta_pct": {
-      "duration_ms": -18.56,
-      "tool_call_count": 3.23,
-      "tool_success_rate": -3.12,
-      "error_count": 100.0,
-      "accuracy": 0.0,
-      "context_bytes_total": 0.05,
-      "prompt_bytes_total": 0.0,
-      "usage_units_total": -12.49
-    },
-    "trend": {
-      "duration_ms": "improved",
-      "tool_call_count": "regressed",
-      "tool_success_rate": "regressed",
-      "error_count": "regressed",
-      "accuracy": "unchanged",
-      "context_bytes_total": "regressed",
-      "prompt_bytes_total": "unchanged",
-      "usage_units_total": "improved"
-    }
-  },
-  "efficiency": {
-    "duration_ms_per_scenario": 25616.3,
-    "checks_per_second": 0.7737,
-    "tool_calls_per_second": 0.2413,
-    "bytes_per_second": 1001.8104,
-    "bytes_per_tool_call": 4151.31,
-    "tokens_per_tool_call": 20120.25
+    "duration_ms": 88873,
+    "tool_call_count": 31,
+    "error_count": 0
   },
   "scenarios": [
     {
-      "id": "live-tools-benchmark-discovery",
+      "id": "live-implement-start-complete-evidence",
       "pass": true,
-      "duration_ms": 8580,
-      "tool_call_count": 1,
-      "checks_total": 8,
-      "checks_passed": 8,
+      "duration_ms": 15185,
+      "tool_call_count": 9,
+      "tool_success_rate": 1,
       "error_count": 0,
-      "retry_count": 0
+      "token_usage": {
+        "input_tokens": 96492,
+        "output_tokens": 523,
+        "total_tokens": 181978
+      }
     },
     {
       "id": "live-implement-next-governance-preflight",
       "pass": true,
-      "duration_ms": 12421,
-      "tool_call_count": 2,
-      "checks_total": 10,
-      "checks_passed": 10,
+      "duration_ms": 10878,
+      "tool_call_count": 5,
+      "tool_success_rate": 1,
       "error_count": 0,
-      "retry_count": 0
+      "token_usage": {
+        "input_tokens": 57399,
+        "output_tokens": 343,
+        "total_tokens": 104040
+      }
     },
     {
-      "id": "live-implement-start-complete-evidence",
+      "id": "live-tools-benchmark-discovery",
       "pass": true,
-      "duration_ms": 13968,
-      "tool_call_count": 4,
-      "checks_total": 10,
-      "checks_passed": 10,
+      "duration_ms": 26291,
+      "tool_call_count": 9,
+      "tool_success_rate": 1,
       "error_count": 0,
-      "retry_count": 0
+      "token_usage": {
+        "input_tokens": 128869,
+        "output_tokens": 1242,
+        "total_tokens": 244184
+      }
+    },
+    {
+      "id": "plan-quality-check",
+      "pass": true,
+      "duration_ms": 9495,
+      "tool_call_count": 1,
+      "tool_success_rate": 1,
+      "error_count": 0,
+      "token_usage": {
+        "input_tokens": 18868,
+        "output_tokens": 488,
+        "total_tokens": 21970
+      }
     },
     {
       "id": "maintenance-cadence-review",
       "pass": true,
-      "duration_ms": 120,
-      "tool_call_count": 4,
-      "checks_total": 8,
-      "checks_passed": 8,
-      "error_count": 0,
-      "retry_count": 0
-    },
-    {
-      "id": "live-wb-update-task-evidence-timeline",
-      "pass": true,
-      "duration_ms": 18767,
-      "tool_call_count": 6,
-      "checks_total": 12,
-      "checks_passed": 12,
-      "error_count": 0,
-      "retry_count": 0
-    },
-    {
-      "id": "live-wb-session-create-scripted-progress",
-      "pass": true,
-      "duration_ms": 24280,
-      "tool_call_count": 6,
-      "checks_total": 31,
-      "checks_passed": 31,
-      "error_count": 1,
-      "retry_count": 0
-    },
-    {
-      "id": "live-autonomous-agentic-folder-delivery",
-      "pass": true,
-      "duration_ms": 63245,
-      "tool_call_count": 19,
-      "checks_total": 34,
-      "checks_passed": 34,
-      "error_count": 0,
-      "retry_count": 0
-    },
-    {
-      "id": "live-afol-provider-compatible-delivery",
-      "pass": true,
-      "duration_ms": 32016,
+      "duration_ms": 27024,
       "tool_call_count": 7,
-      "checks_total": 35,
-      "checks_passed": 35,
+      "tool_success_rate": 1,
       "error_count": 0,
-      "retry_count": 0
-    },
-    {
-      "id": "live-afol-python-code-task-orchestrated",
-      "pass": true,
-      "duration_ms": 72124,
-      "tool_call_count": 12,
-      "checks_total": 51,
-      "checks_passed": 51,
-      "error_count": 3,
-      "retry_count": 0
-    },
-    {
-      "id": "live-wb-update-status-touch",
-      "pass": true,
-      "duration_ms": 21527,
-      "tool_call_count": 5,
-      "checks_total": 10,
-      "checks_passed": 10,
-      "error_count": 0,
-      "retry_count": 0
-    },
-    {
-      "id": "live-wb-update-link",
-      "pass": true,
-      "duration_ms": 11109,
-      "tool_call_count": 2,
-      "checks_total": 9,
-      "checks_passed": 9,
-      "error_count": 0,
-      "retry_count": 0
+      "token_usage": {
+        "input_tokens": 116425,
+        "output_tokens": 1060,
+        "total_tokens": 216034
+      }
     }
   ]
 }

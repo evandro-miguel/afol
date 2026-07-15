@@ -2,19 +2,23 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runBootstrapCommand } from "../commands/bootstrap";
+import { agentOperationContext } from "../core/operation-context";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
+import { resolveExternalPathLockPath } from "../services/io/session-lock";
 import type { TemplateFileMap } from "../services/template/payload";
 
 function sha256Hex(value: string): string {
@@ -79,6 +83,28 @@ function mkCliRuntimeRoot(
 	return root;
 }
 
+function treeState(root: string): string[] {
+	if (!existsSync(root)) return ["absent"];
+	const state: string[] = [];
+	const walk = (directory: string, relative = ""): void => {
+		for (const name of readdirSync(directory).sort()) {
+			const path = join(directory, name);
+			const child = relative ? `${relative}/${name}` : name;
+			const stats = statSync(path);
+			if (stats.isDirectory()) {
+				state.push(`dir:${child}`);
+				walk(path, child);
+			} else {
+				state.push(
+					`file:${child}:${createHash("sha256").update(readFileSync(path)).digest("hex")}`,
+				);
+			}
+		}
+	};
+	walk(root);
+	return state;
+}
+
 describe("bootstrap planner ownership policy", () => {
 	test("plans create/skip-identical/update-managed/preserve-project-owned", () => {
 		const managedCurrent = "managed-old";
@@ -132,6 +158,208 @@ describe("bootstrap planner ownership policy", () => {
 });
 
 describe("bootstrap provider-compatible mutable state", () => {
+	test("allows restricted dry-run but rejects restricted apply without writes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-approval-"));
+		const before = treeState(target);
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			console.error = (...values: unknown[]) =>
+				errors.push(values.map(String).join(" "));
+			expect(
+				await runBootstrapCommand(
+					[target, "--dry-run"],
+					{},
+					agentOperationContext(),
+				),
+			).toBe(0);
+			expect(treeState(target)).toEqual(before);
+			expect(
+				await runBootstrapCommand([target], {}, agentOperationContext()),
+			).toBe(2);
+			expect(treeState(target)).toEqual(before);
+			expect(errors.join("\n")).toContain(
+				"requires local interactive approval",
+			);
+		} finally {
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("returns a structured exit for malformed manifest and directory-as-file", async () => {
+		for (const fixture of ["manifest", "directory"] as const) {
+			const target = mkdtempSync(
+				join(tmpdir(), `bootstrap-read-error-${fixture}-`),
+			);
+			const errors: string[] = [];
+			const originalError = console.error;
+			try {
+				if (fixture === "manifest") {
+					mkdirSync(join(target, ".agents"), { recursive: true });
+					writeFileSync(
+						join(target, ".agents", "manifest.json"),
+						"{broken",
+						"utf8",
+					);
+				} else {
+					mkdirSync(join(target, ".afol", "config.json"), { recursive: true });
+				}
+				console.error = (...values: unknown[]) =>
+					errors.push(values.map(String).join(" "));
+				expect(await runBootstrapCommand([target, "--dry-run"])).toBe(2);
+				expect(errors.length).toBeGreaterThan(0);
+			} finally {
+				console.error = originalError;
+				rmSync(target, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("replans target state after acquiring the target-global lock", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-locked-replan-"));
+		const drifted = "changed while waiting for lock\n";
+		try {
+			const exitCode = await runBootstrapCommand([target], {
+				beforeLockedPlan: () => {
+					mkdirSync(join(target, ".afol"), { recursive: true });
+					writeFileSync(join(target, ".afol", "config.json"), drifted, "utf8");
+				},
+			});
+			expect(exitCode).toBe(4);
+			expect(readFileSync(join(target, ".afol", "config.json"), "utf8")).toBe(
+				drifted,
+			);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a target replaced by a symlink while waiting for its lock", async () => {
+		const root = mkdtempSync(join(tmpdir(), "bootstrap-locked-target-swap-"));
+		const target = join(root, "target");
+		const outside = join(root, "outside");
+		mkdirSync(target);
+		mkdirSync(outside);
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			console.error = (...values: unknown[]) =>
+				errors.push(values.map(String).join(" "));
+			const exitCode = await runBootstrapCommand([target], {
+				beforeLockedPlan: () => {
+					rmSync(target, { recursive: true, force: true });
+					symlinkSync(outside, target, "dir");
+				},
+			});
+			expect(exitCode).toBe(2);
+			expect(errors.join("\n")).toContain(
+				"Bootstrap target changed while waiting for lock",
+			);
+			expect(readdirSync(outside)).toEqual([]);
+			expect(lstatSync(target).isSymbolicLink()).toBe(true);
+		} finally {
+			console.error = originalError;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("supports a nested nonexistent target with a stable canonical lock key", async () => {
+		const root = mkdtempSync(join(tmpdir(), "bootstrap-missing-parent-"));
+		const target = join(root, "missing", "nested", "project");
+		const lockPath = resolveExternalPathLockPath(target);
+		try {
+			const runtime = {
+				beforeLockedPlan: () => expect(existsSync(lockPath)).toBe(true),
+			};
+			expect(await runBootstrapCommand([target], runtime)).toBe(0);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
+			expect(await runBootstrapCommand([target], runtime)).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects existing and broken target-root symlinks without replacing them", async () => {
+		const root = mkdtempSync(join(tmpdir(), "bootstrap-root-symlink-"));
+		const realTarget = join(root, "real");
+		mkdirSync(realTarget);
+		for (const [name, destination] of [
+			["existing-link", realTarget],
+			["broken-link", join(root, "missing")],
+		] as const) {
+			const target = join(root, name);
+			symlinkSync(destination, target, "dir");
+			const errors: string[] = [];
+			const originalError = console.error;
+			try {
+				console.error = (...values: unknown[]) =>
+					errors.push(values.map(String).join(" "));
+				expect(await runBootstrapCommand([target])).toBe(2);
+				expect(errors.join("\n")).toContain("must not be a symlink");
+				expect(lstatSync(target).isSymbolicLink()).toBe(true);
+			} finally {
+				console.error = originalError;
+			}
+		}
+		expect(readdirSync(realTarget)).toEqual([]);
+		rmSync(root, { recursive: true, force: true });
+	});
+
+	test("restores the exact target tree after failures in every mutation phase", async () => {
+		const cases = [
+			{ hook: "failAfterTemplateWrite", args: [] },
+			{ hook: "failAfterCleanup", args: ["--cleanup-obsolete"], cleanup: true },
+			{ hook: "failAfterMutableBaseline", args: [] },
+			{
+				hook: "failAfterProviderMigration",
+				args: [
+					"--cleanup-provider-compatible-mutable",
+					"--confirm-provider-migration",
+				],
+				provider: true,
+			},
+		] as const;
+		for (const item of cases) {
+			const target = mkdtempSync(
+				join(tmpdir(), `bootstrap-rollback-${item.hook}-`),
+			);
+			const errors: string[] = [];
+			const originalError = console.error;
+			try {
+				writeFileSync(join(target, "keep.txt"), "before\n", "utf8");
+				if ("cleanup" in item) {
+					mkdirSync(join(target, ".agents", "scripts"), { recursive: true });
+					writeFileSync(
+						join(target, ".agents", "scripts", "legacy.py"),
+						"old\n",
+						"utf8",
+					);
+				}
+				if ("provider" in item) {
+					mkdirSync(join(target, ".agents", "data"), { recursive: true });
+					writeFileSync(
+						join(target, ".agents", "data", "state.json"),
+						"old\n",
+						"utf8",
+					);
+				}
+				const before = treeState(target);
+				console.error = (...values: unknown[]) =>
+					errors.push(values.map(String).join(" "));
+				const runtime = { [item.hook]: true };
+				expect(await runBootstrapCommand([target, ...item.args], runtime)).toBe(
+					2,
+				);
+				expect(treeState(target)).toEqual(before);
+				expect(errors.join("\n")).toContain("Injected bootstrap failure");
+			} finally {
+				console.error = originalError;
+				rmSync(target, { recursive: true, force: true });
+			}
+		}
+	});
+
 	test("rejects unsupported partial installs", async () => {
 		const target = mkdtempSync(join(tmpdir(), "bootstrap-partial-"));
 		const errors: string[] = [];
@@ -655,12 +883,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			join(tmpdir(), "bootstrap-without-claude-agents-"),
 		);
 		try {
-			const exitCode = await runBootstrapCommand([
-				target,
-				"--mutable-dir",
-				".agents",
-				"--without-claude",
-			]);
+			const exitCode = await runBootstrapCommand([target, "--without-claude"]);
 
 			expect(exitCode).toBe(0);
 			// Claude artifacts absent
@@ -690,7 +913,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 	});
 
-	test("custom mutable dir keeps governance paths on .afol payload", async () => {
+	test("custom mutable dir is rejected to avoid split state contracts", async () => {
 		const target = mkdtempSync(join(tmpdir(), "bootstrap-custom-mutable-"));
 		try {
 			const exitCode = await runBootstrapCommand([
@@ -699,24 +922,8 @@ describe("bootstrap provider-compatible mutable state", () => {
 				".state",
 			]);
 
-			expect(exitCode).toBe(0);
-			expect(
-				existsSync(join(target, ".afol", "adm", "rules", "README.md")),
-			).toBe(true);
-			expect(existsSync(join(target, ".state", "adm", "README.md"))).toBe(
-				false,
-			);
-
-			const config = JSON.parse(
-				readFileSync(join(target, ".afol", "config.json"), "utf8"),
-			) as {
-				paths: Record<string, string>;
-			};
-			expect(config.paths.mutable_dir).toBe(".state");
-			expect(config.paths.adm_dir).toBe(".afol/adm");
-			expect(config.paths.rules_dir).toBe(".afol/adm/rules");
-			expect(config.paths.hooks_dir).toBe(".afol/adm/hooks");
-			expect(config.paths.data_dir).toBe(".state/data");
+			expect(exitCode).toBe(2);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(false);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}

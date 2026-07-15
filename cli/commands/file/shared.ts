@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import {
+	closeSync,
+	constants,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	realpathSync,
+} from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { createPatch } from "diff";
 import { resolveProjectPaths } from "../../services/project/paths";
@@ -44,6 +52,9 @@ export type CommandArgs = {
 	session: string;
 	taskId: string;
 	reason: string;
+	expectedBeforeHash?: string | undefined;
+	expectedDestinationHash?: string | undefined;
+	expectedDestinationExists?: boolean | undefined;
 };
 
 export type PatchArgs = CommandArgs & {
@@ -77,37 +88,75 @@ export function makeUnsupportedUndoResult(
 
 export const DEFAULT_IO: CommandIo = SHARED_DEFAULT_IO;
 
-export const DEFAULT_PATCH_PATH = ".afol/data/mutations/.file-probe.txt";
-export const DEFAULT_MOVE_SOURCE = ".afol/data/mutations/move-source.txt";
+export const DEFAULT_PATCH_PATH = ".afol/tmp/file-command/.file-probe.txt";
+export const DEFAULT_MOVE_SOURCE = ".afol/tmp/file-command/move-source.txt";
 export const DEFAULT_MOVE_DESTINATION =
-	".afol/data/mutations/move-destination.txt";
+	".afol/tmp/file-command/move-destination.txt";
 
 const PROTECTED_PREFIXES = Object.freeze([
+	".afol/adm",
+	".afol/wb",
+	".afol/state",
+	".afol/data/mutations",
 	".afol/config.json",
 	".agents/lock.json",
 	".agents/config.json",
 	".agents/manifest.json",
 ]);
 
-function isProtectedPath(relativePath: string): boolean {
+const LEGACY_SAFE_PATH_PREFIXES = Object.freeze([
+	".afol/config.json",
+	".agents/lock.json",
+	".agents/config.json",
+	".agents/manifest.json",
+]);
+
+const SENSITIVE_BASENAMES = new Set([
+	".npmrc",
+	".pypirc",
+	".netrc",
+	"id_rsa",
+	"id_dsa",
+	"id_ecdsa",
+	"id_ed25519",
+]);
+
+export function isProtectedResourcePath(relativePath: string): boolean {
 	const normalized = relativePath.replaceAll("\\", "/");
-	return PROTECTED_PREFIXES.some(
-		(prefix) => normalized === prefix || normalized.startsWith(prefix),
+	if (
+		PROTECTED_PREFIXES.some((protectedPath) => {
+			if (normalized === protectedPath) {
+				return true;
+			}
+			return normalized.startsWith(`${protectedPath}/`);
+		})
+	) {
+		return true;
+	}
+	const basename = normalized.split("/").at(-1) ?? "";
+	if (basename === ".env" || basename.startsWith(".env.")) {
+		return true;
+	}
+	if (SENSITIVE_BASENAMES.has(basename)) {
+		return true;
+	}
+	return [".pem", ".key", ".p12", ".pfx"].some((extension) =>
+		basename.toLowerCase().endsWith(extension),
 	);
 }
 
 type ResolvedSafePath = { path: string; relativePath: string };
 
-function projectMutationDefaults(projectRoot: string): {
+function projectMutationDefaults(_projectRoot: string): {
 	patchPath: string;
 	moveSource: string;
 	moveDestination: string;
 } {
-	const mutationsDir = resolveProjectPaths(projectRoot).mutationsDir;
+	const tmpDir = join(".afol", "tmp", "file-command");
 	return {
-		patchPath: join(mutationsDir, ".file-probe.txt"),
-		moveSource: join(mutationsDir, "move-source.txt"),
-		moveDestination: join(mutationsDir, "move-destination.txt"),
+		patchPath: join(tmpDir, ".file-probe.txt"),
+		moveSource: join(tmpDir, "move-source.txt"),
+		moveDestination: join(tmpDir, "move-destination.txt"),
 	};
 }
 
@@ -122,7 +171,7 @@ export function requireWriteContext(args: CommandArgs): void {
 	}
 }
 
-export function normalizeHash(value: string): string {
+export function normalizeHash(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
@@ -142,7 +191,12 @@ export function resolveSafePath(
 	if (!resolved.ok) {
 		throw new Error(resolved.error);
 	}
-	if (isProtectedPath(resolved.value.relativePath)) {
+	if (
+		LEGACY_SAFE_PATH_PREFIXES.some((protectedPath) => {
+			if (resolved.value.relativePath === protectedPath) return true;
+			return resolved.value.relativePath.startsWith(`${protectedPath}/`);
+		})
+	) {
 		throw new Error(`protected-path:${targetPath}`);
 	}
 	return resolved.value;
@@ -234,7 +288,7 @@ export function resolveJournalBackupPath(
 			);
 		}
 
-		return storedPath;
+		return resolvedStoredPath;
 	}
 
 	if (!pathIsInsideRoot(lexicalStoredPath, lexicalBackupsDir)) {
@@ -244,6 +298,20 @@ export function resolveJournalBackupPath(
 	}
 
 	return storedPath;
+}
+
+export function readJournalBackupBytes(
+	projectRoot: string,
+	storedPath: string | null | undefined,
+): Buffer | null {
+	const canonicalPath = resolveJournalBackupPath(projectRoot, storedPath);
+	if (!canonicalPath || !existsSync(canonicalPath)) return null;
+	const fd = openSync(canonicalPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+	try {
+		return readFileSync(fd);
+	} finally {
+		closeSync(fd);
+	}
 }
 
 export function archiveDestination(

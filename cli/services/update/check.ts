@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createPatch } from "diff";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
@@ -33,6 +33,11 @@ const SPECIAL_UPDATE_TARGETS = new Set<UpdateFilePath>([
 const UPDATE_TARGETS: UpdateFilePath[] = Object.keys(
 	DEFAULT_TEMPLATE_FILES,
 ).sort();
+
+const REMOVED_TEMPLATE_PATHS: readonly UpdateFilePath[] = [
+	".agents/skills/agentic-folder-sys",
+	".afol/adm/source/universal-skills/skills/agentic-folder-sys",
+];
 
 const MANAGED_OWNERSHIP: ReadonlyArray<ManagedOwnership> = [
 	"managed",
@@ -78,6 +83,9 @@ export type UpdateOperation =
 	| (UpdateDiffOperation & {
 			kind: "update-managed";
 			nextContent: string;
+	  })
+	| (UpdateDiffOperation & {
+			kind: "remove-stale";
 	  });
 
 export type UpdateCheckResult = {
@@ -147,18 +155,40 @@ function collectOwnershipFromManifest(
 	manifest: RawManifest | null,
 ): OwnershipCounts {
 	const counts = zeroOwnershipCounts();
+	const counted = new Set<string>();
 	const ownership = manifest?.ownership;
-	if (!ownership || typeof ownership !== "object" || Array.isArray(ownership)) {
-		return counts;
+	if (ownership && typeof ownership === "object" && !Array.isArray(ownership)) {
+		for (const [rawOwner, rawPaths] of Object.entries(ownership)) {
+			if (!isManagedOwnership(rawOwner) || !Array.isArray(rawPaths)) {
+				continue;
+			}
+			for (const rawPath of rawPaths) {
+				if (typeof rawPath !== "string" || rawPath.trim().length === 0) {
+					continue;
+				}
+				const key = `${rawOwner}:${rawPath}`;
+				if (!counted.has(key)) {
+					counted.add(key);
+					counts[rawOwner] += 1;
+				}
+			}
+		}
 	}
 
-	for (const [rawOwner, rawPaths] of Object.entries(ownership)) {
-		if (!isManagedOwnership(rawOwner) || !Array.isArray(rawPaths)) {
-			continue;
-		}
-		for (const rawPath of rawPaths) {
-			if (typeof rawPath === "string" && rawPath.trim().length > 0) {
-				counts[rawOwner] += 1;
+	const managedHashes = manifest?.managed_hashes;
+	if (
+		managedHashes &&
+		typeof managedHashes === "object" &&
+		!Array.isArray(managedHashes)
+	) {
+		for (const rawPath of Object.keys(managedHashes)) {
+			if (rawPath.trim().length === 0) {
+				continue;
+			}
+			const key = `managed:${rawPath}`;
+			if (!counted.has(key)) {
+				counted.add(key);
+				counts.managed += 1;
 			}
 		}
 	}
@@ -220,6 +250,9 @@ function collectCurrentManifestEntries(
 						isTemplatePathMatch(pattern, templatePath),
 					)
 				) {
+					continue;
+				}
+				if (manifest[templatePath]?.hash) {
 					continue;
 				}
 				manifest[templatePath] = {
@@ -343,6 +376,9 @@ function hasUnsafeManifestEdits(
 		if (!(key in source)) {
 			return true;
 		}
+		if (key === "managed_hashes") {
+			continue;
+		}
 		if (key === "commands") {
 			if (!isObject(currentValue)) {
 				return true;
@@ -446,6 +482,10 @@ function makeSummaryChanges(
 			changes.push(`update ${operation.path}`);
 			continue;
 		}
+		if (operation.kind === "remove-stale") {
+			changes.push(`remove ${operation.path}`);
+			continue;
+		}
 		if (operation.kind === "preserve-project-owned") {
 			changes.push(`preserve ${operation.path}`);
 			continue;
@@ -526,7 +566,13 @@ function planUpdateOperations(
 
 	for (const entry of entries) {
 		const manifestEntry = currentManifestEntries[entry.path];
-		const owner = manifestEntry?.owner ?? "managed";
+		const manifestOwner = manifestEntry?.owner ?? "managed";
+		const owner =
+			entry.path === ".agents/lock.json" &&
+			manifestOwner === "project-owned" &&
+			!entry.hasConflict(entry.sourceContent, entry.currentContent)
+				? "managed"
+				: manifestOwner;
 		if (entry.sourceContent.length === 0) {
 			continue;
 		}
@@ -561,6 +607,20 @@ function planUpdateOperations(
 				path: entry.path,
 				owner,
 				reason: "same-content",
+			});
+			continue;
+		}
+
+		if (
+			(owner === "project-owned" || owner === "ignored") &&
+			entry.hasConflict(entry.sourceContent, entry.currentContent)
+		) {
+			operations.push({
+				kind: "conflict",
+				path: entry.path,
+				owner: "conflict",
+				reason: "local-user-edit-or-unsafe",
+				diff: buildPatch(entry.path, entry.currentContent, entry.sourceContent),
 			});
 			continue;
 		}
@@ -727,13 +787,72 @@ function planUpdateOperations(
 	return operations.sort((left, right) => left.path.localeCompare(right.path));
 }
 
+function collectRemovedTemplateOperations(
+	projectRoot: string,
+	removedPaths: readonly UpdateFilePath[],
+): UpdateOperation[] {
+	const manifest = readJsonText(
+		readText(join(projectRoot, ".agents/manifest.json")),
+	);
+	const entries = collectCurrentManifestEntries(manifest, null, [
+		...removedPaths,
+	]);
+	return removedPaths
+		.filter((path) => existsSync(join(projectRoot, path)))
+		.map((path) => {
+			const entry = entries[path];
+			const managedHashes = manifest?.managed_hashes;
+			const directHash =
+				managedHashes &&
+				typeof managedHashes === "object" &&
+				!Array.isArray(managedHashes) &&
+				typeof (managedHashes as RawManifest)[path] === "string"
+					? ((managedHashes as RawManifest)[path] as string)
+					: undefined;
+			if (entry?.owner === "project-owned" || entry?.owner === "ignored") {
+				return {
+					kind: "preserve-project-owned",
+					path,
+					owner: entry.owner,
+					reason: "removed-template-project-owned",
+				};
+			}
+			const absolutePath = join(projectRoot, path);
+			if (
+				(entry?.owner === "managed" || (!entry && directHash !== undefined)) &&
+				(entry?.hash ?? directHash) !== undefined &&
+				!statSync(absolutePath).isDirectory() &&
+				sha256Hex(readFileSync(absolutePath, "utf8")) ===
+					(entry?.hash ?? directHash)
+			) {
+				return {
+					kind: "remove-stale",
+					path,
+					owner: "managed",
+					reason: "removed-from-template-managed-hash-match",
+					diff: `remove stale managed template file: ${path}\n`,
+				};
+			}
+			return {
+				kind: "conflict",
+				path,
+				owner: "conflict",
+				reason: "removed-template-missing-managed-hash",
+				diff: `cannot safely remove stale template path without last managed hash: ${path}\n`,
+			};
+		});
+}
+
 function serializeOwnership(counts: OwnershipCounts): string {
 	return MANAGED_OWNERSHIP.map((owner) => `${owner}:${counts[owner]}`).join(
 		", ",
 	);
 }
 
-export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
+export function checkTemplateUpdate(
+	projectRoot: string,
+	removedPaths: readonly UpdateFilePath[] = REMOVED_TEMPLATE_PATHS,
+): UpdateCheckResult {
 	const claudeEnabled = readClaudeAdapterEnabled(projectRoot);
 	const updateTargets = claudeEnabled
 		? UPDATE_TARGETS
@@ -764,7 +883,7 @@ export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
 		sourceManifestContent,
 		currentFiles,
 		updateTargets,
-	);
+	).concat(collectRemovedTemplateOperations(projectRoot, removedPaths));
 
 	const hasSource = updateTargets.length > 0;
 	const currentRevision = revisionOf(currentLock);
@@ -803,6 +922,7 @@ function operationSummary(result: UpdateCheckResult): {
 	total: number;
 	create: number;
 	update: number;
+	remove: number;
 	conflict: number;
 	preserve: number;
 	conflictPaths: string[];
@@ -811,6 +931,7 @@ function operationSummary(result: UpdateCheckResult): {
 		total: 0,
 		create: 0,
 		update: 0,
+		remove: 0,
 		conflict: 0,
 		preserve: 0,
 		conflictPaths: [] as string[],
@@ -826,6 +947,10 @@ function operationSummary(result: UpdateCheckResult): {
 		}
 		if (operation.kind === "update-managed") {
 			summary.update += 1;
+			continue;
+		}
+		if (operation.kind === "remove-stale") {
+			summary.remove += 1;
 			continue;
 		}
 		if (operation.kind === "conflict") {
@@ -874,7 +999,7 @@ export function formatUpdateCheck(
 	if (mode === "check" && !options.verbose) {
 		const summary = operationSummary(result);
 		lines.push(
-			`operations: total=${summary.total} create=${summary.create} update=${summary.update} conflict=${summary.conflict} preserve=${summary.preserve}`,
+			`operations: total=${summary.total} create=${summary.create} update=${summary.update} remove=${summary.remove} conflict=${summary.conflict} preserve=${summary.preserve}`,
 		);
 		if (summary.conflictPaths.length > 0) {
 			lines.push("conflicts:");
@@ -891,7 +1016,7 @@ export function formatUpdateCheck(
 	if ((mode === "preview" || mode === "apply") && !options.verbose) {
 		const summary = operationSummary(result);
 		lines.push(
-			`operations: total=${summary.total} create=${summary.create} update=${summary.update} conflict=${summary.conflict} preserve=${summary.preserve}`,
+			`operations: total=${summary.total} create=${summary.create} update=${summary.update} remove=${summary.remove} conflict=${summary.conflict} preserve=${summary.preserve}`,
 		);
 		if (summary.conflictPaths.length > 0) {
 			lines.push("conflicts:");

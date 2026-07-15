@@ -21,6 +21,7 @@ import {
 	type CatchupReport,
 	computeCatchup,
 } from "../services/workbench/catchup";
+import { sessionLifecycleState } from "../services/workbench/lifecycle";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type StatusSnapshot = {
@@ -35,7 +36,7 @@ type StatusSnapshot = {
 	lockPath: string;
 	activeSessionPath: string;
 	taskFilePath?: string;
-	sessionCount?: number;
+	sessionCount?: number | null;
 	sessionHealth?: string[];
 	catchup: CatchupReport | undefined;
 };
@@ -44,6 +45,8 @@ type StatusSessionInfo = {
 	id: string;
 	status: string;
 	changed_files: number;
+	git_changed_files_overflow: boolean;
+	git_changed_files_degraded: boolean;
 	freshness: CatchupReport["freshness"];
 	next_step: string;
 };
@@ -55,6 +58,8 @@ type StatusJsonData = {
 	validation_or_checks: string[];
 	blockers: string[];
 	next: string[];
+	session_count: number | null;
+	session_health_warnings: string[];
 	paths: {
 		config: string;
 		config_source: ProjectConfigSource;
@@ -78,7 +83,9 @@ const TASK_ROW_RE =
 const TASK_STATE_PRIORITY: Record<string, number> = {
 	in_progress: 0,
 	problem: 1,
-	pending: 2,
+	implemented_untested: 2,
+	tested_needs_spec_validation: 3,
+	pending: 4,
 	done: 50,
 	moved: 60,
 };
@@ -94,11 +101,18 @@ type StatusCommandError = Error & {
 };
 
 let computeCatchupImpl = computeCatchup;
+let computeHealthImpl = computeSessionHealth;
 
 export function setCatchupComputerForTests(
 	computer: typeof computeCatchup | null,
 ): void {
 	computeCatchupImpl = computer ?? computeCatchup;
+}
+
+export function setHealthComputerForTests(
+	computer: typeof computeSessionHealth | null,
+): void {
+	computeHealthImpl = computer ?? computeSessionHealth;
 }
 
 function taskNotFoundError(taskId: string, session: string | null): Error {
@@ -437,7 +451,7 @@ function pickTaskFile(
 }
 
 function computeSessionHealth(projectRoot: string): {
-	sessionCount: number;
+	sessionCount: number | null;
 	sessionHealth: string[];
 } {
 	try {
@@ -448,7 +462,10 @@ function computeSessionHealth(projectRoot: string): {
 			sessionHealth: warnings.map((w) => w.message),
 		};
 	} catch {
-		return { sessionCount: 0, sessionHealth: [] };
+		return {
+			sessionCount: null,
+			sessionHealth: ["unavailable: session health collection failed"],
+		};
 	}
 }
 
@@ -459,6 +476,7 @@ function mergeStatusEntries(current: string[], additions: string[]): string[] {
 function formatFreshness(report: CatchupReport): string {
 	const changedFiles = report.git_changed_files.length;
 	if (
+		!report.git_changed_files_degraded &&
 		!report.freshness.findings_stale &&
 		!report.freshness.log_behind_diff &&
 		changedFiles === 0
@@ -466,7 +484,7 @@ function formatFreshness(report: CatchupReport): string {
 		return "freshness: ok";
 	}
 
-	return `freshness: findings_stale=${report.freshness.findings_stale ? "yes" : "no"} log_behind_diff=${report.freshness.log_behind_diff ? "yes" : "no"} changed_files=${changedFiles} next=${JSON.stringify(report.next_step)}`;
+	return `freshness: findings_stale=${report.freshness.findings_stale ? "yes" : "no"} log_behind_diff=${report.freshness.log_behind_diff ? "yes" : "no"} changed_files=${changedFiles} degraded=${report.git_changed_files_degraded ? "yes" : "no"} overflow=${report.git_changed_files_overflow ? "yes" : "no"} next=${JSON.stringify(report.next_step)}`;
 }
 
 function readStatusSnapshot(
@@ -487,7 +505,15 @@ function readStatusSnapshot(
 	const lockPath = projectPaths.abs.lockFile;
 	const activeSessionPath = projectPaths.abs.activeSessionFile;
 
-	const healthInfo = computeSessionHealth(loaded.value.root);
+	let healthInfo: ReturnType<typeof computeSessionHealth>;
+	try {
+		healthInfo = computeHealthImpl(loaded.value.root);
+	} catch {
+		healthInfo = {
+			sessionCount: null,
+			sessionHealth: ["unavailable: session health collection failed"],
+		};
+	}
 	const globalFindings = includeHealthFindings
 		? collectGlobalStatusFindings(loaded.value.root)
 		: [];
@@ -496,10 +522,11 @@ function readStatusSnapshot(
 		: null;
 	const catchupSession = freshnessSession ?? activeSession;
 	const selectedSession = freshnessSession ?? activeSession;
-	const catchupReport =
-		includeCatchup && catchupSession
+	const catchupReport = includeCatchup
+		? catchupSession
 			? computeCatchupImpl(loaded.value.root, { session: catchupSession })
-			: undefined;
+			: computeCatchupImpl(loaded.value.root, {})
+		: undefined;
 
 	if (!selectedSession) {
 		if (taskId) {
@@ -536,7 +563,10 @@ function readStatusSnapshot(
 			throw taskNotFoundError(taskId, selectedSession);
 		}
 		return {
-			status: "none",
+			status:
+				sessionLifecycleState(loaded.value.root, selectedSession) === "corrupt"
+					? "corrupt"
+					: "none",
 			task: "none",
 			filesWritten: ["none"],
 			validationOrChecks: mergeStatusEntries(
@@ -544,7 +574,7 @@ function readStatusSnapshot(
 				globalFindings.map((entry) => entry.validation),
 			),
 			blockers: mergeStatusEntries(
-				["none"],
+				["missing canonical task file"],
 				globalFindings.map((entry) => entry.blocker),
 			),
 			next: mergeStatusEntries(
@@ -588,7 +618,7 @@ function readStatusSnapshot(
 		lockPath,
 		activeSessionPath,
 		taskFilePath,
-		...computeSessionHealth(projectRoot),
+		...healthInfo,
 		catchup: catchupReport,
 	};
 }
@@ -608,7 +638,11 @@ function formatCompact(snapshot: StatusSnapshot): string {
 	];
 
 	if (snapshot.sessionCount !== undefined) {
-		lines.push(`SESSIONS: ${snapshot.sessionCount}`);
+		if (snapshot.sessionCount === null) {
+			lines.push("SESSIONS: unavailable");
+		} else {
+			lines.push(`SESSIONS: ${snapshot.sessionCount}`);
+		}
 		if (snapshot.sessionHealth && snapshot.sessionHealth.length > 0) {
 			lines.push("SESSION_HEALTH_WARNINGS:");
 			for (const warning of snapshot.sessionHealth) {
@@ -667,6 +701,8 @@ export function runStatusCommand(
 			validation_or_checks: snapshot.validationOrChecks,
 			blockers: snapshot.blockers,
 			next: snapshot.next,
+			session_count: snapshot.sessionCount ?? null,
+			session_health_warnings: snapshot.sessionHealth ?? [],
 			paths: {
 				config: snapshot.configPath,
 				config_source: snapshot.configSource,
@@ -679,6 +715,10 @@ export function runStatusCommand(
 						id: snapshot.catchup.session ?? "none",
 						status: snapshot.catchup.session_status,
 						changed_files: snapshot.catchup.git_changed_files.length,
+						git_changed_files_overflow:
+							snapshot.catchup.git_changed_files_overflow,
+						git_changed_files_degraded:
+							snapshot.catchup.git_changed_files_degraded,
 						freshness: snapshot.catchup.freshness,
 						next_step: snapshot.catchup.next_step,
 					}
@@ -693,6 +733,8 @@ export function runStatusCommand(
 					"validation_or_checks",
 					"blockers",
 					"next",
+					"session_count",
+					"session_health_warnings",
 					"paths",
 				]),
 			),

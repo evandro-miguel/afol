@@ -3,13 +3,6 @@
   "kernel": "agentic-cli-ts",
   "optional": true,
   "commands": {
-    "bootstrap": [
-      "b",
-      "bootstrap"
-    ],
-    "init": [
-      "init"
-    ],
     "status": [
       "s",
       "status"
@@ -20,32 +13,44 @@
       "check",
       "validate"
     ],
-    "new": [
-      "n",
-      "new"
+    "init": [
+      "i",
+      "init"
     ],
     "start": [
       "st",
       "start"
     ],
-    "evidence": [
-      "e",
-      "evidence"
-    ],
     "done": [
       "d",
       "done"
+    ],
+    "transition": [
+      "transition"
+    ],
+    "new": [
+      "n",
+      "new"
     ],
     "log": [
       "l",
       "log"
     ],
-    "verify": [
-      "vf",
-      "verify"
+    "quick-task": [
+      "qt",
+      "quick-task"
     ],
-    "verify-tasks": [
-      "verify-tasks"
+    "governance": [
+      "gov",
+      "governance"
+    ],
+    "evidence": [
+      "e",
+      "evidence"
+    ],
+    "hook": [
+      "hk",
+      "hook"
     ],
     "rule": [
       "r",
@@ -55,6 +60,53 @@
       "sk",
       "skill"
     ],
+    "close": [
+      "c",
+      "close"
+    ],
+    "file": [
+      "f",
+      "file"
+    ],
+    "update": [
+      "up",
+      "update"
+    ],
+    "bootstrap": [
+      "b",
+      "bootstrap"
+    ],
+    "verify": [
+      "vf",
+      "verify"
+    ],
+    "verify-tasks": [
+      "vt",
+      "verify-tasks"
+    ],
+    "local-state": [
+      "ls",
+      "local-state"
+    ],
+    "pstr": [
+      "ps",
+      "pstr"
+    ],
+    "ctx": [
+      "cx",
+      "ctx"
+    ],
+    "state": [
+      "stt",
+      "state"
+    ],
+    "hydrate": [
+      "hy",
+      "hydrate"
+    ],
+    "render": [
+      "render"
+    ],
     "library": [
       "lb",
       "library"
@@ -63,9 +115,34 @@
       "mm",
       "memory"
     ],
+    "adm": [
+      "ad",
+      "adm"
+    ],
+    "spec": [
+      "sp",
+      "spec"
+    ],
+    "ux": [
+      "ux"
+    ],
+    "adr": [
+      "adr"
+    ],
+    "changelog": [
+      "cl",
+      "changelog"
+    ],
     "health": [
       "ht",
       "health"
+    ],
+    "db": [
+      "db"
+    ],
+    "doctor": [
+      "dr",
+      "doctor"
     ],
     "maintenance": [
       "mt",
@@ -75,21 +152,37 @@
       "sw",
       "sweep"
     ],
+    "schema": [
+      "sc",
+      "schema"
+    ],
+    "bench": [
+      "be",
+      "bench"
+    ],
     "project-benchmark": [
       "pb",
       "project-benchmark"
     ],
+    "catchup": [
+      "cu",
+      "catchup"
+    ],
+    "preflight": [
+      "pf",
+      "preflight"
+    ],
+    "adapter": [
+      "adp",
+      "adapter"
+    ],
+    "telemetry": [
+      "tel",
+      "telemetry"
+    ],
     "session": [
       "ss",
       "session"
-    ],
-    "update": [
-      "up",
-      "update"
-    ],
-    "close": [
-      "c",
-      "close"
     ]
   },
   "ownership": {
@@ -101,9 +194,12 @@
       ".afol/adm",
       ".afol/data/benchmarks",
       ".afol/data/telemetry",
+      ".afol/library",
       ".afol/memory",
+      ".afol/wb",
       "AGENTS.md",
       "docs/lessons",
+      "docs/standards",
       "docs/telemetry",
       "docs/templates"
     ],

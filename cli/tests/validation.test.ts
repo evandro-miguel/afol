@@ -103,6 +103,9 @@ function getRuntimeLiveArtifactPaths(root: string): {
 		"runtime-flow-live-agent-v4-latest.json",
 	);
 	const snapshot = readJson(snapshotPath);
+	snapshot.schema_version = "1.0.0";
+	snapshot.generated_at = new Date().toISOString();
+	snapshot.stale_after_days = 7;
 	snapshot.benchmark_profile = runtimeLiveBenchmarkProfile;
 	writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 	const savedResultPath = join(root, snapshot.saved_result_path as string);
@@ -576,7 +579,14 @@ describe("validation command family", () => {
 				"mutation-safety",
 				"--json",
 			]);
-			expect(proc.status).toBe(0);
+			const failureContext =
+				proc.status === 0
+					? undefined
+					: [
+							`stdout tail:\n${String(proc.stdout ?? "").slice(-2_048)}`,
+							`stderr tail:\n${String(proc.stderr ?? "").slice(-2_048)}`,
+						].join("\n");
+			expect(proc.status, failureContext).toBe(0);
 			const payload = parseJsonOutput(proc.stdout as string);
 			expect(payload.mode).toBe("benchmark");
 			expect(payload.result_count).toBe(5);
@@ -795,7 +805,7 @@ describe("validation command family", () => {
 		expect(
 			notes.some((entry) =>
 				entry.startsWith(
-					"runtime-live-agent-artifact:.afol/data/benchmarks/catalog/results/",
+					"runtime-live-agent-artifact:.afol/data/benchmarks/results/",
 				),
 			),
 		).toBe(true);
@@ -922,7 +932,7 @@ describe("validation command family", () => {
 		expect(
 			notes.some((entry) =>
 				entry.startsWith(
-					"runtime-live-agent-artifact:.afol/data/benchmarks/catalog/results/",
+					"runtime-live-agent-artifact:.afol/data/benchmarks/results/",
 				),
 			),
 		).toBe(true);
@@ -952,7 +962,7 @@ describe("validation command family", () => {
 				const resultNotes = result.notes as string[];
 				return resultNotes.some((entry) =>
 					entry.startsWith(
-						"live-runner-artifact:.afol/data/benchmarks/catalog/results/",
+						"live-runner-artifact:.afol/data/benchmarks/results/",
 					),
 				);
 			}),
@@ -1016,7 +1026,7 @@ describe("validation command family", () => {
 					token_usage: {
 						available: true,
 						input_tokens: 220,
-						output_tokens: 401,
+						output_tokens: 4001,
 						total_tokens: 621,
 						cached_input_tokens: 0,
 						reasoning_output_tokens: 0,
@@ -1051,19 +1061,19 @@ describe("validation command family", () => {
 		expect(target?.status).toBe("failed");
 		expect(target?.pass).toBe(false);
 		expect(target?.tool_success_rate).toBe(0.97);
-		expect(target?.output_tokens).toBe(401);
+		expect(target?.output_tokens).toBe(4001);
 		const notes = target?.notes as string[];
 		expect(notes).toContain(
 			"threshold-below-min:min_tool_success_rate:0.97<0.98",
 		);
-		expect(notes).toContain("threshold-exceeded:max_output_tokens:401>400");
+		expect(notes).toContain("threshold-exceeded:max_output_tokens:4001>4000");
 		const summary = payload.summary as Record<string, unknown>;
 		expect(summary.passed).toBe(3);
 		expect(summary.failed).toBe(1);
 		expect(summary.skipped).toBe(0);
 	});
 
-	test("v bench runtime-live-agent fails when saved result artifact is absent", () => {
+	test("v bench runtime-live-agent uses the tracked snapshot when saved result is absent", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
 			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
 			if (existsSync(savedResultPath)) {
@@ -1075,23 +1085,67 @@ describe("validation command family", () => {
 			["v", "bench", "--pack", "runtime-live-agent", "--json"],
 			fixtureRoot,
 		);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.status).toBe("failed");
-		expect(payload.pass).toBe(false);
+		expect(payload.status).toBe("passed");
+		expect(payload.pass).toBe(true);
 		expect(payload.notes).toContain(
-			`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+			"runtime-live-agent-evidence-source:snapshot",
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(4);
-		expect(results.every((result) => result.status === "failed")).toBe(true);
+		expect(results.every((result) => result.status === "passed")).toBe(true);
 		expect(
 			results.every((result) =>
 				(result.notes as string[]).includes(
-					`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+					"live-runner-evidence-source:snapshot",
 				),
 			),
 		).toBe(true);
+	});
+
+	test("v bench runtime-live-agent rejects invalid fallback snapshots", () => {
+		const cases = [
+			[
+				"missing-schema",
+				(snapshot: Record<string, unknown>) => delete snapshot.schema_version,
+			],
+			[
+				"invalid-time",
+				(snapshot: Record<string, unknown>) =>
+					(snapshot.generated_at = "invalid"),
+			],
+			[
+				"missing-time",
+				(snapshot: Record<string, unknown>) => delete snapshot.generated_at,
+			],
+			[
+				"stale",
+				(snapshot: Record<string, unknown>) =>
+					(snapshot.generated_at = "2020-01-01T00:00:00.000Z"),
+			],
+			[
+				"incomplete",
+				(snapshot: Record<string, unknown>) => (snapshot.scenarios = []),
+			],
+		] as const;
+		for (const [, mutate] of cases) {
+			const fixtureRoot = createValidationFixtureRoot((root) => {
+				const { snapshotPath, savedResultPath } =
+					getRuntimeLiveArtifactPaths(root);
+				unlinkSync(savedResultPath);
+				const snapshot = readJson(snapshotPath);
+				mutate(snapshot);
+				writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+			});
+			const proc = runKernel(
+				["v", "bench", "--pack", "runtime-live-agent", "--json"],
+				fixtureRoot,
+			);
+			expect(proc.status).toBe(2);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.pass).toBe(false);
+		}
 	});
 
 	test("v bench runtime-live-agent fails when direct live evidence violates thresholds", () => {
@@ -1134,7 +1188,7 @@ describe("validation command family", () => {
 					token_usage: {
 						available: true,
 						input_tokens: 1200,
-						output_tokens: 401,
+						output_tokens: 4001,
 						total_tokens: 1601,
 						cached_input_tokens: 0,
 						reasoning_output_tokens: 0,
@@ -1190,7 +1244,7 @@ describe("validation command family", () => {
 		expect(notes).toContain(
 			"threshold-below-min:min_tool_success_rate:0.75<0.98",
 		);
-		expect(notes).toContain("threshold-exceeded:max_output_tokens:401>400");
+		expect(notes).toContain("threshold-exceeded:max_output_tokens:4001>4000");
 		const summary = payload.summary as Record<string, unknown>;
 		expect(summary.passed).toBe(3);
 		expect(summary.failed).toBe(1);

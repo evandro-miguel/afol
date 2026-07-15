@@ -1,17 +1,9 @@
 {
-  "generated_by": "agents-skills-sync local source",
+  "generated_by": "afol universal skills seed",
   "profiles": [
     "core"
   ],
   "skills": [
-    {
-      "name": "agentic-scaffold-mcp",
-      "path": "skills/agentic-scaffold-mcp"
-    },
-    {
-      "name": "agentic-folder-sys",
-      "path": "skills/agentic-folder-sys"
-    },
     {
       "name": "afol-rules",
       "path": "skills/afol-rules"

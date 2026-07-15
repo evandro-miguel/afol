@@ -9,8 +9,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCatchupCommand } from "../commands/catchup";
-import { computeCatchup } from "../services/workbench/catchup";
+import { formatCatchup, runCatchupCommand } from "../commands/catchup";
+import {
+	combineGitChangedFiles,
+	computeCatchup,
+	readGitChangedFiles,
+} from "../services/workbench/catchup";
 
 type CapturedIo = {
 	stdout: string[];
@@ -52,7 +56,7 @@ function runGit(root: string, args: string[]): void {
 }
 
 function initGitRoot(root: string): void {
-	runGit(root, ["init"]);
+	runGit(root, ["init", "--initial-branch=main"]);
 	runGit(root, ["config", "user.email", "catchup@example.com"]);
 	runGit(root, ["config", "user.name", "Catchup Test"]);
 }
@@ -133,6 +137,129 @@ function createRoot(session = "260614_1200_catchup-test"): {
 	return { root, session, sessionDir };
 }
 
+describe("computeCatchup git probe", () => {
+	test("reports degraded when git is unavailable but session exists", () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-no-git-"));
+		const session = "260614_1200_no-git";
+		try {
+			mkdirSync(join(root, ".agents"), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				`${JSON.stringify(
+					{ schema_version: 1, project: { name: "catchup-no-git" } },
+					null,
+					2,
+				)}\n`,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				`${session}\n`,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_plan_01.md`),
+				"---\n---\nplan\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"| T-01 | pending | worker | test |\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_log_01.md`),
+				"log\n",
+				"utf8",
+			);
+
+			// No git init — git is unavailable
+			const report = computeCatchup(root, {});
+			expect(report.session).toBe(session);
+			expect(report.git_branch).toBeNull();
+			// Must report degraded, not "artifacts look fresh"
+			expect(report.freshness.notes.some((n) => n.includes("degraded"))).toBe(
+				true,
+			);
+			expect(
+				report.freshness.notes.some((n) => n.includes("git unavailable")),
+			).toBe(true);
+			expect(report.next_step).toContain("degraded");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("computeCatchup git split-failure", () => {
+	test("reports degraded when git probe succeeds but status/diff query fails", () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-split-fail-"));
+		const session = "260614_1207_split-fail";
+		try {
+			mkdirSync(join(root, ".agents"), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				`${JSON.stringify(
+					{ schema_version: 1, project: { name: "catchup-split-fail" } },
+					null,
+					2,
+				)}\n`,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				`${session}\n`,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_plan_01.md`),
+				"---\n---\nplan\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"| T-01 | pending | worker | test |\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", session, `${session}_log_01.md`),
+				"log\n",
+				"utf8",
+			);
+
+			// Init git and make an initial commit so the repo is valid
+			initGitRoot(root);
+			commitAll(root, "initial");
+			// Corrupt the index — replace it with a directory so commands that
+			// read the index (status --porcelain, diff --name-only) fail, while
+			// rev-parse --is-inside-work-tree (probe) continues to succeed.
+			const indexPath = join(root, ".git", "index");
+			rmSync(indexPath, { force: true });
+			mkdirSync(indexPath, { recursive: true });
+
+			const report = computeCatchup(root, {});
+			expect(report.session).toBe(session);
+			// git symbolic-ref does not depend on the index, so branch is available
+			expect(report.git_branch).toBe("main");
+			// Must NOT say "artifacts look fresh"
+			expect(report.freshness.notes.some((n) => n.includes("degraded"))).toBe(
+				true,
+			);
+			expect(
+				report.freshness.notes.some((n) =>
+					n.includes("git status query failed"),
+				),
+			).toBe(true);
+			expect(report.next_step).toContain("degraded");
+			expect(report.git_changed_files_degraded).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
 describe("computeCatchup", () => {
 	test("reports no-session with a recent sessions hint when no active pointer exists", () => {
 		const root = mkdtempSync(join(tmpdir(), "catchup-no-session-"));
@@ -149,7 +276,11 @@ describe("computeCatchup", () => {
 			const report = computeCatchup(root, {});
 			expect(report.session).toBeNull();
 			expect(report.session_status).toBe("no-session");
+			expect(report.git_changed_files_degraded).toBe(true);
 			expect(report.next_step).toContain("no active session");
+			expect(report.freshness.notes.join(" ")).toContain(
+				"degraded: git unavailable",
+			);
 			expect(report.freshness.notes.join(" ")).toContain(
 				"recent sessions: 260614_0001_alpha",
 			);
@@ -223,6 +354,35 @@ describe("computeCatchup", () => {
 });
 
 describe("afol catchup command", () => {
+	test("preserves no-session Git degradation in text and JSON", async () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-no-session-output-"));
+		try {
+			mkdirSync(join(root, ".agents"), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb"), { recursive: true });
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				`${JSON.stringify({ schema_version: 1, project: { name: "catchup-no-session-output" } })}\n`,
+				"utf8",
+			);
+
+			const textOut = captureIo();
+			expect(await runCatchupCommand([], root, textOut.io)).toBe(0);
+			expect(textOut.stdout.join("\n")).toContain(
+				"changed_files: 0 (degraded)",
+			);
+			expect(textOut.stdout.join("\n")).toContain("degraded: git unavailable");
+
+			const jsonOut = captureIo();
+			expect(await runCatchupCommand(["--json"], root, jsonOut.io)).toBe(0);
+			const payload = JSON.parse(jsonOut.stdout.join("\n")) as {
+				data: { git_changed_files_degraded: boolean };
+			};
+			expect(payload.data.git_changed_files_degraded).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("prints the session id and next step", async () => {
 		const { root, session } = createRoot("260614_1203_command-text");
 		const out = captureIo();
@@ -296,6 +456,153 @@ describe("afol catchup command", () => {
 			const report = computeCatchup(root, { session: target });
 			expect(report.session).toBe(target);
 			expect(report.session_status).toBe("closed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("combineGitChangedFiles deterministic combiner", () => {
+	test("status failure + diff success => degraded true with diff files retained", () => {
+		const result = combineGitChangedFiles(
+			{ ok: false, stdout: "" },
+			{ ok: true, stdout: "a.txt\nb.txt\n" },
+		);
+		expect(result.gitQueryFailed).toBe(true);
+		expect(result.files).toEqual(["a.txt", "b.txt"]);
+		expect(result.overflow).toBe(false);
+	});
+
+	test("status success + diff failure => degraded false with status files retained", () => {
+		const result = combineGitChangedFiles(
+			{ ok: true, stdout: " M a.txt\n?? b.txt\n" },
+			{ ok: false, stdout: "" },
+		);
+		expect(result.gitQueryFailed).toBe(false);
+		expect(result.files).toEqual(["a.txt", "b.txt"]);
+		expect(result.overflow).toBe(false);
+	});
+
+	test("both fail => degraded true, empty files", () => {
+		const result = combineGitChangedFiles(
+			{ ok: false, stdout: "" },
+			{ ok: false, stdout: "" },
+		);
+		expect(result.gitQueryFailed).toBe(true);
+		expect(result.files).toEqual([]);
+		expect(result.overflow).toBe(false);
+	});
+
+	test("both succeed => not degraded, deduped union", () => {
+		const result = combineGitChangedFiles(
+			{ ok: true, stdout: " M a.txt\n M b.txt\n" },
+			{ ok: true, stdout: "a.txt\nc.txt\n" },
+		);
+		expect(result.gitQueryFailed).toBe(false);
+		expect(result.files).toEqual(["a.txt", "b.txt", "c.txt"]);
+		expect(result.overflow).toBe(false);
+	});
+
+	test("overflow from porcelain triggers early return with diff files hidden", () => {
+		const manyFiles: string[] = [];
+		for (let i = 0; i < 60; i++) {
+			manyFiles.push(` M file-${i}.txt`);
+		}
+		const result = combineGitChangedFiles(
+			{ ok: true, stdout: `${manyFiles.join("\n")}\n` },
+			{ ok: true, stdout: "extra.txt\n" },
+		);
+		expect(result.gitQueryFailed).toBe(false);
+		expect(result.overflow).toBe(true);
+		expect(result.files).toHaveLength(50);
+		expect(result.files).not.toContain("extra.txt");
+	});
+
+	test("overflow from diff triggers early return", () => {
+		const manyFiles: string[] = [];
+		for (let i = 0; i < 60; i++) {
+			manyFiles.push(`file-${i}.txt`);
+		}
+		const result = combineGitChangedFiles(
+			{ ok: true, stdout: "" },
+			{ ok: true, stdout: `${manyFiles.join("\n")}\n` },
+		);
+		expect(result.gitQueryFailed).toBe(false);
+		expect(result.overflow).toBe(true);
+		expect(result.files).toHaveLength(50);
+	});
+
+	test("status failure remains degraded when diff output overflows", () => {
+		const manyFiles: string[] = [];
+		for (let i = 0; i < 60; i++) {
+			manyFiles.push(`file-${i}.txt`);
+		}
+		const result = combineGitChangedFiles(
+			{ ok: false, stdout: "" },
+			{ ok: true, stdout: `${manyFiles.join("\n")}\n` },
+		);
+		expect(result.gitQueryFailed).toBe(true);
+		expect(result.overflow).toBe(true);
+		expect(result.files).toHaveLength(50);
+	});
+});
+
+describe("readGitChangedFiles with real git", () => {
+	test("gitQueryFailed is false when both status and diff succeed", () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-git-ok-"));
+		try {
+			initGitRoot(root);
+			writeFileSync(join(root, "work.txt"), "content\n", "utf8");
+			runGit(root, ["add", "work.txt"]);
+			runGit(root, ["commit", "-m", "add work.txt"]);
+			writeFileSync(join(root, "work.txt"), "modified\n", "utf8");
+
+			const result = readGitChangedFiles(root);
+			expect(result.gitQueryFailed).toBe(false);
+			expect(result.files).toContain("work.txt");
+			expect(result.overflow).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("gitQueryFailed is true when both status and diff fail (corrupted index)", () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-git-both-fail-"));
+		try {
+			initGitRoot(root);
+			writeFileSync(join(root, "work.txt"), "content\n", "utf8");
+			runGit(root, ["add", "work.txt"]);
+			runGit(root, ["commit", "-m", "add work.txt"]);
+			writeFileSync(join(root, "work.txt"), "modified\n", "utf8");
+
+			// Corrupt index so both status and diff fail
+			const indexPath = join(root, ".git", "index");
+			rmSync(indexPath, { force: true });
+			mkdirSync(indexPath, { recursive: true });
+
+			const result = readGitChangedFiles(root);
+			expect(result.gitQueryFailed).toBe(true);
+			expect(result.files).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("catchup command text output with degraded overflow", () => {
+	test("labels overflow and degraded state together", () => {
+		const { root, session } = createRoot("260614_1300_degraded-overflow");
+		try {
+			const report = computeCatchup(root, { session });
+			report.git_changed_files = Array.from(
+				{ length: 50 },
+				(_, index) => `bulk-${index}.md`,
+			);
+			report.git_changed_files_overflow = true;
+			report.git_changed_files_degraded = true;
+			const text = formatCatchup(report);
+			expect(text).toContain(`session: ${session} (active)`);
+			expect(text).toContain("changed_files: 50+ (degraded)");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

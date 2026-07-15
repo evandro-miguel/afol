@@ -3,9 +3,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
+import type { BoundedSpawnResult } from "../core/subprocess";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { resolveValidateInvocation } from "../validate/command";
+import {
+	runValidationCommands,
+	setBoundedSpawnForTests,
+} from "../validate/command-runner";
+import type { PackId } from "../validate/types";
 
 type CapturedIo = {
 	stdout: string[];
@@ -199,6 +205,199 @@ describe("validate command", () => {
 		}
 	});
 
+	test.each([
+		{
+			name: "rejects disabled adapter with .claude",
+			enabled: false,
+			artifact: ".claude",
+			expectedCode: 1,
+			expectedOk: false,
+			expectedMessage:
+				"claude adapter is disabled but owned artifacts are present: .claude",
+		},
+		{
+			name: "rejects disabled adapter with CLAUDE.md",
+			enabled: false,
+			artifact: "CLAUDE.md",
+			expectedCode: 1,
+			expectedOk: false,
+			expectedMessage:
+				"claude adapter is disabled but owned artifacts are present: CLAUDE.md",
+		},
+		{
+			name: "allows enabled adapter with owned artifacts",
+			enabled: true,
+			artifact: ".claude",
+			expectedCode: 0,
+			expectedOk: true,
+			expectedMessage: "ok claude adapter enabled",
+		},
+		{
+			name: "allows disabled adapter without owned artifacts",
+			enabled: false,
+			artifact: null,
+			expectedCode: 0,
+			expectedOk: true,
+			expectedMessage: "ok claude adapter disabled with no owned artifacts",
+		},
+	])("$name", async ({
+		enabled,
+		artifact,
+		expectedCode,
+		expectedOk,
+		expectedMessage,
+	}) => {
+		const root = createValidationFixture();
+		try {
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: { name: "validate-fixture" },
+					adapters: { claude: { enabled } },
+				}),
+				"utf8",
+			);
+			if (artifact === ".claude") {
+				mkdirSync(join(root, ".claude", "skills"), { recursive: true });
+				writeFileSync(
+					join(root, ".claude", "skills", "generated.md"),
+					"generated adapter artifact\n",
+					"utf8",
+				);
+			} else if (artifact === "CLAUDE.md") {
+				writeFileSync(join(root, "CLAUDE.md"), "claude adapter artifact\n");
+			}
+			rebuildValidationFixtureIndexes(root);
+
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id?: string; ok?: boolean; message?: string }>;
+			};
+			const adapterCheck = payload.checks?.find(
+				(check) => check.id === "adapter_consistency",
+			);
+
+			expect(code).toBe(expectedCode);
+			expect(adapterCheck).toEqual({
+				id: "adapter_consistency",
+				ok: expectedOk,
+				message: expectedMessage,
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project readiness ignores missing outcomes for completed history", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_closed-history";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | historical task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project readiness ignores failed outcomes for completed history", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_failed-history";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | historical task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionDir, ".evidence.jsonl"),
+				`${JSON.stringify({ task_id: "T-01", command: "bun test", result: "failed", exit_code: 1, id: "e-1", provenance: "observed" })}\n`,
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project readiness remains strict for open tasks despite closed metadata", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_open-history";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"---",
+					'doc_type: "workbench_task"',
+					`id: "${session}_task_01"`,
+					`session_id: "${session}"`,
+					'status: "closed"',
+					'updated_at: "2026-07-01T08:00:00.000Z"',
+					'closed_at: "2026-07-01T08:00:00.000Z"',
+					"---",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | open task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(join(sessionDir, ".evidence.jsonl"), "not-json\n", "utf8");
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects discontinued skills-sync manifest in .agents", async () => {
 		const root = createValidationFixture();
 		try {
@@ -220,6 +419,35 @@ describe("validate command", () => {
 			expect(code).toBe(1);
 			expect(check?.ok).toBe(false);
 			expect(check?.message).toContain(".agents/skills-sync.manifest.json");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects vendored global agentic-folder-sys skill", async () => {
+		const root = createValidationFixture();
+		try {
+			const staleSkillPath = join(
+				root,
+				".agents",
+				"skills",
+				"agentic-folder-sys",
+			);
+			mkdirSync(staleSkillPath, { recursive: true });
+			writeFileSync(join(staleSkillPath, "SKILL.md"), "# stale\n", "utf8");
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const check = payload.checks?.find(
+				(entry) => entry.id === "agents_payload_clean",
+			);
+
+			expect(code).toBe(1);
+			expect(check?.ok).toBe(false);
+			expect(check?.message).toContain(".agents/skills/agentic-folder-sys");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -496,6 +724,90 @@ describe("validate command", () => {
 			expect(templateCheck).toBeDefined();
 			expect(templateCheck?.ok).toBe(false);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runValidationCommands prevents zero-spec pack from passing as zero coverage", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-zerospec-"));
+		try {
+			// "mcp-parity" has a defined command — this should pass
+			const result = runValidationCommands(root, ["mcp-parity"]);
+			expect(result.summary.passed + result.summary.failed).toBeGreaterThan(0);
+
+			// A defined pack should NOT trigger the empty-spec guard
+			const definedPackResult = runValidationCommands(root, [
+				"cli-kernel-local" as PackId,
+			]);
+			expect(
+				definedPackResult.commandResults.some(
+					(r) =>
+						r.status === "failed" &&
+						r.stderr_tail.includes("no commands defined"),
+				),
+			).toBe(false); // cli-kernel-local is defined, so no failure
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runValidationCommands fires empty-spec guard for unmapped pack", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-zerospec-guard-"));
+		try {
+			const guardResult = runValidationCommands(root, [
+				"non-existent-test-pack" as PackId,
+			]);
+			expect(guardResult.summary.passed).toBe(0);
+			expect(guardResult.summary.failed).toBe(1);
+			expect(
+				guardResult.commandResults.some(
+					(r) =>
+						r.status === "failed" &&
+						r.stderr_tail.includes(
+							"no commands defined for pack: non-existent-test-pack",
+						),
+				),
+			).toBe(true);
+			// Every result from the guard has exit_code null and signal null
+			for (const r of guardResult.commandResults) {
+				expect(r.exit_code).toBeNull();
+				expect(r.signal).toBeNull();
+				expect(r.duration_ms).toBe(0);
+				expect(r.command).toEqual([]);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runValidationCommands classifies timeout via stderr_tail and signal", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-timeout-"));
+		try {
+			// Replace boundedSpawn with a mock that reports timeout
+			setBoundedSpawnForTests(
+				() =>
+					({
+						ok: false,
+						timedOut: true,
+						status: null,
+						signal: "SIGKILL",
+						stdout: "",
+						stderr: "timed out after 1ms",
+					}) as BoundedSpawnResult,
+			);
+
+			const result = runValidationCommands(root, ["cli-kernel-local"]);
+			expect(result.commandResults.length).toBeGreaterThan(0);
+			for (const cmdResult of result.commandResults) {
+				expect(cmdResult.status).toBe("failed");
+				expect(cmdResult.signal).toBe("SIGKILL");
+				expect(cmdResult.stderr_tail).toContain("timed out");
+			}
+			// Summary must report all as failed
+			expect(result.summary.passed).toBe(0);
+			expect(result.summary.failed).toBe(result.commandResults.length);
+		} finally {
+			setBoundedSpawnForTests(null);
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import * as nodeFs from "node:fs";
 import {
 	chmodSync,
 	existsSync,
@@ -25,7 +26,10 @@ import {
 	readMaintenanceReviewSummary,
 	scanLegacyReferences,
 } from "../services/health/maintenance-review";
-import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import {
+	detectSessionHealth,
+	rebuildWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import { writeMemory as writeProjectMemory } from "../services/memory/crud";
 import {
 	buildPstrSnapshotManifest,
@@ -188,6 +192,36 @@ function hoursAgo(hours: number): string {
 	return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
+function writeSessionLifecycleEvents(
+	root: string,
+	events: Array<{
+		type?: string;
+		session?: string;
+		event_type?: string;
+		session_id?: string;
+	}>,
+): void {
+	const eventsPath = join(root, ".afol", "data", "events", "events.jsonl");
+	mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+	writeFileSync(
+		eventsPath,
+		`${events
+			.map((event, index) =>
+				JSON.stringify({
+					...(event.type ? { type: event.type } : {}),
+					...(event.session ? { session: event.session } : {}),
+					...(event.event_type ? { event_type: event.event_type } : {}),
+					...(event.session_id ? { session_id: event.session_id } : {}),
+					id: `E2E-${index}`,
+					ts: hoursAgo(0),
+					source: "cli-workbench",
+				}),
+			)
+			.join("\n")}\n`,
+		"utf8",
+	);
+}
+
 function seedHealthyRoot(root: string): void {
 	const updatedAt = hoursAgo(-1);
 	writeProjectMemory(root, {
@@ -232,6 +266,31 @@ describe("health system", () => {
 		}
 	});
 
+	test("checkHealth fails when a child session directory is unreadable", () => {
+		const root = createFixture();
+		const session = "260715_1500_unreadable-health";
+		const sessionDir = join(root, ".afol", "wb", session);
+		try {
+			mkdirSync(sessionDir, { recursive: true });
+			rebuildWorkBenchIndex(root);
+			chmodSync(sessionDir, 0o000);
+
+			const report = checkHealth(root, {});
+			expect(report.ok).toBe(false);
+			expect(
+				report.findings.some(
+					(finding) =>
+						finding.area === "wb" &&
+						finding.severity === "fail" &&
+						finding.message.includes("session directory unreadable"),
+				),
+			).toBe(true);
+		} finally {
+			chmodSync(sessionDir, 0o700);
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("checkHealth detects stale PSTR", () => {
 		const root = createFixture();
 		try {
@@ -260,6 +319,179 @@ describe("health system", () => {
 			const report = checkHealth(root);
 			expect(report.ok).toBe(true);
 			expect(report.findings).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth warns missing session dir without active directory, archive, or migration", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			writeSessionLifecycleEvents(root, [{ type: "workbench.new", session }]);
+			const warnings = detectSessionHealth(root);
+			expect(warnings).toEqual([
+				{
+					type: "missing_session_directory",
+					session,
+					message: `Session "${session}" has start event but no active workbench directory and no migration/archive fallback.`,
+				},
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth suppresses missing-session warning when session directory exists", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			mkdirSync(join(root, ".afol", "wb", session), { recursive: true });
+			writeSessionLifecycleEvents(root, [{ type: "workbench.new", session }]);
+			const warnings = detectSessionHealth(root);
+			expect(
+				warnings.some(
+					(warning) => warning.type === "missing_session_directory",
+				),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth suppresses missing-session warning when session archive exists", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			mkdirSync(join(root, ".afol", "wb", "_archive", session), {
+				recursive: true,
+			});
+			writeSessionLifecycleEvents(root, [{ type: "workbench.new", session }]);
+			const warnings = detectSessionHealth(root);
+			expect(
+				warnings.some(
+					(warning) => warning.type === "missing_session_directory",
+				),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth suppresses missing-session warning when migration record exists", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			mkdirSync(join(root, ".afol", "data", "migrations", session), {
+				recursive: true,
+			});
+			writeSessionLifecycleEvents(root, [{ type: "workbench.new", session }]);
+			const warnings = detectSessionHealth(root);
+			expect(
+				warnings.some(
+					(warning) => warning.type === "missing_session_directory",
+				),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth scans migration evidence once for multiple missing sessions", () => {
+		const root = createFixture();
+		const firstSession = "260709_1751_first-migrated-session";
+		const secondSession = "260709_1752_second-migrated-session";
+		const migrationRoot = join(root, ".afol", "data", "migrations");
+		mkdirSync(migrationRoot, { recursive: true });
+		writeFileSync(
+			join(migrationRoot, "batch.md"),
+			`${firstSession}\n${secondSession}\n`,
+			"utf8",
+		);
+		writeSessionLifecycleEvents(root, [
+			{ type: "workbench.new", session: firstSession },
+			{ type: "workbench.new", session: secondSession },
+		]);
+		const readdirSpy = spyOn(nodeFs, "readdirSync");
+		const readFileSpy = spyOn(nodeFs, "readFileSync");
+		try {
+			const warnings = detectSessionHealth(root);
+			const migrationRootReads = readdirSpy.mock.calls.filter(
+				([path]) => String(path) === migrationRoot,
+			).length;
+			const migrationFileReads = readFileSpy.mock.calls.filter(
+				([path]) => String(path) === join(migrationRoot, "batch.md"),
+			).length;
+			expect(migrationRootReads).toBe(1);
+			expect(migrationFileReads).toBe(1);
+			expect(
+				warnings.some(
+					(warning) => warning.type === "missing_session_directory",
+				),
+			).toBe(false);
+		} finally {
+			readFileSpy.mockRestore();
+			readdirSpy.mockRestore();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth suppresses missing-session warning when session closed", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			writeSessionLifecycleEvents(root, [
+				{ type: "workbench.new", session },
+				{ type: "workbench.close", session },
+			]);
+			const warnings = detectSessionHealth(root);
+			expect(
+				warnings.some(
+					(warning) => warning.type === "missing_session_directory",
+				),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth warns when latest lifecycle transition reopens session", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			writeSessionLifecycleEvents(root, [
+				{ type: "workbench.new", session },
+				{ type: "workbench.close", session },
+				{ type: "workbench.new", session },
+			]);
+			const warnings = detectSessionHealth(root);
+			expect(warnings).toEqual([
+				{
+					type: "missing_session_directory",
+					session,
+					message: `Session "${session}" has start event but no active workbench directory and no migration/archive fallback.`,
+				},
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkHealth maps missing session directory warning to explicit remediation hint", () => {
+		const root = createFixture();
+		const session = "260709_1751_lifecycle-integrity-hardening";
+		try {
+			rebuildWorkBenchIndex(root);
+			writeSessionLifecycleEvents(root, [{ type: "workbench.new", session }]);
+			const report = checkHealth(root, { area: "wb" });
+			const finding = report.findings.find(
+				(finding) =>
+					finding.severity === "warn" &&
+					finding.message.includes(`Session "${session}"`),
+			);
+			expect(finding?.hint).toBe(
+				"restore from archive, migration pack, or recreate the session directory",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

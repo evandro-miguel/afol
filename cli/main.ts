@@ -16,6 +16,7 @@ import { runContextCommand } from "./commands/context";
 import { runDbCommand } from "./commands/db";
 import { runDoctorCommand } from "./commands/doctor";
 import { runFileCommand } from "./commands/file";
+import { runGovernanceCommand } from "./commands/governance";
 import { runHealthCommand } from "./commands/health";
 import { runHydrateCommand } from "./commands/hydrate";
 import { runInitCommand } from "./commands/init";
@@ -44,11 +45,15 @@ import {
 	runLogCommand,
 	runNewCommand,
 	runStartCommand,
+	runTransitionCommand,
 	runVerifyTasksCommand,
 } from "./commands/workbench";
+import { envelopeErr, stringifyEnvelope } from "./core/envelope";
 import {
 	defaultOperationContext,
+	isActionAllowed,
 	type OperationContext,
+	resolveCanonicalAction,
 	resolveOperationContext,
 } from "./core/operation-context";
 import { CLI_VERSION } from "./generated/version";
@@ -75,6 +80,8 @@ const NEW_COMMAND_HELP = [
 	"  --intent <intent>        Delivery or planning intent",
 	"  --feature-id <id>        Governing roadmap feature ID",
 	"  --parent-spec <spec-id>  Parent spec identifier",
+	"  --no-spec-required      Waive spec requirement for this session",
+	"  --reason <reason>       Required with --no-spec-required",
 	"  --task <text>            Initial task summary; repeat for multiple tasks",
 ].join("\n");
 
@@ -91,11 +98,14 @@ const START_COMMAND_HELP = [
 ].join("\n");
 
 const CLOSE_COMMAND_HELP = [
-	"Usage: afol close --session <session-id> [options]",
+	"Usage: afol close [--session <session-id>] [options]",
 	"",
 	"Options",
-	"  --session <session-id>  Workbench session to close",
-	"  --json                 Emit machine-readable close result",
+	"  --session <session-id>      Workbench session; omit when active/bound",
+	"  -m, --summary <text>        Summary for the generated report",
+	"  --allow-no-report           Explicitly waive a missing report",
+	"  --reason <text>             Required with --allow-no-report",
+	"  -j, --json                  Emit machine-readable close result",
 ].join("\n");
 
 const exit = (code: number): never => {
@@ -111,6 +121,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"start",
 	"evidence",
 	"done",
+	"transition",
 	"log",
 	"quickTask",
 	"verifyTasks",
@@ -127,6 +138,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 
 export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"adm",
+	"governance",
 	"health",
 	"db",
 	"doctor",
@@ -306,31 +318,33 @@ export async function main(argv: string[]): Promise<number> {
 		return resolution.exitCode;
 	}
 
-	if (
-		resolution.kind === "new" &&
-		resolution.args.length === 1 &&
-		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
-	) {
+	if (resolution.kind === "new" && hasHelpArg(resolution.args)) {
 		console.log(NEW_COMMAND_HELP);
 		return 0;
 	}
 
-	if (
-		resolution.kind === "start" &&
-		resolution.args.length === 1 &&
-		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
-	) {
+	if (resolution.kind === "start" && hasHelpArg(resolution.args)) {
 		console.log(START_COMMAND_HELP);
 		return 0;
 	}
 
-	if (
-		resolution.kind === "close" &&
-		resolution.args.length === 1 &&
-		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
-	) {
+	if (resolution.kind === "close" && hasHelpArg(resolution.args)) {
 		console.log(CLOSE_COMMAND_HELP);
 		return 0;
+	}
+
+	const directHelpCommand =
+		resolution.kind !== "subcommand" &&
+		resolution.kind !== "verifyTasks" &&
+		hasHelpArg(resolution.args)
+			? registryHelpCommandForGroup(resolution.kind)
+			: null;
+	if (directHelpCommand) {
+		const help = formatCommandHelp(directHelpCommand, kernelRegistry);
+		if (help) {
+			console.log(help);
+			return 0;
+		}
 	}
 
 	const helpCommand = subcommandGroupHelpCommand(resolution);
@@ -342,12 +356,38 @@ export async function main(argv: string[]): Promise<number> {
 		}
 	}
 
+	const policy = resolveCanonicalAction({
+		kind: resolution.kind,
+		args: resolution.args,
+		...(resolution.kind === "subcommand"
+			? { group: resolution.group, action: resolution.action }
+			: {}),
+	});
+	if (!isActionAllowed(operationCtx, policy)) {
+		const action = policy?.action ?? resolution.kind;
+		const message = `${action} requires local interactive approval`;
+		const json = resolution.args.some((arg) => kernelRegistry.isJsonAlias(arg));
+		if (json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeErr("approval-required", message, {
+						action,
+						exitCode: 2,
+					}),
+				),
+			);
+		} else {
+			console.error(`err approval-required ${message}`);
+		}
+		return 2;
+	}
+
 	if (resolution.kind === "bootstrap") {
-		return runBootstrapCommand(resolution.args);
+		return runBootstrapCommand(resolution.args, {}, operationCtx);
 	}
 
 	if (resolution.kind === "init") {
-		return runInitCommand(resolution.args);
+		return runInitCommand(resolution.args, operationCtx);
 	}
 
 	const project = loadProjectRoot(process.cwd());
@@ -386,6 +426,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "done") {
 		return runDoneCommand(resolution.args, project.value.root, operationCtx);
+	}
+
+	if (resolution.kind === "transition") {
+		return runTransitionCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "log") {
@@ -469,6 +517,15 @@ export async function main(argv: string[]): Promise<number> {
 			return runHealthCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
 				project.value.root,
+			);
+		}
+		if (resolution.group === "governance") {
+			return runGovernanceCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "db") {

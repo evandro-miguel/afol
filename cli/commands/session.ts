@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { relative } from "node:path";
 import {
 	envelopeErr,
@@ -16,8 +16,8 @@ import { atomicWriteText } from "../services/io/atomic";
 import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
-	isSessionClosed,
 	readActiveSession,
+	sessionLifecycleState,
 	sessionPaths,
 } from "../services/workbench/lifecycle";
 import {
@@ -25,6 +25,7 @@ import {
 	listBindings,
 	removeBinding,
 	resolveContextSession,
+	withSessionContextLock,
 } from "../services/workbench/session-context";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -32,6 +33,10 @@ type ActionResult = {
 	data: Record<string, unknown>;
 	lines: string[];
 	exitCode: number;
+};
+
+type SessionCommandRuntime = {
+	beforeSwitchBinding?: (() => void) | undefined;
 };
 
 type CoordinationRadarPath = {
@@ -403,19 +408,22 @@ function assertSessionExists(projectRoot: string, session: string): void {
 			`session not found: ${session} (missing folder ${paths.sessionDir})`,
 		);
 	}
-	if (!existsSync(paths.taskPath)) {
-		throw new Error(
-			`session not found: ${session} (missing task file ${paths.taskPath})`,
-		);
-	}
 }
 
 function assertSessionNotArchivedOrClosed(
 	projectRoot: string,
 	session: string,
 ): void {
-	if (isSessionClosed(projectRoot, session)) {
-		throw new Error(`session closed: ${session} (all tasks done)`);
+	const lifecycle = sessionLifecycleState(projectRoot, session);
+	if (lifecycle === "corrupt") {
+		throw new Error(
+			`session corrupt: ${session} (missing canonical task file)`,
+		);
+	}
+	if (lifecycle === "closed") {
+		throw new Error(
+			`session closed: ${session} (durable close metadata present)`,
+		);
 	}
 }
 
@@ -582,6 +590,7 @@ function switchSession(
 	projectRoot: string,
 	session: string,
 	ctx: OperationContext,
+	runtime: SessionCommandRuntime,
 ): ActionResult {
 	assertSessionExists(projectRoot, session);
 	assertSessionNotArchivedOrClosed(projectRoot, session);
@@ -590,11 +599,20 @@ function switchSession(
 	}
 	const branch = currentGitBranch(projectRoot);
 	const worktree = currentGitWorktree(projectRoot) ?? projectRoot;
-	atomicWriteText(
-		resolveProjectPaths(projectRoot).abs.activeSessionFile,
-		`${session}\n`,
-	);
-	const binding = bindSession(projectRoot, { session, branch, worktree });
+	const activePath = resolveProjectPaths(projectRoot).abs.activeSessionFile;
+	const binding = withSessionContextLock(projectRoot, () => {
+		const activeExisted = existsSync(activePath);
+		const activeBefore = activeExisted ? readFileSync(activePath, "utf8") : "";
+		try {
+			atomicWriteText(activePath, `${session}\n`);
+			runtime.beforeSwitchBinding?.();
+			return bindSession(projectRoot, { session, branch, worktree });
+		} catch (error) {
+			if (activeExisted) atomicWriteText(activePath, activeBefore);
+			else rmSync(activePath, { force: true });
+			throw error;
+		}
+	});
 	return {
 		data: {
 			action: "switch",
@@ -671,6 +689,7 @@ export async function runSessionCommand(
 	projectRoot: string,
 	io: CommandIo = DEFAULT_IO,
 	ctx: OperationContext = defaultOperationContext(),
+	runtime: SessionCommandRuntime = {},
 ): Promise<number> {
 	let parsed: ParsedArgs;
 	try {
@@ -714,7 +733,7 @@ export async function runSessionCommand(
 				throw new Error("Missing session identifier for session switch.");
 			}
 			return emit(
-				switchSession(projectRoot, session, ctx),
+				switchSession(projectRoot, session, ctx, runtime),
 				"session.switch",
 				parsed.json,
 				io,

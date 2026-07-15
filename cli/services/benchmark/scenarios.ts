@@ -85,24 +85,58 @@ function seedSpecs(root: string): void {
 	);
 }
 
+function seedGovernedLifecycleFixture(root: string): void {
+	const roadmapDir = join(root, ".afol", "adm", "roadmap");
+	const specsDir = join(root, ".afol", "adm", "specs");
+	mkdirSync(roadmapDir, { recursive: true });
+	mkdirSync(specsDir, { recursive: true });
+	writeFileSync(
+		join(roadmapDir, "GENERAL-ROADMAP.md"),
+		[
+			"# Roadmap",
+			"",
+			"### F-01 Test feature",
+			"",
+			"- Status: active",
+			"- Governing spec: .afol/adm/specs/spec-01.md",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(specsDir, "spec-01.md"),
+		[
+			"---",
+			"id: spec-01",
+			"status: active",
+			"roadmap_feature: F-01",
+			"---",
+			"",
+			"# Test feature",
+		].join("\n"),
+		"utf8",
+	);
+}
+
 export const BENCH_SCENARIOS: BenchScenario[] = [
 	{
 		id: "governed-task-lifecycle",
 		version: "1.0.0",
 		description:
-			"Create, start, evidence, complete, and close a governed workbench task.",
+			"Create, start, test, complete, and close a governed workbench task.",
 		prompt:
-			"Create a workbench session, start task T-01, add evidence with command 'echo hello', mark done, close session. Use afol commands.",
+			'Execute exactly these four commands, in order: `afol new lifecycle --feature-id F-01 --parent-spec spec-01 --task "exercise T-01"`; `afol start T-01`; `afol d T-01 -x "echo hello"`; `afol close`. The fixture already contains the governed F-01/spec-01 pair. Do not call `afol evidence`, use `--command` or `--result`, inspect or edit `.afol/wb`, or edit the evidence ledger.',
 		setup(root) {
 			seedProjectSkeleton(root);
+			seedGovernedLifecycleFixture(root);
 		},
 		expected: {
-			commands_used: [
-				"afol new",
-				"afol start",
+			commands_used: ["afol new", "afol start", "afol d", "afol close"],
+			forbidden_commands: [
 				"afol evidence",
-				"afol done",
-				"afol close",
+				"--command",
+				"--result",
+				".afol/wb",
+				".evidence.jsonl",
 			],
 			task_completes: true,
 			workbench_closed: true,

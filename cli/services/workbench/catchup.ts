@@ -1,6 +1,6 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { boundedSpawn } from "../../core/subprocess";
 import { collectSessionIds } from "../local-state/workbench-index";
 import { readActiveSession, sessionPaths } from "./lifecycle";
 
@@ -15,6 +15,7 @@ export type CatchupReport = {
 	session_status: "active" | "closed" | "no-session";
 	git_changed_files: string[];
 	git_changed_files_overflow: boolean;
+	git_changed_files_degraded: boolean;
 	git_branch: string | null;
 	artifacts: {
 		plan: ArtifactState;
@@ -103,15 +104,18 @@ function parsePorcelainLine(line: string): string | null {
 }
 
 function runGit(root: string, args: string[]): { ok: boolean; stdout: string } {
-	const result = spawnSync("git", args, {
-		cwd: root,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-	});
+	const result = boundedSpawn("git", args, { cwd: root, timeoutMs: 15_000 });
 	return {
-		ok: result.status === 0,
-		stdout: typeof result.stdout === "string" ? result.stdout : "",
+		ok: result.ok,
+		stdout: result.stdout,
 	};
+}
+
+function gitProbeOk(root: string): boolean {
+	return boundedSpawn("git", ["rev-parse", "--is-inside-work-tree"], {
+		cwd: root,
+		timeoutMs: 10_000,
+	}).ok;
 }
 
 function readGitBranch(root: string): string | null {
@@ -119,15 +123,20 @@ function readGitBranch(root: string): string | null {
 	return result.ok ? result.stdout.trim() || null : null;
 }
 
-function readGitChangedFiles(root: string): {
-	files: string[];
-	overflow: boolean;
-} {
+/**
+ * Pure combining logic for git status + diff outputs.
+ * Exported for deterministic testing without spawning real git.
+ */
+export function combineGitChangedFiles(
+	porcelain: { ok: boolean; stdout: string },
+	diff: { ok: boolean; stdout: string },
+): { files: string[]; overflow: boolean; gitQueryFailed: boolean } {
 	const files: string[] = [];
 	const seen = new Set<string>();
+	let statusOk = false;
 
-	const porcelain = runGit(root, ["status", "--porcelain"]);
 	if (porcelain.ok) {
+		statusOk = true;
 		for (const rawLine of porcelain.stdout.split(/\r?\n/)) {
 			const line = rawLine.trimEnd();
 			if (!line) {
@@ -140,12 +149,11 @@ function readGitChangedFiles(root: string): {
 			seen.add(parsed);
 			files.push(parsed);
 			if (files.length >= CATCHUP_GIT_FILE_LIMIT) {
-				return { files, overflow: true };
+				return { files, overflow: true, gitQueryFailed: false };
 			}
 		}
 	}
 
-	const diff = runGit(root, ["diff", "--name-only", "HEAD"]);
 	if (diff.ok) {
 		for (const rawLine of diff.stdout.split(/\r?\n/)) {
 			const parsed = normalizeChangedFile(rawLine);
@@ -155,12 +163,23 @@ function readGitChangedFiles(root: string): {
 			seen.add(parsed);
 			files.push(parsed);
 			if (files.length >= CATCHUP_GIT_FILE_LIMIT) {
-				return { files, overflow: true };
+				return { files, overflow: true, gitQueryFailed: !statusOk };
 			}
 		}
 	}
 
-	return { files, overflow: false };
+	return { files, overflow: false, gitQueryFailed: !statusOk };
+}
+
+export function readGitChangedFiles(root: string): {
+	files: string[];
+	overflow: boolean;
+	gitQueryFailed: boolean;
+} {
+	return combineGitChangedFiles(
+		runGit(root, ["status", "--porcelain"]),
+		runGit(root, ["diff", "--name-only", "HEAD"]),
+	);
 }
 
 function latestChangedFileMtime(root: string, files: string[]): number {
@@ -209,15 +228,24 @@ export function computeCatchup(
 ): CatchupReport {
 	const explicitSession = opts.session?.trim() || null;
 	const activeSession = readActiveSession(root);
-	const branch = readGitBranch(root);
+	const gitAvailable = gitProbeOk(root);
+	const branch = gitAvailable ? readGitBranch(root) : null;
+	const git = readGitChangedFiles(root);
 	const session = explicitSession ?? activeSession;
 	if (!session) {
 		const recent = recentSessionsHint(root);
+		const notes = [`recent sessions: ${recent}`];
+		if (!gitAvailable) {
+			notes.unshift("degraded: git unavailable, state unknown");
+		} else if (git.gitQueryFailed) {
+			notes.unshift("degraded: git status query failed, state uncertain");
+		}
 		return {
 			session: null,
 			session_status: "no-session",
-			git_changed_files: [],
-			git_changed_files_overflow: false,
+			git_changed_files: git.files,
+			git_changed_files_overflow: git.overflow,
+			git_changed_files_degraded: !gitAvailable || git.gitQueryFailed,
 			git_branch: branch,
 			artifacts: {
 				plan: { present: false, mtime: null, lines: 0 },
@@ -228,14 +256,13 @@ export function computeCatchup(
 			freshness: {
 				findings_stale: false,
 				log_behind_diff: false,
-				notes: [`recent sessions: ${recent}`],
+				notes,
 			},
 			next_step: "no active session — run afol n",
 		};
 	}
 
 	const sessionState = buildArtifactStates(root, session);
-	const git = readGitChangedFiles(root);
 	const latestChanged = latestChangedFileMtime(root, git.files);
 	const planTaskMtime = Math.max(
 		sessionState.artifacts.plan.present && sessionState.artifacts.plan.mtime
@@ -257,6 +284,11 @@ export function computeCatchup(
 		git.files.length > 0 && latestChanged > 0 && logMtime < latestChanged;
 
 	const notes: string[] = [];
+	if (!gitAvailable) {
+		notes.push("degraded: git unavailable, state unknown");
+	} else if (git.gitQueryFailed) {
+		notes.push("degraded: git status query failed, state uncertain");
+	}
 	if (!sessionState.artifacts.plan.present) {
 		notes.push("plan missing");
 	}
@@ -283,6 +315,11 @@ export function computeCatchup(
 	}
 
 	let nextStep = "artifacts look fresh";
+	if (!gitAvailable) {
+		nextStep = "degraded: git unavailable, state unknown";
+	} else if (git.gitQueryFailed) {
+		nextStep = "degraded: git status query failed, state uncertain";
+	}
 	const sessionIsActive = session !== null && session === activeSession;
 	if (explicitSession && !sessionIsActive) {
 		nextStep =
@@ -298,6 +335,7 @@ export function computeCatchup(
 		session_status: sessionIsActive ? "active" : "closed",
 		git_changed_files: git.files,
 		git_changed_files_overflow: git.overflow,
+		git_changed_files_degraded: !gitAvailable || git.gitQueryFailed,
 		git_branch: branch,
 		artifacts: sessionState.artifacts,
 		freshness: {

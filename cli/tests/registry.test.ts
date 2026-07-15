@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { kernelRegistry } from "../registry";
+import { buildManifestCommands } from "../services/manifest/commands";
 
 describe("kernel registry", () => {
 	test("exports expected command kinds and alias resolution", () => {
@@ -160,6 +163,21 @@ describe("kernel registry", () => {
 				expect(seen.has(token)).toBe(false);
 				seen.set(token, spec.command);
 			}
+		}
+	});
+
+	test("keeps static manifests synced from the command registry", () => {
+		const expectedCommands = buildManifestCommands(kernelRegistry.commands);
+
+		for (const relativePath of [
+			".agents/manifest.json",
+			"src/project-template/.agents/manifest.json",
+		]) {
+			const manifest = JSON.parse(
+				readFileSync(join(process.cwd(), relativePath), "utf8"),
+			) as { commands?: unknown };
+
+			expect(manifest.commands).toEqual(expectedCommands);
 		}
 	});
 

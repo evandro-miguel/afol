@@ -46,16 +46,15 @@ export type TelemetryEvent = {
 	outcome?: "success" | "failure";
 	/** Human-readable note (no secrets) */
 	note?: string;
+	/** Evidence provenance for workflow-origin classification */
+	provenance?: "declared" | "observed";
 	/** Error/blocker type when event_type is error or blocker */
 	error_type?: string;
 };
 
 const TELEMETRY_ID_PREFIX = "TEL-";
-let telemetryCounter = 0;
-
 function nextTelemetryId(now: Date): string {
-	telemetryCounter = (telemetryCounter + 1) % 1_000_000;
-	return `${TELEMETRY_ID_PREFIX}${now.getTime()}-${telemetryCounter.toString().padStart(6, "0")}`;
+	return `${TELEMETRY_ID_PREFIX}${now.getTime()}-${randomUUID()}`;
 }
 
 /**
@@ -126,3 +125,5 @@ export function readTelemetryEvents(root: string): TelemetryEvent[] {
 		.map((line: string) => JSON.parse(line) as TelemetryEvent)
 		.filter((e: TelemetryEvent) => e.schema_version === "1");
 }
+
+import { randomUUID } from "node:crypto";

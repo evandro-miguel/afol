@@ -1,6 +1,13 @@
 #!/usr/bin/env bun
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { TEMPLATE_ROOT } from "../schemas/template-policy";
 import {
@@ -24,7 +31,20 @@ function formatGeneratedTemplate(outputPath: string): void {
 	}
 }
 
+function renderFormattedTemplate(rendered: string): string {
+	const scratchDir = mkdtempSync(join(tmpdir(), "afol-template-check-"));
+	const scratchPath = join(scratchDir, "template.ts");
+	try {
+		writeFileSync(scratchPath, rendered, "utf8");
+		formatGeneratedTemplate(scratchPath);
+		return readFileSync(scratchPath, "utf8");
+	} finally {
+		rmSync(scratchDir, { recursive: true, force: true });
+	}
+}
+
 async function main(): Promise<void> {
+	const check = process.argv.includes("--check");
 	const repoRoot = resolve(import.meta.dir, "..", "..");
 	const sourceRoot = join(repoRoot, TEMPLATE_ROOT);
 	const payload = await buildTemplatePayload(sourceRoot);
@@ -32,8 +52,29 @@ async function main(): Promise<void> {
 
 	const outputDir = join(repoRoot, "cli", "generated");
 	const outputPath = join(outputDir, "template.ts");
+	const rendered = renderTemplateModule(payload);
+
+	if (check) {
+		const expected = renderFormattedTemplate(rendered);
+		const current = readFileSync(outputPath, "utf8");
+		if (current !== expected) {
+			throw new Error(
+				"generated template payload is stale; run `bun run template:generate`",
+			);
+		}
+		console.log(
+			[
+				`template payload already synced`,
+				`source=${relative(repoRoot, sourceRoot)}`,
+				`output=${relative(repoRoot, outputPath)}`,
+				`template_hash=${payload.templateHash}`,
+			].join(" "),
+		);
+		return;
+	}
+
 	mkdirSync(outputDir, { recursive: true });
-	writeFileSync(outputPath, renderTemplateModule(payload), "utf8");
+	writeFileSync(outputPath, rendered, "utf8");
 	formatGeneratedTemplate(outputPath);
 
 	const relativeSource = relative(repoRoot, sourceRoot);

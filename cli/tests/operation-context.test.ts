@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	agentOperationContext,
 	defaultOperationContext,
+	isActionAllowed,
 	remoteOperationContext,
 	requiresApproval,
 	resolveOperationContext,
@@ -30,6 +31,58 @@ describe("operation-context", () => {
 		expect(ctx.interactive).toBe(false);
 		expect(ctx.trustLevel).toBe("restricted");
 		expect(requiresApproval(ctx)).toBe(true);
+	});
+
+	test.each([
+		["read", { action: "file.read", sideEffect: "read" }],
+		["preview", { action: "file.patch.preview", sideEffect: "preview" }],
+	] as const)("restricted agent allows %s policies", (_name, policy) => {
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(true);
+	});
+
+	test.each([
+		["read", { action: "file.read", sideEffect: "read" }],
+		["preview", { action: "file.patch.preview", sideEffect: "preview" }],
+	] as const)("restricted remote allows %s policies", (_name, policy) => {
+		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(true);
+	});
+
+	test.each([
+		["append", { action: "file.patch.apply", sideEffect: "write" }],
+		["mutate", { action: "file.move.apply", sideEffect: "write" }],
+	] as const)("restricted agent denies %s policies", (_name, policy) => {
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
+	});
+
+	test.each([
+		["append", { action: "file.patch.apply", sideEffect: "write" }],
+		["mutate", { action: "file.move.apply", sideEffect: "write" }],
+	] as const)("restricted remote denies %s policies", (_name, policy) => {
+		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(false);
+	});
+
+	test("trusted local allows read, preview, and mutation policies", () => {
+		const ctx = defaultOperationContext();
+		expect(
+			isActionAllowed(ctx, { action: "file.read", sideEffect: "read" }),
+		).toBe(true);
+		expect(
+			isActionAllowed(ctx, {
+				action: "file.patch.preview",
+				sideEffect: "preview",
+			}),
+		).toBe(true);
+		expect(
+			isActionAllowed(ctx, { action: "file.patch.apply", sideEffect: "write" }),
+		).toBe(true);
+	});
+
+	test.each([
+		agentOperationContext(),
+		remoteOperationContext(),
+		defaultOperationContext(),
+	])("undefined policy is allowed regardless of context", (ctx) => {
+		expect(isActionAllowed(ctx, undefined)).toBe(true);
 	});
 
 	test("resolveOperationContext defaults to local", () => {

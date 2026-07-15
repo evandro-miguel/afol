@@ -1,10 +1,11 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	accessSync,
+	chmodSync,
 	existsSync,
 	constants as fsConstants,
 	lstatSync,
+	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
@@ -14,6 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import { outputTail } from "./output";
 import type { Scenario } from "./types";
 
@@ -21,6 +23,15 @@ const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const SANDBOX_COPY_EXCLUDES = [".git", "node_modules", "dist", ".bun-build*"];
+const RUNTIME_STATE_GUARD_PATHS = [
+	".afol/state",
+	".afol/data/events",
+	".afol/data/index",
+	".afol/data/mutations",
+	".afol/pstr",
+	".afol/wb/.active_session",
+	".afol/wb/session-context.json",
+] as const;
 
 interface CommandInvocation {
 	command: string;
@@ -47,8 +58,13 @@ interface ScenarioExecutionMetrics {
 	output_tokens: number;
 	context_bytes: number;
 	output_bytes: number;
+	argv_chars?: number;
 	tool_call_count: number;
 	tool_success_rate: number;
+}
+
+function argvCharCount(command: string): number {
+	return Array.from(command.trim()).length;
 }
 
 interface ScenarioExecutionResult {
@@ -59,6 +75,11 @@ interface ScenarioExecutionResult {
 
 interface PorcelainStateEntry {
 	status: string;
+	path: string;
+	fingerprint: string;
+}
+
+interface RuntimeStateEntry {
 	path: string;
 	fingerprint: string;
 }
@@ -124,6 +145,7 @@ function resolveScenarioInvocation(
 	projectRoot: string,
 	command: string,
 	preferLocalWrapper = true,
+	trustedAfolBinary?: string,
 ): CommandInvocation {
 	const tokens = tokenizeCommand(command);
 	if (tokens.length === 0) {
@@ -134,6 +156,7 @@ function resolveScenarioInvocation(
 		projectRoot,
 		tokens,
 		preferLocalWrapper,
+		trustedAfolBinary,
 	);
 }
 
@@ -142,6 +165,7 @@ function resolveCommandInvocation(
 	projectRoot: string,
 	tokens: string[],
 	preferLocalWrapper: boolean,
+	trustedAfolBinary?: string,
 ): CommandInvocation {
 	const program = tokens[0];
 	if (program === undefined) {
@@ -149,6 +173,9 @@ function resolveCommandInvocation(
 	}
 	const args = tokens.slice(1);
 	if (program === "afol" || program === "a") {
+		if (trustedAfolBinary) {
+			return { command: trustedAfolBinary, args };
+		}
 		if (!preferLocalWrapper) {
 			return {
 				command: "bun",
@@ -182,14 +209,12 @@ function createSandboxRoot(projectRoot: string): string {
 		"set -euo pipefail;",
 		`tar -C ${shellQuote(projectRoot)} ${excludeFlags} -cf - . | tar -C ${shellQuote(sandboxRoot)} -xf -`,
 	].join(" ");
-	const exportResult = spawnSync("bash", ["-lc", exportCommand], {
-		stdio: ["ignore", "pipe", "pipe"],
+	const exportResult = boundedSpawn("bash", ["-lc", exportCommand], {
+		timeoutMs: 120_000,
 	});
-	if (exportResult.status !== 0 || exportResult.signal || exportResult.error) {
+	if (!exportResult.ok) {
 		throw new Error(
-			`Sandbox copy export failed: ${outputTail(
-				String((exportResult.stderr ?? exportResult.error?.message) || "tar"),
-			)}`,
+			`Sandbox copy export failed: ${outputTail(spawnFailureDetail(exportResult))}`,
 		);
 	}
 	const projectNodeModules = join(projectRoot, "node_modules");
@@ -199,17 +224,49 @@ function createSandboxRoot(projectRoot: string): string {
 	return sandboxRoot;
 }
 
+function provisionSandboxBinary(
+	sandboxRoot: string,
+	compiledBinary: boolean,
+): { binaryPath: string | null; error: string | null } {
+	if (!compiledBinary) return { binaryPath: null, error: null };
+	const targetDir = join(sandboxRoot, ".afol", "bin");
+	const targetBinary = join(targetDir, "afol");
+	mkdirSync(targetDir, { recursive: true });
+	const result = boundedSpawn(
+		"bun",
+		[
+			"build",
+			"--compile",
+			join(REAL_REPO_ROOT, "cli", "main.ts"),
+			"--outfile",
+			targetBinary,
+		],
+		{
+			cwd: REAL_REPO_ROOT,
+			timeoutMs: 300_000,
+		},
+	);
+	if (!result.ok) {
+		return {
+			binaryPath: null,
+			error: `compiled-binary:${outputTail(spawnFailureDetail(result))}`,
+		};
+	}
+	chmodSync(targetBinary, 0o755);
+	return { binaryPath: targetBinary, error: null };
+}
+
 function gitStatusPorcelain(projectRoot: string): {
 	ok: boolean;
 	output: string;
 } {
-	const result = spawnSync("git", ["status", "--porcelain"], {
+	const result = boundedSpawn("git", ["status", "--porcelain"], {
 		cwd: projectRoot,
-		encoding: "utf8",
+		timeoutMs: 15_000,
 	});
 	return {
-		ok: result.status === 0 && !result.signal && !result.error,
-		output: (result.stdout ?? "").toString().trimEnd(),
+		ok: result.ok,
+		output: result.stdout.trimEnd(),
 	};
 }
 
@@ -286,6 +343,52 @@ function porcelainState(
 	}));
 }
 
+function runtimeStateSnapshot(projectRoot: string): RuntimeStateEntry[] {
+	return RUNTIME_STATE_GUARD_PATHS.map((path) => ({
+		path,
+		fingerprint: hashPath(join(projectRoot, path)),
+	}));
+}
+
+function equivalentRuntimeState(
+	before: RuntimeStateEntry[],
+	after: RuntimeStateEntry[],
+): boolean {
+	const beforeByPath = new Map(before.map((entry) => [entry.path, entry]));
+	const afterByPath = new Map(after.map((entry) => [entry.path, entry]));
+	if (beforeByPath.size !== afterByPath.size) {
+		return false;
+	}
+	for (const [path, beforeEntry] of beforeByPath) {
+		const afterEntry = afterByPath.get(path);
+		if (!afterEntry || afterEntry.fingerprint !== beforeEntry.fingerprint) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function runtimeChangedPaths(
+	before: RuntimeStateEntry[],
+	after: RuntimeStateEntry[],
+): string[] {
+	const beforeByPath = new Map(before.map((entry) => [entry.path, entry]));
+	const afterByPath = new Map(after.map((entry) => [entry.path, entry]));
+	const changedPaths = new Set<string>();
+	for (const [path, afterEntry] of afterByPath) {
+		const beforeEntry = beforeByPath.get(path);
+		if (!beforeEntry || beforeEntry.fingerprint !== afterEntry.fingerprint) {
+			changedPaths.add(path);
+		}
+	}
+	for (const path of beforeByPath.keys()) {
+		if (!afterByPath.has(path)) {
+			changedPaths.add(path);
+		}
+	}
+	return [...changedPaths];
+}
+
 function equivalentPorcelainState(
 	before: PorcelainStateEntry[],
 	after: PorcelainStateEntry[],
@@ -348,10 +451,14 @@ function cleanupGitStatusDiff(
 			rmSync(join(projectRoot, entry.path), { recursive: true, force: true });
 			continue;
 		}
-		spawnSync("git", ["restore", "--worktree", "--staged", "--", entry.path], {
-			cwd: projectRoot,
-			encoding: "utf8",
-		});
+		boundedSpawn(
+			"git",
+			["restore", "--worktree", "--staged", "--", entry.path],
+			{
+				cwd: projectRoot,
+				timeoutMs: 30_000,
+			},
+		);
 	}
 }
 
@@ -379,19 +486,19 @@ function runScenarioSample(
 	invocation: CommandInvocation,
 ): ScenarioSampleRun {
 	const startedAt = performance.now();
-	const result = spawnSync(invocation.command, invocation.args, {
+	const result = boundedSpawn(invocation.command, invocation.args, {
 		cwd: projectRoot,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
+		timeoutMs: 120_000,
 	});
 	const durationMs = Math.max(1, Math.round(performance.now() - startedAt));
 	return {
 		duration_ms: durationMs,
 		exit_code: result.status,
 		signal: result.signal,
-		spawn_error: result.error ? result.error.message : null,
-		stdout: result.stdout ?? "",
-		stderr: result.error ? result.error.message : (result.stderr ?? ""),
+		spawn_error: result.spawnError ?? (result.timedOut ? "timed out" : null),
+		stdout: result.stdout,
+		stderr:
+			result.spawnError ?? (result.timedOut ? "timed out" : result.stderr),
 	};
 }
 
@@ -409,6 +516,9 @@ function coerceMetrics(
 		output_tokens: metrics.output_tokens ?? 0,
 		context_bytes: metrics.context_bytes ?? 0,
 		output_bytes: metrics.output_bytes ?? 0,
+		...(typeof metrics.argv_chars === "number"
+			? { argv_chars: metrics.argv_chars }
+			: {}),
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 	};
@@ -418,36 +528,26 @@ function isCommandSuccess(sample: ScenarioSampleRun): boolean {
 	return !sample.signal && !sample.spawn_error && sample.exit_code === 0;
 }
 
-function buildSampleMetrics(
-	sample: ScenarioSampleRun,
-	passed: boolean,
-): ScenarioExecutionMetrics {
-	const outputBytes = Buffer.byteLength(sample.stdout, "utf8");
-	return {
-		duration_ms: sample.duration_ms,
-		timing_p50_ms: sample.duration_ms,
-		timing_p95_ms: sample.duration_ms,
-		error_count: passed ? 0 : 1,
-		retry_count: 0,
-		context_tokens: 0,
-		prompt_tokens: 0,
-		output_tokens: Math.round(outputBytes / 4),
-		context_bytes: 0,
-		output_bytes: outputBytes,
-		tool_call_count: 1,
-		tool_success_rate: passed ? 1 : 0,
-	};
-}
+type SandboxScenarioSampleResult = {
+	sample: ScenarioSampleRun | null;
+	note: string | null;
+};
 
-function runSandboxScenarioCommand(
+function runSandboxScenarioSample(
 	projectRoot: string,
 	scenario: Scenario,
 	command: string,
-): ScenarioExecutionResult {
-	const expectedExit = scenario.expected_exit;
+): SandboxScenarioSampleResult {
 	let sandboxRoot: string | null = null;
 	try {
 		sandboxRoot = createSandboxRoot(projectRoot);
+		const provisioning = provisionSandboxBinary(
+			sandboxRoot,
+			scenario.compiled_binary === true,
+		);
+		if (provisioning.error) {
+			return { sample: null, note: `setup-failed:${provisioning.error}` };
+		}
 		for (const [index, setupCommand] of (scenario.setup ?? []).entries()) {
 			if (setupCommand.length === 0) {
 				throw new Error("Empty setup command");
@@ -457,13 +557,13 @@ function runSandboxScenarioCommand(
 				sandboxRoot,
 				setupCommand,
 				false,
+				provisioning.binaryPath ?? undefined,
 			);
 			const setupSample = runScenarioSample(sandboxRoot, setupInvocation);
 			if (!isCommandSuccess(setupSample)) {
 				return {
-					metrics: coerceMetrics(scenario.deterministic_metrics),
-					notes: [`setup-failed:${index}:${setupSample.exit_code ?? "null"}`],
-					passed: false,
+					sample: null,
+					note: `setup-failed:${index}:${setupSample.exit_code ?? "null"}`,
 				};
 			}
 		}
@@ -472,14 +572,9 @@ function runSandboxScenarioCommand(
 			sandboxRoot,
 			command,
 			false,
+			provisioning.binaryPath ?? undefined,
 		);
-		const sample = runScenarioSample(sandboxRoot, invocation);
-		const passed = scenarioSamplePassed(sample, expectedExit);
-		return {
-			metrics: buildSampleMetrics(sample, passed),
-			notes: buildSandboxNotes(sample, passed, expectedExit),
-			passed,
-		};
+		return { sample: runScenarioSample(sandboxRoot, invocation), note: null };
 	} finally {
 		if (sandboxRoot) {
 			rmSync(sandboxRoot, { recursive: true, force: true });
@@ -487,19 +582,85 @@ function runSandboxScenarioCommand(
 	}
 }
 
-function buildSandboxNotes(
-	sample: ScenarioSampleRun,
-	passed: boolean,
-	expectedExit: number | undefined,
-): string[] {
-	if (!passed) {
-		return [
-			`sample-failed:1:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
-		];
+function runSandboxScenarioCommand(
+	projectRoot: string,
+	scenario: Scenario,
+	command: string,
+): ScenarioExecutionResult {
+	const expectedExit = scenario.expected_exit;
+	const warmup = runSandboxScenarioSample(projectRoot, scenario, command);
+	const measured = Array.from({ length: BENCH_SAMPLES }, () =>
+		runSandboxScenarioSample(projectRoot, scenario, command),
+	);
+	const setupNotes = [warmup, ...measured]
+		.map((result) => result.note)
+		.filter((note): note is string => note !== null);
+	const samples = measured
+		.map((result) => result.sample)
+		.filter((sample): sample is ScenarioSampleRun => sample !== null);
+	if (
+		!warmup.sample ||
+		setupNotes.length > 0 ||
+		samples.length !== BENCH_SAMPLES
+	) {
+		return {
+			metrics: coerceMetrics({
+				...scenario.deterministic_metrics,
+				argv_chars: argvCharCount(command),
+			}),
+			notes: setupNotes.length > 0 ? setupNotes : ["setup-failed:unknown"],
+			passed: false,
+		};
 	}
-	return typeof expectedExit === "number"
-		? [`expected-exit-honored:${expectedExit}`]
-		: [];
+	const warmupNotes = scenarioSamplePassed(warmup.sample, expectedExit)
+		? []
+		: [
+				`warmup-failed:exit=${warmup.sample.exit_code ?? "null"}:stderr=${outputTail((warmup.sample.spawn_error ?? warmup.sample.stderr) || warmup.sample.stdout)}`,
+			];
+	const sampleFailureNotes = samples.flatMap((sample, index) =>
+		scenarioSamplePassed(sample, expectedExit)
+			? []
+			: [
+					`sample-failed:${index + 1}:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
+				],
+	);
+	const durations = samples.map((sample) => sample.duration_ms);
+	const representativeSample =
+		samples.findLast(
+			(sample) => Buffer.byteLength(sample.stdout, "utf8") > 0,
+		) ?? samples.at(-1);
+	const outputBytes = representativeSample
+		? Buffer.byteLength(representativeSample.stdout, "utf8")
+		: 0;
+	const successfulSamples = samples.filter((sample) =>
+		scenarioSamplePassed(sample, expectedExit),
+	).length;
+	const passed =
+		warmupNotes.length === 0 &&
+		sampleFailureNotes.length === 0 &&
+		successfulSamples === BENCH_SAMPLES;
+	return {
+		metrics: {
+			duration_ms: Math.round(percentile(durations, 0.5)),
+			timing_p50_ms: Math.round(percentile(durations, 0.5)),
+			timing_p95_ms: Math.round(percentile(durations, 0.95)),
+			error_count: BENCH_SAMPLES - successfulSamples,
+			retry_count: 0,
+			context_tokens: 0,
+			prompt_tokens: 0,
+			output_tokens: Math.round(outputBytes / 4),
+			context_bytes: 0,
+			output_bytes: outputBytes,
+			argv_chars: argvCharCount(command),
+			tool_call_count: 1,
+			tool_success_rate: Number((successfulSamples / BENCH_SAMPLES).toFixed(4)),
+		},
+		notes:
+			passed && typeof expectedExit === "number"
+				? [`expected-exit-honored:${expectedExit}`]
+				: [...warmupNotes, ...sampleFailureNotes],
+		passed,
+	};
 }
 
 export function runScenarioCommand(
@@ -527,6 +688,7 @@ export function runScenarioCommand(
 	const gitStateBefore = gitStatusBefore.ok
 		? porcelainState(projectRoot, gitStatusBefore.output)
 		: null;
+	const runtimeStateBefore = runtimeStateSnapshot(projectRoot);
 	let warmup = runScenarioSample(projectRoot, invocation);
 	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
 		warmup = runScenarioSample(projectRoot, invocation);
@@ -545,26 +707,40 @@ export function runScenarioCommand(
 	const gitStateAfter = gitStatusAfter.ok
 		? porcelainState(projectRoot, gitStatusAfter.output)
 		: null;
+	const runtimeStateAfter = runtimeStateSnapshot(projectRoot);
 	const sideEffectNotes: string[] = [];
-	if (
+	const leakedPaths = new Set<string>();
+	const gitGuardUnavailable =
 		!gitStatusBefore.ok ||
 		!gitStatusAfter.ok ||
 		!gitStateBefore ||
-		!gitStateAfter
+		!gitStateAfter;
+	if (
+		!gitGuardUnavailable &&
+		!equivalentPorcelainState(gitStateBefore, gitStateAfter)
 	) {
-		sideEffectNotes.push("side-effect-guard-unavailable");
-	} else if (!equivalentPorcelainState(gitStateBefore, gitStateAfter)) {
 		const changedFiles = porcelainChangedPaths(gitStateBefore, gitStateAfter);
-		if (changedFiles.length > 0) {
-			sideEffectNotes.push(`side-effect-leak:${changedFiles.join(",")}`);
-		} else {
-			sideEffectNotes.push("side-effect-leak:unknown");
+		for (const path of changedFiles) {
+			leakedPaths.add(path);
 		}
 		cleanupGitStatusDiff(
 			projectRoot,
 			gitStatusBefore.output,
 			gitStatusAfter.output,
 		);
+	}
+	if (!equivalentRuntimeState(runtimeStateBefore, runtimeStateAfter)) {
+		for (const path of runtimeChangedPaths(
+			runtimeStateBefore,
+			runtimeStateAfter,
+		)) {
+			leakedPaths.add(path);
+		}
+	}
+	if (leakedPaths.size > 0) {
+		sideEffectNotes.push(`side-effect-leak:${[...leakedPaths].join(",")}`);
+	} else if (gitGuardUnavailable) {
+		sideEffectNotes.push("side-effect-guard-unavailable");
 	}
 	const sampleFailureNotes = samples.flatMap((sample, index) => {
 		if (scenarioSamplePassed(sample, expectedExit)) {
@@ -599,6 +775,7 @@ export function runScenarioCommand(
 		output_tokens: Math.round(outputBytes / 4),
 		context_bytes: 0,
 		output_bytes: outputBytes,
+		argv_chars: argvCharCount(command),
 		tool_call_count: 1,
 		tool_success_rate: Number((successfulSamples / BENCH_SAMPLES).toFixed(4)),
 	};

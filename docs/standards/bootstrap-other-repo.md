@@ -16,7 +16,9 @@ Define how to install the AFOL scaffold into another repository, including:
 - overlay adoption for an existing repo
 - limitations and safe usage notes
 - the skills baseline that should be prepared for future universal-skills contract evolution
-- the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
+- the preferred split between optional project-local skills and global Codex
+  operator skills, where universal AFOL behavior such as `agentic-folder-sys`
+  is not vendored into downstream repos
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
 - the canonical operator front door `afol`; downstream installs must not depend
   on project-local wrappers, legacy aliases, or legacy just command runners
@@ -56,7 +58,8 @@ What it does:
 - prepares current-state map ownership under `.afol/pstr/`
 - creates the workbench/local-state directories under `.afol/` without copying source-repo workbench history
 - validates through the native front door after bootstrap
-- prepares `.afol/adm/source/universal-skills` as the preferred repo-local upstream source checkout
+- prepares `.afol/adm/source/universal-skills` as an optional repo-local
+  upstream source checkout for project-owned skill selections
 - seeds that checkout from committed scaffold assets, so the default bootstrap path does not require a network clone
 
 Recommended command:
@@ -79,7 +82,8 @@ Behavior:
 - the current skills manifest is treated as a compatibility baseline, not as a copy of scaffold-local history
 - bootstrap copies from `src/project-template/`, so downstream output stays clean even if the development workspace contains extra local-only files
 - the target repo should remain ready for repo/ref/profile-based skill installs when the upstream contract lands
-- repo-local skills remain the primary contract; Codex global skills should stay lean
+- repo-local skills remain available for target-specific behavior; universal
+  AFOL operator guidance belongs in global Codex skills
 
 This is the safe path for adopting the scaffold into a live project without clobbering the project’s own source tree.
 
@@ -163,10 +167,14 @@ path authoritative until the release is registered.
 - Existing project governance should be reviewed after install before non-trivial work begins.
 - If the target repo already has its own `AGENTS.md` or local command wrappers,
   review the merge outcome before accepting the install.
-- Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
-- Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
-- `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
+- Bootstrap should reinforce project-local skills for project-specific behavior,
+  while leaving universal AFOL skills such as `agentic-folder-sys` in the global
+  Codex skill layer.
+- Keep project-specific skills directly under the configured
+  `paths.skills_dir` (normally `.agents/skills/**`). Universal skills remain in
+  the machine-global skill layer. `afol skill list|show|search` inspects the
+  local catalog; it does not synchronize an external skills repository.
 - Python/uv bootstrap scripts are factory-only compatibility surfaces. Public
   downstream installs should use the native `afol bootstrap` path and should
   not require `.agents/scripts`, `.agents/runtime`, or project-local uv

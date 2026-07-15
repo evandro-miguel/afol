@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
@@ -159,6 +165,8 @@ describe("verify-tasks command", () => {
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
 			});
 
 			const proc = runKernel(root, [
@@ -210,6 +218,35 @@ describe("verify-tasks command", () => {
 		}
 	});
 
+	test("direct strict verification remains strict for closed sessions", () => {
+		const root = mkProjectRoot("closed-strict");
+		try {
+			const created = newWorkstream(root, "closed-strict");
+			const closedAt = "2026-07-01T08:00:00.000Z";
+			const task = readFileSync(created.taskPath, "utf8")
+				.replace('status: "active"', 'status: "closed"')
+				.replace(
+					/^updated_at: .*$/m,
+					`updated_at: "${closedAt}"\nclosed_at: "${closedAt}"`,
+				)
+				.replace("| T-01 | pending |", "| T-01 | done |")
+				.replace("| T-01 | in_progress |", "| T-01 | done |");
+			writeFileSync(created.taskPath, task, "utf8");
+
+			const proc = runKernel(root, [
+				"verify-tasks",
+				`.afol/wb/${created.session}`,
+				"--strict",
+			]);
+
+			expect(proc.status).toBe(1);
+			expect(proc.stdout as string).toContain("missing_evidence");
+			expect(proc.stdout as string).toContain("Verification failed.");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("accepts explicit .afol/wb session paths", () => {
 		const root = mkProjectRoot("explicit-wb-path");
 		try {
@@ -231,6 +268,8 @@ describe("verify-tasks command", () => {
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
 			});
 
 			const proc = runKernel(root, [

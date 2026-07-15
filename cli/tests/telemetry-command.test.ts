@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,6 +42,24 @@ function captureIo() {
 }
 
 describe("telemetry command", () => {
+	test("telemetry and workbench UUID ids stay unique across processes", () => {
+		const root = mkRoot();
+		try {
+			const script = `import { appendTelemetryEvent } from ${JSON.stringify(join(process.cwd(), "cli/services/events/telemetry.ts"))}; import { appendWorkbenchEvent } from ${JSON.stringify(join(process.cwd(), "cli/services/local-state/workbench-events.ts"))}; const root=process.argv[1]; const tel=appendTelemetryEvent(root,{event_type:"task_start",session_id:"S",task_id:"T-01"}); const wse=appendWorkbenchEvent(root,{type:"workbench.start_task",session:"S",taskId:"T-01"}); console.log(JSON.stringify([tel.id,wse.id]));`;
+			const ids = Array.from({ length: 2 }, () => {
+				const run = spawnSync("bun", ["-e", script, root], {
+					encoding: "utf8",
+				});
+				expect(run.status).toBe(0);
+				return JSON.parse(run.stdout.trim()) as string[];
+			}).flat();
+			expect(new Set(ids).size).toBe(4);
+			for (const id of ids)
+				expect(id).toMatch(/^(?:TEL|WSE)-\d+-[0-9a-f-]{36}$/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("query filters telemetry events", async () => {
 		const root = mkRoot();
 		try {

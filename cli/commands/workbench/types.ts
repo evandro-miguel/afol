@@ -42,6 +42,7 @@ export type CloseArgs = {
 	json: boolean;
 	allowNoReport: boolean;
 	reason: string;
+	summary: string;
 };
 
 export type LogArgs = {

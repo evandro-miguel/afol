@@ -876,33 +876,26 @@ export function checkPstrStale(
 	const snapshot = snapshotBelongsToRoot(root, rawSnapshot)
 		? rawSnapshot
 		: null;
+	const liveEntries = buildLiveMapEntries(root);
 	if (!snapshot) {
-		return PSTR_AREAS.map((area) => ({
-			id: area.id,
+		return liveEntries.map((entry) => ({
+			id: entry.id,
 			stale: true,
 			message: `missing pstr index snapshot: ${pstrIndexPath(root)}`,
 		}));
 	}
 
 	const now = Date.now();
-	return PSTR_AREAS.map((area) => {
-		const entry = snapshot.maps.find((map) => map.id === area.id);
-		if (!entry) {
-			return {
-				id: area.id,
-				stale: true,
-				message: `missing pstr map entry: ${area.id}`,
-			};
-		}
+	return snapshot.maps.map((entry) => {
 		const stale = Number.isFinite(Date.parse(entry.stale_after))
 			? Date.parse(entry.stale_after) <= now
 			: true;
 		return {
-			id: area.id,
+			id: entry.id,
 			stale,
 			message: stale
-				? `stale pstr map: ${area.id}`
-				: `current pstr map: ${area.id}`,
+				? `stale pstr map: ${entry.id}`
+				: `current pstr map: ${entry.id}`,
 		};
 	});
 }

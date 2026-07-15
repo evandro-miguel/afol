@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "artifact_type": "preflight_handoff",
+  "agent_type": "explore",
+  "role": "read-only preflight mapper and sole quality-ledger owner",
+  "status": "complete",
+  "created_at": "2026-07-11T04:07:39Z",
+  "updated_at": "2026-07-11T04:07:39Z",
+  "slice_id": "S-PREFLIGHT",
+  "lane": "feature-map",
+  "repo_root": "/home/ozy/01_projects/dev/afol/afol.dev",
+  "branch": "dev",
+  "afol_mode": "AFOL_GOVERNED",
+  "afol_session": "260710_2355_core-integrity-quality-loop",
+  "afol_task_id": "T-01",
+  "mode": "read-only",
+  "edit_permission": [
+    ".afol/wb/260710_2355_core-integrity-quality-loop/handoffs/preflight-001.json",
+    ".afol/wb/260710_2355_core-integrity-quality-loop/quality-ledger.jsonl"
+  ],
+  "dirty_state": {
+    "observed": [
+      ".afol/wb/260710_2355_core-integrity-quality-loop/.evidence.jsonl",
+      ".afol/wb/260710_2355_core-integrity-quality-loop/260710_2355_core-integrity-quality-loop_log_01.md",
+      ".afol/wb/260710_2355_core-integrity-quality-loop/260710_2355_core-integrity-quality-loop_plan_01.md",
+      ".afol/wb/260710_2355_core-integrity-quality-loop/260710_2355_core-integrity-quality-loop_task_01.md",
+      ".afol/wb/260710_2355_core-integrity-quality-loop/handoffs/claim-verification-governance-001.json",
+      ".afol/wb/260710_2355_core-integrity-quality-loop/handoffs/plan-sequencing-001.json"
+    ],
+    "preserved": true,
+    "note": "Only existing session artifacts were untracked before this handoff. No existing file was edited."
+  },
+  "f22_state": {
+    "roadmap": {
+      "feature": "F-22",
+      "status": "active",
+      "evidence": ".afol/adm/roadmap/GENERAL-ROADMAP.md:782-806"
+    },
+    "parent_spec": {
+      "id": "260710_core-integrity-and-transaction-safety_spec_01",
+      "risk_level": "high",
+      "scope_evidence": ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:17-29,119-144",
+      "acceptance_evidence": ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:179-210"
+    },
+    "current_session": {
+      "session": "260710_2355_core-integrity-quality-loop",
+      "status": "active",
+      "governance_status": "governed",
+      "task_state": "T-01=in_progress; T-02..T-05=pending",
+      "evidence": ".afol/wb/260710_2355_core-integrity-quality-loop/260710_2355_core-integrity-quality-loop_task_01.md:1-32"
+    },
+    "runtime_status": {
+      "command": "bun run cli/main.ts status --json",
+      "exit_code": 0,
+      "status": "in_progress",
+      "task": "T-01",
+      "blockers": [
+        "none"
+      ],
+      "validation_or_checks": [
+        "none"
+      ]
+    },
+    "historical_authority": {
+      "evidence_id": "E-20260710212531821-11150d",
+      "report": ".afol/wb/260710_2121_final-core-integrity-validation/260710_2121_final-core-integrity-validation_report_01.md:46-82",
+      "result": "1062 tests passed, 0 failed, 8441 assertions; Biome, Oxlint, typecheck, manifest/template, Gitleaks, and OSV gates passed",
+      "qualification": "Historical evidence is limited to its recorded commit and timestamp. It does not certify the current preflight or later changes."
+    }
+  },
+  "path_counts": {
+    "cli/commands": 49,
+    "cli/services": 97,
+    "cli/tests": 64,
+    "src/project-template": 28,
+    ".afol/adm/roadmap_and_specs": 77
+  },
+  "executable_surfaces": [
+    {
+      "id": "S-F22-LIFECYCLE",
+      "name": "Lifecycle, evidence, verification, governance",
+      "commands": [
+        "status",
+        "new",
+        "start",
+        "evidence",
+        "done",
+        "transition",
+        "close",
+        "verify-tasks",
+        "quick-task",
+        "governance"
+      ],
+      "command_files": [
+        "cli/main.ts",
+        "cli/registry.ts",
+        "cli/router.ts",
+        "cli/commands/workbench.ts",
+        "cli/commands/session.ts",
+        "cli/commands/status.ts",
+        "cli/commands/quick-task.ts",
+        "cli/commands/governance.ts"
+      ],
+      "service_files": [
+        "cli/services/workbench/lifecycle.ts",
+        "cli/services/workbench/verify.ts",
+        "cli/services/workbench/session-context.ts",
+        "cli/services/governance/pending-specs.ts",
+        "cli/services/state/session-state.ts",
+        "cli/services/state/validate.ts",
+        "cli/services/events/telemetry.ts",
+        "cli/services/local-state/workbench-events.ts",
+        "cli/services/local-state/workbench-index.ts"
+      ],
+      "test_files": [
+        "cli/tests/workbench-lifecycle.test.ts",
+        "cli/tests/workbench-verify.test.ts",
+        "cli/tests/session-command.test.ts",
+        "cli/tests/status.test.ts",
+        "cli/tests/quick-task-command.test.ts",
+        "cli/tests/spec-gate-system.test.ts",
+        "cli/tests/state-sqlite.test.ts",
+        "cli/tests/verify-command.test.ts",
+        "cli/tests/envelope.test.ts",
+        "cli/tests/operator-journeys.test.ts"
+      ],
+      "observed_contract": "F-22 requires legal transitions, observed zero-exit completion authority, typed artifact or waiver policy, session-scoped governance blocking, strict hydration, and one JSON error envelope.",
+      "anchors": [
+        "cli/commands/workbench.ts:91-663",
+        "cli/services/workbench/lifecycle.ts:319-1465",
+        "cli/services/workbench/verify.ts:377-688",
+        "cli/services/governance/pending-specs.ts:335-939",
+        "cli/tests/workbench-lifecycle.test.ts:2613-3226"
+      ]
+    },
+    {
+      "id": "S-F22-MUTATION",
+      "name": "File mutation, resource locks, journal, undo",
+      "commands": [
+        "file append|patch",
+        "file move",
+        "file archive",
+        "file undo"
+      ],
+      "command_files": [
+        "cli/commands/file.ts",
+        "cli/commands/file/args.ts",
+        "cli/commands/file/mutations/patch.ts",
+        "cli/commands/file/mutations/move.ts",
+        "cli/commands/file/mutations/archive.ts",
+        "cli/commands/file/mutations/undo.ts"
+      ],
+      "service_files": [
+        "cli/services/io/session-lock.ts",
+        "cli/services/mutations/journal.ts"
+      ],
+      "test_files": [
+        "cli/tests/file-command-unit.test.ts",
+        "cli/tests/mutation-safety.test.ts",
+        "cli/tests/session-lock.test.ts"
+      ],
+      "observed_contract": "Help exposes dry-run for append/patch; writes carry backup and journal metadata; undo is guarded by mutation identity, hashes, backups, and journal integrity.",
+      "anchors": [
+        "cli/commands/file.ts:46-180",
+        "cli/services/mutations/journal.ts:201-355",
+        "cli/services/io/session-lock.ts:313-461",
+        "cli/tests/mutation-safety.test.ts:575-696"
+      ]
+    },
+    {
+      "id": "S-F22-SCAFFOLD",
+      "name": "Scaffold update, bootstrap/init, rollback, provenance",
+      "commands": [
+        "update check",
+        "update preview",
+        "update apply --dry-run",
+        "update rollback",
+        "bootstrap --dry-run",
+        "init --dry-run"
+      ],
+      "command_files": [
+        "cli/commands/update.ts",
+        "cli/commands/bootstrap.ts",
+        "cli/commands/init.ts",
+        "cli/commands/file.ts"
+      ],
+      "service_files": [
+        "cli/services/update/check.ts",
+        "cli/services/bootstrap/planner.ts",
+        "cli/services/bootstrap/cleanup.ts",
+        "cli/services/io/session-lock.ts",
+        "cli/services/mutations/journal.ts"
+      ],
+      "test_files": [
+        "cli/tests/update-command.test.ts",
+        "cli/tests/bootstrap.test.ts",
+        "cli/tests/bootstrap-conflicts.test.ts",
+        "cli/tests/bootstrap-cleanup.test.ts",
+        "cli/tests/downstream-smoke.test.ts",
+        "cli/tests/session-lock.test.ts",
+        "cli/tests/kernel.test.ts"
+      ],
+      "observed_contract": "Help marks check, preview, and dry-run as read-only. Real apply requires session/task/reason metadata; rollback requires batch/reason and hash verification.",
+      "anchors": [
+        "cli/commands/update.ts:733-960",
+        "cli/commands/bootstrap.ts:702-931",
+        "cli/services/update/check.ts:852-1079",
+        "cli/services/bootstrap/planner.ts:101-227",
+        "cli/tests/update-command.test.ts:1329-1902"
+      ]
+    },
+    {
+      "id": "S-F22-CONTRACTS",
+      "name": "Generated contracts, downstream payload, docs, and release surface",
+      "command_files": [
+        "cli/dev/generate-manifest.ts",
+        "cli/dev/generate-template.ts",
+        "cli/dev/release-provenance.ts",
+        "cli/dev/security-scan.ts"
+      ],
+      "generated_or_template_files": [
+        "cli/generated/template.ts",
+        "src/project-template/.agents/manifest.json",
+        "src/project-template/AGENTS.md",
+        "src/project-template/.afol/adm/project-benchmarks"
+      ],
+      "governance_and_report_files": [
+        ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md",
+        ".afol/wb/260710_1631_core-integrity-execution/260710_1631_core-integrity-execution_report_01.md",
+        ".afol/wb/260710_2018_review-followup-integrity/260710_2018_review-followup-integrity_report_01.md",
+        ".afol/wb/260710_2121_final-core-integrity-validation/260710_2121_final-core-integrity-validation_report_01.md"
+      ],
+      "ci": ".github/workflows/agents-scaffold-ci.yml:8-62",
+      "observed_contract": "Package scripts expose manifest/template checks, typecheck, focused tests, security scans, release validation, distribution smoke, and clean-checkout smoke. CI has one validate job.",
+      "anchors": [
+        "package.json:12-57",
+        ".github/workflows/agents-scaffold-ci.yml:8-62",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:253-262"
+      ]
+    }
+  ],
+  "validation": {
+    "executed_read_only": [
+      {
+        "command": "command -v afol",
+        "exit_code": 0,
+        "result": "/home/ozy/.local/bin/afol"
+      },
+      {
+        "command": "afol --version",
+        "exit_code": 0,
+        "result": "afol 0.1.0-alpha.1"
+      },
+      {
+        "command": "afol status",
+        "exit_code": 0,
+        "result": "STATUS: in_progress; TASK: T-01; FILES_WRITTEN: none; BLOCKERS: none"
+      },
+      {
+        "command": "bun run cli/main.ts --help",
+        "exit_code": 0,
+        "result": "Compact command catalog exposes core, workflow, inspect, and ops groups."
+      },
+      {
+        "command": "bun run cli/main.ts status --json",
+        "exit_code": 0,
+        "result": "afol.result/v1; ok=true; status=in_progress; task=T-01; blockers=none"
+      },
+      {
+        "command": "afol status --health --json",
+        "exit_code": 0,
+        "result": "ok=true; validation_or_checks=project indexes need rebuild; next=run afol local-state rebuild; afol pstr rebuild"
+      },
+      {
+        "command": "afol health --release --json",
+        "exit_code": 1,
+        "result": "HEALTH_FAILED; fail=2; warn=0; info=6; scope=release"
+      },
+      {
+        "command": "gitnexus status",
+        "exit_code": 0,
+        "result": "Indexed commit d7db715 equals current commit d7db715; status up-to-date."
+      }
+    ],
+    "safe_narrow_candidates_not_run": [
+      {
+        "purpose": "Lifecycle/evidence/verification regression",
+        "command": "bun test cli/tests/workbench-lifecycle.test.ts cli/tests/workbench-verify.test.ts cli/tests/workbench-args.test.ts cli/tests/verify-command.test.ts cli/tests/router.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/quick-task-command.test.ts"
+      },
+      {
+        "purpose": "Mutation/journal/lock regression",
+        "command": "bun test cli/tests/session-lock.test.ts cli/tests/file-command-unit.test.ts cli/tests/mutation-safety.test.ts"
+      },
+      {
+        "purpose": "Update/bootstrap regression",
+        "command": "bun test cli/tests/session-lock.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-cleanup.test.ts cli/tests/router.test.ts && bun test cli/tests/kernel.test.ts --test-name-pattern \"bootstrap|init\""
+      },
+      {
+        "purpose": "Governance and JSON contract regression",
+        "command": "bun test cli/tests/quick-task-command.test.ts cli/tests/spec-gate-system.test.ts cli/tests/file-command-unit.test.ts && bun run typecheck"
+      },
+      {
+        "purpose": "Narrow static/generated checks after source changes",
+        "command": "bun run typecheck; bun run lint:biome; bun run manifest:check; bun run template:check"
+      }
+    ],
+    "not_run_by_role": [
+      "bun test",
+      "bun run validate:release",
+      "bun run smoke:clean",
+      "security release scans",
+      "dependency installation",
+      "local-state rebuild or pstr rebuild"
+    ]
+  },
+  "release_warnings": [
+    {
+      "severity": "fail",
+      "area": "pstr",
+      "message": "stale pstr index snapshot: .afol/pstr/index.json",
+      "evidence": "afol health --release --json; exit_code=1",
+      "next": "run afol pstr rebuild when a governed writer is authorized"
+    },
+    {
+      "severity": "fail",
+      "area": "wb",
+      "message": "stale workbench index snapshot: .afol/data/index/workbench.json",
+      "evidence": "afol health --release --json; exit_code=1",
+      "next": "rebuild the workbench index when a governed writer is authorized"
+    },
+    {
+      "severity": "warning",
+      "area": "start-briefing",
+      "message": "The start briefing can surface global index findings, overdue maintenance reviews, legacy references in active docs/skills/memory/library, and coordination-radar warnings.",
+      "evidence": "cli/services/workbench/start-briefing.ts:178-198; cli/tests/workbench-lifecycle.test.ts:1055-1137",
+      "qualification": "The current role did not execute start because it is a write-side lifecycle command; overdue-review and legacy-reference values are source/test-contract findings, not current runtime counts."
+    },
+    {
+      "severity": "warning",
+      "area": "historical-evidence",
+      "message": "The final F-22 gate is historical and explicitly requires new evidence after later changes.",
+      "evidence": ".afol/wb/260710_2121_final-core-integrity-validation/260710_2121_final-core-integrity-validation_report_01.md:69-82"
+    },
+    {
+      "severity": "warning",
+      "area": "recovery",
+      "message": "Mutation backups and bootstrap recovery snapshots must remain readable until terminal commit or rollback.",
+      "evidence": ".afol/wb/260710_2121_final-core-integrity-validation/260710_2121_final-core-integrity-validation_report_01.md:79-82"
+    }
+  ],
+  "discovery_frontier": {
+    "method": "bounded two-pass discovery",
+    "pass_1": {
+      "status": "complete",
+      "scope": "package scripts, CLI dispatch/registry/help, F-22 command/service/test slices, template payload paths",
+      "evidence": [
+        "package.json:12-57",
+        "cli/main.ts:1-90",
+        "cli/registry.ts:1-236",
+        "git show --stat ccb3d48",
+        "git show --stat 90cc8b4",
+        "git show --stat 26103e7"
+      ]
+    },
+    "pass_2": {
+      "status": "complete",
+      "scope": "roadmap/spec, current task board, historical F-22 reports, existing researcher/planner handoffs, help/status/health, CI, GitNexus freshness",
+      "evidence": [
+        ".afol/adm/roadmap/GENERAL-ROADMAP.md:782-806",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:179-262",
+        ".afol/wb/260710_2355_core-integrity-quality-loop/260710_2355_core-integrity-quality-loop_task_01.md:24-32",
+        ".afol/wb/260710_2355_core-integrity-quality-loop/handoffs/claim-verification-governance-001.json",
+        ".afol/wb/260710_2355_core-integrity-quality-loop/handoffs/plan-sequencing-001.json",
+        "afol health --release --json",
+        "gitnexus status"
+      ]
+    },
+    "stop_rule": "Stop after two passes when no new P0/P1 executable candidate appears. Do not infer whole-repo certainty from this map.",
+    "excluded": [
+      "secrets, credentials, .env, attachments, and unrelated/sibling paths",
+      "retired .agents runtime surfaces",
+      "production implementation, migrations, dependency installs, service restarts, commits, pushes, deploys",
+      "broad test, release, benchmark, mutation, and security gates"
+    ],
+    "remaining_unknowns": [
+      "Current reproduction status of claims in the existing researcher handoff; prior handoff claims are not automatically runtime proof.",
+      "Current full test/static/security/release result after HEAD; the 1062-test result is historical.",
+      "The effect of rebuilding stale PSTR/workbench indexes on current release health.",
+      "An approved mutation-testing method and threshold; package scripts expose mutation-safety tests but no mutation runner/threshold.",
+      "Whether overdue maintenance reviews and legacy-reference counts are present in the current start briefing."
+    ]
+  },
+  "next": [
+    "H-002 researcher should verify or reject each bounded claim against current source and focused runtime evidence.",
+    "H-003 planner should convert only reproduced defects into governed child specs and slice gates.",
+    "A governed writer must separately decide when to rebuild PSTR/workbench indexes; this preflight does not mutate them.",
+    "Do not treat historical F-22 release evidence as current closure evidence."
+  ],
+  "confidence_band": "LOW",
+  "evidence_anchors": [
+    ".afol/adm/roadmap/GENERAL-ROADMAP.md:782-806",
+    ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:17-29,119-144,179-210,253-262",
+    "package.json:12-57",
+    ".github/workflows/agents-scaffold-ci.yml:8-62",
+    ".afol/wb/260710_2121_final-core-integrity-validation/260710_2121_final-core-integrity-validation_report_01.md:46-82",
+    "afol health --release --json",
+    "gitnexus status"
+  ]
+}

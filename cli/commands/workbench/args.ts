@@ -25,6 +25,7 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 	const rest: string[] = [];
 	const metadata: NewWorkstreamMetadata = {};
 	let json = false;
+	let noSpecRequired = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		const value = args[index + 1];
@@ -68,6 +69,18 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 			index += 1;
 			continue;
 		}
+		if (arg === "--no-spec-required") {
+			noSpecRequired = true;
+			continue;
+		}
+		if (arg === "--reason") {
+			if (!value) {
+				throw new Error("Missing value for --reason in new.");
+			}
+			metadata.noSpecRequiredReason = value;
+			index += 1;
+			continue;
+		}
 		if (arg === "--task") {
 			if (!value) {
 				throw new Error("Missing value for --task in new.");
@@ -86,6 +99,22 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 	if (rest.length > 0) {
 		throw new Error(`Unknown new argument: ${rest[0]}`);
 	}
+	if (metadata.noSpecRequiredReason && !noSpecRequired) {
+		throw new Error("Missing --no-spec-required for new reason.");
+	}
+	if (noSpecRequired && !metadata.noSpecRequiredReason?.trim()) {
+		throw new Error(
+			"Missing --reason for --no-spec-required in new workstream.",
+		);
+	}
+	if (
+		noSpecRequired &&
+		(metadata.featureId?.trim() || metadata.parentSpec?.trim())
+	) {
+		throw new Error(
+			"new governance binding and waiver are mutually exclusive.",
+		);
+	}
 	return { theme, metadata, json };
 }
 
@@ -94,6 +123,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let json = false;
 	let allowNoReport = false;
 	let reason = "";
+	let summary = "";
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -113,6 +143,15 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 			allowNoReport = true;
 			continue;
 		}
+		if (arg === "--summary" || arg === "-m") {
+			const value = args[i + 1];
+			if (!value) {
+				throw new Error("Missing value for --summary in close.");
+			}
+			summary = value;
+			i += 1;
+			continue;
+		}
 		if (arg === "--reason") {
 			const value = args[i + 1];
 			if (!value) {
@@ -130,11 +169,15 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	if (allowNoReport && !reason.trim()) {
 		throw new Error("Missing --reason for close allow-no-report.");
 	}
+	if (allowNoReport && summary.trim()) {
+		throw new Error("Cannot combine --summary with --allow-no-report.");
+	}
 	return {
 		session: resolveSession(root, session, "close"),
 		json,
 		allowNoReport,
 		reason,
+		summary,
 	};
 }
 

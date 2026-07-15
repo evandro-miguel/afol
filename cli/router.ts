@@ -11,6 +11,7 @@ export type CommandResolution =
 	| { kind: "start"; args: string[] }
 	| { kind: "evidence"; args: string[] }
 	| { kind: "done"; args: string[] }
+	| { kind: "transition"; args: string[] }
 	| { kind: "close"; args: string[] }
 	| { kind: "log"; args: string[] }
 	| { kind: "quickTask"; args: string[] }
@@ -41,6 +42,7 @@ export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
 	"library",
 	"memory",
 	"adm",
+	"governance",
 	"spec",
 	"ux",
 	"adr",
@@ -224,6 +226,13 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "done") {
 		return { kind: "done", args: normalizeScopedFlags("done", rest) };
+	}
+
+	if (topLevelKind === "transition") {
+		return {
+			kind: "transition",
+			args: normalizeScopedFlags("transition", rest),
+		};
 	}
 
 	if (topLevelKind === "close") {

@@ -17,6 +17,7 @@ import { agentOperationContext } from "../core/operation-context";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import {
 	buildPstrDiff,
+	checkPstrStale,
 	getPstrAffectedAreas,
 	PSTR_AREAS,
 	rebuildPstrIndex,
@@ -1004,6 +1005,25 @@ describe("pstr service helpers", () => {
 
 			expect(snapshot.maps.some((entry) => entry.id === "docs")).toBe(false);
 			expect(existsSync(join(root, ".afol", "pstr", "docs.md"))).toBe(false);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("stale check ignores registry areas with no live source files", () => {
+		const root = createFixture(false);
+		try {
+			rmSync(join(root, "src", "project-template", "index.ts"));
+
+			const snapshot = rebuildPstrIndex(root);
+			const stale = checkPstrStale(root);
+
+			expect(snapshot.maps.map((entry) => entry.id)).toEqual([
+				"docs",
+				"config",
+			]);
+			expect(stale.map((entry) => entry.id)).toEqual(["docs", "config"]);
+			expect(stale.every((entry) => !entry.stale)).toBe(true);
 		} finally {
 			cleanup(root);
 		}

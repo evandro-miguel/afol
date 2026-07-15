@@ -1,0 +1,31 @@
+{
+  "schema": "codex-quality-loop.authority-critic/v1",
+  "verdict": "REVISE",
+  "confidence": "high",
+  "blocking_findings": [
+    {
+      "id": "C01-COMPAT-004",
+      "finding": "Generic file defaults currently resolve inside the newly protected mutation tree.",
+      "required_change": "Move defaults to an ordinary path or explicitly accept denial and revise compatibility tests."
+    },
+    {
+      "id": "C01-REDACTION-005",
+      "finding": "The seven-name classifier conflicts with the DEMO_API_KEY example.",
+      "required_change": "Define exact assignment-key suffix normalization and corresponding tests."
+    }
+  ],
+  "accepted_authority_fields": [
+    "issuer and trust boundary",
+    "audience",
+    "expiry and renewal",
+    "revocation",
+    "replay protection",
+    "verification",
+    "audit",
+    "local-operator fallback",
+    "test-shell policy"
+  ],
+  "accepted_implementation_scope": false,
+  "allowed_next_action": "Resolve default-file compatibility and redaction-key normalization, then resubmit.",
+  "report_path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c01-authority-critic-004.json"
+}

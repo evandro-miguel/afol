@@ -16,10 +16,10 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 68 |
+| Total | 69 |
 | Draft | 0 |
 | Active | 2 |
-| Final | 42 |
+| Final | 43 |
 | Superseded | 24 |
 
 ## Index
@@ -94,6 +94,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260612_spec-compatibility-and-decision-history_spec-child_01 | spec-compatibility-and-decision-history | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md, adr: .afol/adm/decisions/ADR-004-afol-administration-and-project-structure.md |
 | 260612_temporal-health-freshness-token-budget_spec-child_01 | temporal-health-freshness-token-budget | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md |
 | 260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01 | afol-brain-shape-retrieval-doctor-trust | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md |
+| 260710_1256_typescript-7-toolchain-adoption_spec_01 | typescript-7-toolchain-adoption | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

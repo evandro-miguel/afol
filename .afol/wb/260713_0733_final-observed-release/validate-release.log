@@ -1,0 +1,227 @@
+$ bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run validate:project-benchmarks && bun run validate:ux-governance && bun run coverage:check && bun run build:deterministic && bun run smoke:dist && bun run smoke:clean && bun run validate:security:release && bun run release:provenance:release
+$ bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff
+$ bun run cli/dev/generate-version.ts --check
+version metadata: ok
+$ bun run cli/dev/generate-manifest.ts --check
+manifest metadata already synced
+$ biome check cli
+Checked 246 files in 124ms. No fixes applied.
+$ oxlint cli
+$ knip --dependencies --use-tsconfig-files --max-issues 0
+$ bun run cli/dev/toolchain-smoke.ts
+toolchain smoke: ok
+$ bun run template:check
+$ bun run cli/dev/generate-template.ts --check && bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts
+template payload already synced source=src/project-template output=cli/generated/template.ts template_hash=898023713ea50a6c7b7ba0229018e05d463d4228bd4a021bb28b60bbd8aabe74
+bun test v1.3.14 (0d9b296a)
+
+cli/tests/bootstrap-template-cleanliness.test.ts:
+(pass) generated template cleanliness > generated payload excludes forbidden paths [8.10ms]
+(pass) generated template cleanliness > generated payload keeps AFOL hooks and project skills in owned roots [0.37ms]
+(pass) generated template cleanliness > bootstrap planner never emits forbidden operations [2.31ms]
+(pass) generated template cleanliness > generated payload includes benchmark catalog required by validate bench [0.04ms]
+(pass) generated template cleanliness > generated payload does not tell agents to mark lifecycle tasks with checkboxes [0.25ms]
+
+cli/tests/template-policy.test.ts:
+(pass) template forbidden-content policy > matches expected forbidden patterns in a small fixture [1.79ms]
+(pass) template forbidden-content policy > blocks secret-bearing template payload paths [0.10ms]
+(pass) template forbidden-content policy > live src/project-template has no forbidden content [4.92ms]
+(pass) template forbidden-content policy > live src/project-template only uses explicit allowed payload classes [5.26ms]
+(pass) template forbidden-content policy > live src/project-template instructions do not reference removed or unsupported runtime surfaces [0.19ms]
+(pass) template forbidden-content policy > live src/project-template does not describe workbench lifecycle as checklist marking [0.26ms]
+(pass) template forbidden-content policy > live src/project-template JSON files parse [12.91ms]
+(pass) template forbidden-content policy > live src/project-template manifest covers documented payload roots [0.32ms]
+(pass) template forbidden-content policy > live src/project-template carries current AFOL tools catalog [0.40ms]
+(pass) template forbidden-content policy > live src/project-template carries current benchmark registry [0.25ms]
+(pass) template forbidden-content policy > live repo and src/project-template do not vendor global agentic-folder-sys skill [0.70ms]
+(pass) scanTemplateToolchainClaims > returns claims for bun and afol [36.60ms]
+
+ 17 pass
+ 0 fail
+ 102 expect() calls
+Ran 17 tests across 2 files. [118.00ms]
+$ bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts
+bun test v1.3.14 (0d9b296a)
+
+cli/tests/bootstrap-conflicts.test.ts:
+(pass) bootstrap planner conflict handling > marks conflict when managed file drifted from manifest hash [1.33ms]
+(pass) bootstrap planner conflict handling > marks conflict when ownership is unknown and content differs [0.14ms]
+(pass) bootstrap planner conflict handling > filters forbidden paths even if input map is contaminated [0.09ms]
+
+cli/tests/bootstrap.test.ts:
+(pass) bootstrap planner ownership policy > plans create/skip-identical/update-managed/preserve-project-owned [0.32ms]
+bootstrap: target=/tmp/bootstrap-approval-PCKPLd mode=dry-run mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > allows restricted dry-run but rejects restricted apply without writes [4.24ms]
+(pass) bootstrap provider-compatible mutable state > returns a structured exit for malformed manifest and directory-as-file [0.93ms]
+bootstrap: target=/tmp/bootstrap-locked-replan-5s7OhV mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=1 cleanup=0 provider_cleanup=0 details=run-with---verbose
+Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.
+(pass) bootstrap provider-compatible mutable state > replans target state after acquiring the target-global lock [2.25ms]
+(pass) bootstrap provider-compatible mutable state > rejects a target replaced by a symlink while waiting for its lock [0.51ms]
+bootstrap: target=/tmp/bootstrap-missing-parent-pBwbcO/missing/nested/project mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+bootstrap: target=/tmp/bootstrap-missing-parent-pBwbcO/missing/nested/project mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > supports a nested nonexistent target with a stable canonical lock key [15.26ms]
+(pass) bootstrap provider-compatible mutable state > rejects existing and broken target-root symlinks without replacing them [0.36ms]
+bootstrap: target=/tmp/bootstrap-rollback-failAfterTemplateWrite-U2zIoa mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+bootstrap: target=/tmp/bootstrap-rollback-failAfterCleanup-64ACHo mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=1 provider_cleanup=0 details=run-with---verbose
+bootstrap: target=/tmp/bootstrap-rollback-failAfterMutableBaseline-53gi8S mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+bootstrap: target=/tmp/bootstrap-rollback-failAfterProviderMigration-eMK6oC mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=1 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > restores the exact target tree after failures in every mutation phase [28.75ms]
+(pass) bootstrap provider-compatible mutable state > rejects unsupported partial installs [0.17ms]
+bootstrap: target=/tmp/bootstrap-unregistered-rwTv4P mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > rejects unregistered binary before writing [1.46ms]
+bootstrap: target=/tmp/bootstrap-registered-binary-YtdW4b mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > accepts registered binary provenance without package.json [9.12ms]
+bootstrap: target=/tmp/bootstrap-symlink-target-BBXxuV mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > does not write template files through symlinked target directories [4.19ms]
+bootstrap: target=/tmp/bootstrap-afol-tGr2qU mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > writes mutable state baseline under .afol and configures paths [8.80ms]
+bootstrap: target=/tmp/bootstrap-afol-idempotent-PeYinT mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+bootstrap: target=/tmp/bootstrap-afol-idempotent-PeYinT mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > is idempotent after provider-compatible config transform [11.35ms]
+bootstrap: target=/tmp/bootstrap-afol-baseline-Fiw5vW mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+bootstrap: target=/tmp/bootstrap-afol-baseline-Fiw5vW mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > does not overwrite existing mutable baselines with force-managed [13.89ms]
+bootstrap: target=/tmp/bootstrap-afol-cleanup-77HXcY mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=3 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > provider-compatible preserves legacy mutable roots by default [9.44ms]
+(pass) bootstrap provider-compatible mutable state > provider-compatible preserves legacy mutable roots when cleanup lacks confirm [9.93ms]
+bootstrap: target=/tmp/bootstrap-afol-cleanup-confirmed-7cKJwc mode=apply mutable=.afol without-claude=false files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=3 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > provider-compatible archives legacy mutable roots only with cleanup and confirm [8.87ms]
+(pass) bootstrap provider-compatible mutable state > dry-run reports provider-compatible mutable baseline details [1.68ms]
+bootstrap: target=/tmp/bootstrap-without-claude-2KKtOf mode=apply mutable=.afol without-claude=true files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > --without-claude omits Claude artifacts and marks config disabled [8.36ms]
+bootstrap: target=/tmp/bootstrap-without-claude-pc-0vjpeM mode=apply mutable=.afol without-claude=true files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > --without-claude combines with --provider-compatible [10.27ms]
+bootstrap: target=/tmp/bootstrap-without-claude-agents-MfTEmT mode=apply mutable=.afol without-claude=true files=89 operations=89 conflicts=0 cleanup=0 provider_cleanup=0 details=run-with---verbose
+(pass) bootstrap provider-compatible mutable state > --without-claude with default mutableDir keeps provider-compatible .agents roots [8.37ms]
+Unsupported bootstrap argument: --mutable-dir only accepts .afol. Custom mutable roots are not supported.
+(pass) bootstrap provider-compatible mutable state > custom mutable dir is rejected to avoid split state contracts [0.33ms]
+
+cli/tests/bootstrap-template-cleanliness.test.ts:
+(pass) generated template cleanliness > generated payload excludes forbidden paths [7.41ms]
+(pass) generated template cleanliness > generated payload keeps AFOL hooks and project skills in owned roots [0.29ms]
+(pass) generated template cleanliness > bootstrap planner never emits forbidden operations [2.16ms]
+(pass) generated template cleanliness > generated payload includes benchmark catalog required by validate bench [0.07ms]
+(pass) generated template cleanliness > generated payload does not tell agents to mark lifecycle tasks with checkboxes [0.26ms]
+
+ 31 pass
+ 0 fail
+ 219 expect() calls
+Ran 31 tests across 3 files. [209.00ms]
+$ bun run coverage:project-benchmarks && bun run kernel -- pb validate --strict --json && bun run kernel -- pb generate --check --json
+$ bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark --max-concurrency 1 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts
+coverage cli/commands/project-benchmark.ts lines: 100.00% (threshold 80%)
+coverage cli/commands/project-benchmark.ts functions: 90.00% (threshold 80%)
+coverage cli/services/project-benchmark/catalog.ts lines: 86.90% (threshold 80%)
+coverage cli/services/project-benchmark/catalog.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/generate.ts lines: 96.36% (threshold 80%)
+coverage cli/services/project-benchmark/generate.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/matrix.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/matrix.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/paths.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/paths.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/render.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/render.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/schema.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/schema.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/scoring.ts lines: 94.61% (threshold 80%)
+coverage cli/services/project-benchmark/scoring.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/types.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/types.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-relations.ts lines: 98.17% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-relations.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-shape.ts lines: 99.53% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-shape.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validation-utils.ts lines: 97.50% (threshold 80%)
+coverage cli/services/project-benchmark/validation-utils.ts functions: 100.00% (threshold 80%)
+coverage: passed
+$ bun run cli/main.ts pb validate --strict --json
+{"schema":"afol.result/v1","ok":true,"action":"project-benchmark.validate","exit_code":0,"data":{"schema_version":"1.0.0","command":"project-benchmark.validate","catalog_source":"project","ok":true,"strict":true,"issues":[],"error_count":0,"warning_count":0,"project_count":5}}
+$ bun run cli/main.ts pb generate --check --json
+{"schema":"afol.result/v1","ok":true,"action":"project-benchmark.generate","exit_code":0,"data":{"schema_version":"1.0.0","command":"project-benchmark.generate","generated_by":"afol pb generate","mode":"check","ok":true,"generated_at":"2026-06-16T20:20:52.599Z","data_dir":".afol/data/project-benchmarks","files":[{"path":".afol/data/project-benchmarks/index.json","kind":"index"},{"path":".afol/data/project-benchmarks/similarity-matrix.json","kind":"matrix"},{"path":".afol/data/project-benchmarks/generated-summary.md","kind":"summary"},{"path":".afol/data/project-benchmarks/validation-report.json","kind":"validation"}],"changed_files":[],"misplaced_files":[],"project_count":5,"catalog_source":"project"}}
+$ bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --json
+$ bun run cli/main.ts ux validate --json
+{"schema":"afol.result/v1","ok":true,"exit_code":0,"data":{"ok":true,"generated_at":"2026-07-13T11:34:05.058Z","count":40,"error_count":0,"warning_count":0,"issues":[]},"action":"ux.validate","generated_at":"2026-07-13T11:34:05.058Z","count":40,"error_count":0,"warning_count":0,"issues":[]}
+$ bun run cli/main.ts v bench --pack governance-history --json
+bench: running governance-history/adr-new ...
+bench: running governance-history/changelog-add ...
+bench: running governance-history/feature-spec-coverage-matrix ...
+bench: running governance-history/spec-check ...
+bench: running governance-history/spec-waive ...
+bench: running governance-history/tool-surface-coverage-matrix ...
+bench: running governance-history/ux-registry-lifecycle ...
+{"schema_version":"1.0.0","command_family":"validation","mode":"benchmark","benchmark_result_schema_version":"1.0.0","status":"passed","pass":true,"selected_pack_ids":["governance-history"],"selection_reasons":["default-no-paths"],"result_count":7,"notes":[],"summary":{"total":7,"passed":7,"failed":0,"skipped":0,"baseline_missing":0},"results":[{"schema_version":"1.0.0","run_id":"bench-governance-history-adr-new-1.0.0","scenario_id":"adr-new","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":300,"max_p95_ms":300,"max_output_tokens":108,"min_tool_success_rate":0.98},"pass":true,"duration_ms":54,"timing_p50_ms":54,"timing_p95_ms":54,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":68,"context_bytes":0,"output_bytes":271,"argv_chars":38,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":[]},{"schema_version":"1.0.0","run_id":"bench-governance-history-changelog-add-1.0.0","scenario_id":"changelog-add","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":300,"max_p95_ms":300,"max_output_tokens":96,"min_tool_success_rate":0.98},"pass":true,"duration_ms":56,"timing_p50_ms":56,"timing_p95_ms":56,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":59,"context_bytes":0,"output_bytes":237,"argv_chars":70,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":[]},{"schema_version":"1.0.0","run_id":"bench-governance-history-feature-spec-coverage-matrix-1.0.0","scenario_id":"feature-spec-coverage-matrix","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":1000,"max_p95_ms":1000,"max_output_tokens":1200,"min_tool_success_rate":0.98},"pass":true,"duration_ms":49,"timing_p50_ms":49,"timing_p95_ms":49,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":136,"context_bytes":0,"output_bytes":545,"argv_chars":15,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":["expected-exit-honored:0"]},{"schema_version":"1.0.0","run_id":"bench-governance-history-spec-check-1.0.0","scenario_id":"spec-check","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":300,"max_p95_ms":300,"max_output_tokens":159,"min_tool_success_rate":0.98},"pass":true,"duration_ms":59,"timing_p50_ms":59,"timing_p95_ms":59,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":106,"context_bytes":0,"output_bytes":423,"argv_chars":52,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":["expected-exit-honored:1"]},{"schema_version":"1.0.0","run_id":"bench-governance-history-spec-waive-1.0.0","scenario_id":"spec-waive","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":300,"max_p95_ms":300,"max_output_tokens":167,"min_tool_success_rate":0.98},"pass":true,"duration_ms":57,"timing_p50_ms":57,"timing_p95_ms":57,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":111,"context_bytes":0,"output_bytes":445,"argv_chars":89,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":[]},{"schema_version":"1.0.0","run_id":"bench-governance-history-tool-surface-coverage-matrix-1.0.0","scenario_id":"tool-surface-coverage-matrix","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":1000,"max_p95_ms":1000,"max_output_tokens":2500,"min_tool_success_rate":0.98},"pass":true,"duration_ms":59,"timing_p50_ms":59,"timing_p95_ms":59,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":73,"context_bytes":0,"output_bytes":292,"argv_chars":23,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":["expected-exit-honored:0"]},{"schema_version":"1.0.0","run_id":"bench-governance-history-ux-registry-lifecycle-1.0.0","scenario_id":"ux-registry-lifecycle","scenario_version":"1.0.0","pack_id":"governance-history","status":"passed","baseline_id":"governance-history-v1","baseline_reference":".afol/data/benchmarks/catalog/baselines/governance-history/baseline-v1.json","threshold_reference":{"max_duration_ms":300,"max_p95_ms":300,"max_output_tokens":500,"min_tool_success_rate":0.98},"pass":true,"duration_ms":57,"timing_p50_ms":57,"timing_p95_ms":57,"error_count":0,"retry_count":0,"context_tokens":0,"prompt_tokens":0,"output_tokens":73,"context_bytes":0,"output_bytes":292,"argv_chars":23,"tool_call_count":1,"tool_success_rate":1,"git_commit":"af160f8e1f45","notes":["expected-exit-honored:0"]}],"contract_issues":[]}
+$ bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark
+coverage cli/commands/bootstrap.ts lines: 92.55% (threshold 80%)
+coverage cli/commands/bootstrap.ts functions: 100.00% (threshold 80%)
+coverage cli/commands/project-benchmark.ts lines: 100.00% (threshold 80%)
+coverage cli/commands/project-benchmark.ts functions: 90.00% (threshold 80%)
+coverage cli/commands/validate.ts lines: 81.48% (threshold 80%)
+coverage cli/commands/validate.ts functions: 90.00% (threshold 80%)
+coverage cli/dev/release-provenance.ts lines: 84.60% (threshold 80%)
+coverage cli/dev/release-provenance.ts functions: 96.55% (threshold 80%)
+coverage cli/services/project-benchmark/catalog.ts lines: 86.90% (threshold 80%)
+coverage cli/services/project-benchmark/catalog.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/generate.ts lines: 96.36% (threshold 80%)
+coverage cli/services/project-benchmark/generate.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/matrix.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/matrix.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/paths.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/paths.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/render.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/render.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/schema.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/schema.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/scoring.ts lines: 94.61% (threshold 80%)
+coverage cli/services/project-benchmark/scoring.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/types.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/types.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-relations.ts lines: 98.17% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-relations.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-shape.ts lines: 99.53% (threshold 80%)
+coverage cli/services/project-benchmark/validate-project-shape.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate.ts lines: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validate.ts functions: 100.00% (threshold 80%)
+coverage cli/services/project-benchmark/validation-utils.ts lines: 97.50% (threshold 80%)
+coverage cli/services/project-benchmark/validation-utils.ts functions: 100.00% (threshold 80%)
+coverage: passed
+$ bun install --frozen-lockfile && bun run build
+bun install v1.3.14 (0d9b296a)
+
+Checked 38 installs across 122 packages (no changes) [1.00ms]
+$ bun run version:generate && bun build --compile ./cli/main.ts --outfile dist/afol
+$ bun run cli/dev/generate-version.ts
+version metadata: wrote cli/generated/version.ts
+  [15ms]  bundle  161 modules
+ [122ms] compile  dist/afol
+$ bun run build && bun run cli/dev/dist-smoke.ts
+$ bun run version:generate && bun build --compile ./cli/main.ts --outfile dist/afol
+$ bun run cli/dev/generate-version.ts
+version metadata: wrote cli/generated/version.ts
+  [16ms]  bundle  161 modules
+ [133ms] compile  dist/afol
+dist smoke: ok 260713_0735_smoke
+$ bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap "rm -rf \"$tmpdir\"" EXIT; checkout="$tmpdir/checkout"; mkdir -p "$checkout"; tar -C "$PWD" --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\* -cf - . | tar -C "$checkout" -xf -; cd "$checkout"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'
+bun install v1.3.14 (0d9b296a)
+
++ @biomejs/biome@2.4.16
++ @types/bun@1.3.14
++ citty@0.2.2
++ knip@6.15.0
++ oxlint@1.67.0
++ typescript@7.0.2
++ valibot@1.4.1
++ diff@9.0.0
+
+38 packages installed [76.00ms]
+$ bun run version:generate && bun build --compile ./cli/main.ts --outfile dist/afol
+$ bun run cli/dev/generate-version.ts
+version metadata: wrote cli/generated/version.ts
+  [16ms]  bundle  161 modules
+ [134ms] compile  dist/afol
+$ bun run security:scan:release
+$ bun run cli/dev/security-scan.ts release
+release security scan: /home/ozy/01_projects/dev/afol/afol.dev/.tmp/release-final/dist/security-scan.release.json
+$ bun run cli/dev/release-provenance.ts --release
+release provenance: /home/ozy/01_projects/dev/afol/afol.dev/.tmp/release-final/dist/afol.sha256 /home/ozy/01_projects/dev/afol/afol.dev/.tmp/release-final/dist/afol.provenance.json

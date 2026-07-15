@@ -52,9 +52,14 @@
       "F-17",
       "F-18",
       "F-19",
-      "F-20"
+      "F-20",
+      "F-21",
+      "F-22"
     ],
     "specs": [
+      "260710_core-integrity-and-transaction-safety_spec_01",
+      "260711_c01-action-policy-and-protected-resources_spec-child_01",
+      "260711_c01-authorization-red-reproducers_spec-child_01",
       "260306_artifact-resolution-layer_spec_01",
       "260306_context-driven-execution-commands_spec_01",
       "260306_execution-intelligence-and-knowledge-system_spec_01",
@@ -93,6 +98,7 @@
       "260521_0010_universal-agent-cli_spec_01",
       "260521_0020_minimal-project-template_spec_01",
       "260521_0030_agent-command-design-system_spec_01",
+      "260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01",
       "260521_0040_governance-workbench-system_spec_01",
       "260521_0050_smart-rules-and-skills-routing_spec_01",
       "260521_0060_file-first-low-token-execution_spec_01",
@@ -120,7 +126,8 @@
       "260615_1350_recurring-problem-guardrails_spec-child_01",
       "260618_1519_orchestrator-coordination-radar_spec-child_01",
       "260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01",
-      "260627_1655_canonical-afol-configuration-rehome_spec_01"
+      "260627_1655_canonical-afol-configuration-rehome_spec_01",
+      "260710_1256_typescript-7-toolchain-adoption_spec_01"
     ]
   },
   "feature_scenarios": [
@@ -249,6 +256,12 @@
       "governing_spec": ".afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md",
       "expected_lane": "workbench-parity",
       "validation": "Parallel local, remote, and CI agents use explicit or context-local session selection without corrupting the global workbench pointer."
+    },
+    {
+      "feature": "F-21",
+      "governing_spec": ".afol/adm/specs/260710_1256_typescript-7-toolchain-adoption_spec_01.md",
+      "expected_lane": "release-validation",
+      "validation": "Stable TypeScript 7 adoption keeps typecheck blocking, removes the masked nightly lane, and preserves the release toolchain contract."
     }
   ],
   "result_schema": "1.0.0",
