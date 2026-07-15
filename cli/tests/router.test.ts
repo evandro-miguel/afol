@@ -80,6 +80,13 @@ describe("router alias grammar", () => {
 		});
 	});
 
+	test("stops done flag normalization at the positional verification delimiter", () => {
+		expect(resolveCommand(["d", "T-01", "-x", "bun", "--", "-x", "--test"])).toEqual({
+			kind: "done",
+			args: ["T-01", "--test", "bun", "--", "-x", "--test"],
+		});
+	});
+
 	test("normalizes scoped action aliases and scope-specific short flags", () => {
 		expect(
 			resolveCommand(["cx", "bn", "-S", "session-1", "-T", "T-01"]),

@@ -7,6 +7,8 @@ import {
 	getSpecCheck,
 } from "../../services/spec-gate/checker";
 import type { SpecCheckResult } from "../../services/spec-gate/types";
+import type { VerificationSpec } from "./types";
+export type { VerificationSpec } from "./types";
 import {
 	defaultAllowGlobalFallback,
 	isCiMode,
@@ -84,7 +86,7 @@ export function resolveRequiredSpecCheck(
 	return checkSpecCompatibility(root, session, taskId);
 }
 
-function splitCommandLine(command: string): string[] {
+export function splitCommandLine(command: string): string[] {
 	const tokens: string[] = [];
 	let current = "";
 	let quote: '"' | "'" | null = null;
@@ -140,15 +142,31 @@ export type RunVerificationResult = {
 
 export function runVerification(
 	root: string,
-	command: string,
+	command: string | VerificationSpec,
 	options: { shell?: boolean } = {},
 ): RunVerificationResult {
-	if (command.trim().length === 0) {
+	const spec: VerificationSpec =
+		typeof command === "string"
+			? options.shell
+				? { mode: "shell", command }
+				: (() => {
+						const argv = splitCommandLine(command);
+						return {
+							mode: "argv" as const,
+							executable: argv[0] ?? "",
+							args: argv.slice(1),
+						};
+					})()
+			: command;
+	if (
+		(spec.mode === "shell" && spec.command.trim().length === 0) ||
+		(spec.mode === "argv" && spec.executable.trim().length === 0)
+	) {
 		return { exitCode: 1, error: "Empty --test command." };
 	}
 	let result: ReturnType<typeof spawnSync>;
-	if (options.shell) {
-		result = spawnSync(command, {
+	if (spec.mode === "shell") {
+		result = spawnSync(spec.command, {
 			cwd: root,
 			encoding: "utf8",
 			maxBuffer: 1024 * 1024,
@@ -156,12 +174,7 @@ export function runVerification(
 			shell: true,
 		});
 	} else {
-		const argv = splitCommandLine(command);
-		const executable = argv[0];
-		if (!executable) {
-			return { exitCode: 1, error: "Empty --test command." };
-		}
-		result = spawnSync(executable, argv.slice(1), {
+		result = spawnSync(spec.executable, spec.args, {
 			cwd: root,
 			encoding: "utf8",
 			maxBuffer: 1024 * 1024,

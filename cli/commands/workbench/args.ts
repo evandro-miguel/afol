@@ -10,10 +10,12 @@ import type {
 	SessionTaskJsonArgs,
 	VerifyArgs,
 } from "./types";
+import type { VerificationSpec } from "./types";
 import {
 	resolveSession,
 	resolveVerifySessionPath,
 	resolveVerifyTargetPath,
+	splitCommandLine,
 } from "./verify";
 
 export function hasJsonFlag(args: readonly string[]): boolean {
@@ -336,6 +338,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let taskId = "";
 	let testCommand: string | null = null;
 	let testShellCommand: string | null = null;
+	let verification: VerificationSpec | null = null;
 	let evidenceCommand: string | null = null;
 	let evidenceResult: string | null = null;
 	let requireSpecCheck = false;
@@ -345,6 +348,21 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
+		if (arg === "--") {
+			if (testCommand || testShellCommand) {
+				throw new Error("Cannot combine positional verification with --test or --test-shell in done.");
+			}
+			const argv = args.slice(i + 1);
+			if (argv.length === 0) {
+				throw new Error("Missing verification command after -- in done.");
+			}
+			verification = {
+				mode: "argv",
+				executable: argv[0] ?? "",
+				args: argv.slice(1),
+			};
+			break;
+		}
 		if (arg === "--json" || arg === "-j") {
 			json = true;
 			continue;
@@ -373,6 +391,12 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 				throw new Error("Cannot use both --test and --test-shell in done.");
 			}
 			testCommand = value;
+			const argv = splitCommandLine(value);
+			verification = {
+				mode: "argv",
+				executable: argv[0] ?? "",
+				args: argv.slice(1),
+			};
 			i += 1;
 			continue;
 		}
@@ -384,6 +408,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 				throw new Error("Cannot use both --test and --test-shell in done.");
 			}
 			testShellCommand = value;
+			verification = { mode: "shell", command: value };
 			i += 1;
 			continue;
 		}
@@ -445,6 +470,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		taskId,
 		testCommand,
 		testShellCommand,
+		verification,
 		evidenceCommand,
 		evidenceResult,
 		...(artifact ? { artifact } : {}),

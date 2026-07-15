@@ -1,5 +1,9 @@
 import type { NewWorkstreamMetadata } from "../../services/workbench/lifecycle";
 
+export type VerificationSpec =
+	| { mode: "argv"; executable: string; args: string[] }
+	| { mode: "shell"; command: string };
+
 export type SessionTaskArgs = {
 	session: string;
 	taskId: string;
@@ -23,6 +27,7 @@ export type EvidenceArgs = SessionTaskArgs & {
 export type DoneArgs = SessionTaskArgs & {
 	testCommand: string | null;
 	testShellCommand: string | null;
+	verification: VerificationSpec | null;
 	evidenceCommand: string | null;
 	evidenceResult: string | null;
 	requireSpecCheck: boolean;

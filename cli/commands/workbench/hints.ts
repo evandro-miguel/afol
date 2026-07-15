@@ -38,18 +38,18 @@ export function nextCommandHint(
 ): string {
 	switch (step) {
 		case "new":
-			return `afol start --session ${sessionId(ctx)} --task-id ${taskId(ctx)}`;
+			return `afol st ${taskId(ctx)}`;
 		case "start":
-			return `afol evidence --session ${sessionId(ctx)} --task-id ${taskId(ctx)} --command "<cmd>" --result passed`;
+			return `afol e ${taskId(ctx)} -c "<cmd>" -o passed`;
 		case "evidence":
-			return `afol done --session ${sessionId(ctx)} --task-id ${taskId(ctx)}`;
+			return `afol d ${taskId(ctx)}`;
 		case "done":
 			return `afol close --session ${sessionId(ctx)}`;
 		case "close":
 		case "quick-task":
 			return "afol status";
 		case "log":
-			return `afol evidence --session ${sessionId(ctx)} --task-id ${taskId(ctx)} --command "<cmd>" --result passed`;
+			return `afol e ${taskId(ctx)} -c "<cmd>" -o passed`;
 		case "session-show":
 			return `afol session show --session ${sessionId(ctx)}`;
 	}
@@ -63,11 +63,11 @@ export function repairHintForStep(
 		case "new":
 			return "afol new <theme> [--feature-id <F-id>] [--parent-spec <spec-id>] [--task <summary>]";
 		case "start":
-			return `afol start --session ${sessionId(ctx)} --task-id ${taskId(ctx)}`;
+			return `afol st ${taskId(ctx)}`;
 		case "evidence":
-			return `afol evidence --session ${sessionId(ctx)} --task-id ${taskId(ctx)} --command "<cmd>" --result passed`;
+			return `afol e ${taskId(ctx)} -c "<cmd>" -o passed`;
 		case "done":
-			return `afol done --session ${sessionId(ctx)} --task-id ${taskId(ctx)}`;
+			return `afol d ${taskId(ctx)}`;
 		case "close":
 			return `afol session show --session ${sessionId(ctx)}`;
 		case "log":

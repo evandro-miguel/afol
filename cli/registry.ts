@@ -209,6 +209,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 					"Run a verification command, record evidence, then complete",
 			},
 			{
+				usage: "-- <argv...>",
+				sideEffect: "write",
+				description: "Run positional argv verification without shell parsing",
+			},
+			{
 				usage: "--require-spec-check",
 				sideEffect: "write",
 				description: "Block done when the linked spec check conflicts",
