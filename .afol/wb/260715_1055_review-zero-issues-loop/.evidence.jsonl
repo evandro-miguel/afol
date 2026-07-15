@@ -1,0 +1,1 @@
+{"id":"E-20260715112953563-0276db","task_id":"T-01","created_at":"2026-07-15T15:29:53.563Z","command":"bun test --only-failures","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}
