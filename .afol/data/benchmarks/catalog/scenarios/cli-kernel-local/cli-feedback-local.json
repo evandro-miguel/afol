@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "cli-feedback-local",
+  "scenario_version": "1.0.0",
+  "pack_id": "cli-kernel-local",
+  "command": "env AFOL_STATE_HOME=.afol/state AFOL_FEEDBACK_MODE=local bun run cli/main.ts feedback status --json",
+  "sandbox": true,
+  "coverage": {
+    "commands": ["feedback"],
+    "subcommands": [
+      "feedback status",
+      "feedback list",
+      "feedback show --id <report-id>",
+      "feedback preview",
+      "feedback annotate --note <text>",
+      "feedback purge --confirm",
+      "feedback last -m <text>"
+    ],
+    "journeys": ["afol-command-user-flow-matrix"],
+    "features": ["F-29"],
+    "specs": [
+      "260715_afol-1-0-linux-wsl-finalization_spec_01",
+      "260715_afol-1-0-local-diagnostics_spec-child_01"
+    ]
+  },
+  "expected_exit": 0,
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 500,
+    "max_p95_ms": 500,
+    "max_output_tokens": 100,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "cli-kernel-local-v1",
+  "deterministic_metrics": {
+    "duration_ms": 160,
+    "timing_p50_ms": 140,
+    "timing_p95_ms": 240,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 42,
+    "context_bytes": 1024,
+    "output_bytes": 240,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}
