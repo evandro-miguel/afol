@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01
 theme: afol-1-0-linux-wsl-release-hardening
-status: draft
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
@@ -60,11 +60,18 @@ Out of scope:
 
 ## Acceptance
 
-- [ ] Linux x64 build and standalone smoke pass from the supported local path.
-- [ ] Provenance/checksum names and `dist/afol` remain stable and additive.
-- [ ] Observed WSL2 smoke is current, reproducible, and not conflated with CI.
-- [ ] Release/security failures remain blocking or are documented as exact
+- [x] Linux x64 build and standalone smoke pass from the supported local path.
+- [x] Provenance/checksum names and `dist/afol` remain stable and additive.
+- [x] Observed WSL2 smoke is current, reproducible, and not conflated with CI.
+- [x] Release/security failures remain blocking or are documented as exact
   environment blockers, never silently waived.
+
+## Closure
+
+Release hardening is final in `260715_1811_afol-1-0-final-status` on direct
+command evidence `E-20260715180931454-766e6a` and observed artifact
+authorization `E-20260715181030468-8dd8d9`. `validate:release` exited 0 at HEAD
+`6210ac8`; the supported claim is limited to observed Linux/WSL behavior.
 
 ## Verification Plan
 

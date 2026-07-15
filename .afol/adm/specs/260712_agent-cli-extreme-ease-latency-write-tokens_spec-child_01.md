@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01
 theme: agent-cli-extreme-ease-latency-write-tokens
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-07-12T21:20:00Z'
@@ -37,8 +37,8 @@ risk_level: high
   `.afol/wb/260713_0724_final-observed-workbench-benchmark/` (8/8 scenarios;
   short-path p50 65-70 ms, p95 66-71 ms; argv 6/24/12 characters).
 - Implementation slice: commit `2f5f42f`.
-- This child remains `draft` intentionally while the unchecked hint/default
-  verbosity and alias-snapshot acceptance items below remain open.
+- The residual implementation and acceptance evidence are closed by the
+  governed F-03 session below; no additional product scope is opened.
 
 ## Child Scope Rationale
 
@@ -258,14 +258,21 @@ Out of scope:
 - [x] Active-session lifecycle works without repeating session id:
       `st T-01`, `d T-01 -x "…"`, `c`.
 - [x] Explicit-session lifecycle still works for CI/multi-agent.
-- [ ] Hints after `new` / `start` / `evidence` / `done` suggest the short form
+- [x] Hints after `new` / `start` / `evidence` / `done` suggest the short form
       when session context is known.
 - [x] `AGENTS.md` and runtime reference lead with the short agent path.
 - [x] Token-economy validation covers **output** and records **input argv**
       targets for lifecycle scenarios (or a dedicated pack section).
 - [x] Hot-path latency stays within the latency budget table on local warm host.
-- [ ] No high-frequency agent command defaults to verbose/full output.
-- [ ] Alias/flag snapshot tests fail on silent drift of agent-critical shorts.
+- [x] No high-frequency agent command defaults to verbose/full output.
+- [x] Alias/flag snapshot tests fail on silent drift of agent-critical shorts.
+
+## Closure
+
+The residual child is final on `E-20260715181045803-75a16e` from
+`.afol/wb/260715_1628_afol-1-0-agent-cli-residual/`, with the reconciled status
+recorded by `260715_1811_afol-1-0-final-status`. Full tests were observed at
+`1203/0`; no remote CI or unsupported platform claim is implied.
 
 ## Risks And Mitigations
 

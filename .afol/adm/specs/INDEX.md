@@ -17,9 +17,9 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | Metric | Count |
 |--------|-------|
 | Total | 74 |
-| Draft | 3 |
-| Active | 4 |
-| Final | 49 |
+| Draft | 0 |
+| Active | 2 |
+| Final | 54 |
 | Superseded | 18 |
 
 ## Index
@@ -93,13 +93,13 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01 | afol-tool-scenario-coverage-and-ux-registry | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0110_validation-ci-and-benchmarks_spec_01.md |
 | 260627_1655_canonical-afol-configuration-rehome_spec_01 | canonical-afol-configuration-rehome | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md |
 | 260710_1256_typescript-7-toolchain-adoption_spec_01 | typescript-7-toolchain-adoption | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260710_core-integrity-and-transaction-safety_spec_01 | core-integrity-and-transaction-safety | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260710_core-integrity-and-transaction-safety_spec_01 | core-integrity-and-transaction-safety | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260711_c01-action-policy-and-protected-resources_spec-child_01 | c01-action-policy-and-protected-resources | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
 | 260711_c01-authorization-red-reproducers_spec-child_01 | c01-authorization-red-reproducers | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
-| 260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01 | agent-cli-extreme-ease-latency-write-tokens | draft | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
-| 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
-| 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | draft | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
-| 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | draft | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01 | agent-cli-extreme-ease-latency-write-tokens | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
+| 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
+| 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

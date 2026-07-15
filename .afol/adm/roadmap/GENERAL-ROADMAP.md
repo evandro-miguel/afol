@@ -206,7 +206,7 @@ Minimum acceptance:
 
 ### F-03 Agent Command Design System
 
-- Status: final (initial delivery) with **open residual child**
+- Status: final
 - Governing spec:
   .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
 - Living residual:
@@ -225,7 +225,9 @@ Minimum acceptance:
 - Closure note: accepted implementation evidence is
   `E-20260529134101240986`; closeout session
   `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
-  passed. Residual tracked by the 2026-07-12 child spec.
+  passed. The residual child is final on `E-20260715181045803-75a16e` in
+  `.afol/wb/260715_1628_afol-1-0-agent-cli-residual/`; final-status session
+  `260715_1811_afol-1-0-final-status` recorded the reconciled closure.
 
 ### F-04 Governance Workbench System
 
@@ -806,7 +808,7 @@ Follow-on slices under this direction:
 
 ### F-22 Core Integrity and Transaction Safety
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md
 - Why: AFOL must fail closed when agents complete tasks, mutate shared files,
@@ -847,6 +849,12 @@ Follow-on slices under this direction:
   - Focused multi-process concurrency, fault-injection, lifecycle, update,
     bootstrap, state hydration, strict verification, typecheck, full tests,
     release validation, and required security scans pass.
+- Closure note: the implemented integrity boundary was revalidated with
+  `E-20260715181107664-d5ef13` in
+  `.afol/wb/260715_1628_afol-1-0-integrity-closeout/`; full tests reported
+  `1203/0` and final-status session `260715_1811_afol-1-0-final-status`
+  reconciled the parent closure. The two pre-existing C01 child specs remain
+  separately governed and are not reopened by this parent closeout.
 - Delivery phases:
   1. Lifecycle transitions and completion authorization.
   2. Resource locks, hash preconditions, mutation transactions, and safe undo.
@@ -865,7 +873,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -896,6 +904,12 @@ Follow-on slices under this direction:
     reproducible, and recorded without claiming unsupported platforms.
   - Focused tests, project validation, release gates, and required security
     scans pass; unresolved failures remain visible blockers.
+- Closure note: final-status session `260715_1811_afol-1-0-final-status`
+  accepted diagnostics evidence `E-20260715172724325-99e5fa`, F-29 release
+  command evidence `E-20260715180931454-766e6a` plus observed artifact
+  authorization `E-20260715181030468-8dd8d9`, and the cross-feature full-test
+  result `1203/0`. `validate:release` exited 0 at HEAD `6210ac8`; unsupported
+  platforms, global install, deployment, and remote CI remain unclaimed.
 
 ## 6) Recommended Delivery Phases
 

@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260715_afol-1-0-linux-wsl-finalization_spec_01
 theme: afol-1-0-linux-wsl-finalization
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
@@ -90,6 +90,15 @@ Out of scope:
 - Linux x64 build, provenance/checksum, clean smoke, observed WSL2 smoke, and
   release/security checks produce current evidence or an explicit blocker.
 - No unsupported platform or deployment claim is made from static checks alone.
+
+## Closure
+
+The parent is final in `260715_1811_afol-1-0-final-status` with diagnostics
+evidence `E-20260715172724325-99e5fa`, release evidence
+`E-20260715180931454-766e6a` and observed artifact authorization
+`E-20260715181030468-8dd8d9`. Full tests were `1203/0` and
+`validate:release` exited 0 at HEAD `6210ac8`. The closure makes no global
+installation, deployment, remote CI, or unsupported-platform claim.
 
 ## Verification Plan
 

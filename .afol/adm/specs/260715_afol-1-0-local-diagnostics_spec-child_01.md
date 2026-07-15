@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260715_afol-1-0-local-diagnostics_spec-child_01
 theme: afol-1-0-local-diagnostics
-status: draft
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
@@ -62,12 +62,19 @@ Out of scope:
 
 ## Acceptance
 
-- [ ] Positive and negative tests prove redaction, offline behavior, bounded
+- [x] Positive and negative tests prove redaction, offline behavior, bounded
   contention, and stable existing envelopes.
-- [ ] Fault injection leaves no partial diagnostic record or corrupted index.
-- [ ] No raw stack or secret value appears in persisted or displayed output.
-- [ ] `afol validate project --check-drift --json` catches index/frontmatter
+- [x] Fault injection leaves no partial diagnostic record or corrupted index.
+- [x] No raw stack or secret value appears in persisted or displayed output.
+- [x] `afol validate project --check-drift --json` catches index/frontmatter
   drift and passes on the reconciled repository.
+
+## Closure
+
+Diagnostics are final in `260715_1811_afol-1-0-final-status` on
+`E-20260715172724325-99e5fa` from the governed F-29 diagnostics session. The
+observed full-test result was `1203/0`; the implementation remains offline,
+redacted, opt-in, and bounded without a network or result/v2 claim.
 
 ## Verification Plan
 
