@@ -27,4 +27,4 @@ spec_waiver_reason: ""
 |------|-------|-------|-------|
 | T-01 | done | worker | Disable standalone dotenv and bunfig autoload and extend provenance additively attempt=1 |
 | T-02 | done | worker | Update Linux and WSL CI smoke, coverage, and runbook wording attempt=1 |
-| T-03 | pending | worker | Run installed-binary benchmark plus full release and security evidence |
+| T-03 | in_progress | worker | Run installed-binary benchmark plus full release and security evidence attempt=1 |
