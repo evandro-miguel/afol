@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runAdrCommand } from "../commands/adr";
 import { runChangelogCommand } from "../commands/changelog";
 import { runSpecCommand } from "../commands/spec";
@@ -272,6 +272,159 @@ describe("spec-gate system", () => {
 			expect(result.status).toBe("not_applicable");
 			expect(result.spec_id).toBe("");
 			expect(getSpecCheck(root, "session-a", "T-01")).toEqual(result);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore throws on malformed JSON, never silently returns empty", () => {
+		const root = createFixture();
+		try {
+			// Create a session with a task so that checkSpecCompatibility/waiveSpecCheck
+			// can reach readStore before failing on task lookup.
+			writeTask(root, "session-a", "T-01", "spec-001");
+			writeSpec(root, "spec-001", "active");
+
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+
+			// Write a valid store with one waiver first
+			writeFileSync(
+				storePath,
+				JSON.stringify({
+					version: 1,
+					results: {
+						"session-a::T-01": {
+							task_id: "T-01",
+							session_id: "session-a",
+							spec_id: "spec-001",
+							status: "waived",
+							checked_at: "2026-01-01T00:00:00.000Z",
+							waiver_reason: "existing waiver",
+						},
+					},
+				}),
+				"utf8",
+			);
+
+			// Verify existing waiver is readable
+			const before = getSpecCheck(root, "session-a", "T-01");
+			expect(before).not.toBeNull();
+			if (before === null) {
+				throw new Error("Expected existing spec waiver");
+			}
+			expect(before.status).toBe("waived");
+
+			// Corrupt the store — write invalid JSON
+			writeFileSync(storePath, "{invalid json\n", "utf8");
+
+			// readStore is called internally by checkSpecCompatibility / getSpecCheck
+			// — must throw instead of silently returning empty
+			const expectedMsg = "Malformed spec-gate store";
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				expectedMsg,
+			);
+			expect(() => checkSpecCompatibility(root, "session-a", "T-01")).toThrow(
+				expectedMsg,
+			);
+			expect(() =>
+				waiveSpecCheck(root, "session-a", "T-01", "override"),
+			).toThrow(expectedMsg);
+
+			// Original file content is preserved
+			const stored = readFileSync(storePath, "utf8");
+			expect(stored).toBe("{invalid json\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore throws on empty file (fail closed), nonexistent file is valid first-run", () => {
+		const root = createFixture();
+		try {
+			writeTask(root, "session-a", "T-01");
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+
+			// Nonexistent file is valid first-run — readStore returns empty store
+			const noFile = getSpecCheck(root, "session-a", "T-01");
+			expect(noFile).toBeNull();
+
+			// Write an empty file — must fail closed like malformed content
+			writeFileSync(storePath, "", "utf8");
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+			expect(() => checkSpecCompatibility(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+
+			// File content is preserved
+			expect(readFileSync(storePath, "utf8")).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore throws on invalid structure, never silently returns empty", () => {
+		const root = createFixture();
+		try {
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+
+			// Valid JSON but wrong shape (not a SpecStore)
+			writeFileSync(
+				storePath,
+				JSON.stringify({ version: 2, data: [] }),
+				"utf8",
+			);
+
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readStore rejects malformed result entries", () => {
+		const root = createFixture();
+		try {
+			const storePath = join(root, ".afol", "state", "spec-gate.json");
+			mkdirSync(dirname(storePath), { recursive: true });
+			writeFileSync(
+				storePath,
+				JSON.stringify({ version: 1, results: { "session-a::T-01": "bad" } }),
+				"utf8",
+			);
+
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
+			expect(() =>
+				waiveSpecCheck(root, "session-a", "T-01", "override"),
+			).toThrow("Malformed spec-gate store");
+
+			writeFileSync(
+				storePath,
+				JSON.stringify({
+					version: 1,
+					results: {
+						"session-a::T-01": {
+							session_id: "other-session",
+							task_id: "T-99",
+							spec_id: "spec-001",
+							status: "waived",
+							checked_at: "2026-07-15T00:00:00.000Z",
+							waiver_reason: "mismatched key",
+						},
+					},
+				}),
+				"utf8",
+			);
+			expect(() => getSpecCheck(root, "session-a", "T-01")).toThrow(
+				"Malformed spec-gate store",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

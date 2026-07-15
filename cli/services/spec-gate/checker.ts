@@ -4,7 +4,7 @@ import { resolveAdmPaths } from "../adm";
 import { readSessionGovernanceMetadata } from "../governance/pending-specs";
 import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
-import type { SpecCheckResult } from "./types";
+import type { SpecCheckResult, SpecCheckStatus } from "./types";
 
 type Frontmatter = Record<string, unknown>;
 
@@ -34,6 +34,12 @@ type SpecFrontmatter = {
 
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const ALLOWED_SPEC_STATUSES = new Set(["active", "final"]);
+const SPEC_CHECK_STATUSES = new Set<SpecCheckStatus>([
+	"compatible",
+	"conflict",
+	"waived",
+	"not_applicable",
+]);
 const STORE_FILE = "spec-gate.json";
 
 function now(): string {
@@ -197,29 +203,72 @@ function findSpecFile(root: string, specId: string): string | null {
 	return null;
 }
 
+function isSpecCheckResult(value: unknown): value is SpecCheckResult {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) {
+		return false;
+	}
+	const result = value as Record<string, unknown>;
+	return (
+		typeof result.task_id === "string" &&
+		typeof result.session_id === "string" &&
+		typeof result.spec_id === "string" &&
+		typeof result.status === "string" &&
+		SPEC_CHECK_STATUSES.has(result.status as SpecCheckStatus) &&
+		typeof result.checked_at === "string" &&
+		(result.waiver_reason === undefined ||
+			typeof result.waiver_reason === "string") &&
+		(result.adr_ref === undefined || typeof result.adr_ref === "string")
+	);
+}
+
 function readStore(root: string): SpecStore {
 	const path = storePath(root);
 	if (!existsSync(path)) {
 		return { version: 1, results: {} };
 	}
-	try {
-		const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-		if (
-			parsed !== null &&
-			typeof parsed === "object" &&
-			!Array.isArray(parsed) &&
-			(parsed as { version?: unknown }).version === 1 &&
-			parsed !== null &&
-			typeof (parsed as { results?: unknown }).results === "object" &&
-			(parsed as { results?: unknown }).results !== null &&
-			!Array.isArray((parsed as { results?: unknown }).results)
-		) {
-			return parsed as SpecStore;
-		}
-	} catch {
-		// Ignore malformed state.
+	const raw = readFileSync(path, "utf8");
+	if (raw.trim().length === 0) {
+		// An existing empty file is just as corrupt as malformed JSON — fail closed.
+		throw new Error(`Malformed spec-gate store at ${path}: file is empty`);
 	}
-	return { version: 1, results: {} };
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch (cause) {
+		throw new Error(`Malformed spec-gate store at ${path}: cannot read JSON`, {
+			cause,
+		});
+	}
+	if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+		const candidate = parsed as Record<string, unknown>;
+		const results = candidate.results;
+		if (
+			candidate.version === 1 &&
+			results !== null &&
+			typeof results === "object" &&
+			!Array.isArray(results)
+		) {
+			const validatedResults = Object.create(null) as Record<
+				string,
+				SpecCheckResult
+			>;
+			for (const [key, value] of Object.entries(results)) {
+				if (!isSpecCheckResult(value)) {
+					throw new Error(
+						`Malformed spec-gate store at ${path}: invalid result ${JSON.stringify(key)}`,
+					);
+				}
+				if (key !== storeKey(value.session_id, value.task_id)) {
+					throw new Error(
+						`Malformed spec-gate store at ${path}: result key ${JSON.stringify(key)} does not match its session/task`,
+					);
+				}
+				validatedResults[key] = value;
+			}
+			return { version: 1, results: validatedResults };
+		}
+	}
+	throw new Error(`Malformed spec-gate store at ${path}: invalid structure`);
 }
 
 function writeStore(root: string, store: SpecStore): void {
