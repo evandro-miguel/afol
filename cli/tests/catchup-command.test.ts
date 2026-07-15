@@ -56,7 +56,7 @@ function runGit(root: string, args: string[]): void {
 }
 
 function initGitRoot(root: string): void {
-	runGit(root, ["init"]);
+	runGit(root, ["init", "--initial-branch=main"]);
 	runGit(root, ["config", "user.email", "catchup@example.com"]);
 	runGit(root, ["config", "user.name", "Catchup Test"]);
 }
