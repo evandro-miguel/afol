@@ -102,13 +102,19 @@ export function resolveCanonicalAction(
 	}
 	if (resolution.kind === "feedback") {
 		const action = args[0] ?? "status";
-		if (action === "annotate" || action === "purge" || action === "last") {
-			return { action: `feedback.${action}`, sideEffect: "write" };
+		const canonicalAction =
+			action === "note" ? "annotate" : action === "clear" ? "purge" : action;
+		if (
+			canonicalAction === "annotate" ||
+			canonicalAction === "purge" ||
+			canonicalAction === "last"
+		) {
+			return { action: `feedback.${canonicalAction}`, sideEffect: "write" };
 		}
-		if (action === "preview") {
+		if (canonicalAction === "preview") {
 			return { action: "feedback.preview", sideEffect: "preview" };
 		}
-		return { action: `feedback.${action}`, sideEffect: "read" };
+		return { action: `feedback.${canonicalAction}`, sideEffect: "read" };
 	}
 
 	if (resolution.kind === "subcommand") {

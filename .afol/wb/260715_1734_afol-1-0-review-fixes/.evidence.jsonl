@@ -1,0 +1,1 @@
+{"id":"E-20260715173835169-5cfc5e","task_id":"T-01","created_at":"2026-07-15T21:38:35.169Z","command":"bun test cli/tests/operation-context.test.ts cli/tests/feedback.test.ts cli/tests/router.test.ts","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}

@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -190,6 +190,24 @@ export function openFeedbackDb(env: NodeJS.ProcessEnv = process.env): Database {
 	}
 }
 
+function openExistingFeedbackDb(
+	env: NodeJS.ProcessEnv = process.env,
+): Database | null {
+	const path = resolveFeedbackDbPath(env);
+	if (!existsSync(path)) return null;
+	const db = new Database(path, { readonly: true });
+	const table = db
+		.query(
+			"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'feedback_reports'",
+		)
+		.get();
+	if (!table) {
+		db.close();
+		return null;
+	}
+	return db;
+}
+
 function id(): string {
 	return `FB-${Date.now()}-${randomUUID()}`;
 }
@@ -278,7 +296,8 @@ export function listFeedback(
 	env: NodeJS.ProcessEnv = process.env,
 ): FeedbackReport[] {
 	if (feedbackMode(env) !== "local") return [];
-	const db = openFeedbackDb(env);
+	const db = openExistingFeedbackDb(env);
+	if (!db) return [];
 	try {
 		const bounded = Math.max(1, Math.min(1000, Math.floor(limit)));
 		return db
@@ -297,7 +316,8 @@ export function getFeedback(
 	env: NodeJS.ProcessEnv = process.env,
 ): FeedbackReport | null {
 	if (feedbackMode(env) !== "local") return null;
-	const db = openFeedbackDb(env);
+	const db = openExistingFeedbackDb(env);
+	if (!db) return null;
 	try {
 		const row = db
 			.query("SELECT * FROM feedback_reports WHERE report_id = ?")
@@ -401,7 +421,15 @@ export function feedbackStatus(
 			count: 0,
 			last_created_at: null,
 		};
-	const db = openFeedbackDb(env);
+	const db = openExistingFeedbackDb(env);
+	if (!db)
+		return {
+			mode,
+			enabled: true,
+			database_path,
+			count: 0,
+			last_created_at: null,
+		};
 	try {
 		const row = db
 			.query(

@@ -38,7 +38,7 @@ function normalizeAction(value: string): FeedbackAction {
 	if (value === "annotate" || value === "note") return "annotate";
 	if (value === "purge" || value === "clear") return "purge";
 	if (value === "last") return "last";
-	throw new Error(`Unknown feedback action: ${value}`);
+	throw new Error("Unknown feedback action.");
 }
 
 function nextValue(args: string[], index: number, flag: string): string {
@@ -104,10 +104,8 @@ function parseArgs(action: FeedbackAction, args: string[]): ParsedArgs {
 				)
 					throw new Error("metadata must be an object");
 				parsed.input.metadata = metadata as Record<string, unknown>;
-			} catch (error) {
-				throw new Error(
-					`Invalid --metadata JSON: ${error instanceof Error ? error.message : String(error)}`,
-				);
+			} catch {
+				throw new Error("Invalid --metadata JSON.");
 			}
 			index += 1;
 		} else if (
@@ -117,7 +115,7 @@ function parseArgs(action: FeedbackAction, args: string[]): ParsedArgs {
 			if (action === "show" || action === "annotate") parsed.id ??= value;
 			else parsed.note ??= value;
 		} else {
-			throw new Error(`Unknown feedback argument: ${value}`);
+			throw new Error("Unknown feedback argument.");
 		}
 	}
 	return parsed;
@@ -193,7 +191,7 @@ export async function runFeedbackCommand(
 		if (normalized === "show") {
 			if (!parsed.id) throw new Error("Feedback show requires --id.");
 			const report = getFeedback(parsed.id, env);
-			if (!report) throw new Error(`Feedback report not found: ${parsed.id}`);
+			if (!report) throw new Error("Feedback report not found.");
 			emit(io, normalized, parsed.json, { report });
 			return 0;
 		}

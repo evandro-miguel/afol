@@ -6,6 +6,7 @@ import { runFeedbackCommand } from "../commands/feedback";
 import {
 	annotateFeedback,
 	feedbackStatus,
+	getFeedback,
 	listFeedback,
 	openFeedbackDb,
 	recordFeedback,
@@ -150,6 +151,39 @@ describe("offline feedback backend", () => {
 		const payload = JSON.parse(captured.stdout[0] ?? "{}");
 		expect(payload.schema).toBe("afol.result/v1");
 		expect(payload.ok).toBe(false);
+	});
+
+	test("invalid feedback arguments never reflect attacker-controlled values", async () => {
+		const captured = capture();
+		const sentinel = "TOP_SECRET_SENTINEL";
+		expect(
+			await runFeedbackCommand(
+				"status",
+				["--metadata", `{"broken":"${sentinel}`],
+				captured.io,
+			),
+		).toBe(2);
+		expect(captured.stdout[0]).not.toContain(sentinel);
+		const unknown = capture();
+		expect(await runFeedbackCommand("status", [sentinel], unknown.io)).toBe(2);
+		expect(unknown.stdout[0]).not.toContain(sentinel);
+	});
+
+	test("read-only local feedback queries do not initialize absent storage", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-feedback-read-only-"));
+		try {
+			const local = env(root);
+			expect(feedbackStatus(local)).toMatchObject({
+				mode: "local",
+				enabled: true,
+				count: 0,
+			});
+			expect(listFeedback(10, local)).toEqual([]);
+			expect(getFeedback("FB-missing", local)).toBeNull();
+			expect(existsSync(resolveFeedbackDbPath(local))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("multiprocess writers complete without lost reports", async () => {

@@ -5,6 +5,7 @@ import {
 	isActionAllowed,
 	remoteOperationContext,
 	requiresApproval,
+	resolveCanonicalAction,
 	resolveOperationContext,
 } from "../core/operation-context";
 
@@ -75,6 +76,21 @@ describe("operation-context", () => {
 		expect(
 			isActionAllowed(ctx, { action: "file.patch.apply", sideEffect: "write" }),
 		).toBe(true);
+	});
+
+	test.each([
+		["note", "annotate"],
+		["clear", "purge"],
+	] as const)("feedback alias %s keeps restricted write policy", (alias, action) => {
+		expect(resolveCanonicalAction({ kind: "feedback", args: [alias] })).toEqual(
+			{ action: `feedback.${action}`, sideEffect: "write" },
+		);
+		expect(
+			isActionAllowed(
+				agentOperationContext(),
+				resolveCanonicalAction({ kind: "feedback", args: [alias] }),
+			),
+		).toBe(false);
 	});
 
 	test.each([
