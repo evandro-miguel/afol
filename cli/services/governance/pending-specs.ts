@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { resolveAdmPaths } from "../adm/paths";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -814,13 +814,20 @@ export function resolveGovernanceCatalog(
 	if (!existsSync(roadmapPath)) throw new Error("Governance roadmap not found");
 	const roadmap = readFileSync(roadmapPath, "utf8");
 	const featureSection = roadmapFeatureSection(roadmap, featureId);
+	const relative = (path: string) =>
+		path.slice(resolve(root).length + 1).replaceAll("\\", "/");
+	const normalizedParentSpec = parentSpec
+		.replaceAll("\\", "/")
+		.replace(/^\.\//, "");
 	const matches = readdirSync(adm.specsDir, { withFileTypes: true })
 		.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
 		.map((entry) => join(adm.specsDir, entry.name))
 		.filter((path) => {
 			const fm = parseFrontmatter(readFileSync(path, "utf8"));
 			return (
-				trimString(fm?.id) === parentSpec || path.endsWith(`/${parentSpec}.md`)
+				trimString(fm?.id) === parentSpec ||
+				path.endsWith(`/${parentSpec}.md`) ||
+				relative(path) === normalizedParentSpec
 			);
 		});
 	if (matches.length !== 1)
@@ -828,12 +835,13 @@ export function resolveGovernanceCatalog(
 	const specPath = matches[0] as string;
 	const spec = readFileSync(specPath, "utf8");
 	const fm = parseFrontmatter(spec);
+	if (!fm || trimString(fm.doc_type) !== "spec")
+		throw new Error(`Parent spec doc_type must be spec: ${parentSpec}`);
 	if (!fm || trimString(fm.status) !== "active")
 		throw new Error(`Parent spec is not active: ${parentSpec}`);
+	const specId = trimString(fm.id) || basename(specPath, ".md");
 	if (trimString(fm.roadmap_feature) !== featureId)
 		throw new Error(`Parent spec roadmap_feature mismatch: ${parentSpec}`);
-	const relative = (path: string) =>
-		path.slice(resolve(root).length + 1).replaceAll("\\", "/");
 	const governingSpecs = parseGoverningSpecsFromSection(root, featureSection);
 	const specPathCandidate = relative(specPath);
 	if (
@@ -843,6 +851,7 @@ export function resolveGovernanceCatalog(
 		throw new Error(`Roadmap feature governing spec mismatch: ${parentSpec}`);
 	}
 	return {
+		specId,
 		roadmapPath: relative(roadmapPath),
 		roadmapHash: sha256(roadmap),
 		specPath: relative(specPath),
@@ -906,7 +915,7 @@ export function resolvePendingSpec(
 			entry.updated_at = resolvedAt;
 			entry.resolved_at = resolvedAt;
 			entry.feature_id = featureId;
-			entry.parent_spec = parentSpec;
+			entry.parent_spec = catalog.specId;
 			entry.missing = [];
 			entry.resolution_hint = "linked to roadmap feature and parent spec";
 			entry.parent_spec_path = catalog.specPath;
@@ -916,7 +925,7 @@ export function resolvePendingSpec(
 			updateSessionFrontmatter(root, input.session, {
 				roadmap_feature: featureId,
 				feature_id: featureId,
-				parent_spec: parentSpec,
+				parent_spec: catalog.specId,
 				parent_spec_path: catalog.specPath,
 				parent_spec_sha256: catalog.specHash,
 				roadmap_path: catalog.roadmapPath,

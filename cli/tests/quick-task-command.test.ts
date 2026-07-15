@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -153,6 +161,51 @@ describe("quick-task parseQuickTaskArgs", () => {
 });
 
 describe("quick-task runQuickTaskCommand", () => {
+	test("normalizes a governed spec path through task completion", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-spec-path-"));
+		try {
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-01 Quick task\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-01.md\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "spec-01.md"),
+				"---\ndoc_type: spec\nid: spec-01\nstatus: active\nroadmap_feature: F-01\n---\n\n# Spec\n",
+				"utf8",
+			);
+
+			const exitCode = await runQuickTaskCommand(
+				[
+					"path-governed",
+					"--command",
+					"true",
+					"--feature-id",
+					"F-01",
+					"--parent-spec",
+					".afol/adm/specs/spec-01.md",
+				],
+				root,
+			);
+			expect(exitCode).toBe(0);
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0] as string;
+			const task = readFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"utf8",
+			);
+			expect(task).toContain('parent_spec: "spec-01"');
+			expect(task).toContain("| T-01 | done |");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects fake governance bindings before creating a session", async () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-governance-"));
 		try {

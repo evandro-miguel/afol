@@ -144,7 +144,7 @@ function writePendingGovernanceFixture(
 	const taskPath = writeTask(root, "S-GOV", "T-01");
 	writeFileSync(
 		join(root, ".afol", "adm", "specs", "spec-22.md"),
-		`---\nid: spec-22\nstatus: ${specStatus}\nroadmap_feature: ${specFeature}\n---\n\n# Spec\n`,
+		`---\ndoc_type: spec\nid: spec-22\nstatus: ${specStatus}\nroadmap_feature: ${specFeature}\n---\n\n# Spec\n`,
 		"utf8",
 	);
 	const indexPath = join(

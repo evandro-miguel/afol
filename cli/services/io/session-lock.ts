@@ -4,7 +4,6 @@ import {
 	existsSync,
 	fstatSync,
 	fsyncSync,
-	linkSync,
 	mkdirSync,
 	openSync,
 	readFileSync,
@@ -284,29 +283,47 @@ function tryReclaimStaleLock(
 	expected: SessionLockMetadata,
 ): boolean {
 	const reclaimPath = `${lockPath}.reclaim`;
+	let reclaimFd: number | null = null;
+	let reclaimIdentity: LockIdentity | null = null;
 	try {
-		linkSync(lockPath, reclaimPath);
-	} catch {
+		reclaimFd = openSync(reclaimPath, "wx");
+		reclaimIdentity = readFdIdentity(reclaimFd);
+		writeFileSync(
+			reclaimFd,
+			`${JSON.stringify({
+				pid: process.pid,
+				acquired_at: new Date().toISOString(),
+				host: HOSTNAME,
+			})}\n`,
+			"utf8",
+		);
+		fsyncSync(reclaimFd);
+	} catch (error) {
+		if (reclaimFd !== null) closeSync(reclaimFd);
+		if (isAlreadyExistsError(error)) {
+			const staleMarker = shouldRecoverStaleLock(reclaimPath, Date.now());
+			if (staleMarker !== null) {
+				return unlinkIfIdentityMatches(reclaimPath, staleMarker);
+			}
+		}
 		return false;
 	}
 
 	try {
-		const claimed = readLockMetadata(reclaimPath);
 		const rechecked = readLockMetadata(lockPath);
 		const expectedSignature = metadataSignature(expected);
 		if (
-			claimed === null ||
 			rechecked === null ||
-			metadataSignature(claimed) !== expectedSignature ||
 			metadataSignature(rechecked) !== expectedSignature
 		) {
 			return false;
 		}
-		return unlinkIfIdentityMatches(lockPath, claimed);
+		return unlinkIfIdentityMatches(lockPath, expected);
 	} finally {
-		try {
-			unlinkSync(reclaimPath);
-		} catch {}
+		if (reclaimIdentity !== null) {
+			unlinkIfIdentityMatches(reclaimPath, reclaimIdentity);
+		}
+		if (reclaimFd !== null) closeSync(reclaimFd);
 	}
 }
 

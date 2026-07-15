@@ -109,6 +109,14 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 			"Missing --reason for --no-spec-required in new workstream.",
 		);
 	}
+	if (
+		noSpecRequired &&
+		(metadata.featureId?.trim() || metadata.parentSpec?.trim())
+	) {
+		throw new Error(
+			"new governance binding and waiver are mutually exclusive.",
+		);
+	}
 	return { theme, metadata, json };
 }
 

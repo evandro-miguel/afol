@@ -51,7 +51,6 @@ interface ReclaimWorkerData {
 interface ReplaceAfterReclaimWorkerData {
 	kind: "replace-after-reclaim";
 	lockPath: string;
-	reclaimPath: string;
 	replacementPath: string;
 	signals: SharedArrayBuffer;
 }
@@ -87,7 +86,6 @@ if (!isMainThread && workerData?.kind === "stale-reclaim") {
 if (!isMainThread && workerData?.kind === "replace-after-reclaim") {
 	const {
 		lockPath,
-		reclaimPath,
 		replacementPath,
 		signals: buffer,
 	} = workerData as ReplaceAfterReclaimWorkerData;
@@ -95,7 +93,7 @@ if (!isMainThread && workerData?.kind === "replace-after-reclaim") {
 	Atomics.store(signals, REPLACE_READY, 1);
 	Atomics.notify(signals, REPLACE_READY);
 	const deadline = Date.now() + 5_000;
-	while (!existsSync(reclaimPath)) {
+	while (!existsSync(`${lockPath}.reclaim`)) {
 		if (Date.now() >= deadline) {
 			throw new Error("replacement worker timed out waiting for reclaim claim");
 		}
@@ -145,7 +143,6 @@ function runReplaceAfterReclaimWorker(
 			workerData: {
 				kind: "replace-after-reclaim",
 				lockPath,
-				reclaimPath: `${lockPath}.reclaim`,
 				replacementPath,
 				signals,
 			} satisfies ReplaceAfterReclaimWorkerData,
@@ -389,6 +386,80 @@ describe("session-lock", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	}, 10_000);
+
+	test("recovers when a prior stale-lock reclaimer left its marker behind", () => {
+		const root = mkProjectRoot("orphaned-reclaim-marker");
+		try {
+			const session = "orphaned-reclaim-marker-session";
+			const lockPath = writeLockMetadata(
+				root,
+				session,
+				{
+					pid: deadPidFromExitedProcess(),
+					session,
+					acquired_at: new Date(Date.now() - 35_000).toISOString(),
+					host: hostname(),
+				},
+				Date.now() - 35_000,
+			);
+			linkSync(lockPath, `${lockPath}.reclaim`);
+
+			let acquired = false;
+			withSessionLock(root, session, () => {
+				acquired = true;
+			});
+
+			expect(acquired).toBe(true);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(existsSync(`${lockPath}.reclaim`)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("continues after a dead reclaim marker expires at the wait deadline", () => {
+		const root = mkProjectRoot("reclaim-marker-deadline");
+		try {
+			const session = "reclaim-marker-deadline-session";
+			const now = Date.now();
+			const deadPid = deadPidFromExitedProcess();
+			const lockPath = writeLockMetadata(
+				root,
+				session,
+				{
+					pid: deadPid,
+					session,
+					acquired_at: new Date(now - 35_000).toISOString(),
+					host: hostname(),
+				},
+				now - 35_000,
+			);
+			writeFileSync(
+				`${lockPath}.reclaim`,
+				`${JSON.stringify({
+					pid: deadPid,
+					acquired_at: new Date(now).toISOString(),
+					host: hostname(),
+				})}\n`,
+				"utf8",
+			);
+
+			let acquired = false;
+			withPatchedDateNow(
+				now,
+				() =>
+					withSessionLock(root, session, () => {
+						acquired = true;
+					}),
+				5_000,
+			);
+			expect(acquired).toBe(true);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(existsSync(`${lockPath}.reclaim`)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
 	test("recovers stale dead lock after the stale-age threshold", () => {
 		const root = mkProjectRoot("stale-dead");

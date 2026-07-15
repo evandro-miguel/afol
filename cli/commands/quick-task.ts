@@ -166,11 +166,12 @@ export async function runQuickTaskCommand(
 		}
 		parsed = parseQuickTaskArgs(args);
 		if (parsed.metadata.featureId && parsed.metadata.parentSpec) {
-			resolveGovernanceCatalog(
+			const catalog = resolveGovernanceCatalog(
 				root,
 				parsed.metadata.featureId,
 				parsed.metadata.parentSpec,
 			);
+			parsed.metadata.parentSpec = catalog.specId;
 		}
 		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);

@@ -99,10 +99,8 @@ Before starting work, consult relevant resources:
 
 - Move to `implemented_untested` only after the implementation checkpoint.
 - Move to `tested_needs_spec_validation` only when runtime validation passed but spec/UX validation is still pending.
-- Record the real command or gate, result, artifact path or note, and returned
-  evidence id before running `afol done`.
-- If validation does not apply, record `N/A` explicitly in the evidence ledger
-  before running `afol done`.
+- Complete with observed exit-zero evidence through `afol done --test-shell`
+  or `afol d -x`; declared evidence alone does not authorize `done`.
 
 ### Test Evidence
 
