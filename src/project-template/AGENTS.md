@@ -43,7 +43,7 @@ Replace this section after bootstrap with real product purpose and constraints.
   1. `afol n {theme} -F {F-id} -P {spec-id} -t "<task>"`
   2. `afol st T-01`
   3. Edit and run named verification.
-  4. `afol d T-01 -x "<verification command>"` (or `afol e T-01 -c "…" -o passed` then `afol d T-01`)
+  4. `afol d T-01 -x "<verification command>"`
   5. `afol c`
 - Explicit multi-agent/CI path when session is ambiguous:
   `afol st -S {session-id} -T T-01`, then `afol d -S {session-id} -T T-01 -x "…"`,
