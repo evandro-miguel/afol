@@ -863,6 +863,40 @@ Follow-on slices under this direction:
   - Locks without deterministic ordering can deadlock; multi-resource locks
     must use canonical paths and stable ordering.
 
+### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
+
+- Status: active
+- Governing spec:
+  .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
+- Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
+  that makes local diagnostics, governance drift, release provenance, and
+  observed standalone behavior explicit without reopening reserved features or
+  restoring retired runtime surfaces.
+- Child spec policy:
+  - Required: yes
+  - Child specs:
+    - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
+    - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
+- Scope:
+  - Reconcile specs index rows and frontmatter through blocking drift checks.
+  - Add offline local diagnostics and integrity evidence while preserving
+    `afol.result/v1` and existing error output contracts.
+  - Prove Linux x64 and observed WSL2 release behavior with bounded,
+    redacted, file-backed evidence.
+- Out of scope:
+  - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
+  - F-12 reopening, F-23 through F-28 reservation, global installation,
+    deployment, or restoration of discontinued `.agents` runtime surfaces.
+- Exit criteria:
+  - Parent and child specs are linked from this roadmap and pass frontmatter /
+    index drift validation.
+  - Local diagnostics remain offline, redacted before persistence, bounded
+    under contention, and opt-in by mode.
+  - Linux x64 build/provenance and observed WSL2 smoke evidence are current,
+    reproducible, and recorded without claiming unsupported platforms.
+  - Focused tests, project validation, release gates, and required security
+    scans pass; unresolved failures remain visible blockers.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
