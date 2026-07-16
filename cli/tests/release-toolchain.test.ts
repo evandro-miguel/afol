@@ -470,6 +470,7 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain(
 			"uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0",
 		);
+		expect(workflow).toContain('go-version: "1.26.x"');
 		expect(workflow).toContain("cache: false");
 		expect(workflow).toContain(
 			"uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
