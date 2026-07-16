@@ -97,6 +97,31 @@ describe("unexpected and integrity diagnostic boundary", () => {
 		}
 	});
 
+	test("hostile error accessors cannot break diagnostic capture", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-diagnostic-hostile-"));
+		try {
+			const hostile = {
+				get message(): never {
+					throw new Error("getter must not escape");
+				},
+				get code(): never {
+					throw new Error("getter must not escape");
+				},
+				toString(): never {
+					throw new Error("string conversion must not escape");
+				},
+			};
+			const diagnostic = captureDiagnostic(hostile, env(root, "local"));
+			expect(diagnostic.kind).toBe("unexpected");
+			expect(diagnostic.persisted).toBe(true);
+			expect(listFeedback(1, env(root, "local"))[0]?.message).toBe(
+				"Unknown error",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("positional argv flags do not change outer diagnostic formatting", async () => {
 		const stderr: string[] = [];
 		const error = console.error;

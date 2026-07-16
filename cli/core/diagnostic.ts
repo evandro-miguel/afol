@@ -24,31 +24,43 @@ function errorRecord(error: unknown): Record<string, unknown> | null {
 		: null;
 }
 
-function errorMessage(error: unknown): string {
-	if (error instanceof Error) return error.message;
-	if (typeof error === "string") return error;
+function errorProperty(error: unknown, key: string): unknown {
 	const record = errorRecord(error);
-	if (!record) return String(error);
-	const message = toStringValue(record.message);
+	if (!record) return undefined;
+	try {
+		return record[key];
+	} catch {
+		return undefined;
+	}
+}
+
+function safeString(error: unknown): string {
+	try {
+		return String(error);
+	} catch {
+		return "Unknown error";
+	}
+}
+
+function errorMessage(error: unknown): string {
+	if (typeof error === "string") return error;
+	const message = toStringValue(errorProperty(error, "message"));
 	if (message !== undefined) return message;
 
 	return (
-		toStringValue(record.error) ??
-		toStringValue(record.reason) ??
-		toStringValue(record.code) ??
-		String(error)
+		toStringValue(errorProperty(error, "error")) ??
+		toStringValue(errorProperty(error, "reason")) ??
+		toStringValue(errorProperty(error, "code")) ??
+		safeString(error)
 	);
 }
 
 export function diagnosticKind(error: unknown): EnvelopeDiagnostic["kind"] {
 	const code =
-		toStringValue(errorRecord(error)?.code) ??
-		toStringValue(errorRecord(error)?.statusCode) ??
+		toStringValue(errorProperty(error, "code")) ??
+		toStringValue(errorProperty(error, "statusCode")) ??
 		"";
-	const name =
-		error instanceof Error
-			? error.name
-			: (toStringValue(errorRecord(error)?.name) ?? "");
+	const name = toStringValue(errorProperty(error, "name")) ?? "";
 	const message = errorMessage(error);
 	return /\b(integrity|corrupt(?:ed|ion)?|checksum|hash mismatch|invariant)\b/i.test(
 		`${name} ${code} ${message}`,
