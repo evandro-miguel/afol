@@ -3,9 +3,9 @@ doc_type: "workbench_task"
 id: "260715_1956_pr-40-review-remediation_task_01"
 session_id: "260715_1956_pr-40-review-remediation"
 theme: "pr-40-review-remediation"
-status: "active"
+status: "closed"
 created_at: "2026-07-15T23:56:52.665Z"
-updated_at: "2026-07-15T23:56:52.665Z"
+updated_at: "2026-07-16T00:32:49.727Z"
 roadmap_feature: "F-29"
 feature_id: "F-29"
 parent_spec: "260715_afol-1-0-linux-wsl-finalization_spec_01"
@@ -17,6 +17,7 @@ pending_spec_status: "none"
 pending_spec_missing: ""
 pending_spec_resolution_hint: "linked to roadmap feature and parent spec"
 spec_waiver_reason: ""
+closed_at: "2026-07-16T00:32:49.727Z"
 ---
 
 # Tasks: pr-40-review-remediation
@@ -29,4 +30,4 @@ spec_waiver_reason: ""
 | T-02 | done | worker | Fix diagnostic and feedback regressions attempt=1 |
 | T-03 | done | worker | Fix project validation and dist smoke regressions attempt=1 |
 | T-04 | done | worker | Run full release and security gates attempt=1 |
-| T-05 | in_progress | worker | Review, close governance, and update PR attempt=1 |
+| T-05 | done | worker | Review, close governance, and update PR attempt=1 |
