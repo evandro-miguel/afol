@@ -12,6 +12,7 @@ import {
 import { readMemory } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
 import { checkPstrStale, validatePstrIndex } from "../pstr";
+import { readMaintenanceReviewSummary } from "./maintenance-review";
 import type { HealthArea, HealthFinding, HealthReport } from "./types";
 
 const HEALTH_AREAS: readonly HealthArea[] = [
@@ -279,6 +280,11 @@ function checkMemoryHealth(root: string, deep: boolean): HealthFinding[] {
 
 	const findings: HealthFinding[] = [];
 	const ageDays = ageInDays(memory.updated_at);
+	const maintenance =
+		memory.entries.length === 0 ? readMaintenanceReviewSummary(root) : null;
+	const hasFreshEmptyReview =
+		maintenance?.store_status === "ok" &&
+		!maintenance.due_areas.includes("memory");
 	if (ageDays === null) {
 		findings.push(
 			makeFinding(
@@ -288,7 +294,7 @@ function checkMemoryHealth(root: string, deep: boolean): HealthFinding[] {
 				"fix the project memory frontmatter",
 			),
 		);
-	} else if (ageDays > MEMORY_STALE_AFTER_DAYS) {
+	} else if (ageDays > MEMORY_STALE_AFTER_DAYS && !hasFreshEmptyReview) {
 		findings.push(
 			makeFinding(
 				"memory",

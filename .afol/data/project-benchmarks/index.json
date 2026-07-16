@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "generated_by": "afol pb generate",
-  "generated_at": "2026-06-16T20:20:52.599Z",
+  "generated_at": "2026-07-16T12:29:45.541Z",
   "project_count": 5,
   "projects": [
     {
@@ -10,16 +10,34 @@
       "category": "direct_comparable",
       "status": "active",
       "confidence": "high",
-      "score": 93,
-      "overall_score": 37,
-      "focused_score": 93,
-      "coverage_weight": 40,
+      "score": 90,
+      "overall_score": 45,
+      "focused_score": 90,
+      "coverage_weight": 50,
       "stale": false,
-      "axis_count": 3,
+      "axis_count": 4,
       "axes": {
         "agent_task_lifecycle": 5,
         "safe_mutation": 4,
-        "evals_benchmarks": 5
+        "evals_benchmarks": 5,
+        "multi_agent": 4
+      }
+    },
+    {
+      "id": "aider",
+      "name": "Aider",
+      "category": "direct_comparable",
+      "status": "active",
+      "confidence": "high",
+      "score": 92,
+      "overall_score": 23,
+      "focused_score": 92,
+      "coverage_weight": 25,
+      "stale": false,
+      "axis_count": 2,
+      "axes": {
+        "repo_context_map": 5,
+        "local_state": 4
       }
     },
     {
@@ -72,22 +90,6 @@
       "axes": {
         "skills_modes_rules": 4,
         "repo_context_map": 3
-      }
-    },
-    {
-      "id": "aider",
-      "name": "Aider",
-      "category": "direct_comparable",
-      "status": "active",
-      "confidence": "high",
-      "score": 100,
-      "overall_score": 15,
-      "focused_score": 100,
-      "coverage_weight": 15,
-      "stale": false,
-      "axis_count": 1,
-      "axes": {
-        "repo_context_map": 5
       }
     }
   ]

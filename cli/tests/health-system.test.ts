@@ -24,6 +24,7 @@ import {
 } from "../services/health/maintenance";
 import {
 	readMaintenanceReviewSummary,
+	recordMaintenanceReview,
 	scanLegacyReferences,
 } from "../services/health/maintenance-review";
 import {
@@ -505,6 +506,55 @@ describe("health system", () => {
 			expect(report.findings[0]?.message).toContain(
 				"missing or invalid project memory",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkHealth accepts recent review freshness only for empty memory", () => {
+		const root = createFixture();
+		const updatedAt = hoursAgo(24 * 31);
+		try {
+			writeFileSync(
+				join(root, ".afol", "memory", "memory.md"),
+				[
+					"---",
+					"doc_type: project_memory",
+					`updated_at: ${updatedAt}`,
+					"entries: 0",
+					"---",
+					"",
+					"# Project Memory",
+					"",
+					"## active",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			expect(
+				checkHealth(root, { area: "memory" }).findings.some((finding) =>
+					finding.message.includes("stale project memory"),
+				),
+			).toBe(true);
+			recordMaintenanceReview(root, {
+				area: "memory",
+				note: "Reviewed empty memory; no reusable candidates.",
+			});
+
+			const emptyReport = checkHealth(root, { area: "memory" });
+			expect(
+				emptyReport.findings.some((finding) =>
+					finding.message.includes("stale project memory"),
+				),
+			).toBe(false);
+
+			writeMemory(root, updatedAt);
+			const populatedReport = checkHealth(root, { area: "memory" });
+			expect(
+				populatedReport.findings.some((finding) =>
+					finding.message.includes("stale project memory"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
