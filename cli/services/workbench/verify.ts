@@ -3,6 +3,10 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { collectSessionIds } from "../local-state/workbench-index";
 import { resolveProjectPaths } from "../project/paths";
 import { loadProjectRoot } from "../project/root";
+import {
+	readVerificationRunLedgerAtSessionPath,
+	verificationRunRecordsAuthorize,
+} from "./verification-runs";
 
 const LEGACY_TASK_RE = /^\s*-\s\[( |\/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$/;
 const OPEN_CHECKLIST_RE = /^\s*-\s\[( |\/|%|&|!)\]\s+(.+?)\s*$/;
@@ -125,6 +129,8 @@ export type EvidenceVerificationEntry = {
 	waiver_reason?: unknown;
 	approved_by?: unknown;
 	attempt?: unknown;
+	verification_run_id?: unknown;
+	task_attempt?: unknown;
 };
 
 type EvidenceLedger = {
@@ -468,12 +474,16 @@ export function evidenceCompletionStatus(
 function doneTaskEvidenceIssue(
 	task: VerifyTask,
 	entries: EvidenceVerificationEntry[],
+	evidenceScope: string,
 ): VerifyIssue | null {
-	const status = evidenceCompletionAuthorization(
-		entries.filter((entry) => (entry.attempt ?? 0) === task.attempt),
+	const attemptEntries = entries.filter(
+		(entry) => (entry.attempt ?? 0) === task.attempt,
+	);
+	const authorization = evidenceCompletionAuthorization(
+		attemptEntries,
 		task.completionPolicy,
-	).status;
-	if (status === "failed") {
+	);
+	if (authorization.status === "failed") {
 		return {
 			type: "failed_evidence",
 			taskId: task.id,
@@ -482,7 +492,40 @@ function doneTaskEvidenceIssue(
 			message: `Task ${task.id} has blocking failed evidence`,
 		};
 	}
-	if (status === "passed") {
+	if (authorization.status === "passed") {
+		const authorizingEntry = attemptEntries.find(
+			(entry) => entry.id === authorization.evidenceId,
+		);
+		if (typeof authorizingEntry?.verification_run_id === "string") {
+			try {
+				const records = readVerificationRunLedgerAtSessionPath(evidenceScope);
+				if (
+					!verificationRunRecordsAuthorize(
+						records,
+						task.id,
+						task.attempt,
+						authorization.evidenceId ?? "",
+						authorizingEntry.verification_run_id,
+					)
+				) {
+					return {
+						type: "invalid_evidence",
+						taskId: task.id,
+						file: task.file,
+						line: task.line,
+						message: `Task ${task.id} has run-tagged evidence without a complete matching verification run`,
+					};
+				}
+			} catch (error) {
+				return {
+					type: "invalid_evidence",
+					taskId: task.id,
+					file: task.file,
+					line: task.line,
+					message: `Task ${task.id} has an invalid verification run ledger: ${(error as Error).message}`,
+				};
+			}
+		}
 		return null;
 	}
 	return {
@@ -591,6 +634,7 @@ export function verifyWorkbenchTasks(
 				const issue = doneTaskEvidenceIssue(
 					task,
 					scopedEvidence?.byTask.get(task.id) ?? [],
+					evidenceScope,
 				);
 				if (issue) {
 					result.issues.push(issue);

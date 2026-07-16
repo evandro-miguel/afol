@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Stats } from "node:fs";
 import {
 	accessSync,
 	chmodSync,
@@ -10,8 +11,10 @@ import {
 	readdirSync,
 	readFileSync,
 	readlinkSync,
+	rmdirSync,
 	rmSync,
 	symlinkSync,
+	unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -23,6 +26,8 @@ const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const SANDBOX_COPY_EXCLUDES = [".git", "node_modules", "dist", ".bun-build*"];
+const COMPLETION_LOCKS_ROOT = ".afol/wb/.locks";
+const COMPLETION_LOCK_FILE_RE = /^completion-[a-f0-9]{64}\.lock(?:\.fence)?$/;
 const RUNTIME_STATE_GUARD_PATHS = [
 	".afol/state",
 	".afol/data/events",
@@ -82,6 +87,36 @@ interface PorcelainStateEntry {
 interface RuntimeStateEntry {
 	path: string;
 	fingerprint: string;
+}
+
+type CompletionLockEntryType =
+	| "regular"
+	| "directory"
+	| "symlink"
+	| "other"
+	| "unavailable";
+
+interface CompletionLockEntry {
+	path: string;
+	type: CompletionLockEntryType;
+	identity?: string;
+	fingerprint?: string;
+	metadata?: CompletionLockMetadataSnapshot | null;
+}
+
+interface CompletionLockState {
+	rootType: "missing" | "directory" | "symlink" | "other" | "unavailable";
+	rootIdentity?: string;
+	entries: CompletionLockEntry[];
+}
+
+interface CompletionLockMetadataSnapshot {
+	pid: number;
+	host: string;
+	owner_token: string;
+	generation: number;
+	acquired_at: string;
+	heartbeat_at: string;
 }
 
 function scenarioSamplePassed(
@@ -260,10 +295,14 @@ function gitStatusPorcelain(projectRoot: string): {
 	ok: boolean;
 	output: string;
 } {
-	const result = boundedSpawn("git", ["status", "--porcelain"], {
-		cwd: projectRoot,
-		timeoutMs: 15_000,
-	});
+	const result = boundedSpawn(
+		"git",
+		["status", "--porcelain", "--untracked-files=all"],
+		{
+			cwd: projectRoot,
+			timeoutMs: 15_000,
+		},
+	);
 	return {
 		ok: result.ok,
 		output: result.stdout.trimEnd(),
@@ -283,11 +322,19 @@ function porcelainEntries(
 		const path = pathPart.includes(" -> ")
 			? pathPart.slice(pathPart.lastIndexOf(" -> ") + 4)
 			: pathPart;
-		if (path.length > 0) {
+		if (path.length > 0 && !isCompletionLockPath(path)) {
 			entries.push({ status, path });
 		}
 	}
 	return entries;
+}
+
+function isCompletionLockPath(path: string): boolean {
+	const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "");
+	return (
+		normalized === COMPLETION_LOCKS_ROOT ||
+		normalized.startsWith(`${COMPLETION_LOCKS_ROOT}/`)
+	);
 }
 
 function porcelainEntryKey(entry: { status: string; path: string }): string {
@@ -302,6 +349,261 @@ function errorCode(error: unknown): string {
 
 function hashFile(path: string): string {
 	return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function statIdentity(stat: Stats): string {
+	return `${stat.dev}:${stat.ino}`;
+}
+
+function expectedCompletionLockFile(path: string): "lock" | "fence" | null {
+	const prefix = `${COMPLETION_LOCKS_ROOT}/`;
+	if (!path.startsWith(prefix)) return null;
+	const relativePath = path.slice(prefix.length);
+	if (relativePath.includes("/") || !COMPLETION_LOCK_FILE_RE.test(relativePath))
+		return null;
+	return relativePath.endsWith(".lock.fence") ? "fence" : "lock";
+}
+
+function parseCompletionLockMetadata(
+	raw: string,
+): CompletionLockMetadataSnapshot | null {
+	try {
+		const value = JSON.parse(raw) as Record<string, unknown>;
+		const keys = Object.keys(value).sort();
+		const expectedKeys = [
+			"acquired_at",
+			"generation",
+			"heartbeat_at",
+			"host",
+			"owner_token",
+			"pid",
+		];
+		if (keys.length !== expectedKeys.length) return null;
+		if (keys.some((key, index) => key !== expectedKeys[index])) return null;
+		if (
+			typeof value.pid !== "number" ||
+			!Number.isSafeInteger(value.pid) ||
+			value.pid <= 0 ||
+			typeof value.host !== "string" ||
+			!value.host ||
+			typeof value.owner_token !== "string" ||
+			!value.owner_token ||
+			typeof value.generation !== "number" ||
+			!Number.isSafeInteger(value.generation) ||
+			value.generation < 0 ||
+			typeof value.acquired_at !== "string" ||
+			!Number.isFinite(Date.parse(value.acquired_at)) ||
+			typeof value.heartbeat_at !== "string" ||
+			!Number.isFinite(Date.parse(value.heartbeat_at))
+		) {
+			return null;
+		}
+		const metadata: CompletionLockMetadataSnapshot = {
+			pid: value.pid,
+			host: value.host,
+			owner_token: value.owner_token,
+			generation: value.generation,
+			acquired_at: value.acquired_at,
+			heartbeat_at: value.heartbeat_at,
+		};
+		if (raw !== `${JSON.stringify(metadata)}\n`) return null;
+		return metadata;
+	} catch {
+		return null;
+	}
+}
+
+function completionLockStateSnapshot(projectRoot: string): CompletionLockState {
+	const rootPath = join(projectRoot, COMPLETION_LOCKS_ROOT);
+	let rootStat: ReturnType<typeof lstatSync>;
+	try {
+		rootStat = lstatSync(rootPath);
+	} catch (error) {
+		return {
+			rootType: errorCode(error) === "ENOENT" ? "missing" : "unavailable",
+			entries: [],
+		};
+	}
+	if (rootStat.isSymbolicLink()) return { rootType: "symlink", entries: [] };
+	if (!rootStat.isDirectory()) return { rootType: "other", entries: [] };
+
+	const entries: CompletionLockEntry[] = [];
+	const visit = (
+		absoluteDirectory: string,
+		relativeDirectory: string,
+	): void => {
+		let names: string[];
+		try {
+			names = readdirSync(absoluteDirectory).sort();
+		} catch {
+			entries.push({
+				path: relativeDirectory
+					? `${COMPLETION_LOCKS_ROOT}/${relativeDirectory}`
+					: COMPLETION_LOCKS_ROOT,
+				type: "unavailable",
+			});
+			return;
+		}
+		for (const name of names) {
+			const relativePath = relativeDirectory
+				? `${relativeDirectory}/${name}`
+				: name;
+			const absolutePath = join(absoluteDirectory, name);
+			const path = `${COMPLETION_LOCKS_ROOT}/${relativePath}`;
+			try {
+				const stat = lstatSync(absolutePath);
+				const identity = statIdentity(stat);
+				if (stat.isSymbolicLink()) {
+					entries.push({ type: "symlink", path, identity });
+				} else if (stat.isFile()) {
+					const raw = readFileSync(absolutePath);
+					entries.push({
+						type: "regular",
+						path,
+						identity,
+						fingerprint: createHash("sha256").update(raw).digest("hex"),
+						...(expectedCompletionLockFile(path) === "lock"
+							? {
+									metadata: parseCompletionLockMetadata(raw.toString("utf8")),
+								}
+							: {}),
+					});
+				} else if (stat.isDirectory()) {
+					entries.push({ type: "directory", path, identity });
+					visit(absolutePath, relativePath);
+				} else {
+					entries.push({ type: "other", path, identity });
+				}
+			} catch {
+				entries.push({ type: "unavailable", path });
+			}
+		}
+	};
+	visit(rootPath, "");
+	return {
+		rootType: "directory",
+		rootIdentity: statIdentity(rootStat),
+		entries,
+	};
+}
+
+function immutableCompletionMetadataMatches(
+	before: CompletionLockMetadataSnapshot,
+	after: CompletionLockMetadataSnapshot,
+): boolean {
+	return (
+		before.pid === after.pid &&
+		before.host === after.host &&
+		before.owner_token === after.owner_token &&
+		before.generation === after.generation &&
+		before.acquired_at === after.acquired_at &&
+		Date.parse(after.heartbeat_at) >= Date.parse(before.heartbeat_at)
+	);
+}
+
+function completionLockChangedPaths(
+	before: CompletionLockState,
+	after: CompletionLockState,
+): string[] {
+	const changed = new Set<string>();
+	if (before.rootType !== after.rootType) changed.add(COMPLETION_LOCKS_ROOT);
+	if (
+		before.rootType === "directory" &&
+		after.rootType === "directory" &&
+		before.rootIdentity !== after.rootIdentity
+	) {
+		changed.add(COMPLETION_LOCKS_ROOT);
+	}
+	if (
+		before.rootType === "symlink" ||
+		before.rootType === "other" ||
+		before.rootType === "unavailable" ||
+		after.rootType === "symlink" ||
+		after.rootType === "other" ||
+		after.rootType === "unavailable"
+	) {
+		changed.add(COMPLETION_LOCKS_ROOT);
+	}
+	const beforeByPath = new Map(
+		before.entries.map((entry) => [entry.path, entry]),
+	);
+	const afterByPath = new Map(
+		after.entries.map((entry) => [entry.path, entry]),
+	);
+	for (const path of new Set([...beforeByPath.keys(), ...afterByPath.keys()])) {
+		const beforeEntry = beforeByPath.get(path);
+		const afterEntry = afterByPath.get(path);
+		if (!beforeEntry || !afterEntry || beforeEntry.type !== afterEntry.type) {
+			changed.add(path);
+			continue;
+		}
+		if (beforeEntry.identity !== afterEntry.identity) {
+			changed.add(path);
+			continue;
+		}
+		if (
+			beforeEntry.type === "symlink" ||
+			beforeEntry.type === "other" ||
+			beforeEntry.type === "unavailable"
+		) {
+			changed.add(path);
+			continue;
+		}
+		if (beforeEntry.type === "regular") {
+			const expectedKind = expectedCompletionLockFile(path);
+			if (expectedKind === "lock") {
+				if (
+					!beforeEntry.metadata ||
+					!afterEntry.metadata ||
+					!immutableCompletionMetadataMatches(
+						beforeEntry.metadata,
+						afterEntry.metadata,
+					)
+				) {
+					changed.add(path);
+				}
+			} else if (beforeEntry.fingerprint !== afterEntry.fingerprint) {
+				changed.add(path);
+			}
+		}
+	}
+	return [...changed].sort();
+}
+
+function cleanupAddedCompletionLockEntries(
+	projectRoot: string,
+	before: CompletionLockState,
+	after: CompletionLockState,
+): void {
+	const beforePaths = new Set(before.entries.map((entry) => entry.path));
+	const additions = after.entries
+		.filter((entry) => !beforePaths.has(entry.path))
+		.sort((left, right) => right.path.length - left.path.length);
+	for (const entry of additions) {
+		if (expectedCompletionLockFile(entry.path)) continue;
+		const absolutePath = join(projectRoot, entry.path);
+		try {
+			const stat = lstatSync(absolutePath);
+			if (stat.isSymbolicLink() || stat.isFile()) {
+				unlinkSync(absolutePath);
+			} else if (stat.isDirectory()) {
+				rmdirSync(absolutePath);
+			}
+		} catch {
+			// Leak reporting remains authoritative when conservative cleanup cannot act.
+		}
+	}
+	const rootPath = join(projectRoot, COMPLETION_LOCKS_ROOT);
+	try {
+		const stat = lstatSync(rootPath);
+		if (stat.isSymbolicLink() && before.rootType !== "symlink") {
+			unlinkSync(rootPath);
+		} else if (before.rootType === "missing" && stat.isDirectory()) {
+			rmdirSync(rootPath);
+		}
+	} catch {
+		// Do not broaden cleanup beyond an empty directory or the added symlink.
+	}
 }
 
 function hashPath(path: string): string {
@@ -689,6 +991,7 @@ export function runScenarioCommand(
 		? porcelainState(projectRoot, gitStatusBefore.output)
 		: null;
 	const runtimeStateBefore = runtimeStateSnapshot(projectRoot);
+	const completionLocksBefore = completionLockStateSnapshot(projectRoot);
 	let warmup = runScenarioSample(projectRoot, invocation);
 	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
 		warmup = runScenarioSample(projectRoot, invocation);
@@ -708,6 +1011,7 @@ export function runScenarioCommand(
 		? porcelainState(projectRoot, gitStatusAfter.output)
 		: null;
 	const runtimeStateAfter = runtimeStateSnapshot(projectRoot);
+	const completionLocksAfter = completionLockStateSnapshot(projectRoot);
 	const sideEffectNotes: string[] = [];
 	const leakedPaths = new Set<string>();
 	const gitGuardUnavailable =
@@ -737,6 +1041,17 @@ export function runScenarioCommand(
 			leakedPaths.add(path);
 		}
 	}
+	for (const path of completionLockChangedPaths(
+		completionLocksBefore,
+		completionLocksAfter,
+	)) {
+		leakedPaths.add(path);
+	}
+	cleanupAddedCompletionLockEntries(
+		projectRoot,
+		completionLocksBefore,
+		completionLocksAfter,
+	);
 	if (leakedPaths.size > 0) {
 		sideEffectNotes.push(`side-effect-leak:${[...leakedPaths].join(",")}`);
 	} else if (gitGuardUnavailable) {

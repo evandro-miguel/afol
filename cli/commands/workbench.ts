@@ -11,16 +11,27 @@ import {
 	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
 import {
+	TaskCompletionBusyError,
+	type TaskCompletionLease,
+	withTaskCompletionLock,
+} from "../services/workbench/completion-lock";
+import {
 	appendTimelineEntry,
 	closeSession,
 	completeObservedTask,
+	completeVerificationRun,
 	doneTask,
+	failVerificationRun,
 	type LifecycleAuxiliaryRuntime,
 	newWorkstream,
+	prepareVerificationRun,
 	recordEvidence,
+	recordVerificationRunStep,
 	startTask,
 	type TaskState,
+	taskAttemptSnapshot,
 	transitionTask,
+	VerificationRunConflictError,
 } from "../services/workbench/lifecycle";
 import {
 	type briefingUnavailable,
@@ -45,7 +56,12 @@ import {
 	parseVerifyArgs,
 } from "./workbench/args";
 import { writeJsonError } from "./workbench/shared";
-import { resolveRequiredSpecCheck, runVerification } from "./workbench/verify";
+import type { DoneArgs, VerificationSpec } from "./workbench/types";
+import {
+	type ObservedVerificationStatus,
+	resolveRequiredSpecCheck,
+	runVerificationAsync,
+} from "./workbench/verify";
 
 function assertWorkbenchMutationAllowed(
 	ctx: OperationContext,
@@ -403,86 +419,258 @@ function formatArgvToken(value: string): string {
 	return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-export async function runDoneCommand(
-	args: string[],
-	root: string = process.cwd(),
-	ctx: OperationContext = defaultOperationContext(),
-): Promise<number> {
-	try {
-		assertWorkbenchMutationAllowed(ctx, "workbench.done");
-		const parsed = parseDoneArgs(args, root);
-		if (parsed.requireSpecCheck) {
-			const specCheck = resolveRequiredSpecCheck(
-				root,
-				parsed.session,
-				parsed.taskId,
-			);
-			if (specCheck.status === "conflict") {
-				if (parsed.json) {
-					writeJsonError(
-						"workbench.done",
-						new Error(
-							`spec check failed: ${specCheck.spec_id || parsed.taskId}`,
-						),
-						1,
-					);
-				} else {
-					console.error(
-						`spec check failed: ${specCheck.spec_id || parsed.taskId}`,
-					);
-				}
-				return 1;
-			}
+function formatVerificationCommand(spec: VerificationSpec): string {
+	return spec.mode === "argv"
+		? [spec.executable, ...spec.args].map(formatArgvToken).join(" ")
+		: spec.command;
+}
+
+type DoneLockedSuccess = {
+	ok: true;
+	done: ReturnType<typeof doneTask>;
+	warnings: string[];
+	runId?: string;
+	evidenceIds?: string[];
+	stepCount?: number;
+};
+
+type DoneLockedFailure = {
+	ok: false;
+	message: string;
+	status:
+		| ObservedVerificationStatus
+		| "spec_conflict"
+		| "persistence_failed"
+		| "stale_conflict";
+	exitCode: number;
+	runId?: string;
+	stepIndex?: number;
+	stepCount?: number;
+	evidenceIds?: string[];
+	warnings?: string[];
+	legacyError?: boolean;
+};
+
+type DoneLockedResult = DoneLockedSuccess | DoneLockedFailure;
+
+async function executeDoneLocked(
+	root: string,
+	parsed: DoneArgs,
+	ctx: OperationContext,
+	lease: TaskCompletionLease,
+): Promise<DoneLockedResult> {
+	if (parsed.requireSpecCheck) {
+		const specCheck = resolveRequiredSpecCheck(
+			root,
+			parsed.session,
+			parsed.taskId,
+		);
+		if (specCheck.status === "conflict") {
+			return {
+				ok: false,
+				message: `spec check failed: ${specCheck.spec_id || parsed.taskId}`,
+				status: "spec_conflict",
+				exitCode: 1,
+				...(parsed.testCommands.length < 2 ? { legacyError: true } : {}),
+			};
 		}
-		let observedCompletion: ReturnType<typeof completeObservedTask> | null =
-			null;
-		if (parsed.verification || parsed.testCommand || parsed.testShellCommand) {
-			const verificationSpec = parsed.verification;
-			const verification = verificationSpec
-				? runVerification(root, verificationSpec)
-				: runVerification(
-						root,
-						parsed.testShellCommand ?? parsed.testCommand ?? "",
-						{ shell: Boolean(parsed.testShellCommand) },
-					);
-			const verificationCommand =
-				parsed.testCommand ??
-				parsed.testShellCommand ??
-				(verificationSpec?.mode === "argv"
-					? [verificationSpec.executable, ...verificationSpec.args]
-							.map(formatArgvToken)
-							.join(" ")
-					: (verificationSpec?.command ?? ""));
-			observedCompletion = completeObservedTask(root, {
+	}
+
+	if (parsed.testCommands.length >= 2) {
+		const snapshot = taskAttemptSnapshot(root, parsed);
+		const commands = parsed.verifications.map(
+			(spec, index) =>
+				parsed.testCommands[index] ?? formatVerificationCommand(spec),
+		);
+		const prepared = prepareVerificationRun(
+			root,
+			{
 				session: parsed.session,
 				taskId: parsed.taskId,
-				command: verificationCommand,
-				exitCode: verification.exitCode,
-				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
-				...(parsed.note ? { note: parsed.note } : {}),
+				taskAttemptSnapshot: snapshot,
+				commands,
+			},
+			{ fencingCheck: lease.assertOwned },
+		);
+		if (prepared.kind === "recovered") {
+			return {
+				ok: true,
+				done: prepared.completion.done,
+				warnings: prepared.completion.warnings,
+				runId: prepared.completion.runId,
+				evidenceIds: prepared.completion.evidenceIds,
+				stepCount: prepared.completion.evidenceIds.length,
+			};
+		}
+		const evidenceIds: string[] = [];
+		for (const [index, verificationSpec] of parsed.verifications.entries()) {
+			const verification = await runVerificationAsync(root, verificationSpec, {
+				signal: lease.signal,
 			});
-			if (verification.exitCode !== 0) {
-				const failureLabel = parsed.testShellCommand
-					? "--test-shell"
-					: "--test";
-				if (parsed.json) {
-					writeJsonError(
-						"workbench.done",
-						new Error(
-							`${failureLabel} failed with exit code ${verification.exitCode}`,
-						),
-						1,
-					);
-				} else {
-					console.error(
-						`${failureLabel} failed with exit code ${verification.exitCode}`,
-					);
-				}
-				return 1;
+			try {
+				lease.assertOwned();
+			} catch {
+				return {
+					ok: false,
+					message: `verification lock ownership was lost at step ${index + 1}/${prepared.run.step_count}`,
+					status: "lock_lost",
+					exitCode: 1,
+					runId: prepared.run.verification_run_id,
+					stepIndex: index + 1,
+					stepCount: prepared.run.step_count,
+					evidenceIds,
+				};
+			}
+			let evidence: ReturnType<typeof recordVerificationRunStep>;
+			try {
+				evidence = recordVerificationRunStep(
+					root,
+					{
+						session: parsed.session,
+						taskId: parsed.taskId,
+						run: prepared.run,
+						stepIndex: index + 1,
+						command: commands[index] ?? "",
+						status: verification.status,
+						exitCode: verification.exitCode,
+						...(verification.signal ? { signal: verification.signal } : {}),
+						durationMs: verification.durationMs,
+						...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+						...(parsed.note ? { note: parsed.note } : {}),
+					},
+					{ fencingCheck: lease.assertOwned },
+				);
+			} catch (error) {
+				const interrupted = failVerificationRun(
+					root,
+					{
+						session: parsed.session,
+						taskId: parsed.taskId,
+						run: prepared.run,
+						terminalStatus: "interrupted",
+					},
+					{ fencingCheck: lease.assertOwned },
+				);
+				return {
+					ok: false,
+					message:
+						error instanceof VerificationRunConflictError
+							? `verification became stale at step ${index + 1}/${prepared.run.step_count}`
+							: `verification evidence commit failed at step ${index + 1}/${prepared.run.step_count}`,
+					status:
+						error instanceof VerificationRunConflictError
+							? "stale_conflict"
+							: "persistence_failed",
+					exitCode: 1,
+					runId: prepared.run.verification_run_id,
+					stepIndex: index + 1,
+					stepCount: prepared.run.step_count,
+					evidenceIds: interrupted.evidenceIds,
+					warnings: interrupted.warnings,
+				};
+			}
+			evidenceIds.push(evidence.id);
+			if (verification.status !== "passed") {
+				const failedRun = failVerificationRun(
+					root,
+					{ session: parsed.session, taskId: parsed.taskId, run: prepared.run },
+					{ fencingCheck: lease.assertOwned },
+				);
+				return {
+					ok: false,
+					message: `--test failed at step ${index + 1}/${prepared.run.step_count} (${verification.status})`,
+					status: verification.status,
+					exitCode: 1,
+					runId: prepared.run.verification_run_id,
+					stepIndex: index + 1,
+					stepCount: prepared.run.step_count,
+					evidenceIds: failedRun.evidenceIds,
+					warnings: failedRun.warnings,
+				};
 			}
 		}
-		if (parsed.evidenceCommand && parsed.evidenceResult) {
-			recordEvidence(root, {
+		const completion = completeVerificationRun(
+			root,
+			{ session: parsed.session, taskId: parsed.taskId, run: prepared.run },
+			{ fencingCheck: lease.assertOwned },
+		);
+		return {
+			ok: true,
+			done: completion.done,
+			warnings: completion.warnings,
+			runId: completion.runId,
+			evidenceIds: completion.evidenceIds,
+			stepCount: prepared.run.step_count,
+		};
+	}
+
+	let observedCompletion: ReturnType<typeof completeObservedTask> | null = null;
+	if (parsed.verifications.length === 1) {
+		const verificationSpec = parsed.verifications[0] as VerificationSpec;
+		const command =
+			parsed.testCommands[0] ?? formatVerificationCommand(verificationSpec);
+		const verification = await runVerificationAsync(root, verificationSpec, {
+			signal: lease.signal,
+		});
+		lease.assertOwned();
+		observedCompletion = completeObservedTask(
+			root,
+			{
+				session: parsed.session,
+				taskId: parsed.taskId,
+				command,
+				exitCode: verification.exitCode,
+				...(verification.signal ? { signal: verification.signal } : {}),
+				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+				...(parsed.note ? { note: parsed.note } : {}),
+			},
+			{ fencingCheck: lease.assertOwned },
+		);
+		if (verification.status !== "passed") {
+			return {
+				ok: false,
+				message: `--test failed with exit code ${verification.exitCode}`,
+				status: verification.status,
+				exitCode: 1,
+				warnings: observedCompletion.warnings,
+				legacyError: true,
+			};
+		}
+	}
+	if (parsed.testShellCommand) {
+		const verification = await runVerificationAsync(
+			root,
+			{ mode: "shell", command: parsed.testShellCommand },
+			{ signal: lease.signal },
+		);
+		lease.assertOwned();
+		observedCompletion = completeObservedTask(
+			root,
+			{
+				session: parsed.session,
+				taskId: parsed.taskId,
+				command: parsed.testShellCommand,
+				exitCode: verification.exitCode,
+				...(verification.signal ? { signal: verification.signal } : {}),
+				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+				...(parsed.note ? { note: parsed.note } : {}),
+			},
+			{ fencingCheck: lease.assertOwned },
+		);
+		if (verification.status !== "passed") {
+			return {
+				ok: false,
+				message: `--test-shell failed with exit code ${verification.exitCode}`,
+				status: verification.status,
+				exitCode: 1,
+				legacyError: true,
+			};
+		}
+	}
+	if (parsed.evidenceCommand && parsed.evidenceResult) {
+		recordEvidence(
+			root,
+			{
 				session: parsed.session,
 				taskId: parsed.taskId,
 				command: parsed.evidenceCommand,
@@ -491,15 +679,69 @@ export async function runDoneCommand(
 				approvalContext: ctx,
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
-			});
+			},
+			{ fencingCheck: lease.assertOwned },
+		);
+	}
+	lease.assertOwned();
+	const done =
+		observedCompletion?.done ??
+		doneTask(root, parsed, { fencingCheck: lease.assertOwned });
+	const warnings = [
+		...new Set([
+			...(observedCompletion?.warnings ?? []),
+			...(done.warnings ?? []),
+		]),
+	];
+	return { ok: true, done, warnings };
+}
+
+export async function runDoneCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
+	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.done");
+		const parsed = parseDoneArgs(args, root);
+		const result = await withTaskCompletionLock(
+			root,
+			parsed.session,
+			parsed.taskId,
+			(lease) => executeDoneLocked(root, parsed, ctx, lease),
+		);
+		if (!result.ok) {
+			if (parsed.json) {
+				if (result.legacyError) {
+					writeJsonError(
+						"workbench.done",
+						new Error(result.message),
+						result.exitCode,
+					);
+				} else {
+					const envelope = {
+						...envelopeErr("workbench.verification_failed", result.message, {
+							action: "workbench.done",
+							exitCode: result.exitCode,
+						}),
+						data: {
+							status: result.status,
+							...(result.runId ? { verification_run_id: result.runId } : {}),
+							...(result.stepIndex ? { step_index: result.stepIndex } : {}),
+							...(result.stepCount ? { step_count: result.stepCount } : {}),
+							evidence_ids: result.evidenceIds ?? [],
+							evidence_count: result.evidenceIds?.length ?? 0,
+							warnings: result.warnings ?? [],
+						},
+					};
+					console.log(stringifyEnvelope(envelope));
+				}
+			} else {
+				console.error(result.message);
+			}
+			return result.exitCode;
 		}
-		const done = observedCompletion?.done ?? doneTask(root, parsed);
-		const completionWarnings = [
-			...new Set([
-				...(observedCompletion?.warnings ?? []),
-				...(done.warnings ?? []),
-			]),
-		];
+		const completionWarnings = result.warnings;
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -511,7 +753,15 @@ export async function runDoneCommand(
 								? "committed_with_warnings"
 								: "done",
 							warnings: completionWarnings,
-							authorizing_evidence_id: done.authorizingEvidenceId,
+							authorizing_evidence_id: result.done.authorizingEvidenceId,
+							...(result.runId
+								? {
+										verification_run_id: result.runId,
+										step_count: result.stepCount ?? 0,
+										evidence_ids: result.evidenceIds ?? [],
+										evidence_count: result.evidenceIds?.length ?? 0,
+									}
+								: {}),
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.done" },
@@ -521,8 +771,13 @@ export async function runDoneCommand(
 		} else {
 			const lines = [
 				`task done: ${parsed.taskId}`,
-				`authorizing evidence: ${done.authorizingEvidenceId}`,
+				`authorizing evidence: ${result.done.authorizingEvidenceId}`,
 			];
+			if (result.runId) {
+				lines.push(
+					`verification: ${result.stepCount ?? 0}/${result.stepCount ?? 0} passed`,
+				);
+			}
 			lines.push(...completionWarnings.map((warning) => `warning: ${warning}`));
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			console.log(lines.join("\n"));
@@ -530,7 +785,27 @@ export async function runDoneCommand(
 		return 0;
 	} catch (error) {
 		if (hasJsonFlag(args)) {
-			writeJsonError("workbench.done", error);
+			if (error instanceof TaskCompletionBusyError) {
+				console.log(
+					stringifyEnvelope(
+						envelopeErr("workbench.completion_busy", error.message, {
+							action: "workbench.done",
+							exitCode: 2,
+						}),
+					),
+				);
+			} else if (error instanceof VerificationRunConflictError) {
+				console.log(
+					stringifyEnvelope(
+						envelopeErr("workbench.stale_conflict", error.message, {
+							action: "workbench.done",
+							exitCode: 2,
+						}),
+					),
+				);
+			} else {
+				writeJsonError("workbench.done", error);
+			}
 		} else {
 			console.error((error as Error).message);
 		}

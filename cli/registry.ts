@@ -245,7 +245,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Complete a task session",
 		category: "workflow",
 		guidance: [
-			"Record authorizing evidence before done, or use --test to execute verification while closing.",
+			"Record evidence first, or repeat --test for up to eight ordered fail-fast checks.",
 		],
 		subcommands: [
 			{
@@ -257,7 +257,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: '--test "<cmd>"',
 				sideEffect: "write",
 				description:
-					"Run a verification command, record evidence, then complete",
+					"Run ordered argv-only verification steps, record each result, then complete",
 			},
 			{
 				usage: "-- <argv...>",

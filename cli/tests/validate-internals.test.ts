@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -20,6 +21,10 @@ import {
 	type BenchResult,
 	DEFAULT_BENCH_MODEL,
 } from "../services/benchmark/types";
+import {
+	resolveTaskCompletionLockPath,
+	withTaskCompletionLock,
+} from "../services/workbench/completion-lock";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
 import { buildResult } from "../validate/command";
 import {
@@ -487,6 +492,21 @@ describe("validate registry", () => {
 				expect(scenario.thresholds.max_argv_chars).toBeDefined();
 				expect(scenario.compiled_binary).toBe(true);
 			}
+			const sequentialDone = snapshot.scenariosByPack["workbench-parity"]?.find(
+				(scenario) => scenario.scenario_id === "wb-sequential-done",
+			);
+			expect(sequentialDone).toBeDefined();
+			const sequentialCommand = sequentialDone?.command ?? "";
+			const oneStepCommand = 'afol d T-01 -x "bun --version"';
+			expect(sequentialCommand.match(/(?:^| )-x /g)).toHaveLength(8);
+			expect(Array.from(sequentialCommand)).toHaveLength(163);
+			expect(Array.from(sequentialCommand).length).toBeLessThan(
+				Array.from(oneStepCommand).length * 8,
+			);
+			expect(sequentialDone?.thresholds).toMatchObject({
+				max_argv_chars: 239,
+				max_output_tokens: 500,
+			});
 			expect(snapshot.coverage?.exemptions).toHaveLength(0);
 			expect(snapshot.coverage?.subcommand_exemptions).toHaveLength(0);
 			expect(
@@ -917,6 +937,17 @@ describe("validate registry", () => {
 });
 
 describe("scenario benchmark execution", () => {
+	test("keeps completion-lock ignore policy in source/example parity", () => {
+		for (const file of [".gitignore", ".gitignore.example"]) {
+			const lines = readFileSync(join(process.cwd(), file), "utf8").split(
+				/\r?\n/,
+			);
+			expect(lines.filter((line) => line === ".afol/wb/.locks/")).toHaveLength(
+				1,
+			);
+		}
+	});
+
 	test("executes commands, records failures, and blocks tracked-file leaks", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
@@ -1192,6 +1223,421 @@ describe("scenario benchmark execution", () => {
 			});
 			expect(sandboxStatusAfter.status).toBe(0);
 			expect(sandboxStatusAfter.stdout).toBe(sandboxStatusBefore.stdout);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("ignores an active completion lock but still catches workbench leaks", async () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "bench-held-completion-lock",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: "afol --version",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+
+			await withTaskCompletionLock(
+				root,
+				"bench-session",
+				"T-01",
+				async () => {
+					const ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					const safe = withCapturedConsoleError(() =>
+						buildResult(root, scenario, baselinePath, baseline),
+					);
+					expect(safe.result.status).toBe("passed");
+					expect(
+						safe.result.notes.some((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe(false);
+					expect(existsSync(ownerLockPath)).toBe(true);
+
+					const arbitraryLockFile = join(
+						root,
+						".afol",
+						"wb",
+						".locks",
+						"unexpected.txt",
+					);
+					const arbitrary = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								...scenario,
+								scenario_id: "bench-held-lock-arbitrary-entry",
+								command: `node -e 'require("node:fs").writeFileSync(".afol/wb/.locks/unexpected.txt","leak\\n","utf8")'`,
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(arbitrary.result.status).toBe("failed");
+					expect(
+						arbitrary.result.notes.find((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe("side-effect-leak:.afol/wb/.locks/unexpected.txt");
+					expect(existsSync(arbitraryLockFile)).toBe(false);
+					expect(existsSync(ownerLockPath)).toBe(true);
+
+					const symlinkTarget = join(root, "lock-symlink-target.txt");
+					writeFileSync(symlinkTarget, "preserve\n", "utf8");
+					const symlinkEntry = join(
+						root,
+						".afol",
+						"wb",
+						".locks",
+						"unexpected-link",
+					);
+					const symlink = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								...scenario,
+								scenario_id: "bench-held-lock-symlink-entry",
+								command: `node -e 'require("node:fs").symlinkSync(${JSON.stringify(symlinkTarget)}, ".afol/wb/.locks/unexpected-link")'`,
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(symlink.result.status).toBe("failed");
+					expect(
+						symlink.result.notes.find((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe("side-effect-leak:.afol/wb/.locks/unexpected-link");
+					expect(existsSync(symlinkEntry)).toBe(false);
+					expect(readFileSync(symlinkTarget, "utf8")).toBe("preserve\n");
+					expect(existsSync(ownerLockPath)).toBe(true);
+
+					const leaked = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								...scenario,
+								scenario_id: "bench-held-lock-real-leak",
+								command: `node -e 'const fs=require("node:fs"); fs.mkdirSync(".afol/wb/session",{recursive:true}); fs.writeFileSync(".afol/wb/session/real-leak.txt","leak\\n","utf8")'`,
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(leaked.result.status).toBe("failed");
+					expect(
+						leaked.result.notes.find((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe("side-effect-leak:.afol/wb/session/real-leak.txt");
+				},
+				{ heartbeatMs: 5 },
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("reports hostile completion-lock metadata and fence mutations without unsafe cleanup", async () => {
+		const mutations = [
+			{
+				id: "owner-token",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.owner_token="hostile-owner"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "generation",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.generation+=1000; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "extra-field",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.untrusted="extra"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "malformed",
+				command(lockPath: string): string {
+					return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(lockPath)},"malformed"+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "heartbeat-regression",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.heartbeat_at="1970-01-01T00:00:00.000Z"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "fence",
+				command(lockPath: string): string {
+					return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(`${lockPath}.fence`)},"999999"+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "fence" as const,
+			},
+		];
+
+		for (const mutation of mutations) {
+			const root = createBenchExecutionFixtureRoot();
+			try {
+				const baselinePath = join(root, "baseline-v1.json");
+				const baseline: Baseline = {
+					baseline_id: "bench-v1",
+					pack_id: "pstr-integrity",
+					schema_version: "1.0.0",
+					timing_p50_ms: 10_000,
+					timing_p95_ms: 10_000,
+				};
+				await withTaskCompletionLock(
+					root,
+					"bench-session",
+					"T-01",
+					async () => {
+						const ownerLockPath = resolveTaskCompletionLockPath(
+							root,
+							"bench-session",
+							"T-01",
+						);
+						const fencePath = `${ownerLockPath}.fence`;
+						const originalLock = readFileSync(ownerLockPath, "utf8");
+						const originalFence = readFileSync(fencePath, "utf8");
+						const relativeLockPath = ownerLockPath
+							.slice(root.length + 1)
+							.replaceAll("\\", "/");
+						const expectedLeakPath =
+							mutation.target === "fence"
+								? `${relativeLockPath}.fence`
+								: relativeLockPath;
+						try {
+							const result = withCapturedConsoleError(() =>
+								buildResult(
+									root,
+									{
+										schema_version: "1.0.0",
+										scenario_id: `bench-hostile-lock-${mutation.id}`,
+										scenario_version: "1.0.0",
+										pack_id: "pstr-integrity",
+										command: mutation.command(ownerLockPath),
+										result_schema: "1.0.0",
+										oracle: "normalized-envelope-and-threshold-check",
+										thresholds: {
+											max_duration_ms: 10_000,
+											max_p95_ms: 10_000,
+											max_output_tokens: 100,
+											min_tool_success_rate: 1,
+										},
+										baseline_id: "bench-v1",
+										deterministic_metrics: {},
+									},
+									baselinePath,
+									baseline,
+								),
+							);
+							expect(result.result.status).toBe("failed");
+							expect(
+								result.result.notes.some((note) =>
+									note.includes(`side-effect-leak:${expectedLeakPath}`),
+								),
+							).toBe(true);
+							if (mutation.target === "fence") {
+								expect(readFileSync(fencePath, "utf8")).toBe("999999\n");
+								expect(readFileSync(ownerLockPath, "utf8")).toBe(originalLock);
+							} else {
+								expect(readFileSync(ownerLockPath, "utf8")).not.toBe(
+									originalLock,
+								);
+								expect(readFileSync(fencePath, "utf8")).toBe(originalFence);
+							}
+						} finally {
+							writeFileSync(ownerLockPath, originalLock, "utf8");
+							writeFileSync(fencePath, originalFence, "utf8");
+						}
+					},
+					{ heartbeatMs: 60_000 },
+				);
+				const ownerLockPath = resolveTaskCompletionLockPath(
+					root,
+					"bench-session",
+					"T-01",
+				);
+				expect(existsSync(ownerLockPath)).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	}, 30_000);
+
+	test("reports atomic replacement of an owner lock and leaves the replacement for explicit recovery", async () => {
+		const root = createBenchExecutionFixtureRoot();
+		let ownerLockPath = "";
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			await withTaskCompletionLock(
+				root,
+				"bench-session",
+				"T-01",
+				async () => {
+					ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					const original = readFileSync(ownerLockPath, "utf8");
+					const originalInode = lstatSync(ownerLockPath).ino;
+					const replacementPath = `${ownerLockPath}.hostile-replacement`;
+					const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); fs.renameSync(replacement,p)'`;
+					const result = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								schema_version: "1.0.0",
+								scenario_id: "bench-hostile-lock-atomic-replacement",
+								scenario_version: "1.0.0",
+								pack_id: "pstr-integrity",
+								command,
+								result_schema: "1.0.0",
+								oracle: "normalized-envelope-and-threshold-check",
+								thresholds: {
+									max_duration_ms: 10_000,
+									max_p95_ms: 10_000,
+									max_output_tokens: 100,
+									min_tool_success_rate: 1,
+								},
+								baseline_id: "bench-v1",
+								deterministic_metrics: {},
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					const relativeLockPath = ownerLockPath
+						.slice(root.length + 1)
+						.replaceAll("\\", "/");
+					expect(result.result.status).toBe("failed");
+					expect(
+						result.result.notes.some((note) =>
+							note.includes(`side-effect-leak:${relativeLockPath}`),
+						),
+					).toBe(true);
+					expect(readFileSync(ownerLockPath, "utf8")).toBe(original);
+					expect(lstatSync(ownerLockPath).ino).not.toBe(originalInode);
+				},
+				{ heartbeatMs: 60_000 },
+			);
+			// The owner identity was destroyed. Neither the benchmark nor the lease
+			// may unlink a same-content replacement that it does not own.
+			expect(existsSync(ownerLockPath)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("reports an owner lock root replaced by a symlink without touching its target", async () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const target = join(root, "lock-root-target");
+			mkdirSync(target);
+			writeFileSync(join(target, "preserve.txt"), "preserve\n", "utf8");
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			let ownerLockPath = "";
+			await withTaskCompletionLock(
+				root,
+				"bench-session",
+				"T-01",
+				async () => {
+					ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					const command = `node -e 'const fs=require("node:fs"); const p=".afol/wb/.locks"; try { const stat=fs.lstatSync(p); if (stat.isSymbolicLink()) fs.unlinkSync(p); else fs.rmSync(p,{recursive:true,force:true}); } catch {} fs.symlinkSync(${JSON.stringify(target)},p,"dir")'`;
+					const result = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								schema_version: "1.0.0",
+								scenario_id: "bench-lock-root-symlink",
+								scenario_version: "1.0.0",
+								pack_id: "pstr-integrity",
+								command,
+								result_schema: "1.0.0",
+								oracle: "normalized-envelope-and-threshold-check",
+								thresholds: {
+									max_duration_ms: 10_000,
+									max_p95_ms: 10_000,
+									max_output_tokens: 100,
+									min_tool_success_rate: 1,
+								},
+								baseline_id: "bench-v1",
+								deterministic_metrics: {},
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(result.result.status).toBe("failed");
+					expect(
+						result.result.notes.some((note) =>
+							note.startsWith("side-effect-leak:.afol/wb/.locks"),
+						),
+					).toBe(true);
+					expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(false);
+					expect(readFileSync(join(target, "preserve.txt"), "utf8")).toBe(
+						"preserve\n",
+					);
+					expect(existsSync(ownerLockPath)).toBe(false);
+				},
+				{ heartbeatMs: 60_000 },
+			);
+			// Replacing the root destroyed the owner's inode. Cleanup removes only
+			// the hostile symlink and does not claim that the owner survived.
+			expect(existsSync(ownerLockPath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

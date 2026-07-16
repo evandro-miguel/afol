@@ -211,6 +211,10 @@ Minimum acceptance:
   .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
 - Living residual:
   .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
+- Sequential verification residual:
+  .afol/adm/specs/260716_1234_agent-cli-sequential-verification-runs_spec-child_01.md
+- Sequential residual state: implementation and local validation are complete;
+  clean-checkout CI provenance and child finalization remain pending.
 - Why: Agents need extreme ease of use, extremely low latency, low
   **write-token** cost for CLI argv, low forced stdout, and very high
   reliability. Long commands and long default output train agents to waste

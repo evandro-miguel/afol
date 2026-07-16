@@ -17,6 +17,7 @@
 .afol/data/migrations/legacy-system-retirement-260609/legacy-*/
 .afol/data/benchmarks/catalog/results/*
 .afol/wb/.active_session
+.afol/wb/.locks/
 .afol/tmp/*
 !.afol/tmp/
 !.afol/tmp/README.md

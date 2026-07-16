@@ -60,6 +60,7 @@ docs/telemetry/reports/implementation_report.md
 
 .afol/wb/.active_session
 .afol/wb/session-context.json
+.afol/wb/.locks/
 
 # Legacy nested worktrees; Worktrunk standard uses grouped siblings.
 .worktree/

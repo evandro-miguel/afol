@@ -1,0 +1,29 @@
+---
+doc_type: "workbench_task"
+id: "260716_1416_sequential-verification_task_01"
+session_id: "260716_1416_sequential-verification"
+theme: "sequential-verification"
+status: "closed"
+created_at: "2026-07-16T18:16:42.774Z"
+updated_at: "2026-07-16T19:07:38.350Z"
+roadmap_feature: "F-03"
+feature_id: "F-03"
+parent_spec: "260521_0030_agent-command-design-system_spec_01"
+task_ids: "T-01"
+governance_status: "governed"
+spec_required: true
+pending_spec: false
+pending_spec_status: "none"
+pending_spec_missing: ""
+pending_spec_resolution_hint: "linked to roadmap feature and parent spec"
+spec_waiver_reason: ""
+closed_at: "2026-07-16T19:07:38.350Z"
+---
+
+# Tasks: sequential-verification
+
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement repeated done verification with legacy compatibility attempt=1 |
