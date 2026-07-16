@@ -300,7 +300,11 @@ describe("validate command", () => {
 		const specPath = join(specsDir, "unreadable.md");
 		try {
 			mkdirSync(specsDir, { recursive: true });
-			writeFileSync(specPath, "---\nid: unreadable\nstatus: active\n---\n", "utf8");
+			writeFileSync(
+				specPath,
+				"---\nid: unreadable\nstatus: active\n---\n",
+				"utf8",
+			);
 			writeFileSync(
 				join(specsDir, "INDEX.md"),
 				[
@@ -339,7 +343,9 @@ describe("validate command", () => {
 			};
 			const check = payload.checks?.find((entry) => entry.id === "index_drift");
 			expect(check?.ok).toBe(false);
-			expect(check?.message).toContain("invalid spec frontmatter: unreadable.md");
+			expect(check?.message).toContain(
+				"invalid spec frontmatter: unreadable.md",
+			);
 		} finally {
 			if (existsSync(specPath)) chmodSync(specPath, 0o600);
 			rmSync(root, { recursive: true, force: true });

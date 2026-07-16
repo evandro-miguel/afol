@@ -476,65 +476,75 @@ describe("validation command family", () => {
 		expect(selected.includes("runtime-live-agent")).toBe(false);
 	});
 
-	test("v bench returns benchmark schema with scenario results", () => {
-		const root = createValidationFixtureRoot();
-		try {
-			const proc = runKernel(
-				["v", "bench", "--pack", "cli-kernel-local", "--json"],
-				root,
-			);
-			expect(proc.status).toBe(0);
-			const payload = parseJsonOutput(proc.stdout as string);
-			expect(payload.mode).toBe("benchmark");
-			expect(payload.benchmark_result_schema_version).toBe("1.0.0");
-			expect(payload.status).toBe("passed");
-			expect(payload.pass).toBe(true);
-			expect(payload.summary).toEqual({
-				total: 8,
-				passed: 8,
-				failed: 0,
-				skipped: 0,
-				baseline_missing: 0,
-			});
-			const results = payload.results as Array<Record<string, unknown>>;
-			expect(results.length).toBeGreaterThanOrEqual(8);
-			const first = results[0];
-			if (!first) {
-				throw new Error("Expected at least one benchmark result");
+	test(
+		"v bench returns benchmark schema with scenario results",
+		() => {
+			const root = createValidationFixtureRoot();
+			try {
+				const proc = runKernel(
+					["v", "bench", "--pack", "cli-kernel-local", "--json"],
+					root,
+				);
+				expect(proc.status).toBe(0);
+				const payload = parseJsonOutput(proc.stdout as string);
+				expect(payload.mode).toBe("benchmark");
+				expect(payload.benchmark_result_schema_version).toBe("1.0.0");
+				expect(payload.status).toBe("passed");
+				expect(payload.pass).toBe(true);
+				expect(payload.summary).toEqual({
+					total: 8,
+					passed: 8,
+					failed: 0,
+					skipped: 0,
+					baseline_missing: 0,
+				});
+				const results = payload.results as Array<Record<string, unknown>>;
+				expect(results.length).toBeGreaterThanOrEqual(8);
+				const first = results[0];
+				if (!first) {
+					throw new Error("Expected at least one benchmark result");
+				}
+				expect(typeof first.scenario_id).toBe("string");
+				expect(typeof first.duration_ms).toBe("number");
+				expect(typeof first.status).toBe("string");
+				expect(typeof first.baseline_reference).toBe("string");
+				expect(
+					(first.baseline_reference as string).startsWith(
+						".afol/data/benchmarks/catalog/baselines/",
+					),
+				).toBe(true);
+				expect((first.baseline_reference as string).startsWith("/")).toBe(
+					false,
+				);
+				expect(typeof first.threshold_reference).toBe("object");
+				expect(first.pass).toBe(true);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
 			}
-			expect(typeof first.scenario_id).toBe("string");
-			expect(typeof first.duration_ms).toBe("number");
-			expect(typeof first.status).toBe("string");
-			expect(typeof first.baseline_reference).toBe("string");
-			expect(
-				(first.baseline_reference as string).startsWith(
-					".afol/data/benchmarks/catalog/baselines/",
-				),
-			).toBe(true);
-			expect((first.baseline_reference as string).startsWith("/")).toBe(false);
-			expect(typeof first.threshold_reference).toBe("object");
-			expect(first.pass).toBe(true);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	}, slowValidationTestTimeoutMs);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
-	test("bench --pack aliases to validation benchmark contract", () => {
-		const root = createValidationFixtureRoot();
-		try {
-			const proc = runKernel(
-				["bench", "--pack", "cli-kernel-local", "--json"],
-				root,
-			);
-			expect(proc.status).toBe(0);
-			const payload = parseJsonOutput(proc.stdout as string);
-			expect(payload.mode).toBe("benchmark");
-			expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
-			expect(payload.pass).toBe(true);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	}, slowValidationTestTimeoutMs);
+	test(
+		"bench --pack aliases to validation benchmark contract",
+		() => {
+			const root = createValidationFixtureRoot();
+			try {
+				const proc = runKernel(
+					["bench", "--pack", "cli-kernel-local", "--json"],
+					root,
+				);
+				expect(proc.status).toBe(0);
+				const payload = parseJsonOutput(proc.stdout as string);
+				expect(payload.mode).toBe("benchmark");
+				expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+				expect(payload.pass).toBe(true);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test(
 		"v bench runs update-safety pack with compact update envelopes",
@@ -646,129 +656,143 @@ describe("validation command family", () => {
 		slowValidationTestTimeoutMs,
 	);
 
-	test("v bench --save persists a benchmark result artifact under default results directory", () => {
-		const fixtureRoot = createValidationFixtureRoot();
-		const proc = runKernel(
-			["v", "bench", "--pack", "cli-kernel-local", "--save", "--json"],
-			fixtureRoot,
-		);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(typeof payload.saved_result_path).toBe("string");
-		const savedPath = payload.saved_result_path as string;
-		expect(savedPath.startsWith(".afol/data/benchmarks/catalog/results/")).toBe(
-			true,
-		);
-		const absoluteSavedPath = join(fixtureRoot, savedPath);
-		expect(existsSync(absoluteSavedPath)).toBe(true);
-		const savedPayload = readJson(absoluteSavedPath);
-		expect(savedPayload.mode).toBe("benchmark");
-		const savedResults = savedPayload.results as Array<Record<string, unknown>>;
-		expect(savedResults.length).toBeGreaterThan(0);
-		const first = savedResults[0];
-		if (!first) {
-			throw new Error("Expected at least one saved benchmark result");
-		}
-		expect(typeof first.run_id).toBe("string");
-		expect(typeof first.pack_id).toBe("string");
-		expect(typeof first.baseline_id).toBe("string");
-		expect(typeof first.git_commit).toBe("string");
-	}, slowValidationTestTimeoutMs);
-
-	test("v bench --output writes to explicit path", () => {
-		const fixtureRoot = createValidationFixtureRoot();
-		const outputPath = join(
-			fixtureRoot,
-			".afol",
-			"tmp",
-			"f11",
-			"cli-kernel-local-result.json",
-		);
-		const proc = runKernel(
-			[
-				"v",
-				"bench",
-				"--pack",
-				"cli-kernel-local",
-				"--output",
-				outputPath,
-				"--json",
-			],
-			fixtureRoot,
-		);
-		expect(proc.status).toBe(0);
-		expect(existsSync(outputPath)).toBe(true);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.saved_result_path).toBe(
-			".afol/tmp/f11/cli-kernel-local-result.json",
-		);
-		const savedPayload = readJson(outputPath);
-		expect(savedPayload.mode).toBe("benchmark");
-	}, slowValidationTestTimeoutMs);
-
-	test("v bench fails when metrics violate threshold and baseline", () => {
-		const fixtureRoot = createValidationFixtureRoot((root) => {
-			const scenarioPath = join(
-				root,
-				".afol",
-				"data",
-				"benchmarks",
-				"catalog",
-				"scenarios",
-				"cli-kernel-local",
-				"cli-help-compact.json",
+	test(
+		"v bench --save persists a benchmark result artifact under default results directory",
+		() => {
+			const fixtureRoot = createValidationFixtureRoot();
+			const proc = runKernel(
+				["v", "bench", "--pack", "cli-kernel-local", "--save", "--json"],
+				fixtureRoot,
 			);
-			const scenario = readJson(scenarioPath);
-			const thresholds = scenario.thresholds as Record<string, unknown>;
-			thresholds.max_output_tokens = 1;
-			writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(typeof payload.saved_result_path).toBe("string");
+			const savedPath = payload.saved_result_path as string;
+			expect(
+				savedPath.startsWith(".afol/data/benchmarks/catalog/results/"),
+			).toBe(true);
+			const absoluteSavedPath = join(fixtureRoot, savedPath);
+			expect(existsSync(absoluteSavedPath)).toBe(true);
+			const savedPayload = readJson(absoluteSavedPath);
+			expect(savedPayload.mode).toBe("benchmark");
+			const savedResults = savedPayload.results as Array<
+				Record<string, unknown>
+			>;
+			expect(savedResults.length).toBeGreaterThan(0);
+			const first = savedResults[0];
+			if (!first) {
+				throw new Error("Expected at least one saved benchmark result");
+			}
+			expect(typeof first.run_id).toBe("string");
+			expect(typeof first.pack_id).toBe("string");
+			expect(typeof first.baseline_id).toBe("string");
+			expect(typeof first.git_commit).toBe("string");
+		},
+		slowValidationTestTimeoutMs,
+	);
 
-			const baselinePath = join(
-				root,
+	test(
+		"v bench --output writes to explicit path",
+		() => {
+			const fixtureRoot = createValidationFixtureRoot();
+			const outputPath = join(
+				fixtureRoot,
 				".afol",
-				"data",
-				"benchmarks",
-				"catalog",
-				"baselines",
-				"cli-kernel-local",
-				"baseline-v1.json",
+				"tmp",
+				"f11",
+				"cli-kernel-local-result.json",
 			);
-			const baseline = readJson(baselinePath);
-			baseline.timing_p50_ms = 1;
-			baseline.timing_p95_ms = 1;
-			writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
-		});
+			const proc = runKernel(
+				[
+					"v",
+					"bench",
+					"--pack",
+					"cli-kernel-local",
+					"--output",
+					outputPath,
+					"--json",
+				],
+				fixtureRoot,
+			);
+			expect(proc.status).toBe(0);
+			expect(existsSync(outputPath)).toBe(true);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.saved_result_path).toBe(
+				".afol/tmp/f11/cli-kernel-local-result.json",
+			);
+			const savedPayload = readJson(outputPath);
+			expect(savedPayload.mode).toBe("benchmark");
+		},
+		slowValidationTestTimeoutMs,
+	);
 
-		const proc = runKernel(
-			["v", "bench", "--pack", "cli-kernel-local", "--json"],
-			fixtureRoot,
-		);
-		expect(proc.status).toBe(2);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.status).toBe("failed");
-		expect(payload.pass).toBe(false);
-		const results = payload.results as Array<Record<string, unknown>>;
-		const target = results.find(
-			(entry) => entry.scenario_id === "cli-help-compact",
-		);
-		expect(target?.status).toBe("failed");
-		expect(target?.pass).toBe(false);
-		expect(Array.isArray(target?.notes)).toBe(true);
-		const notes = target?.notes as string[];
-		expect(
-			notes.some((entry) =>
-				entry.startsWith("threshold-exceeded:max_output_tokens:"),
-			),
-		).toBe(true);
-		expect(
-			notes.some((entry) =>
-				entry.startsWith("baseline-regression:timing_p95_ms:"),
-			),
-		).toBe(true);
-		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.failed).toBe(8);
-		expect(summary.skipped).toBe(0);
-	}, slowValidationTestTimeoutMs);
+	test(
+		"v bench fails when metrics violate threshold and baseline",
+		() => {
+			const fixtureRoot = createValidationFixtureRoot((root) => {
+				const scenarioPath = join(
+					root,
+					".afol",
+					"data",
+					"benchmarks",
+					"catalog",
+					"scenarios",
+					"cli-kernel-local",
+					"cli-help-compact.json",
+				);
+				const scenario = readJson(scenarioPath);
+				const thresholds = scenario.thresholds as Record<string, unknown>;
+				thresholds.max_output_tokens = 1;
+				writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+
+				const baselinePath = join(
+					root,
+					".afol",
+					"data",
+					"benchmarks",
+					"catalog",
+					"baselines",
+					"cli-kernel-local",
+					"baseline-v1.json",
+				);
+				const baseline = readJson(baselinePath);
+				baseline.timing_p50_ms = 1;
+				baseline.timing_p95_ms = 1;
+				writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
+			});
+
+			const proc = runKernel(
+				["v", "bench", "--pack", "cli-kernel-local", "--json"],
+				fixtureRoot,
+			);
+			expect(proc.status).toBe(2);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.status).toBe("failed");
+			expect(payload.pass).toBe(false);
+			const results = payload.results as Array<Record<string, unknown>>;
+			const target = results.find(
+				(entry) => entry.scenario_id === "cli-help-compact",
+			);
+			expect(target?.status).toBe("failed");
+			expect(target?.pass).toBe(false);
+			expect(Array.isArray(target?.notes)).toBe(true);
+			const notes = target?.notes as string[];
+			expect(
+				notes.some((entry) =>
+					entry.startsWith("threshold-exceeded:max_output_tokens:"),
+				),
+			).toBe(true);
+			expect(
+				notes.some((entry) =>
+					entry.startsWith("baseline-regression:timing_p95_ms:"),
+				),
+			).toBe(true);
+			const summary = payload.summary as Record<string, unknown>;
+			expect(summary.failed).toBe(8);
+			expect(summary.skipped).toBe(0);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test("v bench runtime-live-agent fails on a partial live snapshot without fallback mapping", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
@@ -1295,60 +1319,68 @@ describe("validation command family", () => {
 		});
 	});
 
-	test("invalid scenario or baseline schema_version yields contract issues", () => {
-		const fixtureRoot = createValidationFixtureRoot((root) => {
-			const scenarioPath = join(
-				root,
-				".afol",
-				"data",
-				"benchmarks",
-				"catalog",
-				"scenarios",
-				"cli-kernel-local",
-				"cli-help-compact.json",
-			);
-			const baselinePath = join(
-				root,
-				".afol",
-				"data",
-				"benchmarks",
-				"catalog",
-				"baselines",
-				"cli-kernel-local",
-				"baseline-v1.json",
-			);
-			const scenario = readJson(scenarioPath);
-			scenario.schema_version = "9.9.9";
-			writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
-			const baseline = readJson(baselinePath);
-			baseline.schema_version = "9.9.9";
-			writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
-		});
+	test(
+		"invalid scenario or baseline schema_version yields contract issues",
+		() => {
+			const fixtureRoot = createValidationFixtureRoot((root) => {
+				const scenarioPath = join(
+					root,
+					".afol",
+					"data",
+					"benchmarks",
+					"catalog",
+					"scenarios",
+					"cli-kernel-local",
+					"cli-help-compact.json",
+				);
+				const baselinePath = join(
+					root,
+					".afol",
+					"data",
+					"benchmarks",
+					"catalog",
+					"baselines",
+					"cli-kernel-local",
+					"baseline-v1.json",
+				);
+				const scenario = readJson(scenarioPath);
+				scenario.schema_version = "9.9.9";
+				writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+				const baseline = readJson(baselinePath);
+				baseline.schema_version = "9.9.9";
+				writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
+			});
 
-		const selectProc = runKernel(["v", "select", "--json"], fixtureRoot);
-		expect(selectProc.status).toBe(0);
-		const selectPayload = parseJsonOutput(selectProc.stdout as string);
-		const selectIssues = selectPayload.contract_issues as string[];
-		expect(
-			selectIssues.some((entry) =>
-				entry.startsWith("scenario-schema-version-mismatch:cli-kernel-local:"),
-			),
-		).toBe(true);
-		expect(
-			selectIssues.some((entry) =>
-				entry.startsWith("baseline-schema-version-mismatch:cli-kernel-local:"),
-			),
-		).toBe(true);
+			const selectProc = runKernel(["v", "select", "--json"], fixtureRoot);
+			expect(selectProc.status).toBe(0);
+			const selectPayload = parseJsonOutput(selectProc.stdout as string);
+			const selectIssues = selectPayload.contract_issues as string[];
+			expect(
+				selectIssues.some((entry) =>
+					entry.startsWith(
+						"scenario-schema-version-mismatch:cli-kernel-local:",
+					),
+				),
+			).toBe(true);
+			expect(
+				selectIssues.some((entry) =>
+					entry.startsWith(
+						"baseline-schema-version-mismatch:cli-kernel-local:",
+					),
+				),
+			).toBe(true);
 
-		const benchProc = runKernel(
-			["v", "bench", "--pack", "cli-kernel-local", "--json"],
-			fixtureRoot,
-		);
-		expect(benchProc.status).toBe(2);
-		const benchPayload = parseJsonOutput(benchProc.stdout as string);
-		expect(benchPayload.status).toBe("failed");
-		expect(benchPayload.pass).toBe(false);
-	}, slowValidationTestTimeoutMs);
+			const benchProc = runKernel(
+				["v", "bench", "--pack", "cli-kernel-local", "--json"],
+				fixtureRoot,
+			);
+			expect(benchProc.status).toBe(2);
+			const benchPayload = parseJsonOutput(benchProc.stdout as string);
+			expect(benchPayload.status).toBe("failed");
+			expect(benchPayload.pass).toBe(false);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test("validate alias and tpl/update scopes keep working", () => {
 		const validateProc = runKernel(["validate", "select", "--json"]);

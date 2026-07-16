@@ -12,13 +12,16 @@ function reportId(): string {
 
 function toStringValue(value: unknown): string | undefined {
 	if (typeof value === "string") return value;
-	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	if (typeof value === "number" || typeof value === "boolean")
+		return String(value);
 	if (value === null || value === undefined) return undefined;
 	return undefined;
 }
 
 function errorRecord(error: unknown): Record<string, unknown> | null {
-	return error && typeof error === "object" ? (error as Record<string, unknown>) : null;
+	return error && typeof error === "object"
+		? (error as Record<string, unknown>)
+		: null;
 }
 
 function errorMessage(error: unknown): string {
@@ -43,7 +46,9 @@ export function diagnosticKind(error: unknown): EnvelopeDiagnostic["kind"] {
 		toStringValue(errorRecord(error)?.statusCode) ??
 		"";
 	const name =
-		error instanceof Error ? error.name : toStringValue(errorRecord(error)?.name) ?? "";
+		error instanceof Error
+			? error.name
+			: (toStringValue(errorRecord(error)?.name) ?? "");
 	const message = errorMessage(error);
 	return /\b(integrity|corrupt(?:ed|ion)?|checksum|hash mismatch|invariant)\b/i.test(
 		`${name} ${code} ${message}`,

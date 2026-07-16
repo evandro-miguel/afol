@@ -171,10 +171,12 @@ describe("offline feedback backend", () => {
 
 	test("invalid metadata must be a JSON object", async () => {
 		const captured = capture();
-		expect(await runFeedbackCommand("status", ["--metadata", "[]"], captured.io)).toBe(
-			2,
+		expect(
+			await runFeedbackCommand("status", ["--metadata", "[]"], captured.io),
+		).toBe(2);
+		expect(captured.stdout[0]).toContain(
+			"Invalid --metadata: must be a JSON object.",
 		);
-		expect(captured.stdout[0]).toContain("Invalid --metadata: must be a JSON object.");
 	});
 
 	test("read-only local feedback queries do not initialize absent storage", () => {
@@ -202,14 +204,18 @@ describe("offline feedback backend", () => {
 			writeFileSync(dbPath, "not-a-sqlite-db", "utf8");
 			expect(() => feedbackStatus(local)).toThrow("file is not a database");
 			expect(() => listFeedback(10, local)).toThrow("file is not a database");
-			expect(() => getFeedback("FB-missing", local)).toThrow("file is not a database");
+			expect(() => getFeedback("FB-missing", local)).toThrow(
+				"file is not a database",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
 	test("invalid metadata JSON is surfaced as malformed metadata", () => {
-		const root = mkdtempSync(join(tmpdir(), "afol-feedback-malformed-metadata-"));
+		const root = mkdtempSync(
+			join(tmpdir(), "afol-feedback-malformed-metadata-"),
+		);
 		try {
 			const local = env(root);
 			const report = recordFeedback({ message: "ok" }, local);
