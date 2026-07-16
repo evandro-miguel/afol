@@ -7,6 +7,10 @@
       "s",
       "status"
     ],
+    "feedback": [
+      "fb",
+      "feedback"
+    ],
     "validate": [
       "v",
       "ck",

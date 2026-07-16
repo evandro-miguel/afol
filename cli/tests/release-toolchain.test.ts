@@ -226,6 +226,12 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["toolchain:diff"]).toBe(
 			"bun run cli/dev/toolchain-smoke.ts",
 		);
+		expect(scripts.build).toContain(
+			"--no-compile-autoload-dotenv --no-compile-autoload-bunfig",
+		);
+		expect(scripts["smoke:wsl2"]).toBe(
+			"bun run build && bun run cli/dev/dist-smoke.ts --wsl2",
+		);
 		expect(scripts["validate:toolchain"]).toBe(
 			"bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		);
@@ -319,7 +325,7 @@ describe("release and toolchain contracts", () => {
 		const typecheckStep = workflowStep("Typecheck");
 		const releaseStep = workflowStep("Release validation");
 
-		expect(validationJob["runs-on"]).toBe("ubuntu-latest");
+		expect(validationJob["runs-on"]).toBe("ubuntu-24.04");
 		expect(validationJob).not.toHaveProperty("continue-on-error");
 		expect(validationJob).not.toHaveProperty("if");
 		expect(parsedWorkflow).not.toHaveProperty("env");
@@ -339,6 +345,9 @@ describe("release and toolchain contracts", () => {
 		expect(typecheckStep).not.toHaveProperty("working-directory");
 		expect(typecheckStep).not.toHaveProperty("env");
 		expect(releaseStep.run).toBe("bun run validate:release");
+		const runnerStep = workflowStep("Verify Ubuntu Linux x64 runner");
+		expect(runnerStep.run).toContain('test "$(uname -m)" = "x86_64"');
+		expect(runnerStep.run).toContain("grep -qi '^ID=ubuntu' /etc/os-release");
 		expect(stepIndex("Install dependencies")).toBeLessThan(
 			stepIndex("Typecheck"),
 		);
@@ -547,6 +556,11 @@ describe("release and toolchain contracts", () => {
 				releaseMode: true,
 				env: gitEnv,
 			});
+			expect(provenance.build_target).toBe(
+				`bun-${process.platform}-${process.arch}`,
+			);
+			expect(provenance.compile_autoload_dotenv).toBe(false);
+			expect(provenance.compile_autoload_bunfig).toBe(false);
 			expect(provenance.security_scanners).toHaveLength(2);
 			expect(provenance.security_scanners).toEqual(
 				expect.arrayContaining([

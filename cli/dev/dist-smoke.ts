@@ -15,6 +15,19 @@ import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const distPath = join(repoRoot, "dist", "afol");
+const requireWsl2 = process.argv.includes("--wsl2");
+
+if (requireWsl2) {
+	if (process.platform !== "linux" || process.arch !== "x64") {
+		throw new Error(
+			`WSL2 smoke requires Linux x64; observed ${process.platform}/${process.arch}`,
+		);
+	}
+	const procVersion = readFileSync("/proc/version", "utf8");
+	if (!/microsoft|wsl/i.test(procVersion)) {
+		throw new Error("WSL2 smoke requires an observed Microsoft WSL kernel");
+	}
+}
 
 type SpawnResult = ReturnType<typeof spawnSync>;
 type TemplatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
@@ -35,6 +48,10 @@ function runDist(
 		env: { ...process.env, ...env },
 		stdio: ["ignore", "pipe", "pipe"],
 	});
+}
+
+function removeTempEnvFile(path: string): void {
+	rmSync(path, { force: true });
 }
 
 function assertStatus(
@@ -244,7 +261,18 @@ try {
 		);
 	}
 
-	const start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
+	const lifecycleEnvPath = join(lifecycleTarget, ".env");
+	let start: SpawnResult;
+	try {
+		writeFileSync(
+			lifecycleEnvPath,
+			"AFOL_SESSION=dotenv-must-not-load\n",
+			"utf8",
+		);
+		start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
+	} finally {
+		removeTempEnvFile(lifecycleEnvPath);
+	}
 	assertOk(start, "dist start");
 
 	const done = runDist(lifecycleTarget, [

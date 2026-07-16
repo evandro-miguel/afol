@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
 	appendFileSync,
 	cpSync,
@@ -26,6 +26,30 @@ function runKernel(cwd: string, args: string[]) {
 		cwd,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
+	});
+}
+
+function runKernelAsync(
+	cwd: string,
+	args: string[],
+): Promise<{ code: number | null; stderr: string; stdout: string }> {
+	const proc = spawn("bun", [kernelPath, ...args], {
+		cwd,
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+	return new Promise((resolve, reject) => {
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.setEncoding("utf8");
+		proc.stderr?.setEncoding("utf8");
+		proc.stdout?.on("data", (chunk: string) => {
+			stdout += chunk;
+		});
+		proc.stderr?.on("data", (chunk: string) => {
+			stderr += chunk;
+		});
+		proc.on("error", reject);
+		proc.on("close", (code) => resolve({ code, stderr, stdout }));
 	});
 }
 
@@ -372,6 +396,133 @@ describe("mutation safety command family", () => {
 			]);
 			expect(journal[0]?.kind).toBe("patch");
 			expect(journal[1]?.status).toBe("committed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("separate processes reject a stale same-path mutation without losing state", async () => {
+		const root = mkProjectRoot();
+		try {
+			const target = join(root, "notes", "concurrent.txt");
+			mkdirSync(join(root, "notes"), { recursive: true });
+			const base = "base\n";
+			writeFileSync(target, base, "utf8");
+			createMutationSession(root, "S-CONCURRENT-A", "T-01");
+			createMutationSession(root, "S-CONCURRENT-B", "T-02");
+			const expectedBeforeHash = normalizeHash(base);
+			const common = [
+				"f",
+				"pt",
+				"--path",
+				"notes/concurrent.txt",
+				"--expected-before-hash",
+				expectedBeforeHash,
+				"--reason",
+				"concurrent compare and swap",
+				"--json",
+			];
+
+			const [first, second] = await Promise.all([
+				runKernelAsync(root, [
+					...common,
+					"--append",
+					"A",
+					"--session",
+					"S-CONCURRENT-A",
+					"--task-id",
+					"T-01",
+				]),
+				runKernelAsync(root, [
+					...common,
+					"--append",
+					"B",
+					"--session",
+					"S-CONCURRENT-B",
+					"--task-id",
+					"T-02",
+				]),
+			]);
+
+			const results = [first, second];
+			expect(results.filter((result) => result.code === 0)).toHaveLength(1);
+			expect(results.filter((result) => result.code === 2)).toHaveLength(1);
+			for (const result of results) {
+				expect(result.stderr).toBe("");
+			}
+			const successful = results.find((result) => result.code === 0);
+			const rejected = results.find((result) => result.code === 2);
+			expect(successful?.stdout).toBeTruthy();
+			expect(rejected?.stdout).toContain(
+				"stale-before-hash:notes/concurrent.txt",
+			);
+			expect(readFileSync(target, "utf8")).toMatch(/^base\n[AB]$/);
+
+			const journal = readMutationJournal(root);
+			expect(journal.map((row) => row.status)).toEqual([
+				"prepared",
+				"committed",
+			]);
+			expect(
+				journal.every((row) => row.sourcePath === "notes/concurrent.txt"),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("separate processes serialize same-path appends without losing either update", async () => {
+		const root = mkProjectRoot();
+		try {
+			const target = join(root, "notes", "concurrent-appends.txt");
+			mkdirSync(join(root, "notes"), { recursive: true });
+			writeFileSync(target, "base\n", "utf8");
+			createMutationSession(root, "S-CONCURRENT-C", "T-03");
+			createMutationSession(root, "S-CONCURRENT-D", "T-04");
+			const common = [
+				"f",
+				"pt",
+				"--path",
+				"notes/concurrent-appends.txt",
+				"--reason",
+				"concurrent append serialization",
+				"--json",
+			];
+
+			const [first, second] = await Promise.all([
+				runKernelAsync(root, [
+					...common,
+					"--append",
+					"C",
+					"--session",
+					"S-CONCURRENT-C",
+					"--task-id",
+					"T-03",
+				]),
+				runKernelAsync(root, [
+					...common,
+					"--append",
+					"D",
+					"--session",
+					"S-CONCURRENT-D",
+					"--task-id",
+					"T-04",
+				]),
+			]);
+
+			for (const result of [first, second]) {
+				expect(result.code).toBe(0);
+				expect(result.stderr).toBe("");
+			}
+			expect(readFileSync(target, "utf8")).toMatch(/^base\n[CD][CD]$/);
+			expect(readFileSync(target, "utf8")).toContain("C");
+			expect(readFileSync(target, "utf8")).toContain("D");
+			expect(readMutationJournal(root).map((row) => row.status)).toEqual([
+				"prepared",
+				"committed",
+				"prepared",
+				"committed",
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

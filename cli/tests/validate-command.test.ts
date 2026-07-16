@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
@@ -201,6 +209,145 @@ describe("validate command", () => {
 				),
 			).toBe(true);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detects specs INDEX/frontmatter drift", async () => {
+		const root = createValidationFixture();
+		try {
+			const specsDir = join(root, ".afol", "adm", "specs");
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(
+				join(specsDir, "spec-a.md"),
+				[
+					"---",
+					"doc_type: spec",
+					"id: spec-a",
+					"theme: alpha",
+					"status: active",
+					"owners:",
+					"- worker",
+					"---",
+					"",
+					"# Spec A",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(specsDir, "INDEX.md"),
+				[
+					"---",
+					"doc_type: specs_index",
+					"id: specs_index",
+					"status: active",
+					"---",
+					"",
+					"# SPECS INDEX",
+					"",
+					"| Total | Count |",
+					"|--------|-------|",
+					"| Total | 1 |",
+					"| Draft | 0 |",
+					"| Active | 1 |",
+					"| Final | 0 |",
+					"| Superseded | 0 |",
+					"",
+					"| SPEC ID | Theme | Status | Owner | Links |",
+					"|--------:|-------|--------|-------|------|",
+					"| spec-a | alpha | active | worker | |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const initialCode = await runValidateCommand(
+				root,
+				["--check-drift", "--json"],
+				captured.io,
+			);
+			expect(initialCode).toBe(0);
+
+			writeFileSync(
+				join(specsDir, "INDEX.md"),
+				readFileSync(join(specsDir, "INDEX.md"), "utf8").replace(
+					"| spec-a | alpha | active | worker | |",
+					"| spec-a | alpha | final | worker | |",
+				),
+				"utf8",
+			);
+			const drifted = captureIo();
+			expect(
+				await runValidateCommand(root, ["--check-drift", "--json"], drifted.io),
+			).toBe(1);
+			const payload = JSON.parse(drifted.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const check = payload.checks?.find((entry) => entry.id === "index_drift");
+			expect(check?.ok).toBe(false);
+			expect(check?.message).toContain("specs_markdown");
+			expect(check?.message).toContain("index/frontmatter mismatch: spec-a");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports unreadable spec frontmatter without crashing", async () => {
+		const root = createValidationFixture();
+		const specsDir = join(root, ".afol", "adm", "specs");
+		const specPath = join(specsDir, "unreadable.md");
+		try {
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(
+				specPath,
+				"---\nid: unreadable\nstatus: active\n---\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(specsDir, "INDEX.md"),
+				[
+					"---",
+					"doc_type: specs_index",
+					"id: specs_index",
+					"status: active",
+					"---",
+					"",
+					"| Total | Count |",
+					"|--------|-------|",
+					"| Total | 1 |",
+					"| Draft | 0 |",
+					"| Active | 1 |",
+					"| Final | 0 |",
+					"| Superseded | 0 |",
+					"",
+					"| SPEC ID | Theme | Status | Owner | Links |",
+					"|--------:|-------|--------|-------|------|",
+					"| unreadable | unreadable | active | worker | |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			chmodSync(specPath, 0o000);
+			const captured = captureIo();
+			const code = await runValidateCommand(
+				root,
+				["--check-drift", "--json"],
+				captured.io,
+			);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const check = payload.checks?.find((entry) => entry.id === "index_drift");
+			expect(check?.ok).toBe(false);
+			expect(check?.message).toContain(
+				"invalid spec frontmatter: unreadable.md",
+			);
+		} finally {
+			if (existsSync(specPath)) chmodSync(specPath, 0o600);
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

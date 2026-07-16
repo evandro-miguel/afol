@@ -5,6 +5,7 @@ import {
 	parseNewArgs,
 	parseSessionTaskArgs,
 } from "../commands/workbench/args";
+import { runVerification } from "../commands/workbench/verify";
 
 describe("workbench parseNewArgs", () => {
 	test("preserves repeated --task values in order", () => {
@@ -164,5 +165,37 @@ describe("parseDoneArgs", () => {
 				process.cwd(),
 			),
 		).toThrow("Cannot use both --test and --test-shell in done.");
+	});
+
+	test("captures positional argv verification after -- without normalization", () => {
+		const parsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--",
+				"bun",
+				"-e",
+				"console.log('--test -x')",
+			],
+			process.cwd(),
+		);
+
+		expect(parsed.testCommand).toBeNull();
+		expect(parsed.testShellCommand).toBeNull();
+		expect(parsed.verification).toEqual({
+			mode: "argv",
+			executable: "bun",
+			args: ["-e", "console.log('--test -x')"],
+		});
+	});
+
+	test("runs VerificationSpec argv without reparsing positional tokens", () => {
+		const result = runVerification(process.cwd(), {
+			mode: "argv",
+			executable: process.execPath,
+			args: ["-e", "process.exit(0)"],
+		});
+		expect(result).toEqual({ exitCode: 0 });
 	});
 });

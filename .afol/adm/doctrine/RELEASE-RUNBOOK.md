@@ -19,6 +19,11 @@ updated_at: "2026-07-13T00:00:00+00:00"
 - Security scans execute and pass (`bun run validate:security:release`)
 - Release provenance is generated (`bun run release:provenance:release`)
 
+The release claim is limited to the observed Linux x64 path. CI is pinned to
+an Ubuntu 24.04 x64 runner. WSL2 smoke is a separate observed local check and
+must be recorded independently; neither static checks nor Ubuntu CI establish
+Windows, macOS, or ARM support.
+
 It does not currently run the AFOL project hygiene gate, the AFOL release
 health check, or the TypeScript typecheck as standalone preflights, so those
 are explicit release preflight commands in this runbook. The manifest check is
@@ -58,11 +63,13 @@ Use this order before any global update/install or release promotion:
 8. Check release health with `afol health --release --json`.
 9. Run `bun run validate:release` from a clean checkout of the exact product
    commit; it generates the final security and provenance artifacts.
-10. Record the observed exit code and retained log/artifact as AFOL evidence.
-11. Install `dist/afol` as a real executable only after the artifact gate.
-12. Verify installed/artifact SHA-256 equality, non-symlink status, version,
+10. On an observed WSL2 shell, run `bun run smoke:wsl2` separately and retain
+    its output as WSL2 evidence; do not merge it with Ubuntu CI evidence.
+11. Record the observed exit code and retained log/artifact as AFOL evidence.
+12. Install `dist/afol` as a real executable only after the artifact gate.
+13. Verify installed/artifact SHA-256 equality, non-symlink status, version,
     and an outside-repository help smoke.
-13. Close the session only after evidence is attached and no tasks remain open.
+14. Close the session only after evidence is attached and no tasks remain open.
 
 Do not run global update/install when `afol --version` diverges from the repo
 version and that version has no registered release provenance. Keep the work
@@ -85,7 +92,7 @@ afol --version
 
 - `dist/afol` — standalone binary
 - `dist/afol.sha256` — checksum (format: `<sha256>  dist/afol`)
-- `dist/afol.provenance.json` — provenance including version, commit, lockfile hash, template hash, platform, arch, and security scanner outcomes
+- `dist/afol.provenance.json` — provenance including version, commit, lockfile hash, template hash, platform, arch, Bun target, disabled standalone `.env`/`bunfig.toml` autoload policy, and security scanner outcomes
 - `dist/security-scan.release.json` — release scanner versions and pass/waiver
   status. Required scanners may not be silently waived.
 

@@ -15,6 +15,7 @@ import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
 import { runDbCommand } from "./commands/db";
 import { runDoctorCommand } from "./commands/doctor";
+import { runFeedbackCommand } from "./commands/feedback";
 import { runFileCommand } from "./commands/file";
 import { runGovernanceCommand } from "./commands/governance";
 import { runHealthCommand } from "./commands/health";
@@ -48,6 +49,7 @@ import {
 	runTransitionCommand,
 	runVerifyTasksCommand,
 } from "./commands/workbench";
+import { captureDiagnostic } from "./core/diagnostic";
 import { envelopeErr, stringifyEnvelope } from "./core/envelope";
 import {
 	defaultOperationContext,
@@ -117,6 +119,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"init",
 	"validate",
 	"status",
+	"feedback",
 	"new",
 	"start",
 	"evidence",
@@ -380,6 +383,11 @@ export async function main(argv: string[]): Promise<number> {
 			console.error(`err approval-required ${message}`);
 		}
 		return 2;
+	}
+
+	if (resolution.kind === "feedback") {
+		const [action = "status", ...feedbackArgs] = resolution.args;
+		return runFeedbackCommand(action, feedbackArgs);
 	}
 
 	if (resolution.kind === "bootstrap") {
@@ -699,6 +707,44 @@ export async function main(argv: string[]): Promise<number> {
 	return 2;
 }
 
+export async function runWithDiagnostics(
+	argv: string[],
+	invoke: (argv: string[]) => Promise<number> = main,
+): Promise<number> {
+	try {
+		return await invoke(argv);
+	} catch (error) {
+		const diagnostic = captureDiagnostic(error);
+		const integrity = diagnostic.kind === "integrity";
+		const code = integrity ? "INTEGRITY_ERROR" : "UNEXPECTED_ERROR";
+		const message = integrity
+			? "Integrity check failed."
+			: "Unexpected command failure.";
+		const commandArgs = argv.slice(2);
+		const delimiter = commandArgs.indexOf("--");
+		const boundaryArgs =
+			delimiter === -1 ? commandArgs : commandArgs.slice(0, delimiter);
+		const json = boundaryArgs.some((arg) => arg === "--json" || arg === "-j");
+		if (json) {
+			console.log(
+				stringifyEnvelope({
+					schema: "afol.result/v1",
+					ok: false,
+					exit_code: 1,
+					error: { code, message },
+					diagnostic: {
+						kind: diagnostic.kind,
+						report_id: diagnostic.report_id,
+					},
+				}),
+			);
+		} else {
+			console.error(`err ${code} ${message} report_id=${diagnostic.report_id}`);
+		}
+		return 1;
+	}
+}
+
 if (import.meta.main) {
-	exit(await main(process.argv));
+	exit(await runWithDiagnostics(process.argv));
 }

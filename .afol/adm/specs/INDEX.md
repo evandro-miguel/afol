@@ -16,11 +16,11 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 69 |
+| Total | 74 |
 | Draft | 0 |
 | Active | 2 |
-| Final | 43 |
-| Superseded | 24 |
+| Final | 54 |
+| Superseded | 18 |
 
 ## Index
 
@@ -48,16 +48,15 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, plan: .afol/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_plan_01.md, task: .afol/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_task_01.md, report: .afol/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_report_01.md |
 | 260412_0000_specs-folder-guide_spec_01 |  | final |  |  |
 | 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260412_1130_spec-child-and-spec-test-governance_spec-test_01 | spec-child-and-spec-test-governance | superseded | tester | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, workbench_plan: 260412_1130_spec-child-and-spec-test-governance_plan_01 |
 | 260412_2004_repo-wide-simplification-runtime-parity_spec_01 | repo-wide-simplification-runtime-parity | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, plan: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_plan_01.md, task: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_task_01.md, report: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_report_01.md |
 | 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
 | 260413_1849_just-command-runner-migration_spec_01 | just-command-runner-migration | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, plan: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_plan_01.md, task: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_task_01.md, report: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md |
 | 260415_2121_scripts-cleanup-optimization_spec-child_01 | scripts-cleanup-optimization | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .afol/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_plan_01.md, task: .afol/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_task_01.md |
-| 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01 | agent-governance-preflight-and-recurrence-guardrails | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01 | agent-governance-preflight-and-recurrence-guardrails | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260423_1605_controlled-runtime-flow-benchmarks_spec_01 | controlled-runtime-flow-benchmarks | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260423_1821_runtime-flow-benchmark-runner_spec-child_01 | runtime-flow-benchmark-runner | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260423_2006_runtime-flow-benchmark-live-agent_spec-child_01 | runtime-flow-benchmark-live-agent | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260423_2006_runtime-flow-benchmark-live-agent_spec-child_01 | runtime-flow-benchmark-live-agent | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260423_2120_runtime-flow-benchmark-scenarios_spec-child_01 | runtime-flow-benchmark-scenarios | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260426_1215_parallel-session-isolation_spec_01 | parallel-session-isolation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260509_1453_plan-task-execution-integrity-state-model_spec-child_01 | plan-task-execution-integrity-state-model | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent_spec: .afol/adm/specs/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md, plan: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md, task: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md |
@@ -71,12 +70,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260521_0070_local-state-index-and-event-log_spec_01 | local-state-index-and-event-log | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |
 | 260521_0080_safe-file-mutation-and-undo_spec_01 | safe-file-mutation-and-undo | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |
 | 260521_0090_template-update-and-versioning_spec_01 | template-update-and-versioning | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md, plan: .afol/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_plan_01.md, task: .afol/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_task_01.md, report: .afol/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_report_01.md |
-| 260521_0130_universal-agent-cli-kernel-contract_spec-test_01 | universal-agent-cli-kernel-contract | superseded | tester | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260521_0132_minimal-project-template-export_spec-test_01 | minimal-project-template-export | superseded | tester | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260521_0135_agent-command-design-system_spec-test_01 | agent-command-design-system | superseded | tester | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260521_0100_runtime-adapters-and-mcp_spec_01 | runtime-adapters-and-mcp | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |
-| 260521_0140_runtime-adapters-and-mcp-parity_spec-test_01 | runtime-adapters-and-mcp-parity | superseded | tester | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260521_0145_validation-ci-benchmark-matrix_spec-test_01 | validation-ci-benchmark-matrix | superseded | tester | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260521_0110_validation-ci-and-benchmarks_spec_01 | validation-ci-and-benchmarks | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |
 | 260521_0120_public-distribution-and-onboarding_spec_01 | public-distribution-and-onboarding | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |
 | 260528_1723_map-boundary-cleanup_spec-child_01 | map-boundary-cleanup | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .afol/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_plan_01.md, task: .afol/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_task_01.md |
@@ -94,7 +88,18 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260612_spec-compatibility-and-decision-history_spec-child_01 | spec-compatibility-and-decision-history | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md, adr: .afol/adm/decisions/ADR-004-afol-administration-and-project-structure.md |
 | 260612_temporal-health-freshness-token-budget_spec-child_01 | temporal-health-freshness-token-budget | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md |
 | 260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01 | afol-brain-shape-retrieval-doctor-trust | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md |
+| 260615_1350_recurring-problem-guardrails_spec-child_01 | recurring-problem-guardrails | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md |
+| 260618_1519_orchestrator-coordination-radar_spec-child_01 | orchestrator-coordination-radar | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md |
+| 260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01 | afol-tool-scenario-coverage-and-ux-registry | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0110_validation-ci-and-benchmarks_spec_01.md |
+| 260627_1655_canonical-afol-configuration-rehome_spec_01 | canonical-afol-configuration-rehome | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md |
 | 260710_1256_typescript-7-toolchain-adoption_spec_01 | typescript-7-toolchain-adoption | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260710_core-integrity-and-transaction-safety_spec_01 | core-integrity-and-transaction-safety | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260711_c01-action-policy-and-protected-resources_spec-child_01 | c01-action-policy-and-protected-resources | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
+| 260711_c01-authorization-red-reproducers_spec-child_01 | c01-authorization-red-reproducers | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
+| 260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01 | agent-cli-extreme-ease-latency-write-tokens | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
+| 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
+| 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

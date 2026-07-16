@@ -377,7 +377,13 @@ export function normalizeScopedFlags(
 	}
 	const normalized: string[] = [];
 	let previousConsumesValue = false;
-	for (const arg of args) {
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === undefined) continue;
+		if (arg === "--") {
+			normalized.push("--", ...args.slice(index + 1));
+			break;
+		}
 		if (previousConsumesValue) {
 			normalized.push(arg);
 			previousConsumesValue = false;

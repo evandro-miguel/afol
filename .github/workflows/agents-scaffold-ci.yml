@@ -7,7 +7,7 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       OSV_SCANNER_VERSION: "2.3.8"
       GITLEAKS_VERSION: "8.24.2"
@@ -20,6 +20,14 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.14"
+
+      - name: Verify Ubuntu Linux x64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = "Linux"
+          test "$(uname -m)" = "x86_64"
+          grep -qi '^ID=ubuntu' /etc/os-release
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -44,7 +52,7 @@ jobs:
           ./afol ctx build --json >/dev/null
 
       - name: Validate project
-        run: ./afol validate project --json
+        run: ./afol validate project --json --check-drift
 
       - name: Release health
         run: ./afol health --release --json
@@ -79,3 +87,4 @@ jobs:
             dist/afol
             dist/afol.sha256
             dist/afol.provenance.json
+            dist/security-scan.release.json

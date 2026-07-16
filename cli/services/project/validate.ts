@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadJsonObject } from "../../core/schema";
 import {
@@ -10,6 +10,7 @@ import {
 	findClaudeArtifacts,
 	readClaudeAdapterEnabled,
 } from "../adapter/claude";
+import { resolveAdmPaths } from "../adm";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
 	validateFilesIndex,
@@ -293,6 +294,10 @@ function detectIndexDrift(projectRoot: string): string[] {
 			case "specs": {
 				const result = validateSpecsIndex(projectRoot);
 				if (!result.ok) drifts.push(`${id}: ${result.message}`);
+				const markdownResult = validateSpecsMarkdownIndex(projectRoot);
+				if (!markdownResult.ok) {
+					drifts.push(`specs_markdown: ${markdownResult.message}`);
+				}
 				break;
 			}
 			case "files": {
@@ -309,6 +314,151 @@ function detectIndexDrift(projectRoot: string): string[] {
 	}
 
 	return drifts;
+}
+
+type SpecsMarkdownEntry = {
+	theme: string;
+	status: string;
+	owner: string;
+};
+
+const SPEC_STATUSES = new Set(["draft", "active", "final", "superseded"]);
+
+function readSpecFrontmatter(path: string): Record<string, unknown> | null {
+	try {
+		const content = readFileSync(path, "utf8");
+		const match = /^---\n([\s\S]*?)\n---\n?/.exec(content);
+		if (!match?.[1]) return null;
+		const parsed = Bun.YAML.parse(match[1]);
+		return parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+function stringValue(value: unknown): string {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+function ownerValue(value: unknown): string {
+	if (Array.isArray(value)) return stringValue(value[0]);
+	return stringValue(value);
+}
+
+function validateSpecsMarkdownIndex(projectRoot: string): {
+	ok: boolean;
+	message: string;
+} {
+	const specsDir = resolveAdmPaths(projectRoot).specsDir;
+	const indexPath = join(specsDir, "INDEX.md");
+	if (!existsSync(indexPath)) {
+		return { ok: false, message: `missing markdown index: ${indexPath}` };
+	}
+
+	const indexFrontmatter = readSpecFrontmatter(indexPath);
+	if (
+		!indexFrontmatter ||
+		stringValue(indexFrontmatter.doc_type) !== "specs_index" ||
+		stringValue(indexFrontmatter.id) !== "specs_index"
+	) {
+		return { ok: false, message: `invalid index frontmatter: ${indexPath}` };
+	}
+
+	const expected = new Map<string, SpecsMarkdownEntry>();
+	const counts = new Map<string, number>();
+	for (const name of readdirSync(specsDir).sort()) {
+		if (!name.endsWith(".md") || name === "INDEX.md" || name === "README.md") {
+			continue;
+		}
+		const path = join(specsDir, name);
+		const frontmatter = readSpecFrontmatter(path);
+		if (!frontmatter) {
+			return { ok: false, message: `invalid spec frontmatter: ${name}` };
+		}
+		const id = stringValue(frontmatter.id);
+		const status = stringValue(frontmatter.status);
+		if (!id || !SPEC_STATUSES.has(status)) {
+			return {
+				ok: false,
+				message: `invalid spec metadata: ${name} (id/status required)`,
+			};
+		}
+		if (expected.has(id)) {
+			return { ok: false, message: `duplicate spec id in frontmatter: ${id}` };
+		}
+		expected.set(id, {
+			theme: stringValue(frontmatter.theme),
+			status,
+			owner: ownerValue(frontmatter.owners),
+		});
+		counts.set(status, (counts.get(status) ?? 0) + 1);
+	}
+
+	const rows = new Map<string, SpecsMarkdownEntry>();
+	for (const match of readFileSync(indexPath, "utf8").matchAll(
+		/^\|\s*([^|]+?)\s*\|\s*([^|]*)\s*\|\s*([^|]+?)\s*\|\s*([^|]*)\s*\|/gm,
+	)) {
+		const id = match[1]?.trim() ?? "";
+		if (
+			!id ||
+			id === "SPEC ID" ||
+			id.startsWith("-") ||
+			["Metric", "Total", "Draft", "Active", "Final", "Superseded"].includes(id)
+		) {
+			continue;
+		}
+		if (rows.has(id))
+			return { ok: false, message: `duplicate index row: ${id}` };
+		rows.set(id, {
+			theme: match[2]?.trim() ?? "",
+			status: match[3]?.trim() ?? "",
+			owner: match[4]?.trim() ?? "",
+		});
+	}
+
+	for (const [id, entry] of expected) {
+		const row = rows.get(id);
+		if (!row) return { ok: false, message: `missing index row: ${id}` };
+		if (
+			row.theme !== entry.theme ||
+			row.status !== entry.status ||
+			row.owner !== entry.owner
+		) {
+			return {
+				ok: false,
+				message: `index/frontmatter mismatch: ${id}`,
+			};
+		}
+	}
+	for (const id of rows.keys()) {
+		if (!expected.has(id))
+			return { ok: false, message: `stale index row: ${id}` };
+	}
+
+	const indexSource = readFileSync(indexPath, "utf8");
+	const summary = new Map<string, number>();
+	for (const match of indexSource.matchAll(
+		/^\|\s*(Total|Draft|Active|Final|Superseded)\s*\|\s*(\d+)\s*\|/gm,
+	)) {
+		summary.set(match[1] ?? "", Number(match[2]));
+	}
+	const expectedSummary: Record<string, number> = {
+		Total: expected.size,
+		Draft: counts.get("draft") ?? 0,
+		Active: counts.get("active") ?? 0,
+		Final: counts.get("final") ?? 0,
+		Superseded: counts.get("superseded") ?? 0,
+	};
+	for (const [label, count] of Object.entries(expectedSummary)) {
+		if (summary.get(label) !== count) {
+			return { ok: false, message: `index summary drift: ${label}=${count}` };
+		}
+	}
+	return { ok: true, message: `ok ${indexPath}` };
 }
 
 export async function validateProjectStructure(

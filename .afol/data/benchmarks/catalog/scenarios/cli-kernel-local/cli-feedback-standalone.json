@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "cli-feedback-standalone",
+  "scenario_version": "1.0.0",
+  "pack_id": "cli-kernel-local",
+  "command": "afol feedback preview --mode off --message local-feedback --json",
+  "sandbox": true,
+  "compiled_binary": true,
+  "coverage": {
+    "commands": ["feedback"],
+    "subcommands": ["feedback preview"],
+    "journeys": ["afol-command-user-flow-matrix"],
+    "features": ["F-29"],
+    "specs": ["260715_afol-1-0-linux-wsl-release-hardening_spec-child_01"]
+  },
+  "expected_exit": 0,
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 500,
+    "max_p95_ms": 500,
+    "max_output_tokens": 120,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "cli-kernel-local-v1",
+  "deterministic_metrics": {
+    "duration_ms": 180,
+    "timing_p50_ms": 150,
+    "timing_p95_ms": 260,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 48,
+    "context_bytes": 1024,
+    "output_bytes": 280,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

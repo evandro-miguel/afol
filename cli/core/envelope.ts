@@ -4,6 +4,11 @@ export type EnvelopeError = {
 	hint?: string;
 };
 
+export type EnvelopeDiagnostic = {
+	kind: "unexpected" | "integrity";
+	report_id: string;
+};
+
 export type ResultEnvelope<T> = {
 	schema: "afol.result/v1";
 	ok: boolean;
@@ -11,6 +16,7 @@ export type ResultEnvelope<T> = {
 	exit_code: number;
 	data?: T;
 	error?: EnvelopeError;
+	diagnostic?: EnvelopeDiagnostic;
 	warnings?: string[];
 };
 

@@ -431,57 +431,44 @@ export async function runDoneCommand(
 		}
 		let observedCompletion: ReturnType<typeof completeObservedTask> | null =
 			null;
-		if (parsed.testCommand) {
-			const verification = runVerification(root, parsed.testCommand, {
-				shell: false,
-			});
+		if (parsed.verification || parsed.testCommand || parsed.testShellCommand) {
+			const verificationSpec = parsed.verification;
+			const verification = verificationSpec
+				? runVerification(root, verificationSpec)
+				: runVerification(
+						root,
+						parsed.testShellCommand ?? parsed.testCommand ?? "",
+						{ shell: Boolean(parsed.testShellCommand) },
+					);
+			const verificationCommand =
+				parsed.testCommand ??
+				parsed.testShellCommand ??
+				(verificationSpec?.mode === "argv"
+					? [verificationSpec.executable, ...verificationSpec.args].join(" ")
+					: (verificationSpec?.command ?? ""));
 			observedCompletion = completeObservedTask(root, {
 				session: parsed.session,
 				taskId: parsed.taskId,
-				command: parsed.testCommand,
+				command: verificationCommand,
 				exitCode: verification.exitCode,
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
 			if (verification.exitCode !== 0) {
-				if (parsed.json) {
-					writeJsonError(
-						"workbench.done",
-						new Error(`--test failed with exit code ${verification.exitCode}`),
-						1,
-					);
-				} else {
-					console.error(
-						`--test failed with exit code ${verification.exitCode}`,
-					);
-				}
-				return 1;
-			}
-		}
-		if (parsed.testShellCommand) {
-			const verification = runVerification(root, parsed.testShellCommand, {
-				shell: true,
-			});
-			observedCompletion = completeObservedTask(root, {
-				session: parsed.session,
-				taskId: parsed.taskId,
-				command: parsed.testShellCommand,
-				exitCode: verification.exitCode,
-				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
-				...(parsed.note ? { note: parsed.note } : {}),
-			});
-			if (verification.exitCode !== 0) {
+				const failureLabel = parsed.testShellCommand
+					? "--test-shell"
+					: "--test";
 				if (parsed.json) {
 					writeJsonError(
 						"workbench.done",
 						new Error(
-							`--test-shell failed with exit code ${verification.exitCode}`,
+							`${failureLabel} failed with exit code ${verification.exitCode}`,
 						),
 						1,
 					);
 				} else {
 					console.error(
-						`--test-shell failed with exit code ${verification.exitCode}`,
+						`${failureLabel} failed with exit code ${verification.exitCode}`,
 					);
 				}
 				return 1;

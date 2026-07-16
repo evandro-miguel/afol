@@ -100,6 +100,22 @@ export function resolveCanonicalAction(
 		}
 		return { action: "workbench.done.record", sideEffect: "write" };
 	}
+	if (resolution.kind === "feedback") {
+		const action = args[0] ?? "status";
+		const canonicalAction =
+			action === "note" ? "annotate" : action === "clear" ? "purge" : action;
+		if (
+			canonicalAction === "annotate" ||
+			canonicalAction === "purge" ||
+			canonicalAction === "last"
+		) {
+			return { action: `feedback.${canonicalAction}`, sideEffect: "write" };
+		}
+		if (canonicalAction === "preview") {
+			return { action: "feedback.preview", sideEffect: "preview" };
+		}
+		return { action: `feedback.${canonicalAction}`, sideEffect: "read" };
+	}
 
 	if (resolution.kind === "subcommand") {
 		const group = resolution.group ?? "";
@@ -177,8 +193,10 @@ export function resolveOperationContext(
 	const consumed = new Set<number>();
 	let foundAgent = false;
 	let foundRemote = false;
+	const delimiterIndex = args.indexOf("--");
+	const scanLimit = delimiterIndex === -1 ? args.length : delimiterIndex;
 
-	for (let index = 0; index < args.length; index++) {
+	for (let index = 0; index < scanLimit; index++) {
 		const arg = args[index];
 		if (!arg) continue;
 
