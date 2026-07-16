@@ -18,8 +18,8 @@ updated_at: "2026-06-14T00:00:00+00:00"
 |--------|-------|
 | Total | 74 |
 | Draft | 0 |
-| Active | 2 |
-| Final | 54 |
+| Active | 5 |
+| Final | 51 |
 | Superseded | 18 |
 
 ## Index
