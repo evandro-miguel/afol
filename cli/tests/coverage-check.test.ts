@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 const repoRoot = join(import.meta.dir, "..", "..");
 
 function runCoverageCheck(
-	coverageOutput: string,
+	coverageOutput: string | ((root: string) => string),
 	args: string[] = [],
 	options: {
 		lcovOutput?: string;
@@ -34,7 +34,14 @@ function runCoverageCheck(
 	writeFileSync(
 		join(binDir, "bun"),
 		options.bunScript ??
-			["#!/bin/sh", "cat <<'EOF'", coverageOutput, "EOF"].join("\n"),
+			[
+				"#!/bin/sh",
+				"cat <<'EOF'",
+				typeof coverageOutput === "function"
+					? coverageOutput(root)
+					: coverageOutput,
+				"EOF",
+			].join("\n"),
 		"utf8",
 	);
 	chmodSync(join(binDir, "bun"), 0o755);
@@ -113,6 +120,52 @@ cli/commands/ignored.ts    | 10      | 10
 				"coverage cli/services/good.ts lines: 100.00% (threshold 80%)",
 			);
 			expect(decode(result.stdout)).not.toContain("cli/commands/ignored.ts");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails when any requested include prefix has no coverage row", () => {
+		const { result, root } = runCoverageCheck(
+			`
+File                       | % Funcs | % Lines |
+All files                  | 100     | 100
+cli/services/good.ts       | 100     | 100
+`,
+			["--include", "cli/services", "--include", "cli/missing.ts"],
+		);
+
+		try {
+			expect(result.exitCode).toBe(1);
+			expect(decode(result.stderr)).toContain(
+				"coverage: missing include prefixes: cli/missing.ts",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("normalizes relative and absolute Windows-style coverage paths", () => {
+		const { result, root } = runCoverageCheck(
+			(fixtureRoot) => `
+File                                  | % Funcs | % Lines |
+All files                             | 100     | 100
+cli\\services\\relative.ts             | 100     | 100
+${join(fixtureRoot, "cli", "services", "absolute.ts").replaceAll("/", "\\")} | 100     | 100
+`,
+			[
+				"--include",
+				"cli\\services\\relative.ts",
+				"--include",
+				"cli/services/absolute.ts",
+			],
+		);
+
+		try {
+			expect(result.exitCode).toBe(0);
+			const stdout = decode(result.stdout);
+			expect(stdout).toContain("coverage cli/services/relative.ts lines:");
+			expect(stdout).toContain("coverage cli/services/absolute.ts lines:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

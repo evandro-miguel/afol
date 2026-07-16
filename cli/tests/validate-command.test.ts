@@ -120,6 +120,50 @@ describe("validate command", () => {
 		});
 	});
 
+	test("rejects unknown and unexpected validate arguments", async () => {
+		for (const [args, message] of [
+			[["--unknown"], "Unknown validate argument: --unknown"],
+			[["unexpected"], "Unexpected validate argument: unexpected"],
+		] as const) {
+			const captured = captureIo();
+			expect(await runValidateCommand(".", [...args], captured.io)).toBe(2);
+			expect(captured.stdout).toEqual([]);
+			expect(captured.stderr).toEqual([message]);
+		}
+	});
+
+	test("renders failing drift validation in JSON and human modes", async () => {
+		const root = createValidationFixture();
+		try {
+			const json = captureIo();
+			expect(await runValidateCommand(root, ["drift", "--json"], json.io)).toBe(
+				1,
+			);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
+				ok: boolean;
+				findings: Array<{ hint?: string }>;
+			};
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				exit_code: 1,
+				ok: false,
+			});
+			expect(payload.findings.length).toBeGreaterThan(0);
+
+			const human = captureIo();
+			expect(
+				await runValidateCommand(root, ["validate", "drift"], human.io),
+			).toBe(1);
+			expect(human.stdout[0]).toContain("drift: failed");
+			expect(human.stdout[0]).toContain("findings:");
+			expect(human.stdout[0]).toContain("hint=");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("passes structural checks in a minimal project fixture", async () => {
 		const root = createValidationFixture();
 		try {
