@@ -361,7 +361,11 @@ export function annotateFeedback(
 									"SELECT report_id FROM feedback_reports ORDER BY created_at DESC, rowid DESC LIMIT 1",
 								)
 								.get() as { report_id?: string } | null)
-						: { report_id: reportId };
+						: (db
+								.query(
+									"SELECT report_id FROM feedback_reports WHERE report_id = ?",
+								)
+								.get(reportId) as { report_id?: string } | null);
 				if (!target?.report_id) {
 					db.exec("ROLLBACK");
 					return null;

@@ -107,6 +107,31 @@ describe("offline feedback backend", () => {
 		}
 	});
 
+	test("missing explicit annotation ids reach the friendly CLI error", async () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-feedback-missing-note-"));
+		const previousHome = process.env.AFOL_STATE_HOME;
+		try {
+			expect(annotateFeedback("FB-missing", "note", env(root))).toBeNull();
+			process.env.AFOL_STATE_HOME = root;
+			const captured = capture();
+			expect(
+				await runFeedbackCommand(
+					"annotate",
+					["--id", "FB-missing", "--note", "note", "--mode", "local", "--json"],
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stdout[0]).toContain(
+				"No feedback report available to annotate.",
+			);
+			expect(captured.stdout[0]).not.toContain("FOREIGN KEY");
+		} finally {
+			if (previousHome === undefined) delete process.env.AFOL_STATE_HOME;
+			else process.env.AFOL_STATE_HOME = previousHome;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("command supports last-note and guarded purge", async () => {
 		const root = mkdtempSync(join(tmpdir(), "afol-feedback-command-"));
 		try {
