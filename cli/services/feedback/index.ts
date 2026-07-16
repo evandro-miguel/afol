@@ -128,9 +128,11 @@ export function feedbackMode(
 }
 
 function isBusy(error: unknown): boolean {
-	return /busy|locked/i.test(
-		error instanceof Error ? error.message : String(error),
-	);
+	const code =
+		error instanceof Error
+			? String((error as NodeJS.ErrnoException).code ?? "")
+			: "";
+	return code === "SQLITE_BUSY" || code === "SQLITE_LOCKED";
 }
 
 function withRetry<T>(operation: () => T): T {
@@ -140,7 +142,10 @@ function withRetry<T>(operation: () => T): T {
 			return operation();
 		} catch (error) {
 			last = error;
-			if (!isBusy(error) || attempt === MAX_RETRIES - 1) break;
+			if (!isBusy(error)) {
+				throw error;
+			}
+			if (attempt === MAX_RETRIES - 1) break;
 		}
 	}
 	throw new Error(
@@ -196,16 +201,21 @@ function openExistingFeedbackDb(
 	const path = resolveFeedbackDbPath(env);
 	if (!existsSync(path)) return null;
 	const db = new Database(path, { readonly: true });
-	const table = db
-		.query(
-			"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'feedback_reports'",
-		)
-		.get();
-	if (!table) {
+	try {
+		const table = db
+			.query(
+				"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'feedback_reports'",
+			)
+			.get();
+		if (!table) {
+			db.close();
+			return null;
+		}
+		return db;
+	} catch (error) {
 		db.close();
-		return null;
+		throw error;
 	}
-	return db;
 }
 
 function id(): string {
@@ -216,8 +226,11 @@ function rowToReport(row: Record<string, unknown>): FeedbackReport {
 	let metadata: Record<string, unknown> = {};
 	try {
 		const parsed = JSON.parse(String(row.metadata_json));
-		if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
 			metadata = parsed;
+		} else {
+			metadata = { malformed: true };
+		}
 	} catch {
 		metadata = { malformed: true };
 	}

@@ -10,18 +10,43 @@ function reportId(): string {
 	return `FB-${Date.now()}-${randomUUID()}`;
 }
 
+function toStringValue(value: unknown): string | undefined {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	if (value === null || value === undefined) return undefined;
+	return undefined;
+}
+
+function errorRecord(error: unknown): Record<string, unknown> | null {
+	return error && typeof error === "object" ? (error as Record<string, unknown>) : null;
+}
+
 function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
+	if (error instanceof Error) return error.message;
+	if (typeof error === "string") return error;
+	const record = errorRecord(error);
+	if (!record) return String(error);
+	const message = toStringValue(record.message);
+	if (message !== undefined) return message;
+
+	return (
+		toStringValue(record.error) ??
+		toStringValue(record.reason) ??
+		toStringValue(record.code) ??
+		String(error)
+	);
 }
 
 export function diagnosticKind(error: unknown): EnvelopeDiagnostic["kind"] {
 	const code =
-		typeof error === "object" && error !== null && "code" in error
-			? String((error as { code?: unknown }).code ?? "")
-			: "";
-	const name = error instanceof Error ? error.name : "";
+		toStringValue(errorRecord(error)?.code) ??
+		toStringValue(errorRecord(error)?.statusCode) ??
+		"";
+	const name =
+		error instanceof Error ? error.name : toStringValue(errorRecord(error)?.name) ?? "";
+	const message = errorMessage(error);
 	return /\b(integrity|corrupt(?:ed|ion)?|checksum|hash mismatch|invariant)\b/i.test(
-		`${name} ${code} ${errorMessage(error)}`,
+		`${name} ${code} ${message}`,
 	)
 		? "integrity"
 		: "unexpected";

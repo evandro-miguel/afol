@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runFeedbackCommand } from "../commands/feedback";
@@ -169,6 +169,14 @@ describe("offline feedback backend", () => {
 		expect(unknown.stdout[0]).not.toContain(sentinel);
 	});
 
+	test("invalid metadata must be a JSON object", async () => {
+		const captured = capture();
+		expect(await runFeedbackCommand("status", ["--metadata", "[]"], captured.io)).toBe(
+			2,
+		);
+		expect(captured.stdout[0]).toContain("Invalid --metadata: must be a JSON object.");
+	});
+
 	test("read-only local feedback queries do not initialize absent storage", () => {
 		const root = mkdtempSync(join(tmpdir(), "afol-feedback-read-only-"));
 		try {
@@ -181,6 +189,37 @@ describe("offline feedback backend", () => {
 			expect(listFeedback(10, local)).toEqual([]);
 			expect(getFeedback("FB-missing", local)).toBeNull();
 			expect(existsSync(resolveFeedbackDbPath(local))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("read-only local feedback queries fail on invalid db payload", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-feedback-corrupt-db-"));
+		try {
+			const local = env(root);
+			const dbPath = resolveFeedbackDbPath(local);
+			writeFileSync(dbPath, "not-a-sqlite-db", "utf8");
+			expect(() => feedbackStatus(local)).toThrow("file is not a database");
+			expect(() => listFeedback(10, local)).toThrow("file is not a database");
+			expect(() => getFeedback("FB-missing", local)).toThrow("file is not a database");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("invalid metadata JSON is surfaced as malformed metadata", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-feedback-malformed-metadata-"));
+		try {
+			const local = env(root);
+			const report = recordFeedback({ message: "ok" }, local);
+			expect(report).not.toBeNull();
+			if (!report) throw new Error("expected feedback report");
+			const db = openFeedbackDb(local);
+			db.prepare("UPDATE feedback_reports SET metadata_json = '1'").run();
+			db.close();
+			const reloaded = getFeedback(report.report_id, local);
+			expect(reloaded?.metadata).toEqual({ malformed: true });
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -228,6 +267,23 @@ describe("offline feedback backend", () => {
 			recoveryDb.close();
 			expect(recordFeedback({ message: "recovered" }, local)).not.toBeNull();
 			expect(listFeedback(10, local)).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("permanent SQLite errors with lock text are returned directly", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-feedback-lock-failure-"));
+		try {
+			const local = env(root);
+			const db = openFeedbackDb(local);
+			db.exec(
+				"CREATE TRIGGER reject_feedback_locked BEFORE INSERT ON feedback_reports BEGIN SELECT RAISE(ABORT, 'database is locked'); END;",
+			);
+			db.close();
+			expect(() =>
+				recordFeedback({ kind: "error", message: "should fail" }, local),
+			).toThrow("database is locked");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

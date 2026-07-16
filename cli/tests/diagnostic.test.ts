@@ -74,6 +74,29 @@ describe("unexpected and integrity diagnostic boundary", () => {
 		}
 	});
 
+	test("plain object errors keep informative message and integrity classification", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-diagnostic-object-"));
+		try {
+			const local = env(root, "local");
+			const diagnostic = captureDiagnostic(
+				{
+					name: "IntegrityError",
+					code: "integrity_mismatch",
+					message: "checksum mismatch detected",
+				},
+				local,
+			);
+			expect(diagnostic.kind).toBe("integrity");
+			expect(diagnostic.persisted).toBe(true);
+			const report = listFeedback(1, local)[0];
+			expect(report).not.toBeUndefined();
+			expect(report?.message).toContain("checksum mismatch detected");
+			expect(report?.kind).toBe("integrity");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("positional argv flags do not change outer diagnostic formatting", async () => {
 		const stderr: string[] = [];
 		const error = console.error;

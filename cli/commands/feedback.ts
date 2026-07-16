@@ -95,18 +95,21 @@ function parseArgs(action: FeedbackAction, args: string[]): ParsedArgs {
 			parsed.input.stack = nextValue(args, index, value);
 			index += 1;
 		} else if (value === "--metadata") {
+			const rawMetadata = nextValue(args, index, value);
+			let metadata: unknown;
 			try {
-				const metadata = JSON.parse(nextValue(args, index, value)) as unknown;
-				if (
-					!metadata ||
-					typeof metadata !== "object" ||
-					Array.isArray(metadata)
-				)
-					throw new Error("metadata must be an object");
-				parsed.input.metadata = metadata as Record<string, unknown>;
+				metadata = JSON.parse(rawMetadata);
 			} catch {
 				throw new Error("Invalid --metadata JSON.");
 			}
+			if (
+				!metadata ||
+				typeof metadata !== "object" ||
+				Array.isArray(metadata)
+			) {
+				throw new Error("Invalid --metadata: must be a JSON object.");
+			}
+			parsed.input.metadata = metadata as Record<string, unknown>;
 			index += 1;
 		} else if (
 			!value.startsWith("-") &&
