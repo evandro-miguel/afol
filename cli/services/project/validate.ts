@@ -325,9 +325,10 @@ type SpecsMarkdownEntry = {
 const SPEC_STATUSES = new Set(["draft", "active", "final", "superseded"]);
 
 function readSpecFrontmatter(path: string): Record<string, unknown> | null {
-	const match = /^---\n([\s\S]*?)\n---\n?/.exec(readFileSync(path, "utf8"));
-	if (!match?.[1]) return null;
 	try {
+		const content = readFileSync(path, "utf8");
+		const match = /^---\n([\s\S]*?)\n---\n?/.exec(content);
+		if (!match?.[1]) return null;
 		const parsed = Bun.YAML.parse(match[1]);
 		return parsed !== null &&
 			typeof parsed === "object" &&

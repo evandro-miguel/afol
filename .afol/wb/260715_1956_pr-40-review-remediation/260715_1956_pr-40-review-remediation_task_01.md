@@ -27,6 +27,6 @@ spec_waiver_reason: ""
 |------|-------|-------|-------|
 | T-01 | done | worker | Triage PR review and CI failures attempt=1 |
 | T-02 | done | worker | Fix diagnostic and feedback regressions attempt=1 |
-| T-03 | pending | worker | Fix project validation and dist smoke regressions |
+| T-03 | done | worker | Fix project validation and dist smoke regressions attempt=1 |
 | T-04 | pending | worker | Run full release and security gates |
 | T-05 | pending | worker | Review, close governance, and update PR |

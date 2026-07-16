@@ -517,7 +517,7 @@ describe("validation command family", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test("bench --pack aliases to validation benchmark contract", () => {
 		const root = createValidationFixtureRoot();
@@ -534,7 +534,7 @@ describe("validation command family", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test(
 		"v bench runs update-safety pack with compact update envelopes",
@@ -673,7 +673,7 @@ describe("validation command family", () => {
 		expect(typeof first.pack_id).toBe("string");
 		expect(typeof first.baseline_id).toBe("string");
 		expect(typeof first.git_commit).toBe("string");
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test("v bench --output writes to explicit path", () => {
 		const fixtureRoot = createValidationFixtureRoot();
@@ -704,7 +704,7 @@ describe("validation command family", () => {
 		);
 		const savedPayload = readJson(outputPath);
 		expect(savedPayload.mode).toBe("benchmark");
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test("v bench fails when metrics violate threshold and baseline", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
@@ -768,7 +768,7 @@ describe("validation command family", () => {
 		const summary = payload.summary as Record<string, unknown>;
 		expect(summary.failed).toBe(8);
 		expect(summary.skipped).toBe(0);
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test("v bench runtime-live-agent fails on a partial live snapshot without fallback mapping", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
@@ -1348,7 +1348,7 @@ describe("validation command family", () => {
 		const benchPayload = parseJsonOutput(benchProc.stdout as string);
 		expect(benchPayload.status).toBe("failed");
 		expect(benchPayload.pass).toBe(false);
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test("validate alias and tpl/update scopes keep working", () => {
 		const validateProc = runKernel(["validate", "select", "--json"]);

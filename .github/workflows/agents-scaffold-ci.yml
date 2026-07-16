@@ -52,7 +52,7 @@ jobs:
           ./afol ctx build --json >/dev/null
 
       - name: Validate project
-        run: ./afol validate project --json
+        run: ./afol validate project --json --check-drift
 
       - name: Release health
         run: ./afol health --release --json

@@ -50,6 +50,10 @@ function runDist(
 	});
 }
 
+function removeTempEnvFile(path: string): void {
+	rmSync(path, { force: true });
+}
+
 function assertStatus(
 	proc: SpawnResult,
 	label: string,
@@ -257,13 +261,14 @@ try {
 		);
 	}
 
-	writeFileSync(
-		join(lifecycleTarget, ".env"),
-		"AFOL_SESSION=dotenv-must-not-load\n",
-		"utf8",
-	);
-	const start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
-	rmSync(join(lifecycleTarget, ".env"), { force: true });
+	const lifecycleEnvPath = join(lifecycleTarget, ".env");
+	writeFileSync(lifecycleEnvPath, "AFOL_SESSION=dotenv-must-not-load\n", "utf8");
+	let start: SpawnResult;
+	try {
+		start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
+	} finally {
+		removeTempEnvFile(lifecycleEnvPath);
+	}
 	assertOk(start, "dist start");
 
 	const done = runDist(lifecycleTarget, [
