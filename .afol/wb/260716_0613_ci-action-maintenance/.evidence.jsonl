@@ -1,0 +1,1 @@
+{"id":"E-20260716062005187-848a5c","task_id":"T-01","created_at":"2026-07-16T10:20:05.187Z","command":"bun test --only-failures cli/tests/release-toolchain.test.ts","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}

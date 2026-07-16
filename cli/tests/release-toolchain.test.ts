@@ -467,7 +467,21 @@ describe("release and toolchain contracts", () => {
 
 		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
 		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
-		expect(workflow).toContain("uses: actions/setup-go@v5");
+		expect(workflow).toContain(
+			"uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0",
+		);
+		expect(workflow).toContain("cache: false");
+		expect(workflow).toContain(
+			"uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+		);
+		expect(workflow).toContain(
+			"uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+		);
+		expect(workflow).toContain("retention-days: 3");
+		expect(workflow).toContain("compression-level: 9");
+		expect(workflow).toContain(
+			"github.event_name == 'push' && github.ref == 'refs/heads/main'",
+		);
 		expect(workflow).toContain("Install pinned security scanners");
 		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(osvInstallCommand);
