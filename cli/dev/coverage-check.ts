@@ -54,6 +54,11 @@ if (result.status !== 0) {
 		process.stdout.write(result.stdout ?? "");
 		process.stderr.write(result.stderr ?? "");
 	}
+	if (result.signal) {
+		console.error(`coverage: bun test terminated by signal ${result.signal}`);
+	} else if (result.status === null) {
+		console.error("coverage: bun test exited without a status");
+	}
 	process.exit(result.status ?? 1);
 }
 

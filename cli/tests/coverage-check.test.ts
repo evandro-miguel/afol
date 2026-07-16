@@ -17,6 +17,7 @@ function runCoverageCheck(
 	options: {
 		lcovOutput?: string;
 		lcovPath?: string;
+		bunScript?: string;
 	} = {},
 ) {
 	const root = mkdtempSync(join(tmpdir(), "coverage-check-"));
@@ -32,7 +33,8 @@ function runCoverageCheck(
 	}
 	writeFileSync(
 		join(binDir, "bun"),
-		["#!/bin/sh", "cat <<'EOF'", coverageOutput, "EOF"].join("\n"),
+		options.bunScript ??
+			["#!/bin/sh", "cat <<'EOF'", coverageOutput, "EOF"].join("\n"),
 		"utf8",
 	);
 	chmodSync(join(binDir, "bun"), 0o755);
@@ -176,6 +178,21 @@ end_of_record
 				"coverage cli/services/explicit.ts lines: 100.00% (threshold 80%)",
 			);
 			expect(root).not.toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports when bun test is terminated by a signal", () => {
+		const { result, root } = runCoverageCheck("", [], {
+			bunScript: "#!/bin/sh\nkill -TERM $$",
+		});
+
+		try {
+			expect(result.exitCode).toBe(1);
+			expect(decode(result.stderr)).toContain(
+				"coverage: bun test terminated by signal SIGTERM",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

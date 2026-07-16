@@ -277,7 +277,7 @@ describe("release and toolchain contracts", () => {
 			stepIndex("bun run release:provenance:release"),
 		);
 		expect(scripts["coverage:check"]).toBe(
-			"bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark",
+			"bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark --max-concurrency 1",
 		);
 		expect(scripts["coverage:project-benchmarks"]).toContain(
 			"cli/tests/validation.test.ts",
