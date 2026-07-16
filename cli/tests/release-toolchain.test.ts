@@ -282,6 +282,12 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["coverage:project-benchmarks"]).toContain(
 			"cli/tests/validation.test.ts",
 		);
+		expect(scripts["validate:mutation-performance"]).toBe(
+			"bun run kernel -- v bench --pack mutation-safety --json",
+		);
+		expect(scripts["validate:project-benchmarks"]).toContain(
+			"bun run validate:mutation-performance && bun run coverage:project-benchmarks",
+		);
 	});
 
 	test("CI keeps frozen install and blocking typecheck before release validation", () => {
