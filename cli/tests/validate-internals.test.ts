@@ -374,7 +374,7 @@ describe("validate output helpers", () => {
 		expect(summary[0]).toMatchObject({
 			pack_id: "cli-kernel-local",
 			min_scenarios: 6,
-			scenario_count: 6,
+			scenario_count: 8,
 			baseline_present: true,
 		});
 		expect(summary.some((entry) => entry.baseline_present === false)).toBe(
@@ -2088,7 +2088,11 @@ describe("validation command entrypoint", () => {
 				writeFileSync(
 					scenarioPath,
 					`${JSON.stringify(
-						{ ...scenario, implementation_status: "skipped" },
+						{
+							...scenario,
+							implementation_status: "skipped",
+							sandbox: false,
+						},
 						null,
 						2,
 					)}\n`,

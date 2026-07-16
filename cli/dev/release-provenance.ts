@@ -44,6 +44,9 @@ type ReleaseProvenance = {
 	build_command: string;
 	platform: string;
 	arch: string;
+	build_target: string;
+	compile_autoload_dotenv: boolean;
+	compile_autoload_bunfig: boolean;
 	security_scanners: Array<{
 		tool: string;
 		kind: string;
@@ -248,6 +251,9 @@ function assertKnownReleaseFields(provenance: ReleaseProvenance): void {
 		"build_command",
 		"platform",
 		"arch",
+		"build_target",
+		"compile_autoload_dotenv",
+		"compile_autoload_bunfig",
 		"security_scanners",
 	];
 	const unknownFields = requiredFields.filter(
@@ -542,6 +548,12 @@ export function buildReleaseProvenance(
 		build_command: options.buildCommand ?? DEFAULT_BUILD_COMMAND,
 		platform: process.platform || "unknown",
 		arch: process.arch || "unknown",
+		build_target:
+			process.platform && process.arch
+				? `bun-${process.platform}-${process.arch}`
+				: "unknown",
+		compile_autoload_dotenv: false,
+		compile_autoload_bunfig: false,
 		security_scanners: securityScanners,
 	};
 

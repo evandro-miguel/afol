@@ -226,6 +226,12 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["toolchain:diff"]).toBe(
 			"bun run cli/dev/toolchain-smoke.ts",
 		);
+		expect(scripts.build).toContain(
+			"--no-compile-autoload-dotenv --no-compile-autoload-bunfig",
+		);
+		expect(scripts["smoke:wsl2"]).toBe(
+			"bun run build && bun run cli/dev/dist-smoke.ts --wsl2",
+		);
 		expect(scripts["validate:toolchain"]).toBe(
 			"bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		);
@@ -319,7 +325,7 @@ describe("release and toolchain contracts", () => {
 		const typecheckStep = workflowStep("Typecheck");
 		const releaseStep = workflowStep("Release validation");
 
-		expect(validationJob["runs-on"]).toBe("ubuntu-latest");
+		expect(validationJob["runs-on"]).toBe("ubuntu-24.04");
 		expect(validationJob).not.toHaveProperty("continue-on-error");
 		expect(validationJob).not.toHaveProperty("if");
 		expect(parsedWorkflow).not.toHaveProperty("env");
@@ -339,6 +345,9 @@ describe("release and toolchain contracts", () => {
 		expect(typecheckStep).not.toHaveProperty("working-directory");
 		expect(typecheckStep).not.toHaveProperty("env");
 		expect(releaseStep.run).toBe("bun run validate:release");
+		const runnerStep = workflowStep("Verify Ubuntu Linux x64 runner");
+		expect(runnerStep.run).toContain('test "$(uname -m)" = "x86_64"');
+		expect(runnerStep.run).toContain("grep -qi '^ID=ubuntu' /etc/os-release");
 		expect(stepIndex("Install dependencies")).toBeLessThan(
 			stepIndex("Typecheck"),
 		);
@@ -458,7 +467,22 @@ describe("release and toolchain contracts", () => {
 
 		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
 		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
-		expect(workflow).toContain("uses: actions/setup-go@v5");
+		expect(workflow).toContain(
+			"uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0",
+		);
+		expect(workflow).toContain('go-version: "1.26.x"');
+		expect(workflow).toContain("cache: false");
+		expect(workflow).toContain(
+			"uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+		);
+		expect(workflow).toContain(
+			"uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+		);
+		expect(workflow).toContain("retention-days: 3");
+		expect(workflow).toContain("compression-level: 9");
+		expect(workflow).toContain(
+			"github.event_name == 'push' && github.ref == 'refs/heads/main'",
+		);
 		expect(workflow).toContain("Install pinned security scanners");
 		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(osvInstallCommand);
@@ -547,6 +571,11 @@ describe("release and toolchain contracts", () => {
 				releaseMode: true,
 				env: gitEnv,
 			});
+			expect(provenance.build_target).toBe(
+				`bun-${process.platform}-${process.arch}`,
+			);
+			expect(provenance.compile_autoload_dotenv).toBe(false);
+			expect(provenance.compile_autoload_bunfig).toBe(false);
 			expect(provenance.security_scanners).toHaveLength(2);
 			expect(provenance.security_scanners).toEqual(
 				expect.arrayContaining([

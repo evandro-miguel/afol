@@ -42,7 +42,8 @@
 			"adapter",
 			"telemetry",
 			"session",
-			"transition"
+			"transition",
+			"feedback"
 		],
 		"subcommands": [
 			"status --json",
@@ -157,7 +158,15 @@
 			"session bind --session <id> --actor <name>",
 			"session switch <session-id>",
 			"session unbind <session-id>",
-			"session radar --json"
+			"session radar --json",
+			"feedback status",
+			"feedback list",
+			"feedback show --id <report-id>",
+			"feedback preview",
+			"feedback annotate --note <text>",
+			"feedback purge --confirm",
+			"feedback last -m <text>",
+			"done -- <argv...>"
 		],
 		"journeys": [
 			"afol-command-user-flow-matrix",

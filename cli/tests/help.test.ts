@@ -93,7 +93,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(365);
+		expect(lines.length).toBeLessThanOrEqual(380);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);

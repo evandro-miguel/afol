@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260710_core-integrity-and-transaction-safety_spec_01
 theme: core-integrity-and-transaction-safety
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
@@ -88,6 +88,14 @@ Failure or friction points:
 - Invalid governance binding -> reject before task execution.
 - Auxiliary failure after a durable commit -> return committed-with-warnings or
   roll back; never report an ambiguous generic failure.
+
+## Closure
+
+The implemented integrity routes were revalidated with
+`E-20260715181107664-d5ef13` in
+`.afol/wb/260715_1628_afol-1-0-integrity-closeout/`; final-status session
+`260715_1811_afol-1-0-final-status` recorded the parent closeout after full
+tests observed `1203/0`. Existing C01 child specs remain separately governed.
 
 ## 4) Experience and Behavior
 

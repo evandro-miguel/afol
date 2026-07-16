@@ -897,6 +897,40 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("done preserves argv boundaries in recorded evidence", () => {
+		const root = mkRoot("done-argv-evidence");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-argv-evidence");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--json",
+				"--",
+				"printf",
+				"%s",
+				"a b;$HOME",
+			]);
+
+			expect(proc.status).toBe(0);
+			const evidence = readFileSync(
+				join(root, ".afol", "wb", created.session, ".evidence.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.at(-1);
+			const entry = JSON.parse(evidence as string) as { command?: string };
+			expect(entry.command).toBe("printf %s 'a b;$HOME'");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("completeObservedTask coalesces observed completion into one refresh", () => {
 		const root = mkRoot("complete-observed");
 		try {

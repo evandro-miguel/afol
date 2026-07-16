@@ -5,6 +5,7 @@ import {
 	isActionAllowed,
 	remoteOperationContext,
 	requiresApproval,
+	resolveCanonicalAction,
 	resolveOperationContext,
 } from "../core/operation-context";
 
@@ -75,6 +76,21 @@ describe("operation-context", () => {
 		expect(
 			isActionAllowed(ctx, { action: "file.patch.apply", sideEffect: "write" }),
 		).toBe(true);
+	});
+
+	test.each([
+		["note", "annotate"],
+		["clear", "purge"],
+	] as const)("feedback alias %s keeps restricted write policy", (alias, action) => {
+		expect(resolveCanonicalAction({ kind: "feedback", args: [alias] })).toEqual(
+			{ action: `feedback.${action}`, sideEffect: "write" },
+		);
+		expect(
+			isActionAllowed(
+				agentOperationContext(),
+				resolveCanonicalAction({ kind: "feedback", args: [alias] }),
+			),
+		).toBe(false);
 	});
 
 	test.each([
@@ -216,12 +232,55 @@ describe("operation-context", () => {
 		expect(remainingArgs).toEqual(["status"]);
 	});
 
+	test("does not consume --agent after delimiter", () => {
+		const { ctx, remainingArgs } = resolveOperationContext(
+			["d", "T-01", "--", "some-tool", "--agent"],
+			{},
+		);
+		expect(ctx.callerType).toBe("local");
+		expect(remainingArgs).toEqual(["d", "T-01", "--", "some-tool", "--agent"]);
+	});
+
+	test("does not consume -A after delimiter", () => {
+		const { remainingArgs } = resolveOperationContext(
+			["d", "T-01", "--", "-A"],
+			{},
+		);
+		expect(remainingArgs).toEqual(["d", "T-01", "--", "-A"]);
+	});
+
 	test("consumes --remote from remaining args", () => {
 		const { remainingArgs } = resolveOperationContext(
 			["--remote", "pstr", "rebuild"],
 			{},
 		);
 		expect(remainingArgs).toEqual(["pstr", "rebuild"]);
+	});
+
+	test("does not consume --remote after delimiter", () => {
+		const { ctx, remainingArgs } = resolveOperationContext(
+			["d", "T-01", "--", "--remote"],
+			{},
+		);
+		expect(ctx.callerType).toBe("local");
+		expect(remainingArgs).toEqual(["d", "T-01", "--", "--remote"]);
+	});
+
+	test("does not consume -R after delimiter", () => {
+		const { remainingArgs } = resolveOperationContext(
+			["d", "T-01", "--", "-R"],
+			{},
+		);
+		expect(remainingArgs).toEqual(["d", "T-01", "--", "-R"]);
+	});
+
+	test("keeps restricted outer context and preserves verifier flags", () => {
+		const { ctx, remainingArgs } = resolveOperationContext(
+			["--remote", "d", "T-01", "--", "some-tool", "--agent"],
+			{},
+		);
+		expect(ctx.callerType).toBe("remote");
+		expect(remainingArgs).toEqual(["d", "T-01", "--", "some-tool", "--agent"]);
 	});
 
 	test("consumes -R from remaining args", () => {

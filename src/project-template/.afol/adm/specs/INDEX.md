@@ -1,14 +1,17 @@
 ---
-id: "specs-index"
-type: "index"
-desc: "AFOL specs index"
-created: "2026-06-20"
-updated: "2026-06-20"
+doc_type: specs_index
+id: specs_index
 ---
 
 # Specs INDEX
 
-- Parent spec:
-- Child spec:
+| Metric | Count |
+|--------|-------|
+| Total | 0 |
+| Draft | 0 |
+| Active | 0 |
+| Final | 0 |
+| Superseded | 0 |
 
-Keep this index updated in downstream projects as new specs are added.
+| SPEC ID | Theme | Status | Owner | Links |
+|--------:|-------|--------|-------|------|
