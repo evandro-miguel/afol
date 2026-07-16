@@ -28,7 +28,7 @@
 		"test:unit": "bun test cli/tests",
 		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
 		"coverage": "bun test --coverage --coverage-reporter=text",
-		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark --max-concurrency 1",
+		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark --max-concurrency 1 --isolate",
 		"coverage:project-benchmarks": "bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark --max-concurrency 1 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts",
 		"validate": "bun run typecheck && bun test",
 		"validate:template": "bun run template:check",
