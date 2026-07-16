@@ -15,7 +15,7 @@ export const DEFAULT_TEMPLATE_METADATA = Object.freeze({
 	excludedForbiddenCount: 0,
 	generatedAt: "1970-01-01T00:00:00.000Z",
 	templateHash:
-		"d425cb95e32a8b67e02e2aeee90c3eafa51d98df59dfe70133a14362f271ab15",
+		"3448322f958719bebab40e634c48d52be9f3f485409431c443c483da0087af3c",
 	forbiddenPatterns: [
 		"a",
 		"afol",
@@ -288,9 +288,9 @@ export const DEFAULT_TEMPLATE_FILES: Readonly<
 	".afol/adm/specs/INDEX.md": {
 		path: ".afol/adm/specs/INDEX.md",
 		contentBase64:
-			"LS0tCmlkOiAic3BlY3MtaW5kZXgiCnR5cGU6ICJpbmRleCIKZGVzYzogIkFGT0wgc3BlY3MgaW5kZXgiCmNyZWF0ZWQ6ICIyMDI2LTA2LTIwIgp1cGRhdGVkOiAiMjAyNi0wNi0yMCIKLS0tCgojIFNwZWNzIElOREVYCgotIFBhcmVudCBzcGVjOgotIENoaWxkIHNwZWM6CgpLZWVwIHRoaXMgaW5kZXggdXBkYXRlZCBpbiBkb3duc3RyZWFtIHByb2plY3RzIGFzIG5ldyBzcGVjcyBhcmUgYWRkZWQuCg==",
-		sha256: "cbbc5c7bd9e882a44c2fc12a020e671fd2250ffd841ebe87fee4c5e4d736e808",
-		bytes: 226,
+			"LS0tCmRvY190eXBlOiBzcGVjc19pbmRleAppZDogc3BlY3NfaW5kZXgKLS0tCgojIFNwZWNzIElOREVYCgp8IE1ldHJpYyB8IENvdW50IHwKfC0tLS0tLS0tfC0tLS0tLS18CnwgVG90YWwgfCAwIHwKfCBEcmFmdCB8IDAgfAp8IEFjdGl2ZSB8IDAgfAp8IEZpbmFsIHwgMCB8CnwgU3VwZXJzZWRlZCB8IDAgfAoKfCBTUEVDIElEIHwgVGhlbWUgfCBTdGF0dXMgfCBPd25lciB8IExpbmtzIHwKfC0tLS0tLS0tOnwtLS0tLS0tfC0tLS0tLS0tfC0tLS0tLS18LS0tLS0tfAo=",
+		sha256: "2a32a20e4a1a8df29d8ed421e7b44a7e05a87c2b96a2ddc7faa66440de01af37",
+		bytes: 266,
 	},
 	".afol/adm/specs/README.md": {
 		path: ".afol/adm/specs/README.md",

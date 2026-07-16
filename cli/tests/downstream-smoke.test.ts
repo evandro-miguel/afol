@@ -101,6 +101,21 @@ describe("downstream bootstrap smoke", () => {
 			expect(statusBefore.stdout as string).toContain("STATUS: none");
 			expect(statusBefore.stdout as string).toContain("SESSIONS: 0");
 
+			const rebuild = runAfol(target, ["local-state", "rebuild"]);
+			assertOk(rebuild, "local-state rebuild");
+
+			const validateCheckDrift = runAfol(target, [
+				"validate",
+				"project",
+				"--check-drift",
+				"--json",
+			]);
+			assertOk(validateCheckDrift, "validate project --check-drift");
+			const validatePayload = JSON.parse(
+				validateCheckDrift.stdout as string,
+			) as { ok: boolean };
+			expect(validatePayload.ok).toBe(true);
+
 			const created = runAfol(target, [
 				"new",
 				"smoke",
