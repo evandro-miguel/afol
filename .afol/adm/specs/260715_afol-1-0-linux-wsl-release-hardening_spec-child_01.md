@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01
 theme: afol-1-0-linux-wsl-release-hardening
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
