@@ -169,12 +169,18 @@ describe("offline feedback backend", () => {
 		expect(unknown.stdout[0]).not.toContain(sentinel);
 	});
 
-	test("invalid metadata must be a JSON object", async () => {
-		const captured = capture();
+	test("invalid metadata distinguishes malformed JSON from non-object values", async () => {
+		const malformed = capture();
 		expect(
-			await runFeedbackCommand("status", ["--metadata", "[]"], captured.io),
+			await runFeedbackCommand("status", ["--metadata", "{"], malformed.io),
 		).toBe(2);
-		expect(captured.stdout[0]).toContain(
+		expect(malformed.stdout[0]).toContain("Invalid --metadata JSON.");
+
+		const nonObject = capture();
+		expect(
+			await runFeedbackCommand("status", ["--metadata", "[]"], nonObject.io),
+		).toBe(2);
+		expect(nonObject.stdout[0]).toContain(
 			"Invalid --metadata: must be a JSON object.",
 		);
 	});

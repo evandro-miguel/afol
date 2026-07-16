@@ -262,13 +262,13 @@ try {
 	}
 
 	const lifecycleEnvPath = join(lifecycleTarget, ".env");
-	writeFileSync(
-		lifecycleEnvPath,
-		"AFOL_SESSION=dotenv-must-not-load\n",
-		"utf8",
-	);
 	let start: SpawnResult;
 	try {
+		writeFileSync(
+			lifecycleEnvPath,
+			"AFOL_SESSION=dotenv-must-not-load\n",
+			"utf8",
+		);
 		start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
 	} finally {
 		removeTempEnvFile(lifecycleEnvPath);
