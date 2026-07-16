@@ -193,8 +193,10 @@ export function resolveOperationContext(
 	const consumed = new Set<number>();
 	let foundAgent = false;
 	let foundRemote = false;
+	const delimiterIndex = args.indexOf("--");
+	const scanLimit = delimiterIndex === -1 ? args.length : delimiterIndex;
 
-	for (let index = 0; index < args.length; index++) {
+	for (let index = 0; index < scanLimit; index++) {
 		const arg = args[index];
 		if (!arg) continue;
 
