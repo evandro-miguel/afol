@@ -25,7 +25,13 @@ import type { Scenario } from "./types";
 const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
-const SANDBOX_COPY_EXCLUDES = [".git", "node_modules", "dist", ".bun-build*"];
+const SANDBOX_COPY_EXCLUDES = [
+	".git",
+	"node_modules",
+	"dist",
+	".bun-build*",
+	".coverage",
+];
 const COMPLETION_LOCKS_ROOT = ".afol/wb/.locks";
 const COMPLETION_LOCK_FILE_RE = /^completion-[a-f0-9]{64}\.lock(?:\.fence)?$/;
 const RUNTIME_STATE_GUARD_PATHS = [

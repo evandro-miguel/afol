@@ -1139,10 +1139,13 @@ describe("scenario benchmark execution", () => {
 				],
 				command: "node sandbox-mutate.cjs",
 			};
+			mkdirSync(join(root, ".coverage"), { recursive: true });
+			writeFileSync(join(root, ".coverage", "sentinel"), "derived\n", "utf8");
 			writeFileSync(
 				join(root, "sandbox-mutate.cjs"),
 				[
 					"const fs = require('node:fs');",
+					"if (fs.existsSync('.coverage')) process.exit(8);",
 					"const path = '.afol/memory/memory.md';",
 					"const text = fs.readFileSync(path, 'utf8');",
 					"if (!text.includes('MEM-SB-1')) process.exit(7);",
