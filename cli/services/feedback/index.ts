@@ -39,10 +39,10 @@ const MAX_RETRIES = 3;
 const MAX_TEXT = 4000;
 const MAX_METADATA = 2000;
 const SECRET_KEY =
-	/(token|password|secret|cookie|authorization|api[_-]?key|credential|private[_-]?key)/i;
+	/(token|password|passphrase|pwd|secret|cookie|authorization|api[_-]?key|credential|private[_-]?key|salt|cert(?:ificate)?|jwt)/i;
 const SECRET_VALUE = /(bearer\s+)[a-z0-9._~+/=-]+/gi;
 const KEYED_SECRET =
-	/(token|password|secret|cookie|authorization|api[_-]?key|credential|private[_-]?key)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)/gi;
+	/(token|password|passphrase|pwd|secret|cookie|authorization|api[_-]?key|credential|private[_-]?key|salt|cert(?:ificate)?|jwt)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)/gi;
 const CONTROL_CHARACTER = /\p{Cc}/gu;
 
 function cap(value: string, max = MAX_TEXT): string {

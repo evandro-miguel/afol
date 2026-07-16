@@ -107,6 +107,49 @@ describe("offline feedback backend", () => {
 		}
 	});
 
+	test("redacts additional sensitive keys in metadata and free text", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-feedback-sensitive-"));
+		try {
+			const report = recordFeedback(
+				{
+					message: "passphrase=open-sesame jwt=header.payload.signature",
+					metadata: {
+						pwd: "password-value",
+						salt: "salt-value",
+						cert: "certificate-value",
+						jwt: "jwt-value",
+						safe: "keep",
+					},
+				},
+				env(root),
+			);
+			const serialized = JSON.stringify(report);
+			for (const secret of [
+				"open-sesame",
+				"header.payload.signature",
+				"password-value",
+				"salt-value",
+				"certificate-value",
+				"jwt-value",
+			]) {
+				expect(serialized).not.toContain(secret);
+			}
+			expect(serialized).toContain("keep");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("value flags reject a following short flag", async () => {
+		const captured = capture();
+		expect(
+			await runFeedbackCommand("last", ["--note", "-j"], captured.io),
+		).toBe(2);
+		expect([...captured.stdout, ...captured.stderr].join("\n")).toContain(
+			"Missing value for --note.",
+		);
+	});
+
 	test("missing explicit annotation ids reach the friendly CLI error", async () => {
 		const root = mkdtempSync(join(tmpdir(), "afol-feedback-missing-note-"));
 		const previousHome = process.env.AFOL_STATE_HOME;

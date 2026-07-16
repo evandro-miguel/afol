@@ -398,6 +398,11 @@ export async function runTransitionCommand(
 	}
 }
 
+function formatArgvToken(value: string): string {
+	if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
+	return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
 export async function runDoneCommand(
 	args: string[],
 	root: string = process.cwd(),
@@ -444,7 +449,9 @@ export async function runDoneCommand(
 				parsed.testCommand ??
 				parsed.testShellCommand ??
 				(verificationSpec?.mode === "argv"
-					? [verificationSpec.executable, ...verificationSpec.args].join(" ")
+					? [verificationSpec.executable, ...verificationSpec.args]
+							.map(formatArgvToken)
+							.join(" ")
 					: (verificationSpec?.command ?? ""));
 			observedCompletion = completeObservedTask(root, {
 				session: parsed.session,
