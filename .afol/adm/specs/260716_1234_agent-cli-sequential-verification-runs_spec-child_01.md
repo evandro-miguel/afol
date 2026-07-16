@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260716_1234_agent-cli-sequential-verification-runs_spec-child_01
 theme: agent-cli-sequential-verification-runs
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
@@ -245,7 +245,7 @@ follow-up. Existing compact-output and token-budget contracts remain in force.
 - [x] Benchmarks prove lower authored command cost than equivalent repeated
       lifecycle calls, compact default output, and no regression of F-03 warm
       latency/output budgets.
-- [ ] Clean-checkout release validation and CI evidence are linked from this
+- [x] Clean-checkout release validation and CI evidence are linked from this
       spec before finalization.
 
 ## Required verification matrix
@@ -302,10 +302,16 @@ records; no canonical knowledge is deleted.
 
 The governed implementation session is closed with observed typecheck and full
 test evidence. Independent local gates also passed manifest/template parity,
-health, drift, benchmark, Gitleaks, and dependency scanning. The child remains
-`active` because `bun run validate:release` requires a committed clean checkout.
-Finalization requires an immutable link to successful CI for the implementation
-commit, followed by a closeout commit and successful CI on that final commit.
+health, drift, benchmark, Gitleaks, and dependency scanning.
+
+Implementation commit
+[`16c743d6dfc2e6884bb0a113fcf02e0bfafdc074`](https://github.com/evandro-miguel/afol/commit/16c743d6dfc2e6884bb0a113fcf02e0bfafdc074)
+passed clean-checkout release validation in both the
+[push run](https://github.com/evandro-miguel/afol/actions/runs/29542326218)
+and the
+[pull-request merge-candidate run](https://github.com/evandro-miguel/afol/actions/runs/29542328244).
+This child is final. PR #46 remains merge-blocked until the closeout commit also
+passes its required CI checks.
 
 ---
 

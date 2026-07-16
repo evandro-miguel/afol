@@ -213,8 +213,9 @@ Minimum acceptance:
   .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
 - Sequential verification residual:
   .afol/adm/specs/260716_1234_agent-cli-sequential-verification-runs_spec-child_01.md
-- Sequential residual state: implementation and local validation are complete;
-  clean-checkout CI provenance and child finalization remain pending.
+- Sequential residual state: final on PR #46. Repeated argv-only verification,
+  ordered fail-fast evidence, completion-lock fencing, and clean-checkout release
+  provenance are complete on implementation commit `16c743d6dfc2`.
 - Why: Agents need extreme ease of use, extremely low latency, low
   **write-token** cost for CLI argv, low forced stdout, and very high
   reliability. Long commands and long default output train agents to waste
@@ -231,7 +232,9 @@ Minimum acceptance:
   `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
   passed. The residual child is final on `E-20260715181045803-75a16e` in
   `.afol/wb/260715_1628_afol-1-0-agent-cli-residual/`; final-status session
-  `260715_1811_afol-1-0-final-status` recorded the reconciled closure.
+  `260715_1811_afol-1-0-final-status` recorded the reconciled closure. The
+  sequential verification child passed both push and merge-candidate release
+  validation on implementation commit `16c743d6dfc2`.
 
 ### F-04 Governance Workbench System
 
