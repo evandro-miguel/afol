@@ -1114,10 +1114,7 @@ export function validateBenchmarkProvenance(
 	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
 	const measurement = scenario.measurement;
 	if (measurement === undefined) {
-		if (
-			scenario.pack_id === "evolution-core" &&
-			scenario.implementation_status === "implemented"
-		) {
+		if (scenario.pack_id === "evolution-core") {
 			return [`benchmark-provenance-missing:${prefix}:measurement`];
 		}
 		return [];
@@ -1165,6 +1162,18 @@ export function validateBenchmarkProvenance(
 		`${prefix}:baseline.warmup_count`,
 		issues,
 	);
+	if (scenario.pack_id === "evolution-core") {
+		if (measurement.sample_count !== 3) {
+			issues.push(
+				`benchmark-provenance-sample-count-required:${prefix}:3`,
+			);
+		}
+		if (measurement.warmup_count !== 1) {
+			issues.push(
+				`benchmark-provenance-warmup-count-required:${prefix}:1`,
+			);
+		}
+	}
 	for (const [field, measured, recorded] of [
 		["sample_count", measurement.sample_count, baseline.sample_count],
 		["warmup_count", measurement.warmup_count, baseline.warmup_count],
@@ -1256,6 +1265,14 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 			);
 		}
 		for (const scenario of scenarios) {
+			if (
+				packId === "evolution-core" &&
+				scenario.implementation_status !== "implemented"
+			) {
+				issues.push(
+					`scenario-implementation-status-required:${packId}:${scenario.scenario_id}:${scenario.implementation_status ?? "missing"}`,
+				);
+			}
 			if (scenario.pack_id !== packId) {
 				issues.push(`scenario-pack-mismatch:${packId}:${scenario.scenario_id}`);
 			}

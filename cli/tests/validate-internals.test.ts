@@ -840,6 +840,10 @@ describe("validate registry", () => {
 			if (!evolutionScenarios?.[0]) {
 				throw new Error("Expected evolution-core scenario fixture");
 			}
+			const evolutionBaseline = snapshot.baselinesByPack["evolution-core"];
+			if (!evolutionBaseline) {
+				throw new Error("Expected evolution-core baseline fixture");
+			}
 			const missingEvolutionScenario = { ...evolutionScenarios[0] };
 			delete missingEvolutionScenario.measurement;
 			const missingEvolutionMeasurement: RegistrySnapshot = {
@@ -854,6 +858,74 @@ describe("validate registry", () => {
 			};
 			expect(validateRegistryContract(missingEvolutionMeasurement)).toContain(
 				`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+			);
+			const missingStatus = { ...missingEvolutionScenario };
+			delete missingStatus.implementation_status;
+			const skippedStatus = {
+				...missingEvolutionScenario,
+				implementation_status: "skipped" as const,
+			};
+			const invalidStatus = {
+				...missingEvolutionScenario,
+				implementation_status: "invalid",
+			} as unknown as Scenario;
+			for (const [scenario, status] of [
+				[missingStatus, "missing"],
+				[skippedStatus, "skipped"],
+				[invalidStatus, "invalid"],
+			] as const) {
+				const issues = validateRegistryContract({
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"evolution-core": [scenario],
+					},
+				});
+				expect(issues).toContain(
+					`scenario-implementation-status-required:evolution-core:${evolutionScenarios[0].scenario_id}:${status}`,
+				);
+				expect(issues).toContain(
+					`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+				);
+			}
+			const mismatchedPack = {
+				...evolutionScenarios[0],
+				pack_id: "cli-kernel-local" as const,
+			};
+			expect(
+				validateRegistryContract({
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"evolution-core": [mismatchedPack],
+					},
+				}),
+			).toContain(
+				`scenario-pack-mismatch:evolution-core:${evolutionScenarios[0].scenario_id}`,
+			);
+			const weakSampleScenario = {
+				...evolutionScenarios[0],
+				measurement: {
+					...evolutionScenarios[0].measurement,
+					sample_count: 1,
+				},
+			};
+			const weakSampleIssues = validateRegistryContract({
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"evolution-core": [weakSampleScenario],
+				},
+				baselinesByPack: {
+					...snapshot.baselinesByPack,
+					"evolution-core": {
+						...evolutionBaseline,
+						sample_count: 1,
+					},
+				},
+			});
+			expect(weakSampleIssues).toContain(
+				`benchmark-provenance-sample-count-required:evolution-core:${evolutionScenarios[0].scenario_id}:3`,
 			);
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
