@@ -144,6 +144,18 @@ rollback, and tombstones. Entries are hash-linked and checked for local tamper
 evidence, but a project-root writer can rewrite or truncate the file and
 recompute the digests; this is not immutable storage or authenticity against a
 malicious local writer and never authorizes a critical change.
+The first-release concurrency boundary covers cooperative AFOL processes and
+agents, whose journal and projection operations are serialized by AFOL locks
+and database transactions. An arbitrary filesystem writer able to mutate,
+replace, rename, or otherwise alter project-root components is outside the
+containment and authenticity boundary on every supported OS. Static checks
+fail closed before opening or writing: targets must remain under the configured
+root and be regular files; symlinks, reparse points/junctions, hardlinks whose
+identity cannot be proven, FIFOs, sockets, devices, and other non-regular
+targets are rejected. These checks do not claim TOCTOU resistance or
+`openat2`, `dirfd`, or equivalent kernel-enforced no-follow guarantees.
+`afol evolve status` remains read-only, and no critical authorization derives
+from the journal or its digests.
 `.afol/state/evolution.db`, receipt rows, clusters, scores, caches, and exports
 are derived projections. They may be rebuilt deterministically from the
 canonical journal plus existing AFOL canonical sources, and derived-state GC

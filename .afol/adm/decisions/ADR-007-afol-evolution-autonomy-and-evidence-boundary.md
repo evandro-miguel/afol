@@ -110,8 +110,9 @@ blocks the operation and leaves it at proposal/preview state.
    FIFO, socket, block/character device, or network fetch. Path resolution
    must reject traversal and escape before opening. Size, record, field, and
    nesting limits are enforced before allocation. The importer verifies
-   realpath and file identity before and after streaming so a symlink, inode,
-   junction, or reparse-point swap cannot redirect the read.
+   realpath and file identity before and after streaming; a detected symlink,
+   inode, junction, or reparse-point swap fails closed. This bounded check does
+   not claim TOCTOU resistance or a kernel-enforced no-follow guarantee.
 4. **Receipt fencing and ABA protection.** Daily suggestion receipts are
    keyed by stable project UUID and the local calendar date calculated from the
    project-configured IANA timezone, not UTC, production ordinal, or elapsed
@@ -145,7 +146,21 @@ blocks the operation and leaves it at proposal/preview state.
    malicious local writer and never authorizes a critical change. Existing
    entries are not rewritten by AFOL; undo records a compensating event, not
    silent deletion.
-6. **Conservative project linking.** An `auto_verified` link requires both the
+6. **First-release containment and concurrency boundary.** Cooperative AFOL
+   processes and agents are the in-scope concurrent writers; their journal and
+   projection operations are serialized by AFOL locks and database
+   transactions. An arbitrary concurrent filesystem writer that can mutate,
+   replace, rename, or otherwise alter project-root components is outside the
+   first-release containment and authenticity boundary on Linux, Windows, and
+   every other supported OS. Static path checks fail closed before opening or
+   writing: the target must remain under the configured root and be a regular
+   file, while symlinks, Windows reparse points/junctions, hardlinks whose
+   identity cannot be proven, FIFOs, sockets, devices, and other non-regular
+   targets are rejected. These checks do not claim TOCTOU resistance or
+   `openat2`, `dirfd`, or equivalent kernel-enforced no-follow guarantees.
+   `afol evolve status` remains read-only, and no critical authorization is
+   derived from the journal or its digests.
+7. **Conservative project linking.** An `auto_verified` link requires both the
    local project UUID and a commit verified in the current repository. A
    `manual_confirmed` link requires a canonical decision reference. A
    `pending` link is ineligible for ranking and learning. Remote, path,
@@ -154,13 +169,13 @@ blocks the operation and leaves it at proposal/preview state.
    themselves. Ambiguous or cross-project links remain excluded from ranking
    and learning until explicit confirmation. Displayed paths/remotes remove
    userinfo and tokens. A link never imports a preference by implication.
-7. **Windows path and device boundary.** On Windows, reject UNC paths,
+8. **Windows path and device boundary.** On Windows, reject UNC paths,
    alternate data streams (`name:stream`), reparse-point/symlink escapes,
    device names and device namespaces, reserved DOS names, and path forms
    whose normalized identity differs from the allowlisted root. The same
    no-follow and regular-file checks apply on Linux; tests must cover both
    separator and case-folding rules without granting a broader root.
-8. **Retention and tombstones.** Raw external material is opt-in and
+9. **Retention and tombstones.** Raw external material is opt-in and
    retention-bound. Purge creates a tombstone containing import id, content
    digest, reason, actor/policy, and time; it does not silently erase the
    audit trail or permit reappearance through a stale index/cache. Derived

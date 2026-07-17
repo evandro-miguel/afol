@@ -157,6 +157,28 @@ describe("evolve status canonical journal integrity", () => {
 		}
 	});
 
+	test("reports a valid journal with a stale empty projection as rebuild_required", async () => {
+		const root = fixture();
+		try {
+			createJournal(root);
+			const db = openEvolutionDb(evolutionDbPath(root));
+			db.exec("DELETE FROM production_days; DELETE FROM evolution_metadata;");
+			db.close();
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({
+				state: "rebuild_required",
+				journal_health: { exists: true, valid: true, error: null },
+				db_health: { db_exists: true, ok: false },
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("fails closed for a malformed canonical journal without creating a db", async () => {
 		const root = fixture();
 		try {

@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
+import { assertSafeEvolutionTarget } from "./db";
 import {
 	type EvolutionJournalContext,
 	validateProductionDayProjection,
@@ -186,6 +187,9 @@ export function checkEvolutionDbHealth(
 	let productionDayCount = 0;
 	let projectId: string | null = null;
 	try {
+		assertSafeEvolutionTarget(dbPath, "evolution db", false);
+		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
+		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
 		db = new Database(dbPath, { readonly: true });
 		migrationVersion = readUserVersion(db);
 		const journal = scalarString(

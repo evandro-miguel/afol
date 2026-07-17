@@ -203,6 +203,34 @@ describe("Evolution canonical projection and concurrency", () => {
 		}
 	});
 
+	test("BEGIN failure does not roll back a caller transaction", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-begin-caller-tx-"));
+		const db = openEvolutionDb(evolutionDbPath(root));
+		seedEvidence(root, "S-01", "E-01");
+		db.exec("BEGIN IMMEDIATE");
+		db.prepare(
+			"INSERT INTO evolution_metadata(key, value) VALUES ('caller_sentinel', 'preserve')",
+		).run();
+		try {
+			expect(() => append(root, db, "S-01", "E-01")).toThrow(
+				"cannot start a transaction within a transaction",
+			);
+			expect(
+				db
+					.query(
+						"SELECT value FROM evolution_metadata WHERE key = 'caller_sentinel'",
+					)
+					.get(),
+			).toEqual({ value: "preserve" });
+		} finally {
+			try {
+				db.exec("ROLLBACK");
+			} catch {}
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("journal rejects a final symlink without touching its target", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-journal-symlink-"));
 		const db = openEvolutionDb(evolutionDbPath(root));

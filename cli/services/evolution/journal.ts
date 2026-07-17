@@ -6,7 +6,7 @@ import {
 	fstatSync,
 	fsyncSync,
 	ftruncateSync,
-	lstatSync,
+	type lstatSync,
 	mkdirSync,
 	openSync,
 	readFileSync,
@@ -16,6 +16,7 @@ import { dirname, join, relative } from "node:path";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectWritePath } from "../project/root";
 import { localDateForTimezone, validateEvolutionIdentity } from "./config";
+import { assertSafeEvolutionTarget } from "./db";
 import { applyMigrations } from "./migrations";
 import {
 	allocateProductionDay,
@@ -28,6 +29,7 @@ import {
 
 const GENESIS_DIGEST = "GENESIS";
 const JOURNAL_LOCK = "__evolution-journal__";
+const READ_RETRIES = 3;
 function assertWalEnabled(db: Database): void {
 	const row = db.query("PRAGMA journal_mode").get() as Record<
 		string,
@@ -111,42 +113,80 @@ function journalOpenFlags(flags: number): number {
 }
 function inspectJournalTarget(
 	path: string,
-): ReturnType<typeof lstatSync> | null {
-	try {
-		const stat = lstatSync(path);
-		if (!stat.isFile())
-			throw new Error("production-day journal target must be a regular file");
-		return stat;
-	} catch (error) {
-		if (
-			typeof error === "object" &&
-			error !== null &&
-			"code" in error &&
-			(error as { code?: unknown }).code === "ENOENT"
-		)
-			return null;
-		throw error;
-	}
+): NonNullable<ReturnType<typeof lstatSync>> | null {
+	return assertSafeEvolutionTarget(path, "production-day journal target");
+}
+type JournalFingerprint = {
+	dev: number | bigint;
+	ino: number | bigint;
+	size: number;
+	mtimeMs: number;
+	ctimeMs: number;
+};
+function journalFingerprint(
+	stat: NonNullable<ReturnType<typeof lstatSync>>,
+): JournalFingerprint {
+	return {
+		dev: stat.dev,
+		ino: stat.ino,
+		size: Number(stat.size),
+		mtimeMs: Number(stat.mtimeMs),
+		ctimeMs: Number(stat.ctimeMs),
+	};
+}
+function sameJournalFingerprint(
+	left: JournalFingerprint,
+	right: JournalFingerprint,
+): boolean {
+	return (
+		left.dev === right.dev &&
+		left.ino === right.ino &&
+		left.size === right.size &&
+		left.mtimeMs === right.mtimeMs &&
+		left.ctimeMs === right.ctimeMs
+	);
 }
 function readJournalText(path: string): string | null {
-	if (!inspectJournalTarget(path)) return null;
+	const before = inspectJournalTarget(path);
+	if (!before) return null;
+	const beforeFingerprint = journalFingerprint(before);
 	const fd = openSync(path, journalOpenFlags(fsConstants.O_RDONLY));
 	try {
-		if (!fstatSync(fd).isFile())
+		const opened = fstatSync(fd);
+		if (
+			!opened.isFile() ||
+			opened.nlink !== 1 ||
+			!sameJournalFingerprint(beforeFingerprint, journalFingerprint(opened))
+		)
 			throw new Error("production-day journal target must be a regular file");
-		return readFileSync(fd, "utf8");
+		const text = readFileSync(fd, "utf8");
+		const after = inspectJournalTarget(path);
+		if (
+			!after ||
+			!sameJournalFingerprint(beforeFingerprint, journalFingerprint(after))
+		)
+			throw new Error("production-day journal changed during read");
+		return text;
 	} finally {
 		closeSync(fd);
 	}
 }
 function truncateJournal(path: string, size: number): void {
-	if (!inspectJournalTarget(path)) return;
+	const before = inspectJournalTarget(path);
+	if (!before) return;
+	const beforeFingerprint = journalFingerprint(before);
 	const fd = openSync(path, journalOpenFlags(fsConstants.O_WRONLY));
 	try {
-		if (!fstatSync(fd).isFile())
+		const opened = fstatSync(fd);
+		if (
+			!opened.isFile() ||
+			opened.nlink !== 1 ||
+			!sameJournalFingerprint(beforeFingerprint, journalFingerprint(opened))
+		)
 			throw new Error("production-day journal target must be a regular file");
 		ftruncateSync(fd, size);
 		fsyncSync(fd);
+		assertSafeEvolutionTarget(path, "production-day journal target", false);
 	} finally {
 		closeSync(fd);
 	}
@@ -220,17 +260,35 @@ export function readProductionDayJournal(
 ): ProductionDayJournalEvent[] {
 	validateEvolutionIdentity({ projectId, timezone });
 	const path = productionDayJournalPath(root, eventsDir);
-	const text = readJournalText(path);
-	if (text === null) return [];
-	const events: ProductionDayJournalEvent[] = [];
-	let previousDigest = GENESIS_DIGEST;
-	for (const [index, line] of text.split(/\r?\n/).filter(Boolean).entries()) {
-		const event = JSON.parse(line) as ProductionDayJournalEvent;
-		validateEvent(root, event, index, previousDigest, projectId, timezone);
-		events.push(event);
-		previousDigest = event.event_digest;
+	let lastError: unknown;
+	for (let attempt = 0; attempt < READ_RETRIES; attempt += 1) {
+		try {
+			const text = readJournalText(path);
+			if (text === null) return [];
+			const events: ProductionDayJournalEvent[] = [];
+			let previousDigest = GENESIS_DIGEST;
+			for (const [index, line] of text
+				.split(/\r?\n/)
+				.filter(Boolean)
+				.entries()) {
+				const event = JSON.parse(line) as ProductionDayJournalEvent;
+				validateEvent(root, event, index, previousDigest, projectId, timezone);
+				events.push(event);
+				previousDigest = event.event_digest;
+			}
+			return events;
+		} catch (error) {
+			lastError = error;
+			if (
+				!(
+					error instanceof Error &&
+					error.message.includes("changed during read")
+				)
+			)
+				throw error;
+		}
 	}
-	return events;
+	throw lastError;
 }
 function projectEvents(
 	db: Database,
@@ -301,9 +359,52 @@ function validateProductionDayProjectionUnlocked(
 export function validateProductionDayProjection(
 	context: EvolutionJournalContext & { db: Database },
 ): void {
-	withSessionLock(context.root, JOURNAL_LOCK, () =>
-		validateProductionDayProjectionUnlocked(context),
-	);
+	let lastError: unknown;
+	for (let attempt = 0; attempt < READ_RETRIES; attempt += 1) {
+		try {
+			const before = readProductionDayJournal(
+				context.root,
+				context.projectId,
+				context.timezone,
+				context.evolutionEventsDir,
+			);
+			const expected = replayProjection(before);
+			const actual = projectionRows(context.db);
+			const after = readProductionDayJournal(
+				context.root,
+				context.projectId,
+				context.timezone,
+				context.evolutionEventsDir,
+			);
+			const actualAfter = projectionRows(context.db);
+			if (
+				digest(before) !== digest(after) ||
+				digest(actual) !== digest(actualAfter)
+			) {
+				lastError = new Error("evolution state changed during read");
+				Bun.sleepSync(25);
+				continue;
+			}
+			if (digest(actual) !== digest(expected)) {
+				lastError = new Error(
+					"evolution db projection differs from canonical production-day journal",
+				);
+				Bun.sleepSync(25);
+				continue;
+			}
+			return;
+		} catch (error) {
+			lastError = error;
+			if (
+				!(
+					error instanceof Error &&
+					error.message === "evolution state changed during read"
+				)
+			)
+				throw error;
+		}
+	}
+	throw lastError;
 }
 export function appendProductionDayAllocation(
 	input: AppendProductionDayAllocationInput,
@@ -394,9 +495,12 @@ function appendProductionDayAllocationUnlocked(
 	};
 	const path = productionDayJournalPath(input.root, input.evolutionEventsDir);
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+	assertSafeEvolutionTarget(path, "production-day journal");
 	const previousTarget = inspectJournalTarget(path);
+	assertSafeEvolutionTarget(path, "production-day journal");
 	const existedBefore = previousTarget !== null;
 	const previousSize = Number(previousTarget?.size ?? 0);
+	let transactionStarted = false;
 	try {
 		const fd = openSync(
 			path,
@@ -406,8 +510,10 @@ function appendProductionDayAllocationUnlocked(
 			0o600,
 		);
 		try {
-			if (!fstatSync(fd).isFile() || !inspectJournalTarget(path))
+			const opened = fstatSync(fd);
+			if (!opened.isFile() || opened.nlink !== 1 || !inspectJournalTarget(path))
 				throw new Error("production-day journal target must be a regular file");
+			assertSafeEvolutionTarget(path, "production-day journal", false);
 			writeSync(fd, `${JSON.stringify(event)}\n`, null, "utf8");
 			fsyncSync(fd);
 		} finally {
@@ -421,14 +527,18 @@ function appendProductionDayAllocationUnlocked(
 				closeSync(directoryFd);
 			}
 		}
+		assertSafeEvolutionTarget(path, "production-day journal", false);
 		input.db.exec("BEGIN IMMEDIATE");
+		transactionStarted = true;
 		const result = projectEvents(input.db, [...events, event], true);
 		input.db.exec("COMMIT");
 		return result as ProductionDay;
 	} catch (error) {
-		try {
-			input.db.exec("ROLLBACK");
-		} catch {}
+		if (transactionStarted) {
+			try {
+				input.db.exec("ROLLBACK");
+			} catch {}
+		}
 		try {
 			truncateJournal(path, previousSize);
 		} catch {

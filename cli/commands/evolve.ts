@@ -83,6 +83,7 @@ function statusState(
 	projectId: string | null,
 	dbExists: boolean,
 	dbHealthy: boolean,
+	dbNeedsRebuild: boolean,
 	journalExists: boolean,
 	journalValid: boolean | null,
 ): EvolutionStatusState {
@@ -93,6 +94,8 @@ function statusState(
 	if (!dbExists && journalExists && journalValid === true)
 		return "rebuild_required";
 	if (!dbExists) return "ready_uninitialized";
+	if (dbNeedsRebuild && journalExists && journalValid === true)
+		return "rebuild_required";
 	return dbHealthy ? "healthy" : "unhealthy";
 }
 
@@ -129,12 +132,17 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 					evolutionEventsDir: resolved.paths.evolutionEventsDir,
 				})
 			: null;
+	const dbNeedsRebuild =
+		dbHealth?.findings.length === 1 &&
+		dbHealth.findings[0]?.severity === "fail" &&
+		dbHealth.findings[0]?.message.includes("projection differs");
 	const state = statusState(
 		resolved.configured,
 		resolved.enabled,
 		resolved.projectId,
 		dbExists,
 		dbHealth?.ok ?? false,
+		dbNeedsRebuild,
 		journalExists,
 		journalValid,
 	);

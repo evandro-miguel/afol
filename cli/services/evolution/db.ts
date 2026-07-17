@@ -1,12 +1,84 @@
 import { Database } from "bun:sqlite";
-import { chmodSync, existsSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import {
+	chmodSync,
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	realpathSync,
+} from "node:fs";
+import { dirname, resolve } from "node:path";
 import { resolveProjectWritePath } from "../project/root";
 import { applyMigrations } from "./migrations";
 
 export const EVOLUTION_DB_RELATIVE_PATH = ".afol/state/evolution.db";
 const BUSY_TIMEOUT_MS = 5000;
 const BUSY_RETRY_MS = 25;
+
+type EvolutionFileStat = NonNullable<ReturnType<typeof lstatSync>>;
+
+function samePath(left: string, right: string): boolean {
+	const normalizedLeft = resolve(left);
+	const normalizedRight = resolve(right);
+	return process.platform === "win32"
+		? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+		: normalizedLeft === normalizedRight;
+}
+
+function inspectExistingParent(path: string): void {
+	let current = dirname(path);
+	while (true) {
+		try {
+			const stat = lstatSync(current);
+			if (stat.isSymbolicLink() || !stat.isDirectory())
+				throw new Error("evolution state parent must be a real directory");
+			const real = realpathSync(current);
+			if (!samePath(real, current))
+				throw new Error("evolution state parent crosses a reparse point");
+			return;
+		} catch (error) {
+			if (
+				typeof error === "object" &&
+				error !== null &&
+				"code" in error &&
+				(error as { code?: unknown }).code === "ENOENT"
+			) {
+				const parent = dirname(current);
+				if (parent === current) throw error;
+				current = parent;
+				continue;
+			}
+			throw error;
+		}
+	}
+}
+
+export function assertSafeEvolutionTarget(
+	path: string,
+	label: string,
+	allowMissing = true,
+): EvolutionFileStat | null {
+	inspectExistingParent(path);
+	try {
+		const stat = lstatSync(path);
+		if (stat.isSymbolicLink() || !stat.isFile())
+			throw new Error(`${label} must be a regular file`);
+		if (stat.nlink !== 1) throw new Error(`${label} must not be hardlinked`);
+		const real = realpathSync(path);
+		if (!samePath(real, path))
+			throw new Error(`${label} crosses a reparse point`);
+		return stat;
+	} catch (error) {
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			(error as { code?: unknown }).code === "ENOENT" &&
+			allowMissing
+		)
+			return null;
+		throw error;
+	}
+}
 
 function ensurePrivatePermissions(dbPath: string): void {
 	if (process.platform === "win32") return;
@@ -48,13 +120,22 @@ export function evolutionDbPath(
 }
 
 export function openEvolutionDb(dbPath: string): Database {
+	inspectExistingParent(dbPath);
 	mkdirSync(dirname(dbPath), { recursive: true });
+	inspectExistingParent(dbPath);
+	assertSafeEvolutionTarget(dbPath, "evolution db");
+	assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
+	assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
 	ensurePrivatePermissions(dbPath);
 	const db = new Database(dbPath);
 	try {
+		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		ensurePrivatePermissions(dbPath);
 		db.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT_MS};`);
 		withBusyRetry(() => db.exec("PRAGMA journal_mode=WAL;"));
+		assertSafeEvolutionTarget(dbPath, "evolution db", false);
+		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
+		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
 		ensurePrivatePermissions(dbPath);
 		const mode = Object.values(
 			(db.query("PRAGMA journal_mode").get() as Record<
