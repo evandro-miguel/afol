@@ -598,7 +598,7 @@ Minimum acceptance:
   - Durable artifacts carry timestamps, status, authority, source hash, and
     branch/commit metadata where relevant.
   - `afol health` is fast by default and reports `fail`, `warn`, and `info`.
-  - `afol health --area adm|pstr|wb|memory|library|state|ctx|token_budget`
+  - `afol health --area adm|pstr|wb|memory|library|state|ctx|evolution|token_budget`
     is the canonical domain health surface.
   - `afol pstr stale` blocks stale maps from trusted context bundles.
   - State health checks schema, migrations, source hashes, FTS freshness,
