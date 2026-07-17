@@ -1111,11 +1111,17 @@ export function validateBenchmarkProvenance(
 	baseline: Baseline,
 	now: Date = new Date(),
 ): string[] {
+	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
 	const measurement = scenario.measurement;
 	if (measurement === undefined) {
+		if (
+			scenario.pack_id === "evolution-core" &&
+			scenario.implementation_status === "implemented"
+		) {
+			return [`benchmark-provenance-missing:${prefix}:measurement`];
+		}
 		return [];
 	}
-	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
 	const issues: string[] = [];
 	if (baseline.baseline_id !== scenario.baseline_id) {
 		issues.push(`benchmark-provenance-mismatch:${prefix}:baseline_id`);

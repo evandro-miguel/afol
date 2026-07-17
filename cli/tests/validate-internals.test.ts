@@ -836,6 +836,26 @@ describe("validate registry", () => {
 				"scenario-feature-coverage-missing:F-30",
 			);
 
+			const evolutionScenarios = snapshot.scenariosByPack["evolution-core"];
+			if (!evolutionScenarios?.[0]) {
+				throw new Error("Expected evolution-core scenario fixture");
+			}
+			const missingEvolutionScenario = { ...evolutionScenarios[0] };
+			delete missingEvolutionScenario.measurement;
+			const missingEvolutionMeasurement: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"evolution-core": [
+						missingEvolutionScenario,
+						...evolutionScenarios.slice(1),
+					],
+				},
+			};
+			expect(validateRegistryContract(missingEvolutionMeasurement)).toContain(
+				`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+			);
+
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
 			const routingScenarios = snapshot.scenariosByPack["routing-accuracy"];
 			if (!cliKernelScenarios) {
