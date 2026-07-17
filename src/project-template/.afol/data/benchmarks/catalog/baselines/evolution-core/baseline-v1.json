@@ -9,7 +9,7 @@
   "timing_p95_ms": 262,
   "tokenizer_id": "tiktoken-o200k-base",
   "tokenizer_version": "recorded",
-  "git_commit": "b9c52e9b18ae",
+  "git_commit": "b817a33ec62c",
   "run_id": "bench-evolution-core-evolution-status-contract-1.0.0",
   "timestamp": "2026-07-17T10:43:21.246Z",
   "results_count": 1,
