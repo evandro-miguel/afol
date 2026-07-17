@@ -21,6 +21,7 @@ const LOCK_RETRY_MS = 25;
 const LOCK_TIMEOUT_MS = 30_000;
 const LOCK_STALE_AGE_MS = 30_000;
 const LOCK_OWNERLESS_STALE_AGE_MS = 120_000;
+const LOCK_OWNERLESS_WRITE_WINDOW_MS = 250;
 const LOCK_WAIT_BUFFER = new Int32Array(new SharedArrayBuffer(4));
 const heldLocks = new Map<string, number>();
 const HOSTNAME = hostname().toLowerCase();
@@ -38,6 +39,22 @@ interface SessionLockMetadata extends LockIdentity {
 	raw: string | null;
 	mtimeMs: number;
 }
+
+export type SessionLockObservation = {
+	present: boolean;
+	active: boolean;
+	parsed: boolean;
+	pid: number | null;
+	host: string | null;
+	reason:
+		| "absent"
+		| "active"
+		| "ownerless-write-window"
+		| "foreign"
+		| "dead"
+		| "stale"
+		| "malformed";
+};
 
 function sleepSync(ms: number): void {
 	if (ms <= 0) {
@@ -276,6 +293,94 @@ function shouldRecoverStaleLock(
 		return null;
 	}
 	return metadata;
+}
+
+function observationFromMetadata(
+	metadata: SessionLockMetadata | null,
+): SessionLockObservation {
+	if (metadata === null) {
+		return {
+			present: false,
+			active: false,
+			parsed: false,
+			pid: null,
+			host: null,
+			reason: "absent",
+		};
+	}
+	if (
+		metadata.isParsed &&
+		metadata.pid !== undefined &&
+		metadata.host === HOSTNAME &&
+		isProcessAlive(metadata.pid)
+	) {
+		return {
+			present: true,
+			active: true,
+			parsed: true,
+			pid: metadata.pid,
+			host: metadata.host,
+			reason: "active",
+		};
+	}
+	return {
+		present: true,
+		active: false,
+		parsed: metadata.isParsed,
+		pid: metadata.pid ?? null,
+		host: metadata.host ?? null,
+		reason:
+			metadata.isParsed &&
+			metadata.host !== undefined &&
+			metadata.host !== HOSTNAME
+				? "foreign"
+				: metadata.isParsed && metadata.pid !== undefined
+					? "dead"
+					: "malformed",
+	};
+}
+
+/**
+ * Observe a session lock without acquiring, reclaiming, or otherwise mutating it.
+ * A just-created ownerless file is sampled briefly to cover the writer's
+ * create-then-write window; old malformed/dead locks remain inactive so they
+ * cannot hide a required projection rebuild.
+ */
+export function observeSessionLock(
+	root: string,
+	session: string,
+): SessionLockObservation {
+	const lockPath = resolveSessionLockPath(root, session);
+	if ((heldLocks.get(lockPath) ?? 0) > 0) {
+		return {
+			present: true,
+			active: true,
+			parsed: true,
+			pid: process.pid,
+			host: HOSTNAME,
+			reason: "active",
+		};
+	}
+	const first = readLockMetadata(lockPath);
+	const initial = observationFromMetadata(first);
+	if (initial.active || first === null) return initial;
+	if (first.isParsed && first.pid !== undefined) {
+		return initial;
+	}
+	const ageMs = Math.max(0, Date.now() - first.mtimeMs);
+	if (ageMs > LOCK_OWNERLESS_WRITE_WINDOW_MS) return initial;
+	for (let attempt = 0; attempt < 3; attempt += 1) {
+		sleepSync(LOCK_RETRY_MS);
+		const current = readLockMetadata(lockPath);
+		const observed = observationFromMetadata(current);
+		if (observed.active || !observed.present) return observed;
+		if (
+			current !== null &&
+			Date.now() - current.mtimeMs > LOCK_OWNERLESS_WRITE_WINDOW_MS
+		)
+			return observed;
+	}
+	return { ...initial, active: true, reason: "ownerless-write-window" };
 }
 
 function tryReclaimStaleLock(

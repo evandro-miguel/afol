@@ -39,7 +39,10 @@ import {
 	outputTail,
 	registrySummary,
 } from "../validate/output";
-import { validateRegistryContract } from "../validate/registry";
+import {
+	validateBenchmarkProvenance,
+	validateRegistryContract,
+} from "../validate/registry";
 import {
 	buildRuntimeLiveAgentResults,
 	collectThresholdNotes,
@@ -141,6 +144,60 @@ function createFixtureRoot(): string {
 		if (result.status !== 0) {
 			throw new Error(
 				result.stderr || result.stdout || `git ${args.join(" ")} failed`,
+			);
+		}
+	}
+	// The copied catalog may carry provenance from the source checkout. Rebind
+	// measured fixtures to this disposable repository so registry validation
+	// exercises the same ancestor/timestamp contract without trusting that hash.
+	const fixtureCommit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
+	const fixtureTimestamp = gitFixtureValue(root, [
+		"show",
+		"-s",
+		"--format=%cI",
+		fixtureCommit,
+	]);
+	const evolutionScenarioPath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"scenarios",
+		"evolution-core",
+		"evolution-status-contract.json",
+	);
+	const evolutionBaselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"evolution-core",
+		"baseline-v1.json",
+	);
+	if (existsSync(evolutionScenarioPath) && existsSync(evolutionBaselinePath)) {
+		const evolutionScenario = readJson(evolutionScenarioPath);
+		const measurement = evolutionScenario.measurement;
+		if (isObject(measurement)) {
+			evolutionScenario.measurement = {
+				...measurement,
+				git_commit: fixtureCommit,
+				timestamp: fixtureTimestamp,
+			};
+			writeFileSync(
+				evolutionScenarioPath,
+				`${JSON.stringify(evolutionScenario, null, 2)}\n`,
+				"utf8",
+			);
+			const evolutionBaseline = readJson(evolutionBaselinePath);
+			evolutionBaseline.git_commit = fixtureCommit;
+			evolutionBaseline.timestamp = fixtureTimestamp;
+			writeFileSync(
+				evolutionBaselinePath,
+				`${JSON.stringify(evolutionBaseline, null, 2)}\n`,
+				"utf8",
 			);
 		}
 	}
@@ -289,6 +346,60 @@ function getCliKernelPaths(root: string): {
 			"cli-kernel-local",
 			"cli-status-json.json",
 		),
+	};
+}
+
+function gitFixtureValue(root: string, args: string[]): string {
+	const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+	if (result.status !== 0) {
+		throw new Error(result.stderr || `git ${args.join(" ")} failed`);
+	}
+	return result.stdout.trim();
+}
+
+function createProvenanceFixtures(root: string): {
+	scenario: Scenario;
+	baseline: Baseline;
+	commitTime: Date;
+	commit: string;
+} {
+	const commit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
+	const commitTime = new Date(
+		gitFixtureValue(root, ["show", "-s", "--format=%cI", commit]),
+	);
+	const timestamp = commitTime.toISOString();
+	return {
+		scenario: {
+			schema_version: "1.0.0",
+			scenario_id: "provenance-fixture",
+			scenario_version: "1.0.0",
+			pack_id: "evolution-core",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_duration_ms: 1000 },
+			baseline_id: "provenance-fixture-v1",
+			deterministic_metrics: { duration_ms: 1 },
+			measurement: {
+				status: "observed",
+				source: "fixture",
+				sample_count: 3,
+				warmup_count: 1,
+				git_commit: commit,
+				timestamp,
+			},
+		},
+		baseline: {
+			baseline_id: "provenance-fixture-v1",
+			pack_id: "evolution-core",
+			schema_version: "1.0.0",
+			sample_count: 3,
+			warmup_count: 1,
+			git_commit: commit,
+			timestamp,
+			provenance: "fixture",
+		},
+		commitTime,
+		commit,
 	};
 }
 
@@ -466,6 +577,162 @@ describe("validate selector", () => {
 });
 
 describe("validate registry", () => {
+	test("accepts an observed baseline bound to an ancestor commit", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects missing and mismatched observed metadata", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const missing = {
+				...fixture.scenario,
+				measurement: { ...fixture.scenario.measurement, source: undefined },
+			} as unknown as Scenario;
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					missing,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-missing:evolution-core:provenance-fixture:measurement.source",
+			);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					{ ...fixture.baseline, sample_count: 4 },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-mismatch:evolution-core:provenance-fixture:sample_count",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects unknown and non-ancestor commits", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const unknownCommit = "f".repeat(40);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					{
+						...fixture.scenario,
+						measurement: {
+							...fixture.scenario.measurement,
+							git_commit: unknownCommit,
+						},
+					},
+					{ ...fixture.baseline, git_commit: unknownCommit },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				`benchmark-provenance-commit-not-found:evolution-core:provenance-fixture:${unknownCommit}`,
+			);
+
+			const orphan = gitFixtureValue(root, ["mktree"]);
+			const nonAncestor = spawnSync("git", ["commit-tree", orphan], {
+				cwd: root,
+				encoding: "utf8",
+				input: "non-ancestor\n",
+			}).stdout.trim();
+			expect(nonAncestor).toMatch(/^[0-9a-f]{40}$/);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					{
+						...fixture.scenario,
+						measurement: {
+							...fixture.scenario.measurement,
+							git_commit: nonAncestor,
+						},
+					},
+					{ ...fixture.baseline, git_commit: nonAncestor },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				`benchmark-provenance-commit-not-ancestor:evolution-core:provenance-fixture:${nonAncestor}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects timestamps before the recorded commit", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const beforeCommit = new Date(
+				fixture.commitTime.getTime() - 1_000,
+			).toISOString();
+			const issues = validateBenchmarkProvenance(
+				root,
+				{
+					...fixture.scenario,
+					measurement: {
+						...fixture.scenario.measurement,
+						timestamp: beforeCommit,
+					},
+				},
+				{ ...fixture.baseline, timestamp: beforeCommit },
+				new Date(fixture.commitTime.getTime() + 1_000),
+			);
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-timestamp-before-commit:evolution-core:provenance-fixture:measurement.timestamp",
+					"benchmark-provenance-timestamp-before-commit:evolution-core:provenance-fixture:baseline.timestamp",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects timestamps in the future", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const now = new Date(fixture.commitTime.getTime() + 1_000);
+			const future = new Date(now.getTime() + 1_000).toISOString();
+			const issues = validateBenchmarkProvenance(
+				root,
+				{
+					...fixture.scenario,
+					measurement: { ...fixture.scenario.measurement, timestamp: future },
+				},
+				{ ...fixture.baseline, timestamp: future },
+				now,
+			);
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-timestamp-future:evolution-core:provenance-fixture:measurement.timestamp",
+					"benchmark-provenance-timestamp-future:evolution-core:provenance-fixture:baseline.timestamp",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("loads the real catalog and flags contract issues", () => {
 		const root = createFixtureRoot();
 		try {

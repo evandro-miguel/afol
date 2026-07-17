@@ -17,7 +17,7 @@ import {
 	readProductionDayJournal,
 	resolveEvolutionConfig,
 } from "../services/evolution";
-import { resolveSessionLockPath } from "../services/io/session-lock";
+import { observeSessionLock } from "../services/io/session-lock";
 import { readProjectConfig } from "../services/project/paths";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -89,13 +89,13 @@ function statusState(
 	dbNeedsRebuild: boolean,
 	journalExists: boolean,
 	journalValid: boolean | null,
-	journalLockPresent: boolean,
+	journalLockActive: boolean,
 ): EvolutionStatusState {
 	if (!configured) return "legacy_unconfigured";
 	if (!enabled) return "disabled";
 	if (!projectId) return "needs_project_id";
 	if (journalExists && journalValid === false) return "unhealthy";
-	if (dbNeedsRebuild && journalLockPresent) return "reconciling";
+	if (dbNeedsRebuild && journalLockActive) return "reconciling";
 	if (!dbExists && journalExists && journalValid === true)
 		return "rebuild_required";
 	if (!dbExists) return "ready_uninitialized";
@@ -107,11 +107,10 @@ function statusState(
 function buildStatus(projectRoot: string): EvolutionStatusData {
 	assertSafeEvolutionProjectRoot(projectRoot);
 	const resolved = resolveEvolutionConfig(readProjectConfig(projectRoot));
-	const journalLockPath = resolveSessionLockPath(
+	const journalLockActiveBefore = observeSessionLock(
 		projectRoot,
 		"__evolution-journal__",
-	);
-	const journalLockPresentBefore = existsSync(journalLockPath);
+	).active;
 	const dbPath = evolutionDbPath(projectRoot, resolved.paths.evolutionDb);
 	const journalPath =
 		resolved.configured && resolved.projectId
@@ -147,8 +146,9 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 		dbHealth?.findings.length === 1 &&
 		dbHealth.findings[0]?.severity === "fail" &&
 		dbHealth.findings[0]?.message.includes("projection differs");
-	const journalLockPresent =
-		journalLockPresentBefore || existsSync(journalLockPath);
+	const journalLockActive =
+		journalLockActiveBefore ||
+		observeSessionLock(projectRoot, "__evolution-journal__").active;
 	const state = statusState(
 		resolved.configured,
 		resolved.enabled,
@@ -158,7 +158,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 		dbNeedsRebuild,
 		journalExists,
 		journalValid,
-		journalLockPresent,
+		journalLockActive,
 	);
 	return {
 		configured: resolved.configured,

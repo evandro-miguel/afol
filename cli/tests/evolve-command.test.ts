@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import {
 	copyFileSync,
 	existsSync,
@@ -9,7 +10,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runEvolveCommand } from "../commands/evolve";
 import { kernelRegistry } from "../registry";
@@ -134,6 +135,29 @@ function captureIo() {
 	};
 }
 
+async function holdChildSessionLock(root: string, session: string) {
+	const lockPath = resolveSessionLockPath(root, session);
+	const child = spawn(
+		process.execPath,
+		[
+			"-e",
+			`const fs=require("node:fs"); const os=require("node:os"); fs.mkdirSync(${JSON.stringify(dirname(lockPath))},{recursive:true}); fs.writeFileSync(${JSON.stringify(lockPath)}, JSON.stringify({pid:process.pid,host:os.hostname().toLowerCase(),acquired_at:new Date().toISOString(),session:${JSON.stringify(session)}})+"\\n"); process.stdout.write("ready\\n"); setInterval(()=>{},1000);`,
+		],
+		{ stdio: ["ignore", "pipe", "pipe"] },
+	);
+	await new Promise<void>((resolve, reject) => {
+		const onData = (chunk: Buffer | string) => {
+			if (String(chunk).includes("ready")) {
+				child.stdout.off("data", onData);
+				resolve();
+			}
+		};
+		child.stdout.on("data", onData);
+		child.once("error", reject);
+	});
+	return { child, lockPath };
+}
+
 describe("evolve status", () => {
 	test("is registered and routes through the subcommand group", () => {
 		expect(
@@ -191,26 +215,18 @@ describe("evolve status", () => {
 		}
 	});
 
-	test("reports reconciling while a writer lock outlives projection retries", async () => {
+	test("reports reconciling while a child writer lock is active", async () => {
 		const root = fixture();
+		let child: ReturnType<typeof spawn> | null = null;
 		try {
 			const db = openSeededProductionDb(root, PROJECT_ID);
 			db.query("UPDATE production_days SET qualifying_events = ?").run(
 				JSON.stringify(["E-status", "E-concurrent-writer"]),
 			);
 			db.close();
-			const lockPath = resolveSessionLockPath(root, "__evolution-journal__");
-			mkdirSync(dirname(lockPath), { recursive: true });
-			writeFileSync(
-				lockPath,
-				`${JSON.stringify({
-					pid: process.pid,
-					host: "local-test-writer",
-					acquired_at: new Date().toISOString(),
-					session: "__evolution-journal__",
-				})}\n`,
-				"utf8",
-			);
+			const held = await holdChildSessionLock(root, "__evolution-journal__");
+			child = held.child;
+			const lockPath = held.lockPath;
 			const before = readFileSync(lockPath);
 			const beforeStat = statSync(lockPath);
 			Bun.sleepSync(100);
@@ -225,6 +241,40 @@ describe("evolve status", () => {
 			expect(afterStat.ino).toBe(beforeStat.ino);
 			expect(afterStat.mtimeMs).toBe(beforeStat.mtimeMs);
 		} finally {
+			child?.kill();
+			await new Promise<void>(
+				(resolve) => child?.once("exit", () => resolve()) ?? resolve(),
+			);
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("does not let a stale dead lock mask rebuild_required", async () => {
+		const root = fixture();
+		try {
+			const db = openSeededProductionDb(root, PROJECT_ID);
+			db.query("UPDATE production_days SET qualifying_events = ?").run(
+				JSON.stringify(["E-status", "E-stale-lock"]),
+			);
+			db.close();
+			const lockPath = resolveSessionLockPath(root, "__evolution-journal__");
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(
+				lockPath,
+				`${JSON.stringify({
+					pid: 999_999_999,
+					host: hostname().toLowerCase(),
+					acquired_at: new Date(Date.now() - 240_000).toISOString(),
+				})}\n`,
+				"utf8",
+			);
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({ state: "rebuild_required" });
+		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
@@ -236,13 +286,24 @@ describe("evolve status", () => {
 			"\\\\.\\PhysicalDrive0",
 			"C:\\project\\state.db:stream",
 			"C:relative-project",
+			"C:\\project\\CON",
+			"C:\\project\\con.txt",
+			"C:\\project\\AUX.",
+			"C:\\project\\LPT9 ",
+			"C:\\project\\COM1 .txt",
 		]) {
 			expect(() => assertSafeEvolutionProjectRoot(root)).toThrow(
-				/evolution project root must not use/,
+				/evolution project root must not (use|contain)/,
 			);
 		}
 		expect(() => assertSafeEvolutionProjectRoot("C:\\project")).not.toThrow();
 		expect(() => assertSafeEvolutionProjectRoot("C:/project")).not.toThrow();
+		expect(() =>
+			assertSafeEvolutionProjectRoot("C:\\project\\context"),
+		).not.toThrow();
+		expect(() =>
+			assertSafeEvolutionProjectRoot("C:\\project\\COM10"),
+		).not.toThrow();
 	});
 
 	test("fails closed for an invalid configured timezone", async () => {

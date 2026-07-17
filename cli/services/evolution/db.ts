@@ -13,6 +13,8 @@ import { applyMigrations } from "./migrations";
 export const EVOLUTION_DB_RELATIVE_PATH = ".afol/state/evolution.db";
 const BUSY_TIMEOUT_MS = 5000;
 const BUSY_RETRY_MS = 25;
+const WINDOWS_RESERVED_DEVICE_NAMES =
+	/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
 
 type EvolutionFileStat = NonNullable<ReturnType<typeof lstatSync>>;
 
@@ -41,6 +43,19 @@ export function assertSafeEvolutionProjectRoot(root: string): void {
 			throw new Error(
 				"evolution project root must not use drive-relative or ADS path syntax",
 			);
+	}
+	const withoutDrive = normalized.replace(/^[A-Za-z]:[\\/]?/, "");
+	for (const component of withoutDrive.split(/[\\/]+/)) {
+		const normalizedComponent = component.replace(/[ .]+$/, "");
+		const deviceName = (normalizedComponent.split(".", 1)[0] ?? "").replace(
+			/[ .]+$/,
+			"",
+		);
+		if (WINDOWS_RESERVED_DEVICE_NAMES.test(deviceName)) {
+			throw new Error(
+				"evolution project root must not contain Windows reserved device components",
+			);
+		}
 	}
 }
 

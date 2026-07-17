@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
+import { boundedSpawn } from "../core/subprocess";
 import { kernelRegistry } from "../registry";
 import {
 	asNumberRecord,
@@ -20,6 +21,7 @@ import {
 	type RegistrySnapshot,
 	type Scenario,
 	type ScenarioCoverage,
+	type ScenarioMeasurement,
 	type ToolCoverageExemption,
 	type ToolCoveragePolicy,
 	type ToolSubcommandCoverageExemption,
@@ -54,6 +56,7 @@ const SPEC_STATUSES = [
 	"review",
 	"superseded",
 ] as const;
+const GIT_PROVENANCE_TIMEOUT_MS = 5_000;
 
 function parsePackId(value: unknown, key: string): PackId {
 	const packId = asString(value, key);
@@ -219,6 +222,44 @@ function parseScenario(
 	if (liveRunnerScenarioId !== undefined) {
 		scenario.live_runner_scenario_id = liveRunnerScenarioId;
 	}
+	const measurementRaw = asOptionalObject(
+		data.measurement,
+		`${sourcePath}.measurement`,
+	);
+	if (measurementRaw !== undefined) {
+		const measurement: ScenarioMeasurement = {};
+		const status = asOptionalString(
+			measurementRaw.status,
+			`${sourcePath}.measurement.status`,
+		);
+		const source = asOptionalString(
+			measurementRaw.source,
+			`${sourcePath}.measurement.source`,
+		);
+		const sampleCount = asOptionalNumber(
+			measurementRaw.sample_count,
+			`${sourcePath}.measurement.sample_count`,
+		);
+		const warmupCount = asOptionalNumber(
+			measurementRaw.warmup_count,
+			`${sourcePath}.measurement.warmup_count`,
+		);
+		const gitCommit = asOptionalString(
+			measurementRaw.git_commit,
+			`${sourcePath}.measurement.git_commit`,
+		);
+		const timestamp = asOptionalString(
+			measurementRaw.timestamp,
+			`${sourcePath}.measurement.timestamp`,
+		);
+		if (status !== undefined) measurement.status = status;
+		if (source !== undefined) measurement.source = source;
+		if (sampleCount !== undefined) measurement.sample_count = sampleCount;
+		if (warmupCount !== undefined) measurement.warmup_count = warmupCount;
+		if (gitCommit !== undefined) measurement.git_commit = gitCommit;
+		if (timestamp !== undefined) measurement.timestamp = timestamp;
+		scenario.measurement = measurement;
+	}
 	return scenario;
 }
 
@@ -248,6 +289,28 @@ function parseBaseline(
 	if (timingP95 !== undefined) {
 		baseline.timing_p95_ms = timingP95;
 	}
+	const sampleCount = asOptionalNumber(
+		data.sample_count,
+		`${sourcePath}.sample_count`,
+	);
+	const warmupCount = asOptionalNumber(
+		data.warmup_count,
+		`${sourcePath}.warmup_count`,
+	);
+	const gitCommit = asOptionalString(
+		data.git_commit,
+		`${sourcePath}.git_commit`,
+	);
+	const timestamp = asOptionalString(data.timestamp, `${sourcePath}.timestamp`);
+	const provenance = asOptionalString(
+		data.provenance,
+		`${sourcePath}.provenance`,
+	);
+	if (sampleCount !== undefined) baseline.sample_count = sampleCount;
+	if (warmupCount !== undefined) baseline.warmup_count = warmupCount;
+	if (gitCommit !== undefined) baseline.git_commit = gitCommit;
+	if (timestamp !== undefined) baseline.timestamp = timestamp;
+	if (provenance !== undefined) baseline.provenance = provenance;
 	return baseline;
 }
 
@@ -921,6 +984,257 @@ function validateFeatureSpecCoverage(
 	}
 }
 
+interface GitProvenance {
+	exists: boolean;
+	ancestor: boolean;
+	commitTimeMs?: number;
+}
+
+const gitProvenanceCache = new Map<string, GitProvenance>();
+
+function runBoundedGit(projectRoot: string, args: string[]) {
+	return boundedSpawn("git", args, {
+		cwd: projectRoot,
+		timeoutMs: GIT_PROVENANCE_TIMEOUT_MS,
+		maxBuffer: 64 * 1024,
+	});
+}
+
+function readGitProvenance(projectRoot: string, commit: string): GitProvenance {
+	const head = runBoundedGit(projectRoot, ["rev-parse", "--verify", "HEAD"]);
+	const headKey = head.ok ? head.stdout.trim() : "<missing-head>";
+	const cacheKey = `${projectRoot}\0${commit}\0${headKey}`;
+	const cached = gitProvenanceCache.get(cacheKey);
+	if (cached !== undefined) {
+		return cached;
+	}
+	const commitObject = runBoundedGit(projectRoot, [
+		"cat-file",
+		"-e",
+		`${commit}^{commit}`,
+	]);
+	if (!commitObject.ok) {
+		const missing: GitProvenance = { exists: false, ancestor: false };
+		gitProvenanceCache.set(cacheKey, missing);
+		return missing;
+	}
+	const ancestor = runBoundedGit(projectRoot, [
+		"merge-base",
+		"--is-ancestor",
+		commit,
+		"HEAD",
+	]);
+	if (!ancestor.ok) {
+		const notAncestor: GitProvenance = { exists: true, ancestor: false };
+		gitProvenanceCache.set(cacheKey, notAncestor);
+		return notAncestor;
+	}
+	const timestamp = runBoundedGit(projectRoot, [
+		"show",
+		"-s",
+		"--format=%cI",
+		commit,
+	]);
+	const commitTimeMs = timestamp.ok
+		? Date.parse(timestamp.stdout.trim())
+		: Number.NaN;
+	const result: GitProvenance = {
+		exists: true,
+		ancestor: true,
+		...(Number.isFinite(commitTimeMs) ? { commitTimeMs } : {}),
+	};
+	gitProvenanceCache.set(cacheKey, result);
+	return result;
+}
+
+function validateTimestamp(
+	value: string | undefined,
+	label: string,
+	nowMs: number,
+	commitTimeMs: number | undefined,
+	issues: string[],
+): number | undefined {
+	if (value === undefined) {
+		issues.push(`benchmark-provenance-missing:${label}`);
+		return undefined;
+	}
+	const timestampMs = Date.parse(value);
+	if (!Number.isFinite(timestampMs)) {
+		issues.push(`benchmark-provenance-timestamp-invalid:${label}`);
+		return undefined;
+	}
+	if (timestampMs > nowMs) {
+		issues.push(`benchmark-provenance-timestamp-future:${label}`);
+	}
+	if (commitTimeMs !== undefined && timestampMs < commitTimeMs) {
+		issues.push(`benchmark-provenance-timestamp-before-commit:${label}`);
+	}
+	return timestampMs;
+}
+
+function validateSampleCount(
+	value: number | undefined,
+	label: string,
+	issues: string[],
+): void {
+	if (value === undefined) {
+		issues.push(`benchmark-provenance-missing:${label}`);
+		return;
+	}
+	if (!Number.isInteger(value) || value < 1) {
+		issues.push(`benchmark-provenance-sample-count-invalid:${label}`);
+	}
+}
+
+function validateWarmupCount(
+	value: number | undefined,
+	label: string,
+	issues: string[],
+): void {
+	if (value === undefined) {
+		issues.push(`benchmark-provenance-missing:${label}`);
+		return;
+	}
+	if (!Number.isInteger(value) || value < 0) {
+		issues.push(`benchmark-provenance-warmup-count-invalid:${label}`);
+	}
+}
+
+/**
+ * Validate the provenance contract for an observed benchmark measurement.
+ * This is intentionally separate from registry shape checks so tests and
+ * tooling can exercise the Git/time invariants without loading the catalog.
+ */
+export function validateBenchmarkProvenance(
+	projectRoot: string | undefined,
+	scenario: Scenario,
+	baseline: Baseline,
+	now: Date = new Date(),
+): string[] {
+	const measurement = scenario.measurement;
+	if (measurement === undefined) {
+		return [];
+	}
+	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
+	const issues: string[] = [];
+	if (baseline.baseline_id !== scenario.baseline_id) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:baseline_id`);
+	}
+	if (baseline.pack_id !== scenario.pack_id) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:pack_id`);
+	}
+	if (measurement.status !== "observed") {
+		issues.push(
+			`benchmark-provenance-status-invalid:${prefix}:${measurement.status ?? "missing"}`,
+		);
+	}
+	if (measurement.source === undefined) {
+		issues.push(`benchmark-provenance-missing:${prefix}:measurement.source`);
+	}
+	if (baseline.provenance === undefined) {
+		issues.push(`benchmark-provenance-missing:${prefix}:baseline.provenance`);
+	} else if (
+		measurement.source !== undefined &&
+		baseline.provenance !== measurement.source
+	) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:provenance`);
+	}
+	validateSampleCount(
+		measurement.sample_count,
+		`${prefix}:measurement.sample_count`,
+		issues,
+	);
+	validateSampleCount(
+		baseline.sample_count,
+		`${prefix}:baseline.sample_count`,
+		issues,
+	);
+	validateWarmupCount(
+		measurement.warmup_count,
+		`${prefix}:measurement.warmup_count`,
+		issues,
+	);
+	validateWarmupCount(
+		baseline.warmup_count,
+		`${prefix}:baseline.warmup_count`,
+		issues,
+	);
+	for (const [field, measured, recorded] of [
+		["sample_count", measurement.sample_count, baseline.sample_count],
+		["warmup_count", measurement.warmup_count, baseline.warmup_count],
+	] as const) {
+		if (
+			measured !== undefined &&
+			recorded !== undefined &&
+			measured !== recorded
+		) {
+			issues.push(`benchmark-provenance-mismatch:${prefix}:${field}`);
+		}
+	}
+	if (measurement.git_commit === undefined) {
+		issues.push(
+			`benchmark-provenance-missing:${prefix}:measurement.git_commit`,
+		);
+	}
+	if (baseline.git_commit === undefined) {
+		issues.push(`benchmark-provenance-missing:${prefix}:baseline.git_commit`);
+	}
+	if (
+		measurement.git_commit !== undefined &&
+		baseline.git_commit !== undefined &&
+		measurement.git_commit !== baseline.git_commit
+	) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:git_commit`);
+	}
+	const commit = measurement.git_commit ?? baseline.git_commit;
+	let git: GitProvenance | undefined;
+	if (commit !== undefined) {
+		if (!/^[0-9a-f]{7,40}$/i.test(commit)) {
+			issues.push(`benchmark-provenance-commit-invalid:${prefix}:${commit}`);
+		} else if (projectRoot === undefined) {
+			issues.push(`benchmark-provenance-project-root-missing:${prefix}`);
+		} else {
+			git = readGitProvenance(projectRoot, commit);
+			if (!git.exists) {
+				issues.push(
+					`benchmark-provenance-commit-not-found:${prefix}:${commit}`,
+				);
+			} else if (!git.ancestor) {
+				issues.push(
+					`benchmark-provenance-commit-not-ancestor:${prefix}:${commit}`,
+				);
+			}
+		}
+	}
+	const nowMs = now.getTime();
+	if (!Number.isFinite(nowMs)) {
+		issues.push(`benchmark-provenance-now-invalid:${prefix}`);
+		return issues;
+	}
+	const measurementTimestampMs = validateTimestamp(
+		measurement.timestamp,
+		`${prefix}:measurement.timestamp`,
+		nowMs,
+		git?.commitTimeMs,
+		issues,
+	);
+	const baselineTimestampMs = validateTimestamp(
+		baseline.timestamp,
+		`${prefix}:baseline.timestamp`,
+		nowMs,
+		git?.commitTimeMs,
+		issues,
+	);
+	if (
+		measurementTimestampMs !== undefined &&
+		baselineTimestampMs !== undefined &&
+		measurementTimestampMs !== baselineTimestampMs
+	) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:timestamp`);
+	}
+	return issues;
+}
+
 export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 	const issues: string[] = [];
 	for (const packId of REQUIRED_PACKS) {
@@ -964,6 +1278,15 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 		if (baseline.schema_version !== VALIDATION_SCHEMA_VERSION) {
 			issues.push(
 				`baseline-schema-version-mismatch:${packId}:${baseline.schema_version}`,
+			);
+		}
+		for (const scenario of scenarios) {
+			issues.push(
+				...validateBenchmarkProvenance(
+					snapshot.projectRoot,
+					scenario,
+					baseline,
+				),
 			);
 		}
 	}

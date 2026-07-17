@@ -32,6 +32,15 @@ export interface ScenarioCoverage {
 	specs?: string[];
 }
 
+export interface ScenarioMeasurement {
+	status?: string;
+	source?: string;
+	sample_count?: number;
+	warmup_count?: number;
+	git_commit?: string;
+	timestamp?: string;
+}
+
 export interface Scenario {
 	schema_version: string;
 	scenario_id: string;
@@ -50,6 +59,7 @@ export interface Scenario {
 	implementation_status?: "implemented" | "planned" | "skipped";
 	live_runner_scenario_id?: string;
 	compiled_binary?: boolean;
+	measurement?: ScenarioMeasurement;
 }
 
 export interface ToolCoverageExemption {
@@ -100,6 +110,11 @@ export interface Baseline {
 	schema_version: string;
 	timing_p50_ms?: number;
 	timing_p95_ms?: number;
+	sample_count?: number;
+	warmup_count?: number;
+	git_commit?: string;
+	timestamp?: string;
+	provenance?: string;
 }
 
 export interface PackMetadata {
