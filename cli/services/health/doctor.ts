@@ -1,3 +1,5 @@
+import { resolveEvolutionConfig } from "../evolution";
+import { readProjectConfig } from "../project/paths";
 import { checkHealth } from "./checker";
 import type {
 	DoctorReport,
@@ -14,6 +16,7 @@ const AREAS: readonly HealthArea[] = [
 	"library",
 	"state",
 	"ctx",
+	"evolution",
 	"token_budget",
 ];
 
@@ -60,10 +63,32 @@ function remediationAction(finding: HealthFinding): string {
 			return "rehydrate the affected session state";
 		case "ctx":
 			return "rebuild the section index";
+		case "evolution":
+			return "run afol evolve status and repair the reported derived state";
 		case "token_budget":
 			return "prune or split section sources";
 		default:
 			return "review the reported area";
+	}
+}
+
+function evolutionConfiguration(root: string): Record<string, unknown> {
+	try {
+		const config = resolveEvolutionConfig(readProjectConfig(root));
+		return {
+			valid: true,
+			configured: config.configured,
+			enabled: config.enabled,
+			project_id: config.projectId,
+			timezone: config.timezone,
+			paths: config.paths,
+			settings: config.settings,
+		};
+	} catch (error) {
+		return {
+			valid: false,
+			error: (error as Error).message,
+		};
 	}
 }
 
@@ -90,5 +115,9 @@ export function runDoctor(root: string): DoctorReport {
 			severity: finding.severity,
 		}));
 
-	return { scores, remediation };
+	return {
+		configuration: { evolution: evolutionConfiguration(root) },
+		scores,
+		remediation,
+	};
 }

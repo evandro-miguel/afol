@@ -11,6 +11,7 @@ import {
 	readClaudeAdapterEnabled,
 } from "../adapter/claude";
 import { resolveAdmPaths } from "../adm";
+import { validateEvolutionConfigExtension } from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
 	validateFilesIndex,
@@ -77,6 +78,14 @@ function validateConfig(projectRoot: string): ProjectValidationCheck {
 					id: "config",
 					ok: false,
 					message: `${resolved.absolutePath}: ${skillPathError}`,
+				};
+			}
+			const evolutionIssues = validateEvolutionConfigExtension(loaded.value);
+			if (evolutionIssues.length > 0) {
+				return {
+					id: "config",
+					ok: false,
+					message: `${resolved.absolutePath}: ${evolutionIssues.join("; ")}`,
 				};
 			}
 			return {

@@ -25,6 +25,7 @@ const AREAS = new Set<HealthArea>([
 	"library",
 	"state",
 	"ctx",
+	"evolution",
 	"token_budget",
 ]);
 const ALL_AREAS: readonly HealthArea[] = [
@@ -35,6 +36,7 @@ const ALL_AREAS: readonly HealthArea[] = [
 	"library",
 	"state",
 	"ctx",
+	"evolution",
 	"token_budget",
 ];
 const CORE_AREAS: readonly HealthArea[] = ["wb"];

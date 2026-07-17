@@ -15,6 +15,7 @@ import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
 import { runDbCommand } from "./commands/db";
 import { runDoctorCommand } from "./commands/doctor";
+import { runEvolveCommand } from "./commands/evolve";
 import { runFeedbackCommand } from "./commands/feedback";
 import { runFileCommand } from "./commands/file";
 import { runGovernanceCommand } from "./commands/governance";
@@ -159,6 +160,7 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"ctx",
 	"library",
 	"memory",
+	"evolve",
 	"state",
 	"adapter",
 	"telemetry",
@@ -668,6 +670,13 @@ export async function main(argv: string[]): Promise<number> {
 				project.value.root,
 				undefined,
 				operationCtx,
+			);
+		}
+		if (resolution.group === "evolve") {
+			return runEvolveCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
 			);
 		}
 		if (resolution.group === "state") {

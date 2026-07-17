@@ -43,7 +43,8 @@
 			"telemetry",
 			"session",
 			"transition",
-			"feedback"
+			"feedback",
+			"evolve"
 		],
 		"subcommands": [
 			"status --json",
@@ -167,6 +168,7 @@
 			"feedback annotate --note <text>",
 			"feedback purge --confirm",
 			"feedback last -m <text>",
+			"evolve status [--json]",
 			"done -- <argv...>"
 		],
 		"journeys": [

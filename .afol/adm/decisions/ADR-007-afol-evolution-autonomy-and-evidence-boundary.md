@@ -125,8 +125,9 @@ blocks the operation and leaves it at proposal/preview state.
    and recreated (ABA). Production-day event dedupe and ordinal allocation use
    the same transactional rule. Clock/time-zone changes fail closed or require
    an explicit reconciliation.
-5. **Immutable evidence journal.** `.afol/data/events/evolution/**` is the
-   append-only canonical authority for import acceptance/digests, links,
+5. **Append-only, tamper-evident evidence journal.**
+   `.afol/data/events/evolution/**` is the AFOL append-only canonical source for
+   import acceptance/digests, links,
    observations, proposals, receipt claims/decisions, production-day ordinal
    allocation, approvals, mutations, evaluations, rollbacks, and tombstones.
    Each event has stable sequence/id, action, actor, caller/trust/authority
@@ -134,11 +135,16 @@ blocks the operation and leaves it at proposal/preview state.
    payload, payload/event digests, and source refs. Approval and rollback
    events also bind the exact proposal digest. Receipt claims/shown events may
    use observer authority; receipt decisions and manual link confirmations
-   require explicit project-user authority. Existing entries are not rewritten;
-   journal-backed derived projections retain the originating
-   `journal_event_id`; derived projections
-   may be rebuilt only from this journal and must retain its sequence and
-   digests. Undo records a compensating event, not silent deletion.
+   require explicit project-user authority. Journal-backed derived projections
+   retain the originating `journal_event_id`;
+   derived projections may be rebuilt only from this journal and must retain
+   its sequence and digests. AFOL readers use the hash chain to detect
+   corruption or edits within the local trust boundary. A writer with access
+   to the project root can rewrite or truncate the file and recompute the
+   digests, so this is not immutable storage or authenticity against a
+   malicious local writer and never authorizes a critical change. Existing
+   entries are not rewritten by AFOL; undo records a compensating event, not
+   silent deletion.
 6. **Conservative project linking.** An `auto_verified` link requires both the
    local project UUID and a commit verified in the current repository. A
    `manual_confirmed` link requires a canonical decision reference. A
@@ -209,7 +215,7 @@ blocks the operation and leaves it at proposal/preview state.
 | Secrets in messages, paths, errors, WAL, or exports | Redact before every persistence/logging boundary; fail closed on redaction failure | Do not retain plaintext; report only path/key metadata |
 | Symlink/reparse/UNC/ADS/device escape | Canonicalize before open, no-follow, regular-file and root-identity checks; reject unsafe Windows forms | Import fails closed |
 | Cross-project contamination | Require local project UUID plus a commit verified in the current repository; ambiguous links stay unlinked | Explicit user confirmation |
-| Duplicate/replayed import | Manifest content digest, adapter version, idempotency key, and immutable journal | Reuse prior normalized result |
+| Duplicate/replayed import | Manifest content digest, adapter version, idempotency key, and append-only hash-linked journal (local tamper evidence only) | Reuse prior normalized result |
 | Partial/crashed import | Temp transaction, checkpoint cursor, atomic commit, and resumable journal sequence | Incomplete derived cache is disposable |
 | Receipt race, expiry, or ABA | Local-date key, TTL, owner/fence token, monotonic generation, and compare-and-swap acknowledgement | Stale writer loses without mutation |
 | Malicious or oversized input | Streaming parser and bounded bytes/records/fields/nesting; reject unknown format | No partial policy/state promotion |
@@ -250,9 +256,11 @@ durable command output linked from the governing F-30 workbench report:
   a proposal.
 - Ambiguous and cross-project links remain unlinked; high-confidence links
   include deterministic evidence and never create preferences by implication.
-- Journal entries have stable sequence/digests, append-only verification,
-  compensating undo records, and rebuildable derived indexes. Purge creates a
-  tombstone and stale caches cannot resurrect the record.
+- Journal entries have stable sequence/digests, append-only verification within
+  the local trust boundary, compensating undo records, and rebuildable derived
+  indexes. Hash-chain verification is not authenticity against a project-root
+  writer and never authorizes a critical change. Purge creates a tombstone and
+  stale caches cannot resurrect the record.
 - Rules, skills, configuration, specs, ADRs, roadmap, `AGENTS.md`, code,
   global preferences, and canonical deletion remain unchanged after preview,
   reject, and failed validation. A bounded low-risk canary rolls back on a

@@ -1469,13 +1469,14 @@ describe("validation command family", () => {
 		expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
 	}, 10000);
 
-	test("registry contract remains complete for the fifteen-pack matrix", () => {
+	test("registry contract remains complete for the sixteen-pack matrix", () => {
 		const proc = runKernel(["v", "select", "--json"]);
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		const registry = payload.registry as Array<Record<string, unknown>>;
 		expect(registry.map((entry) => entry.pack_id)).toEqual([
 			"cli-kernel-local",
+			"evolution-core",
 			"routing-accuracy",
 			"mutation-safety",
 			"update-safety",

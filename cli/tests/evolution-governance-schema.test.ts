@@ -131,7 +131,14 @@ describe("Evolution Slice 0 governance schema", () => {
 		const current = JSON.parse(
 			readFileSync(join(root, ".afol", "config.json"), "utf8"),
 		);
+		const template = JSON.parse(
+			readFileSync(
+				join(root, "src", "project-template", ".afol", "config.json"),
+				"utf8",
+			),
+		);
 		expect(validate?.(current)).toBe(true);
+		expect(validate?.(template)).toBe(true);
 		expect(validate?.(projectConfig())).toBe(true);
 	});
 

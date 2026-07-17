@@ -76,6 +76,7 @@ afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
 afol close --session <session-id> --summary "<summary>"
 afol governance pending --json
 afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
+afol evolve status --json
 afol update check
 afol update preview
 afol update apply --dry-run

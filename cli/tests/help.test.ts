@@ -36,6 +36,7 @@ describe("help formatter", () => {
 		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
+		expect(help).toContain("evolve[read] - evolution status");
 		expect(help).toContain(
 			"pb/project-benchmark[generated] - compare references",
 		);
@@ -67,6 +68,7 @@ describe("help formatter", () => {
 		expect(planning).toContain("Commands for planning");
 		expect(planning).toContain("pf/preflight");
 		expect(planning).toContain("pb/project-benchmark");
+		expect(planning).toContain("evolve");
 		expect(planning).not.toContain("qt/quick-task");
 		expect(execution).toContain("Commands for execution");
 		expect(execution).toContain("n/new");
@@ -93,7 +95,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(380);
+		expect(lines.length).toBeLessThanOrEqual(390);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -439,6 +441,7 @@ describe("help formatter", () => {
 				"pstr",
 				"adm",
 				"project-benchmark",
+				"evolve",
 			]),
 		);
 		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(

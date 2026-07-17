@@ -376,7 +376,7 @@ describe("validate output helpers", () => {
 		expect(outputTail("x".repeat(4100))).toBe("x".repeat(4000));
 
 		const summary = registrySummary(snapshot);
-		expect(summary).toHaveLength(15);
+		expect(summary).toHaveLength(16);
 		expect(summary[0]).toMatchObject({
 			pack_id: "cli-kernel-local",
 			min_scenarios: 6,
@@ -431,9 +431,20 @@ describe("validate selector", () => {
 			]),
 		);
 
+		expect(
+			selectPacks({
+				scope: "default",
+				changedPaths: ["cli/services/evolution/journal.ts"],
+			}),
+		).toEqual({
+			selected_pack_ids: ["evolution-core"],
+			reasons: ["evolution-change:cli/services/evolution/journal.ts"],
+		});
+
 		expect(selectPacks({ scope: "default", changedPaths: [] })).toEqual({
 			selected_pack_ids: [
 				"cli-kernel-local",
+				"evolution-core",
 				"routing-accuracy",
 				"mutation-safety",
 				"update-safety",
@@ -460,7 +471,7 @@ describe("validate registry", () => {
 		try {
 			const snapshot = loadRegistry(root);
 			expect(snapshot.schema_version).toBe("1.0.0");
-			expect(snapshot.packs).toHaveLength(15);
+			expect(snapshot.packs).toHaveLength(16);
 			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["pstr-integrity"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);

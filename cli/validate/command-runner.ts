@@ -18,6 +18,18 @@ const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
 			],
 		},
 	],
+	"evolution-core": [
+		{ command: ["bun", "run", "typecheck"] },
+		{
+			command: [
+				"bun",
+				"test",
+				"cli/tests/evolution-core.test.ts",
+				"cli/tests/evolve-command.test.ts",
+				"cli/tests/evolution-legacy-migration.test.ts",
+			],
+		},
+	],
 	"routing-accuracy": [
 		{
 			command: [

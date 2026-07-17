@@ -201,6 +201,7 @@ coverage when the command changes or a production incident exposes a weak path:
 | `afol render` | Compatibility agent uses deprecated memory render alias. | scripted alias fixture. | Alias warns/delegates without reviving retired surfaces. |
 | `afol library` | Research agent searches and shows source-backed library entries. | scripted library pack plus live research/library scenario. | Claims include source/freshness, or stale claims warn. |
 | `afol memory` | Memory agent recalls, proposes, archives, and renders memory. | scripted memory pack plus live memory scenario. | Memory operations preserve provenance and require review for cleanup. |
+| `afol evolve` | Operator inspects the project-local evolution foundation. | dedicated `evolution-core` pack with a multi-state runnable status smoke. | Status is read-only, compact, migration-aware, rejects copied cross-project state, and never creates the derived DB. |
 | `afol adm` | Maintainer inspects AFOL administration paths. | scripted adm paths/show/validate. | Output separates `.afol/adm`, `.afol/pstr`, `.afol/wb`, and mutable data. |
 | `afol spec` | Agent searches, checks, and waives spec contracts. | governance-history pack plus live research scenario. | Spec links feature, parent, child, and expected validation. |
 | `afol ux` | Maintainer lists, validates, registers, and checks coverage for user journeys. | governance-history `ux-registry-lifecycle`. | List/show/validate/coverage/register dry-run pass, and maintenance warning journey is visible. |

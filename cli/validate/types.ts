@@ -3,6 +3,7 @@ export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
 
 export const REQUIRED_PACKS = [
 	"cli-kernel-local",
+	"evolution-core",
 	"routing-accuracy",
 	"mutation-safety",
 	"update-safety",

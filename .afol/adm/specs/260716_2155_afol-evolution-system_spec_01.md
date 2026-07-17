@@ -137,9 +137,13 @@ for project configuration.
 
 ### Canonical and derived state
 
-`.afol/data/events/evolution/**` is the append-only canonical event journal for
-receipt claims/decisions, production-day allocation, import acceptance/digests,
-links, proposals, approvals, mutations, evaluation, rollback, and tombstones.
+`.afol/data/events/evolution/**` is the AFOL append-only canonical event journal
+for receipt claims/decisions, production-day allocation, import
+acceptance/digests, links, proposals, approvals, mutations, evaluation,
+rollback, and tombstones. Entries are hash-linked and checked for local tamper
+evidence, but a project-root writer can rewrite or truncate the file and
+recompute the digests; this is not immutable storage or authenticity against a
+malicious local writer and never authorizes a critical change.
 `.afol/state/evolution.db`, receipt rows, clusters, scores, caches, and exports
 are derived projections. They may be rebuilt deterministically from the
 canonical journal plus existing AFOL canonical sources, and derived-state GC

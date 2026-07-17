@@ -17,6 +17,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 		return {
 			selected_pack_ids: [
 				"cli-kernel-local",
+				"evolution-core",
 				"routing-accuracy",
 				"mutation-safety",
 				"update-safety",
@@ -39,6 +40,17 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 	const reasons: string[] = [];
 	for (const changedPath of changedPaths) {
 		const normalizedPath = normalizePath(changedPath);
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/evolution/",
+				"cli/commands/evolve.ts",
+				"cli/dev/evolve-benchmark-smoke.ts",
+			])
+		) {
+			selected.add("evolution-core");
+			reasons.push(`evolution-change:${changedPath}`);
+			continue;
+		}
 		if (
 			hasPrefix(normalizedPath, ["cli/services/pstr/", "cli/commands/pstr"])
 		) {

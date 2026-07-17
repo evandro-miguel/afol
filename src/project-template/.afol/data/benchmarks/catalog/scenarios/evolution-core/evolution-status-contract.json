@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "evolution-status-contract",
+  "scenario_version": "1.0.0",
+  "pack_id": "evolution-core",
+  "command": "bun run cli/dev/evolve-benchmark-smoke.ts",
+  "sandbox": true,
+  "objective": "Prove Evolution status is runnable for uninitialized, healthy, and copied cross-project databases.",
+  "expected_result": "The smoke verifies ready_uninitialized without SQLite sidecars, healthy initialized state, and fail-closed cross-project state.",
+  "coverage": {
+    "commands": ["evolve"],
+    "subcommands": ["evolve status [--json]"],
+    "journeys": ["afol-evolution-system"],
+    "features": ["F-30"],
+    "specs": ["260716_2155_afol-evolution-system_spec_01"]
+  },
+  "expected_exit": 0,
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 1500,
+    "max_p95_ms": 1500,
+    "max_output_tokens": 250,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "evolution-core-v1",
+  "deterministic_metrics": {
+    "duration_ms": 254,
+    "timing_p50_ms": 254,
+    "timing_p95_ms": 262,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 17,
+    "context_bytes": 0,
+    "output_bytes": 67,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "measurement": {
+    "status": "observed",
+    "source": "fresh-local-runnable-smoke",
+    "sample_count": 3,
+    "warmup_count": 1,
+    "git_commit": "b9c52e9b18ae"
+  },
+  "implementation_status": "implemented"
+}
