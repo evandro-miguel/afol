@@ -16,7 +16,10 @@ import { dirname, join, relative } from "node:path";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectWritePath } from "../project/root";
 import { localDateForTimezone, validateEvolutionIdentity } from "./config";
-import { assertSafeEvolutionTarget } from "./db";
+import {
+	assertSafeEvolutionProjectRoot,
+	assertSafeEvolutionTarget,
+} from "./db";
 import { applyMigrations } from "./migrations";
 import {
 	allocateProductionDay,
@@ -102,6 +105,7 @@ export function productionDayJournalPath(
 	root: string,
 	eventsDir = ".afol/data/events/evolution",
 ): string {
+	assertSafeEvolutionProjectRoot(root);
 	const resolved = resolveProjectWritePath(root, eventsDir);
 	if (!resolved.ok) throw new Error(resolved.error);
 	return join(resolved.value.path, "production-day-allocations.jsonl");

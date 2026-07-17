@@ -7,6 +7,7 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import {
+	assertSafeEvolutionProjectRoot,
 	checkEvolutionDbHealth,
 	type EvolutionDbHealth,
 	type EvolutionStatus,
@@ -16,6 +17,7 @@ import {
 	readProductionDayJournal,
 	resolveEvolutionConfig,
 } from "../services/evolution";
+import { resolveSessionLockPath } from "../services/io/session-lock";
 import { readProjectConfig } from "../services/project/paths";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -24,6 +26,7 @@ type EvolutionStatusState =
 	| "healthy"
 	| "legacy_unconfigured"
 	| "needs_project_id"
+	| "reconciling"
 	| "rebuild_required"
 	| "ready_uninitialized"
 	| "unhealthy";
@@ -86,11 +89,13 @@ function statusState(
 	dbNeedsRebuild: boolean,
 	journalExists: boolean,
 	journalValid: boolean | null,
+	journalLockPresent: boolean,
 ): EvolutionStatusState {
 	if (!configured) return "legacy_unconfigured";
 	if (!enabled) return "disabled";
 	if (!projectId) return "needs_project_id";
 	if (journalExists && journalValid === false) return "unhealthy";
+	if (dbNeedsRebuild && journalLockPresent) return "reconciling";
 	if (!dbExists && journalExists && journalValid === true)
 		return "rebuild_required";
 	if (!dbExists) return "ready_uninitialized";
@@ -100,7 +105,13 @@ function statusState(
 }
 
 function buildStatus(projectRoot: string): EvolutionStatusData {
+	assertSafeEvolutionProjectRoot(projectRoot);
 	const resolved = resolveEvolutionConfig(readProjectConfig(projectRoot));
+	const journalLockPath = resolveSessionLockPath(
+		projectRoot,
+		"__evolution-journal__",
+	);
+	const journalLockPresentBefore = existsSync(journalLockPath);
 	const dbPath = evolutionDbPath(projectRoot, resolved.paths.evolutionDb);
 	const journalPath =
 		resolved.configured && resolved.projectId
@@ -136,6 +147,8 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 		dbHealth?.findings.length === 1 &&
 		dbHealth.findings[0]?.severity === "fail" &&
 		dbHealth.findings[0]?.message.includes("projection differs");
+	const journalLockPresent =
+		journalLockPresentBefore || existsSync(journalLockPath);
 	const state = statusState(
 		resolved.configured,
 		resolved.enabled,
@@ -145,6 +158,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 		dbNeedsRebuild,
 		journalExists,
 		journalValid,
+		journalLockPresent,
 	);
 	return {
 		configured: resolved.configured,

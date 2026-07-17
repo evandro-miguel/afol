@@ -4,20 +4,24 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runEvolveCommand } from "../commands/evolve";
 import { kernelRegistry } from "../registry";
 import { resolveCommand } from "../router";
 import {
 	appendProductionDayAllocation,
+	assertSafeEvolutionProjectRoot,
 	evolutionDbPath,
 	openEvolutionDb,
 	validateEvolutionConfigExtension,
 } from "../services/evolution";
+import { resolveSessionLockPath } from "../services/io/session-lock";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
 
@@ -185,6 +189,60 @@ describe("evolve status", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("reports reconciling while a writer lock outlives projection retries", async () => {
+		const root = fixture();
+		try {
+			const db = openSeededProductionDb(root, PROJECT_ID);
+			db.query("UPDATE production_days SET qualifying_events = ?").run(
+				JSON.stringify(["E-status", "E-concurrent-writer"]),
+			);
+			db.close();
+			const lockPath = resolveSessionLockPath(root, "__evolution-journal__");
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(
+				lockPath,
+				`${JSON.stringify({
+					pid: process.pid,
+					host: "local-test-writer",
+					acquired_at: new Date().toISOString(),
+					session: "__evolution-journal__",
+				})}\n`,
+				"utf8",
+			);
+			const before = readFileSync(lockPath);
+			const beforeStat = statSync(lockPath);
+			Bun.sleepSync(100);
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({ state: "reconciling" });
+			expect(readFileSync(lockPath)).toEqual(before);
+			const afterStat = statSync(lockPath);
+			expect(afterStat.ino).toBe(beforeStat.ino);
+			expect(afterStat.mtimeMs).toBe(beforeStat.mtimeMs);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects unsafe Windows project-root namespaces before filesystem access", () => {
+		for (const root of [
+			"//server/share/project",
+			"\\\\?\\C:\\project",
+			"\\\\.\\PhysicalDrive0",
+			"C:\\project\\state.db:stream",
+			"C:relative-project",
+		]) {
+			expect(() => assertSafeEvolutionProjectRoot(root)).toThrow(
+				/evolution project root must not use/,
+			);
+		}
+		expect(() => assertSafeEvolutionProjectRoot("C:\\project")).not.toThrow();
+		expect(() => assertSafeEvolutionProjectRoot("C:/project")).not.toThrow();
 	});
 
 	test("fails closed for an invalid configured timezone", async () => {

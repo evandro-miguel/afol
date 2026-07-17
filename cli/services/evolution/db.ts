@@ -16,6 +16,34 @@ const BUSY_RETRY_MS = 25;
 
 type EvolutionFileStat = NonNullable<ReturnType<typeof lstatSync>>;
 
+/**
+ * Evolution state is project-local. Reject Windows namespaces and alternate
+ * data streams before any path helper can inspect the filesystem.
+ */
+export function assertSafeEvolutionProjectRoot(root: string): void {
+	if (typeof root !== "string" || root.length === 0)
+		throw new Error("evolution project root must be a non-empty path");
+	const normalized = root.replaceAll("/", "\\");
+	if (
+		normalized.startsWith("\\\\") ||
+		normalized.startsWith("\\?\\") ||
+		normalized.startsWith("\\.\\") ||
+		normalized.startsWith("\\??\\")
+	)
+		throw new Error(
+			"evolution project root must not use UNC, device, or extended path syntax",
+		);
+	const firstColon = root.indexOf(":");
+	if (firstColon !== -1) {
+		const isDriveRoot = /^[A-Za-z]:[\\/]/.test(root);
+		const hasAdditionalColon = root.indexOf(":", firstColon + 1) !== -1;
+		if (!isDriveRoot || hasAdditionalColon)
+			throw new Error(
+				"evolution project root must not use drive-relative or ADS path syntax",
+			);
+	}
+}
+
 function samePath(left: string, right: string): boolean {
 	const normalizedLeft = resolve(left);
 	const normalizedRight = resolve(right);
@@ -114,6 +142,7 @@ export function evolutionDbPath(
 	root: string,
 	configuredPath = EVOLUTION_DB_RELATIVE_PATH,
 ): string {
+	assertSafeEvolutionProjectRoot(root);
 	const resolved = resolveProjectWritePath(root, configuredPath);
 	if (!resolved.ok) throw new Error(resolved.error);
 	return resolved.value.path;

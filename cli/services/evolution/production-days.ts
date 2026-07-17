@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { resolveProjectWritePath } from "../project/root";
 import { validateEvolutionIdentity } from "./config";
+import { assertSafeEvolutionProjectRoot } from "./db";
 
 const LOCAL_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
@@ -117,6 +118,7 @@ function normalizeJournalEventId(value: string): string {
 export function readObservedProductionEvidence(
 	input: ProductionEvidenceInput,
 ): { snapshot: ObservedProductionEvidence; path: string } {
+	assertSafeEvolutionProjectRoot(input.root);
 	if (!ID_RE.test(input.sessionId) || !ID_RE.test(input.evidenceId)) {
 		throw new Error("invalid workbench evidence reference");
 	}
