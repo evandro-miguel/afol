@@ -5,13 +5,13 @@
   "host_profile_id": "ci-linux-x64",
   "sample_count": 3,
   "warmup_count": 1,
-  "timing_p50_ms": 254,
-  "timing_p95_ms": 262,
+  "timing_p50_ms": 261,
+  "timing_p95_ms": 273,
   "tokenizer_id": "tiktoken-o200k-base",
   "tokenizer_version": "recorded",
-  "git_commit": "dfcf3b1facc7",
+  "git_commit": "27e758d0a8bf",
   "run_id": "bench-evolution-core-evolution-status-contract-1.0.0",
-  "timestamp": "2026-07-17T10:43:21.246Z",
+  "timestamp": "2026-07-17T12:29:48.156Z",
   "results_count": 1,
   "provenance": "fresh-local-runnable-smoke"
 }
