@@ -1164,14 +1164,10 @@ export function validateBenchmarkProvenance(
 	);
 	if (scenario.pack_id === "evolution-core") {
 		if (measurement.sample_count !== 3) {
-			issues.push(
-				`benchmark-provenance-sample-count-required:${prefix}:3`,
-			);
+			issues.push(`benchmark-provenance-sample-count-required:${prefix}:3`);
 		}
 		if (measurement.warmup_count !== 1) {
-			issues.push(
-				`benchmark-provenance-warmup-count-required:${prefix}:1`,
-			);
+			issues.push(`benchmark-provenance-warmup-count-required:${prefix}:1`);
 		}
 	}
 	for (const [field, measured, recorded] of [
