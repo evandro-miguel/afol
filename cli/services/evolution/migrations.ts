@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 2;
+export const EVOLUTION_SCHEMA_VERSION = 3;
 
 const MIGRATIONS = [
 	{
@@ -71,7 +71,68 @@ CREATE INDEX IF NOT EXISTS preferences_project_status_idx
 	ON preferences(project_id, status);
 CREATE INDEX IF NOT EXISTS preference_evidence_project_preference_idx
 	ON preference_evidence(project_id, preference_id, production_day_sequence);
-`,
+		`,
+	},
+	{
+		version: 3,
+		sql: `
+CREATE TABLE IF NOT EXISTS observations (
+	project_id TEXT NOT NULL,
+	id TEXT NOT NULL,
+	fingerprint TEXT NOT NULL,
+	fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version = 1),
+	occurrence_identity TEXT NOT NULL,
+	session_id TEXT NOT NULL CHECK (length(trim(session_id)) > 0),
+	production_day_sequence INTEGER NOT NULL CHECK (production_day_sequence >= 0),
+	task_type TEXT NOT NULL CHECK (length(trim(task_type)) > 0),
+	impact TEXT NOT NULL CHECK (length(trim(impact)) > 0),
+	normalized_fields TEXT NOT NULL CHECK (length(trim(normalized_fields)) > 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	created_at TEXT NOT NULL,
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, id),
+	UNIQUE (project_id, occurrence_identity)
+);
+
+CREATE TABLE IF NOT EXISTS recurrence_decisions (
+	project_id TEXT NOT NULL,
+	id TEXT NOT NULL,
+	fingerprint TEXT NOT NULL,
+	state TEXT NOT NULL CHECK (state IN ('observed', 'candidate', 'recurring')),
+	occurrence_count INTEGER NOT NULL CHECK (occurrence_count >= 0),
+	distinct_session_count INTEGER NOT NULL CHECK (distinct_session_count >= 0),
+	distinct_production_day_count INTEGER NOT NULL CHECK (distinct_production_day_count >= 0),
+	trusted_confirmation INTEGER NOT NULL CHECK (trusted_confirmation IN (0, 1)),
+	reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS issue_clusters (
+	project_id TEXT NOT NULL,
+	fingerprint TEXT NOT NULL,
+	state TEXT NOT NULL CHECK (state IN ('observed', 'candidate', 'recurring')),
+	occurrence_count INTEGER NOT NULL CHECK (occurrence_count >= 0),
+	distinct_session_count INTEGER NOT NULL CHECK (distinct_session_count >= 0),
+	distinct_production_day_count INTEGER NOT NULL CHECK (distinct_production_day_count >= 0),
+	first_seen_at TEXT NOT NULL,
+	last_seen_at TEXT NOT NULL,
+	priority INTEGER NOT NULL CHECK (priority >= 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (project_id, fingerprint)
+);
+
+CREATE INDEX IF NOT EXISTS observations_project_fingerprint_idx
+	ON observations(project_id, fingerprint, production_day_sequence);
+CREATE INDEX IF NOT EXISTS recurrence_decisions_project_fingerprint_idx
+	ON recurrence_decisions(project_id, fingerprint, updated_at);
+CREATE INDEX IF NOT EXISTS issue_clusters_project_state_idx
+	ON issue_clusters(project_id, state, priority DESC);
+		`,
 	},
 ] as const;
 
