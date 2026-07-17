@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260716_1234_agent-cli-sequential-verification-runs_spec-child_01
 theme: agent-cli-sequential-verification-runs
-status: final
+status: active
 owners:
 - orchestrator
 workstream_intent: feature
@@ -245,7 +245,7 @@ follow-up. Existing compact-output and token-budget contracts remain in force.
 - [x] Benchmarks prove lower authored command cost than equivalent repeated
       lifecycle calls, compact default output, and no regression of F-03 warm
       latency/output budgets.
-- [x] Clean-checkout release validation and CI evidence are linked from this
+- [ ] Clean-checkout release validation and CI evidence are linked from this
       spec before finalization.
 
 ## Required verification matrix
@@ -310,8 +310,11 @@ passed clean-checkout release validation in both the
 [push run](https://github.com/evandro-miguel/afol/actions/runs/29542326218)
 and the
 [pull-request merge-candidate run](https://github.com/evandro-miguel/afol/actions/runs/29542328244).
-This child is final. PR #46 remains merge-blocked until the closeout commit also
-passes its required CI checks.
+The first closeout commit exposed a hosted-runner timing-gate defect: the push
+run passed while the equivalent pull-request run failed only on timing outliers.
+The child remains active until the explicit governance timing-observation mode
+passes both required CI events without weakening functional or F-03 performance
+gates.
 
 ---
 

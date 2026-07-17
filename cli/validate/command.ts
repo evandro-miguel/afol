@@ -14,6 +14,7 @@ import { runScenarioCommand } from "./scenario-execution";
 export { resolveValidateInvocation } from "./args";
 export { runScenarioCommand } from "./scenario-execution";
 
+import type { TimingMode } from "./args";
 import { selectPacks } from "./selector";
 import {
 	type Baseline,
@@ -32,7 +33,25 @@ const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
 const TOKEN_RULE_NONIDEAL = 5_000;
 const TOKEN_RULE_PROHIBITIVE = 10_000;
 const BASELINE_TIMING_REGRESSION_FACTOR = 1.25;
+const TIMING_THRESHOLD_KEYS = new Set([
+	"max_duration_ms",
+	"min_duration_ms",
+	"max_p50_ms",
+	"min_p50_ms",
+	"max_p95_ms",
+	"min_p95_ms",
+]);
 
+function isTimingThresholdFailure(note: string): boolean {
+	const match = /^(?:threshold-exceeded|threshold-below-min):([^:]+)/.exec(
+		note,
+	);
+	return match !== null && TIMING_THRESHOLD_KEYS.has(match[1] ?? "");
+}
+
+function isTimingRegressionFailure(note: string): boolean {
+	return /^baseline-regression:timing_(?:p50|p95)_ms:/.test(note);
+}
 function resolveValidationSelection(
 	snapshot: RegistrySnapshot,
 	scope: ValidationScope,
@@ -192,6 +211,7 @@ function collectBenchmarkPackResults(
 	projectRoot: string,
 	snapshot: RegistrySnapshot,
 	packId: PackId,
+	timingMode: TimingMode,
 ): BenchmarkPackResults {
 	const scenarios = snapshot.scenariosByPack[packId] ?? [];
 	const baselinePath = join(
@@ -214,7 +234,7 @@ function collectBenchmarkPackResults(
 	}
 	return {
 		results: scenarios.map((scenario) =>
-			buildResult(projectRoot, scenario, baselinePath, baseline),
+			buildResult(projectRoot, scenario, baselinePath, baseline, timingMode),
 		),
 		notes: [],
 	};
@@ -225,7 +245,13 @@ export function buildResult(
 	scenario: Scenario,
 	baselinePath: string,
 	baseline: Baseline | undefined,
+	timingMode: TimingMode = "enforce",
 ): BenchmarkResult {
+	if (timingMode === "observe" && scenario.pack_id !== "governance-history") {
+		throw new Error(
+			"--timing-mode observe is limited to the governance-history pack",
+		);
+	}
 	// bench executes scenario.command and measures; deterministic_metrics is legacy/ignored for execution packs
 	const hasCommand =
 		typeof scenario.command === "string" && scenario.command.trim().length > 0;
@@ -252,8 +278,12 @@ export function buildResult(
 		scenario,
 		baseline,
 		execution,
-		thresholdNotes,
-		regressionNotes,
+		timingMode === "observe"
+			? thresholdNotes.filter((note) => !isTimingThresholdFailure(note))
+			: thresholdNotes,
+		timingMode === "observe"
+			? regressionNotes.filter((note) => !isTimingRegressionFailure(note))
+			: regressionNotes,
 	);
 	if (status === "baseline-missing") {
 		notes.push("baseline-missing");
@@ -392,11 +422,21 @@ function handleBenchmark(
 	explicitPacks: PackId[],
 	persist: boolean,
 	outputPath?: string,
+	timingMode: TimingMode = "enforce",
 ): number {
 	const { selectedPacks, selectionReasons, contractIssues } =
 		resolveValidationSelection(snapshot, scope, changedPaths, explicitPacks);
+	if (
+		timingMode === "observe" &&
+		(selectedPacks.length !== 1 || selectedPacks[0] !== "governance-history")
+	) {
+		console.error(
+			"--timing-mode observe is limited to the governance-history pack",
+		);
+		return 2;
+	}
 	const packResults = selectedPacks.map((packId) =>
-		collectBenchmarkPackResults(projectRoot, snapshot, packId),
+		collectBenchmarkPackResults(projectRoot, snapshot, packId, timingMode),
 	);
 	const results = packResults.flatMap((entry) => entry.results);
 	const benchmarkNotes = packResults.flatMap((entry) => entry.notes);
@@ -410,6 +450,7 @@ function handleBenchmark(
 		schema_version: VALIDATION_SCHEMA_VERSION,
 		command_family: "validation",
 		mode: "benchmark",
+		timing_mode: timingMode,
 		benchmark_result_schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
 		status,
 		pass: status === "passed",
@@ -469,6 +510,7 @@ export function runValidationCommand(
 			parsed.explicitPacks,
 			parsed.save,
 			parsed.outputPath,
+			parsed.timingMode,
 		);
 	}
 	if (parsed.mode === "select") {

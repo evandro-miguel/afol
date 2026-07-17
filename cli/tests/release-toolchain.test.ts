@@ -260,7 +260,7 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
 		expect(scripts["validate:ux-governance"]).toBe(
-			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --json",
+			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --timing-mode observe --json",
 		);
 		expect(scripts["validate:release"]).toContain(
 			"bun run validate:ux-governance",

@@ -181,6 +181,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Run one benchmark pack with its configured gates",
 			},
 			{
+				usage: "bench --pack governance-history --timing-mode observe --json",
+				sideEffect: "read",
+				description: "Observe timing; non-timing gates block",
+			},
+			{
 				usage: "select --changed-path <path>",
 				sideEffect: "read",
 				description: "Show which benchmark packs match changed paths",

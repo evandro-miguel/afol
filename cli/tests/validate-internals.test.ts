@@ -25,6 +25,7 @@ import {
 	resolveTaskCompletionLockPath,
 	withTaskCompletionLock,
 } from "../services/workbench/completion-lock";
+import { parseValidationArgs } from "../validate/args";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
 import { buildResult } from "../validate/command";
 import {
@@ -1713,6 +1714,48 @@ describe("scenario benchmark execution", () => {
 			expect(p50Regression.notes).toContain(
 				"baseline-regression:timing_p50_ms:251>250",
 			);
+			const observedP50Regression = buildResult(
+				root,
+				{
+					...scenario,
+					pack_id: "governance-history",
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 251,
+						timing_p50_ms: 251,
+					},
+				},
+				baselinePath,
+				baseline,
+				"observe",
+			);
+			expect(observedP50Regression.status).toBe("passed");
+			expect(observedP50Regression.timing_p50_ms).toBe(251);
+			expect(observedP50Regression.notes).toContain(
+				"baseline-regression:timing_p50_ms:251>250",
+			);
+			const observedTimingThreshold = buildResult(
+				root,
+				{
+					...scenario,
+					pack_id: "governance-history",
+					thresholds: {
+						...scenario.thresholds,
+						max_p95_ms: 300,
+						min_duration_ms: 300,
+					},
+				},
+				baselinePath,
+				baseline,
+				"observe",
+			);
+			expect(observedTimingThreshold.status).toBe("passed");
+			expect(observedTimingThreshold.notes).toContain(
+				"threshold-exceeded:max_p95_ms:375>300",
+			);
+			expect(observedTimingThreshold.notes).toContain(
+				"threshold-below-min:min_duration_ms:250<300",
+			);
 
 			const p95Regression = buildResult(
 				root,
@@ -1730,9 +1773,41 @@ describe("scenario benchmark execution", () => {
 			expect(p95Regression.notes).toContain(
 				"baseline-regression:timing_p95_ms:376>375",
 			);
+
+			const observedNonTimingFailure = buildResult(
+				root,
+				{
+					...scenario,
+					pack_id: "governance-history",
+					thresholds: { ...scenario.thresholds, max_output_tokens: 0 },
+				},
+				baselinePath,
+				baseline,
+				"observe",
+			);
+			expect(observedNonTimingFailure.status).toBe("failed");
+			expect(observedNonTimingFailure.notes).toContain(
+				"threshold-exceeded:max_output_tokens:1>0",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("parses explicit benchmark timing modes and rejects them outside bench", () => {
+		expect(
+			parseValidationArgs(["bench", "--timing-mode", "observe"]).timingMode,
+		).toBe("observe");
+		expect(parseValidationArgs(["bench"]).timingMode).toBe("enforce");
+		expect(() =>
+			parseValidationArgs(["bench", "--timing-mode", "invalid"]),
+		).toThrow("Unknown --timing-mode value: invalid");
+		expect(() =>
+			parseValidationArgs(["run", "--timing-mode", "observe"]),
+		).toThrow("--timing-mode requires bench mode");
+		expect(() =>
+			parseValidationArgs(["run", "--timing-mode", "enforce"]),
+		).toThrow("--timing-mode requires bench mode");
 	});
 
 	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
@@ -2276,6 +2351,26 @@ describe("runtime live validation helpers", () => {
 });
 
 describe("validation command entrypoint", () => {
+	test("reports governance-history timing observation at the public entrypoint", () => {
+		const observed = withCapturedStdout(() =>
+			runValidationCommand(process.cwd(), [
+				"bench",
+				"--pack",
+				"governance-history",
+				"--timing-mode",
+				"observe",
+				"--json",
+			]),
+		);
+		expect(observed.result).toBe(0);
+		expect(JSON.parse(observed.stdout[0] ?? "{}")).toMatchObject({
+			mode: "benchmark",
+			timing_mode: "observe",
+			status: "passed",
+			pass: true,
+		});
+	}, 30_000);
+
 	test("supports select, run, benchmark save, and argument failures", () => {
 		const root = createFixtureRoot();
 		try {
@@ -2377,6 +2472,20 @@ describe("validation command entrypoint", () => {
 			expect(unknownPack.result).toBe(2);
 			expect(unknownPack.stderr[0]).toContain(
 				"Unknown --pack value: not-a-pack",
+			);
+
+			const observedPerformancePack = withCapturedConsoleError(() =>
+				runValidationCommand(root, [
+					"bench",
+					"--pack",
+					"workbench-parity",
+					"--timing-mode",
+					"observe",
+				]),
+			);
+			expect(observedPerformancePack.result).toBe(2);
+			expect(observedPerformancePack.stderr[0]).toContain(
+				"--timing-mode observe is limited to the governance-history pack",
 			);
 
 			const unknownArg = withCapturedConsoleError(() =>
