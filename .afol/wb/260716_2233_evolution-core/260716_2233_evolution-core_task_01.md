@@ -3,9 +3,9 @@ doc_type: "workbench_task"
 id: "260716_2233_evolution-core_task_01"
 session_id: "260716_2233_evolution-core"
 theme: "evolution-core"
-status: "active"
+status: "closed"
 created_at: "2026-07-17T02:33:20.599Z"
-updated_at: "2026-07-17T02:33:20.599Z"
+updated_at: "2026-07-17T13:13:12.185Z"
 roadmap_feature: "F-30"
 feature_id: "F-30"
 parent_spec: "260716_2155_afol-evolution-system_spec_01"
@@ -17,6 +17,7 @@ pending_spec_status: "none"
 pending_spec_missing: ""
 pending_spec_resolution_hint: "linked to roadmap feature and parent spec"
 spec_waiver_reason: ""
+closed_at: "2026-07-17T13:13:12.185Z"
 ---
 
 # Tasks: evolution-core
@@ -25,7 +26,7 @@ spec_waiver_reason: ""
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | pending | principal | Config compatibility, separate DB migration, production-day ledger, health, and evolve status |
+| T-01 | done | principal | Config compatibility, separate DB migration, production-day ledger, health, and evolve status attempt=1 |
 
 ## T-01 Acceptance
 
