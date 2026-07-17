@@ -19,6 +19,7 @@ import {
 	appendProductionDayAllocation,
 	assertSafeEvolutionProjectRoot,
 	evolutionDbPath,
+	observationJournalPath,
 	openEvolutionDb,
 	validateEvolutionConfigExtension,
 } from "../services/evolution";
@@ -193,6 +194,28 @@ describe("evolve status", () => {
 			expect(existsSync(dbPath)).toBe(false);
 			expect(existsSync(`${dbPath}-wal`)).toBe(false);
 			expect(existsSync(`${dbPath}-shm`)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed on an invalid observation journal before DB initialization", async () => {
+		const root = fixture();
+		try {
+			const path = observationJournalPath(root);
+			mkdirSync(dirname(path), { recursive: true });
+			writeFileSync(path, "{invalid-json}\n", "utf8");
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({
+				state: "unhealthy",
+				journal_health: { exists: true, valid: false },
+			});
+			expect(payload.data.journal_health.error).toMatch(/^observations:/);
+			expect(existsSync(evolutionDbPath(root))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

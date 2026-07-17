@@ -7,6 +7,7 @@ export const RECURRENCE_MINIMUM_SESSIONS = 2;
 export const RECURRENCE_MINIMUM_PRODUCTION_DAYS = 2;
 
 export type ObservationFingerprintFields = {
+	kind: string;
 	error_code: string;
 	test: string;
 	command: string;
@@ -21,6 +22,9 @@ export type ObservationInput = {
 	project_id?: string;
 	projectId?: string;
 	id: string;
+	kind?: string;
+	observation_kind?: string;
+	observationKind?: string;
 	session_id?: string;
 	sessionId?: string;
 	production_day_sequence?: number;
@@ -32,6 +36,8 @@ export type ObservationInput = {
 	createdAt?: string;
 	journal_event_id?: string;
 	journalEventId?: string;
+	journal_sequence?: number;
+	journalSequence?: number;
 	source_refs?: Array<Record<string, string>>;
 	sourceRefs?: Array<Record<string, string>>;
 	error_code?: string;
@@ -51,6 +57,7 @@ export type ObservationInput = {
 export type ObservationRecord = {
 	project_id: string;
 	id: string;
+	kind: string;
 	fingerprint: string;
 	fingerprint_version: 1;
 	occurrence_identity: string;
@@ -61,10 +68,16 @@ export type ObservationRecord = {
 	normalized_fields: ObservationFingerprintFields;
 	source_refs: Array<Record<string, string>>;
 	created_at: string;
+	journal_sequence: number;
 	journal_event_id: string;
 };
 
 export type RecurrenceState = "observed" | "candidate" | "recurring";
+export type RecurrenceThresholds = {
+	minimum_occurrences: number;
+	minimum_distinct_sessions: number;
+	minimum_distinct_production_days: number;
+};
 export type RecurrenceDecision = {
 	fingerprint: string;
 	state: RecurrenceState;
@@ -75,25 +88,31 @@ export type RecurrenceDecision = {
 	reason: string;
 };
 
+export type ScorecardMetric = {
+	value: number | null;
+	better: "lower" | "higher";
+};
+export type ScorecardDimension = Readonly<Record<string, ScorecardMetric>>;
 export type Scorecard = {
-	rework: number;
-	regressions: number;
-	user_load: number;
-	outcome: number;
-	efficiency: number;
+	rework: ScorecardDimension;
+	regressions: ScorecardDimension;
+	user_load: ScorecardDimension;
+	outcome: ScorecardDimension;
+	efficiency: ScorecardDimension;
 };
 
 export type ScorecardComparison = {
 	comparable: boolean;
 	accepted: boolean;
 	reason: string;
-	deltas: Scorecard;
+	deltas: Record<keyof Scorecard, Readonly<Record<string, number | null>>>;
 };
 
 export type ComparableCohort = {
 	task_type: string;
 	observations: ObservationRecord[];
 	minimum_data: number;
+	distinct_production_days: number;
 	comparable: boolean;
 };
 
@@ -103,6 +122,19 @@ function text(value: unknown): string {
 
 function redact(value: unknown): string {
 	return text(value)
+		.replace(
+			/\b(authorization)\s*[:=]\s*(?:bearer\s+)?[^\s,;]+/gi,
+			"$1=<redacted>",
+		)
+		.replace(/\b(bearer)\s+[^\s,;]+/gi, "$1 <redacted>")
+		.replace(
+			/(--(?:api[_-]?key|access[_-]?token|authorization|password|secret|token))\s+[^\s,;]+/gi,
+			"$1 <redacted>",
+		)
+		.replace(
+			/([?&](?:api[_-]?key|access[_-]?token|authorization|password|secret|token)=)[^&#\s]+/gi,
+			"$1<redacted>",
+		)
 		.replace(
 			/(api[_ -]?key|access[_ -]?token|auth(?:orization)?|bearer|password|secret|token)\s*[:=]\s*[^\s,;]+/gi,
 			"$1=<redacted>",
@@ -149,6 +181,7 @@ export function normalizeObservation(
 	input: ObservationInput,
 ): ObservationFingerprintFields {
 	return {
+		kind: redact(input.kind ?? input.observation_kind ?? input.observationKind),
 		error_code: redact(input.error_code ?? input.errorCode),
 		test: redact(input.test),
 		command: redact(input.command),
@@ -177,12 +210,15 @@ export function occurrenceIdentity(input: ObservationInput): string {
 		project_id: projectId(input),
 		session_id: sessionId(input),
 		id: required(input.id, "id"),
-		journal_event_id: text(input.journal_event_id ?? input.journalEventId),
-		source_refs: refs.map((ref) => ({
-			id: text(ref.id),
-			path: text(ref.path),
-			digest: text(ref.digest),
-		})),
+		source_refs: refs
+			.map((ref) =>
+				Object.fromEntries(
+					Object.entries(ref)
+						.sort(([left], [right]) => left.localeCompare(right))
+						.map(([key, value]) => [key, text(value)]),
+				),
+			)
+			.sort((left, right) => stableJson(left).localeCompare(stableJson(right))),
 	});
 }
 
@@ -202,9 +238,18 @@ export function normalizeObservationRecord(
 	if (!Array.isArray(source_refs))
 		throw new Error("observation source refs must be an array");
 	const normalized_fields = normalizeObservation(input);
+	const journal_sequence = Number(
+		input.journal_sequence ?? input.journalSequence ?? 1,
+	);
+	if (!Number.isInteger(journal_sequence) || journal_sequence < 1)
+		throw new Error("observation journal sequence must be a positive integer");
 	return {
 		project_id,
 		id: required(input.id, "id"),
+		kind: required(
+			input.kind ?? input.observation_kind ?? input.observationKind,
+			"kind",
+		),
 		fingerprint: observationFingerprint(normalized_fields),
 		fingerprint_version: 1,
 		occurrence_identity: occurrenceIdentity(input),
@@ -215,6 +260,7 @@ export function normalizeObservationRecord(
 		normalized_fields,
 		source_refs,
 		created_at: required(input.created_at ?? input.createdAt, "created at"),
+		journal_sequence,
 		journal_event_id: required(
 			input.journal_event_id ?? input.journalEventId,
 			"journal event id",
@@ -225,24 +271,37 @@ export function normalizeObservationRecord(
 export function deriveRecurrenceDecision(
 	observations: readonly ObservationRecord[],
 	trustedConfirmation = false,
+	thresholds: RecurrenceThresholds = {
+		minimum_occurrences: RECURRENCE_MINIMUM_OCCURRENCES,
+		minimum_distinct_sessions: RECURRENCE_MINIMUM_SESSIONS,
+		minimum_distinct_production_days: RECURRENCE_MINIMUM_PRODUCTION_DAYS,
+	},
 ): RecurrenceDecision {
 	if (observations.length === 0)
 		throw new Error("recurrence needs an observation");
 	const fingerprints = new Set(observations.map((row) => row.fingerprint));
 	if (fingerprints.size !== 1)
 		throw new Error("recurrence observations must share a fingerprint");
+	for (const [name, value] of Object.entries(thresholds))
+		if (!Number.isInteger(value) || value < 1)
+			throw new Error(
+				`recurrence threshold ${name} must be a positive integer`,
+			);
 	const sessions = new Set(observations.map((row) => row.session_id));
 	const productionDays = new Set(
-		observations.map((row) => row.production_day_sequence),
+		observations
+			.map((row) => row.production_day_sequence)
+			.filter((day) => day > 0),
 	);
 	const occurrence_count = observations.length;
 	const distinct_session_count = sessions.size;
 	const distinct_production_day_count = productionDays.size;
 	const recurring =
 		trustedConfirmation ||
-		(occurrence_count >= RECURRENCE_MINIMUM_OCCURRENCES &&
-			distinct_session_count >= RECURRENCE_MINIMUM_SESSIONS &&
-			distinct_production_day_count >= RECURRENCE_MINIMUM_PRODUCTION_DAYS);
+		(occurrence_count >= thresholds.minimum_occurrences &&
+			distinct_session_count >= thresholds.minimum_distinct_sessions &&
+			distinct_production_day_count >=
+				thresholds.minimum_distinct_production_days);
 	const state: RecurrenceState = recurring
 		? "recurring"
 		: occurrence_count >= 2
@@ -258,7 +317,7 @@ export function deriveRecurrenceDecision(
 		reason: trustedConfirmation
 			? "trusted user confirmation"
 			: state === "recurring"
-				? "minimum 3 occurrences across 2 sessions and 2 production days"
+				? `minimum ${thresholds.minimum_occurrences} occurrences across ${thresholds.minimum_distinct_sessions} sessions and ${thresholds.minimum_distinct_production_days} production days`
 				: state === "candidate"
 					? "repeated evidence below recurrence threshold"
 					: "first observed occurrence",
@@ -268,16 +327,20 @@ export function deriveRecurrenceDecision(
 export function comparableCohort(
 	observations: readonly ObservationRecord[],
 	taskType: string,
-	minimumData = 2,
+	minimumData = 3,
 ): ComparableCohort {
 	if (!Number.isInteger(minimumData) || minimumData < 1)
 		throw new Error("minimum comparable data must be a positive integer");
 	const filtered = observations.filter((row) => row.task_type === taskType);
+	const distinct_production_days = new Set(
+		filtered.map((row) => row.production_day_sequence).filter((day) => day > 0),
+	).size;
 	return {
 		task_type: taskType,
 		observations: filtered,
 		minimum_data: minimumData,
-		comparable: filtered.length >= minimumData,
+		distinct_production_days,
+		comparable: filtered.length >= minimumData && distinct_production_days >= 2,
 	};
 }
 
@@ -286,12 +349,34 @@ export function compareScorecards(
 	current: Scorecard,
 	cohort: ComparableCohort | { comparable: boolean },
 ): ScorecardComparison {
+	const delta = (
+		before: ScorecardDimension,
+		after: ScorecardDimension,
+	): Readonly<Record<string, number | null>> => {
+		const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+		return Object.fromEntries(
+			[...keys].sort().map((key) => {
+				const baselineMetric = before[key];
+				const currentMetric = after[key];
+				if (
+					!baselineMetric ||
+					!currentMetric ||
+					baselineMetric.value === null ||
+					currentMetric.value === null
+				)
+					return [key, null];
+				if (baselineMetric.better !== currentMetric.better)
+					throw new Error(`scorecard metric direction changed for ${key}`);
+				return [key, currentMetric.value - baselineMetric.value];
+			}),
+		);
+	};
 	const deltas = {
-		rework: current.rework - baseline.rework,
-		regressions: current.regressions - baseline.regressions,
-		user_load: current.user_load - baseline.user_load,
-		outcome: current.outcome - baseline.outcome,
-		efficiency: current.efficiency - baseline.efficiency,
+		rework: delta(baseline.rework, current.rework),
+		regressions: delta(baseline.regressions, current.regressions),
+		user_load: delta(baseline.user_load, current.user_load),
+		outcome: delta(baseline.outcome, current.outcome),
+		efficiency: delta(baseline.efficiency, current.efficiency),
 	};
 	if (!cohort.comparable)
 		return {
@@ -300,17 +385,42 @@ export function compareScorecards(
 			reason: "insufficient comparable cohort data",
 			deltas,
 		};
-	const worsened =
-		deltas.rework > 0 ||
-		deltas.regressions > 0 ||
-		deltas.user_load > 0 ||
-		deltas.outcome < 0;
+	const dimensions = Object.keys(deltas) as Array<keyof Scorecard>;
+	const missing = dimensions.some((dimension) =>
+		Object.values(deltas[dimension]).some((value) => value === null),
+	);
+	if (missing)
+		return {
+			comparable: false,
+			accepted: false,
+			reason: "scorecard has explicit missing metric data",
+			deltas,
+		};
+	const metricWorsened = (dimension: keyof Scorecard): boolean =>
+		Object.entries(deltas[dimension]).some(([key, value]) => {
+			const metric = baseline[dimension][key];
+			return metric?.better === "lower" ? Number(value) > 0 : Number(value) < 0;
+		});
+	const metricImproved = (dimension: keyof Scorecard): boolean =>
+		Object.entries(deltas[dimension]).some(([key, value]) => {
+			const metric = baseline[dimension][key];
+			return metric?.better === "lower" ? Number(value) < 0 : Number(value) > 0;
+		});
+	const worsened = (
+		["rework", "regressions", "user_load", "outcome"] as const
+	).some(metricWorsened);
+	const efficiencyWorsened = metricWorsened("efficiency");
+	const improved = dimensions.some(metricImproved);
 	return {
 		comparable: true,
-		accepted: !worsened,
+		accepted: !worsened && !efficiencyWorsened && improved,
 		reason: worsened
-			? "speed or efficiency gain cannot offset worsened quality, recurrence, regression, or user load"
-			: "all scorecard guard dimensions are non-worsening",
+			? "efficiency gain cannot offset worsened safety, rework, quality, or user load"
+			: efficiencyWorsened
+				? "efficiency metrics conflict or regress"
+				: !improved
+					? "proposal has no measured improvement"
+					: "safety, rework, quality, user load, and efficiency are non-worsening with a measured improvement",
 		deltas,
 	};
 }
@@ -319,6 +429,7 @@ function rowToObservation(row: Record<string, unknown>): ObservationRecord {
 	return {
 		project_id: String(row.project_id),
 		id: String(row.id),
+		kind: String(row.kind),
 		fingerprint: String(row.fingerprint),
 		fingerprint_version: 1,
 		occurrence_identity: String(row.occurrence_identity),
@@ -333,6 +444,7 @@ function rowToObservation(row: Record<string, unknown>): ObservationRecord {
 			Record<string, string>
 		>,
 		created_at: String(row.created_at),
+		journal_sequence: Number(row.journal_sequence),
 		journal_event_id: String(row.journal_event_id),
 	};
 }
@@ -341,19 +453,25 @@ export function projectObservation(
 	db: Database,
 	observation: ObservationRecord,
 ): ObservationRecord {
+	const existing = db
+		.query("SELECT * FROM observations WHERE project_id = ? AND id = ?")
+		.get(observation.project_id, observation.id) as Record<
+		string,
+		unknown
+	> | null;
+	if (existing) {
+		const existingRecord = rowToObservation(existing);
+		if (stableJson(existingRecord) !== stableJson(observation))
+			throw new Error("observation id already exists with different content");
+		return observation;
+	}
 	db.prepare(
-		`INSERT INTO observations(project_id,id,fingerprint,fingerprint_version,occurrence_identity,session_id,production_day_sequence,task_type,impact,normalized_fields,source_refs,created_at,journal_event_id)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-		ON CONFLICT(project_id,id) DO UPDATE SET
-		fingerprint=excluded.fingerprint, fingerprint_version=excluded.fingerprint_version,
-		occurrence_identity=excluded.occurrence_identity, session_id=excluded.session_id,
-		production_day_sequence=excluded.production_day_sequence, task_type=excluded.task_type,
-		impact=excluded.impact, normalized_fields=excluded.normalized_fields,
-		source_refs=excluded.source_refs, created_at=excluded.created_at,
-		journal_event_id=excluded.journal_event_id`,
+		`INSERT INTO observations(project_id,id,kind,fingerprint,fingerprint_version,occurrence_identity,session_id,production_day_sequence,task_type,impact,normalized_fields,source_refs,created_at,journal_sequence,journal_event_id)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	).run(
 		observation.project_id,
 		observation.id,
+		observation.kind,
 		observation.fingerprint,
 		observation.fingerprint_version,
 		observation.occurrence_identity,
@@ -364,6 +482,7 @@ export function projectObservation(
 		JSON.stringify(observation.normalized_fields),
 		JSON.stringify(observation.source_refs),
 		observation.created_at,
+		observation.journal_sequence,
 		observation.journal_event_id,
 	);
 	return observation;

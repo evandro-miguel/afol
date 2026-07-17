@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 3;
+export const EVOLUTION_SCHEMA_VERSION = 4;
 
 const MIGRATIONS = [
 	{
@@ -134,6 +134,102 @@ CREATE INDEX IF NOT EXISTS issue_clusters_project_state_idx
 	ON issue_clusters(project_id, state, priority DESC);
 		`,
 	},
+	{
+		version: 4,
+		sql: `
+DROP INDEX IF EXISTS observations_project_fingerprint_idx;
+DROP INDEX IF EXISTS recurrence_decisions_project_fingerprint_idx;
+DROP INDEX IF EXISTS issue_clusters_project_state_idx;
+
+ALTER TABLE observations RENAME TO observations_v3;
+ALTER TABLE recurrence_decisions RENAME TO recurrence_decisions_v3;
+ALTER TABLE issue_clusters RENAME TO issue_clusters_v3;
+
+CREATE TABLE observation_legacy_archive AS
+	SELECT * FROM observations_v3;
+
+CREATE TABLE observations (
+	project_id TEXT NOT NULL,
+	id TEXT NOT NULL,
+	kind TEXT NOT NULL CHECK (length(trim(kind)) > 0),
+	fingerprint TEXT NOT NULL,
+	fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version = 1),
+	occurrence_identity TEXT NOT NULL,
+	session_id TEXT NOT NULL CHECK (length(trim(session_id)) > 0),
+	production_day_sequence INTEGER NOT NULL CHECK (production_day_sequence >= 0),
+	task_type TEXT NOT NULL CHECK (length(trim(task_type)) > 0),
+	impact TEXT NOT NULL CHECK (length(trim(impact)) > 0),
+	normalized_fields TEXT NOT NULL CHECK (length(trim(normalized_fields)) > 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	created_at TEXT NOT NULL,
+	journal_sequence INTEGER NOT NULL CHECK (journal_sequence > 0),
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, id),
+	UNIQUE (project_id, occurrence_identity)
+);
+
+INSERT INTO observations (
+	project_id,id,kind,fingerprint,fingerprint_version,occurrence_identity,
+	session_id,production_day_sequence,task_type,impact,normalized_fields,
+	source_refs,created_at,journal_sequence,journal_event_id
+)
+SELECT
+	project_id,id,
+	COALESCE(NULLIF(json_extract(normalized_fields, '$.kind'), ''), 'unknown'),
+	fingerprint,fingerprint_version,occurrence_identity,session_id,
+	production_day_sequence,task_type,impact,normalized_fields,source_refs,
+	created_at,
+	ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at,id),
+	journal_event_id
+FROM observations_v3;
+
+CREATE TABLE recurrence_decisions (
+	project_id TEXT NOT NULL,
+	id TEXT NOT NULL,
+	fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version = 1),
+	fingerprint TEXT NOT NULL,
+	action TEXT NOT NULL CHECK (action IN ('confirm', 'dismiss', 'reopen')),
+	observation_ids TEXT NOT NULL CHECK (length(trim(observation_ids)) > 0),
+	observation_membership_digest TEXT NOT NULL CHECK (length(trim(observation_membership_digest)) > 0),
+	source_decision_ref TEXT NOT NULL CHECK (length(trim(source_decision_ref)) > 0),
+	decision_digest TEXT NOT NULL CHECK (length(trim(decision_digest)) > 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	created_at TEXT NOT NULL,
+	journal_sequence INTEGER NOT NULL CHECK (journal_sequence > 0),
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, id)
+);
+
+CREATE TABLE issue_clusters (
+	project_id TEXT NOT NULL,
+	fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version = 1),
+	fingerprint TEXT NOT NULL,
+	state TEXT NOT NULL CHECK (state IN ('observed', 'candidate', 'recurring', 'proposal_open', 'mitigation_canary', 'resolved', 'reopened', 'dismissed')),
+	occurrence_count INTEGER NOT NULL CHECK (occurrence_count >= 0),
+	distinct_session_count INTEGER NOT NULL CHECK (distinct_session_count >= 0),
+	distinct_production_day_count INTEGER NOT NULL CHECK (distinct_production_day_count >= 0),
+	user_confirmed_recurrence INTEGER NOT NULL CHECK (user_confirmed_recurrence IN (0, 1)),
+	first_seen_at TEXT NOT NULL,
+	last_seen_at TEXT NOT NULL,
+	priority INTEGER NOT NULL CHECK (priority >= 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	updated_at TEXT NOT NULL,
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, fingerprint_version, fingerprint)
+);
+
+DROP TABLE observations_v3;
+DROP TABLE recurrence_decisions_v3;
+DROP TABLE issue_clusters_v3;
+
+CREATE INDEX observations_project_fingerprint_idx
+	ON observations(project_id, fingerprint_version, fingerprint, production_day_sequence);
+CREATE INDEX recurrence_decisions_project_fingerprint_idx
+	ON recurrence_decisions(project_id, fingerprint_version, fingerprint, journal_sequence);
+CREATE INDEX issue_clusters_project_state_idx
+	ON issue_clusters(project_id, state, priority DESC);
+		`,
+	},
 ] as const;
 
 export type EvolutionMigration = { version: number; checksum: string };
@@ -169,8 +265,18 @@ export function ensureMigrationTable(db: Database): void {
 	`);
 }
 
-export function applyMigrations(db: Database): void {
+export function applyMigrations(
+	db: Database,
+	targetVersion = EVOLUTION_SCHEMA_VERSION,
+): void {
+	if (
+		!Number.isInteger(targetVersion) ||
+		targetVersion < 1 ||
+		targetVersion > EVOLUTION_SCHEMA_VERSION
+	)
+		throw new Error("invalid evolution migration target version");
 	for (const migration of MIGRATIONS) {
+		if (migration.version > targetVersion) break;
 		db.exec("BEGIN IMMEDIATE");
 		try {
 			// Re-read after acquiring the write lock. Another opener may have

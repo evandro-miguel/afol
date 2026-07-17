@@ -13,7 +13,12 @@ import {
 	type EvolutionStatus,
 	evolutionDbPath,
 	getEvolutionStatus,
+	observationJournalPath,
+	preferenceJournalPath,
 	productionDayJournalPath,
+	type RecurrenceThresholds,
+	readObservationJournal,
+	readPreferenceJournal,
 	readProductionDayJournal,
 	resolveEvolutionConfig,
 } from "../services/evolution";
@@ -70,6 +75,7 @@ function readDbStatus(
 		projectId: string;
 		timezone: string;
 		evolutionEventsDir?: string;
+		recurrenceThresholds?: RecurrenceThresholds;
 	},
 ): EvolutionStatus {
 	const db = new Database(path, { readonly: true });
@@ -78,6 +84,19 @@ function readDbStatus(
 	} finally {
 		db.close();
 	}
+}
+
+function recurrenceThresholds(
+	settings: Record<string, unknown>,
+): RecurrenceThresholds {
+	const recurrence = settings.recurrence as Record<string, unknown>;
+	return {
+		minimum_occurrences: Number(recurrence.minimum_occurrences),
+		minimum_distinct_sessions: Number(recurrence.minimum_distinct_sessions),
+		minimum_distinct_production_days: Number(
+			recurrence.minimum_distinct_production_days,
+		),
+	};
 }
 
 function statusState(
@@ -107,29 +126,70 @@ function statusState(
 function buildStatus(projectRoot: string): EvolutionStatusData {
 	assertSafeEvolutionProjectRoot(projectRoot);
 	const resolved = resolveEvolutionConfig(readProjectConfig(projectRoot));
+	const thresholds = recurrenceThresholds(resolved.settings);
 	const journalLockActiveBefore = observeSessionLock(
 		projectRoot,
 		"__evolution-journal__",
 	).active;
 	const dbPath = evolutionDbPath(projectRoot, resolved.paths.evolutionDb);
-	const journalPath =
+	const journalPaths =
 		resolved.configured && resolved.projectId
-			? productionDayJournalPath(projectRoot, resolved.paths.evolutionEventsDir)
-			: null;
-	const journalExists = journalPath ? existsSync(journalPath) : false;
-	let journalValid: boolean | null = journalExists ? false : null;
+			? [
+					{
+						label: "production-days",
+						path: productionDayJournalPath(
+							projectRoot,
+							resolved.paths.evolutionEventsDir,
+						),
+						read: () =>
+							readProductionDayJournal(
+								projectRoot,
+								resolved.projectId as string,
+								resolved.timezone,
+								resolved.paths.evolutionEventsDir,
+							),
+					},
+					{
+						label: "preferences",
+						path: preferenceJournalPath(
+							projectRoot,
+							resolved.paths.evolutionEventsDir,
+						),
+						read: () =>
+							readPreferenceJournal(
+								projectRoot,
+								resolved.projectId as string,
+								resolved.paths.evolutionEventsDir,
+							),
+					},
+					{
+						label: "observations",
+						path: observationJournalPath(
+							projectRoot,
+							resolved.paths.evolutionEventsDir,
+						),
+						read: () =>
+							readObservationJournal(
+								projectRoot,
+								resolved.projectId as string,
+								resolved.paths.evolutionEventsDir,
+							),
+					},
+				]
+			: [];
+	const existingJournals = journalPaths.filter((journal) =>
+		existsSync(journal.path),
+	);
+	const journalExists = existingJournals.length > 0;
+	let journalValid: boolean | null = journalExists ? true : null;
 	let journalError: string | null = null;
-	if (journalExists && resolved.projectId) {
+	for (const journal of existingJournals) {
 		try {
-			readProductionDayJournal(
-				projectRoot,
-				resolved.projectId,
-				resolved.timezone,
-				resolved.paths.evolutionEventsDir,
-			);
-			journalValid = true;
+			journal.read();
 		} catch (error) {
-			journalError = (error as Error).message;
+			journalValid = false;
+			journalError = `${journal.label}: ${(error as Error).message}`;
+			break;
 		}
 	}
 	const dbExists = existsSync(dbPath);
@@ -140,6 +200,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 					projectId: resolved.projectId,
 					timezone: resolved.timezone,
 					evolutionEventsDir: resolved.paths.evolutionEventsDir,
+					recurrenceThresholds: thresholds,
 				})
 			: null;
 	const dbNeedsRebuild =
@@ -175,6 +236,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 						projectId: resolved.projectId,
 						timezone: resolved.timezone,
 						evolutionEventsDir: resolved.paths.evolutionEventsDir,
+						recurrenceThresholds: thresholds,
 					})
 				: null,
 		journal_health: {

@@ -180,6 +180,27 @@ describe("Evolution Slice 0 governance schema", () => {
 		);
 	});
 
+	test("binds canonical recurrence decisions to exact observation membership", () => {
+		const validate = validator("recurrenceDecision");
+		const decision = {
+			...baseRecord("recurrence_decision"),
+			state_class: "canonical",
+			journal_event_id: "EV-REC-01",
+			fingerprint: "abc123",
+			fingerprint_version: 1,
+			action: "confirm",
+			observation_ids: ["O-01", "O-02"],
+			observation_membership_digest: "membership123",
+			source_decision_ref: "USER-DEC-01",
+			decision_digest: "decision123",
+		};
+		expect(validate(decision)).toBe(true);
+		expect(validate({ ...decision, observation_ids: ["O-01", "O-01"] })).toBe(
+			false,
+		);
+		expect(validate({ ...decision, action: "approve" })).toBe(false);
+	});
+
 	test("blocks observer decisions and binds proposal mutations", () => {
 		const validate = validator("journalEntry");
 		expect(validate(journalEntry())).toBe(true);

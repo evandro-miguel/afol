@@ -96,21 +96,21 @@ function appendProductionDays(root: string, db: Database, count: number): void {
 }
 
 describe("Evolution preference projection", () => {
-	test("applies migration v2 and records checksums", () => {
+	test("applies preference migration and advances to the current schema", () => {
 		const { root, db } = fixture();
 		try {
 			const migration2 = EVOLUTION_MIGRATIONS.find(
 				(migration) => migration.version === 2,
 			);
 			if (!migration2) throw new Error("missing migration v2");
-			expect(EVOLUTION_SCHEMA_VERSION).toBe(2);
+			expect(EVOLUTION_SCHEMA_VERSION).toBe(4);
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(2);
+			).toBe(4);
 			expect(
 				EVOLUTION_MIGRATIONS.map((migration) => migration.version),
-			).toEqual([1, 2]);
+			).toEqual([1, 2, 3, 4]);
 			expect(
 				db
 					.query("SELECT checksum FROM evolution_migrations WHERE version = 2")
@@ -150,7 +150,7 @@ describe("Evolution preference projection", () => {
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(2);
+			).toBe(4);
 			expect(
 				db
 					.query("SELECT name FROM sqlite_master WHERE name = 'preferences'")
