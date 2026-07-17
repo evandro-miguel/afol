@@ -43,7 +43,7 @@
     "source": "fresh-local-runnable-smoke",
     "sample_count": 3,
     "warmup_count": 1,
-    "git_commit": "b817a33ec62c"
+    "git_commit": "0b71607a32b5"
   },
   "implementation_status": "implemented"
 }
