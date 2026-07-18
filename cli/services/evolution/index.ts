@@ -3,9 +3,25 @@ export * from "./config";
 export * from "./db";
 export * from "./derived-state";
 export * from "./health";
-export * from "./import-journal";
+export {
+	type ExternalImportManifest,
+	type ExternalSessionLink,
+	type ExternalSessionRecord,
+	type ImportAcceptanceEvent,
+	type ImportAcceptancePayload,
+	type ImportCheckpoint,
+	importJournalPath,
+	readImportJournal,
+} from "./import-journal";
 export * from "./import-linking";
-export * from "./import-store";
+export * from "./import-service";
+export {
+	type ExternalImportRow,
+	listExternalImports,
+	readImportCheckpoint,
+	rebuildExternalImportProjection,
+	validateExternalImportProjection,
+} from "./import-store";
 export {
 	appendProductionDayAllocation,
 	type EvolutionJournalContext,

@@ -46,7 +46,7 @@ describe("external session linking", () => {
 			});
 			expect(link.link_state).toBe("auto_verified");
 			expect(link.confirmation_required).toBe(false);
-			expect(link.eligible_for_learning).toBe(true);
+			expect(link.eligible_for_learning).toBe(false);
 
 			const mismatched = evaluateSessionLink({
 				root,
@@ -122,7 +122,7 @@ describe("external session linking", () => {
 				canonicalDecisionRef: "DEC-1",
 			});
 			expect(link.link_state).toBe("manual_confirmed");
-			expect(link.eligible_for_learning).toBe(true);
+			expect(link.eligible_for_learning).toBe(false);
 		} finally {
 			db.close();
 			rmSync(root, { recursive: true, force: true });

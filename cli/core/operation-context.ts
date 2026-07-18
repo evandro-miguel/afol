@@ -179,6 +179,14 @@ export function resolveCanonicalAction(
 		if (group === "state" && action === "sync") {
 			return { action: "state.sync", sideEffect: "write" };
 		}
+		if (group === "evolve" && action === "import") {
+			return hasFlag(args, "--confirm")
+				? { action: "evolve.import.confirm", sideEffect: "write" }
+				: { action: "evolve.import.preview", sideEffect: "preview" };
+		}
+		if (group === "evolve" && action === "external") {
+			return { action: "evolve.external.list", sideEffect: "read" };
+		}
 		if (group === "hydrate") {
 			return { action: "hydrate.run", sideEffect: "write" };
 		}

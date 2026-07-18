@@ -859,6 +859,16 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				sideEffect: "write",
 				description: "Repair evolution derived state",
 			},
+			{
+				usage: "import <codex|pi> --source <path> [--confirm] [--json]",
+				sideEffect: "preview",
+				description: "Preview or confirm a redacted import",
+			},
+			{
+				usage: "external list [--json]",
+				sideEffect: "read",
+				description: "List accepted external imports without raw records",
+			},
 		],
 	},
 	{

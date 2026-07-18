@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
-import { lstatSync } from "node:fs";
-import { join } from "node:path";
+import { lstatSync, realpathSync } from "node:fs";
+import { isAbsolute, join, relative } from "node:path";
 import { readProjectConfig } from "../project/paths";
 import { resolveEvolutionIdentity } from "./config";
 import type { ExternalSessionLink } from "./import-journal";
@@ -35,8 +35,17 @@ function sessionExists(
 	)
 		return false;
 	try {
-		const stat = lstatSync(join(root, ".afol", "wb", sessionId));
-		return stat.isDirectory() && !stat.isSymbolicLink();
+		const wbRoot = realpathSync(join(root, ".afol", "wb"));
+		const candidate = join(wbRoot, sessionId);
+		const stat = lstatSync(candidate);
+		const canonical = realpathSync(candidate);
+		const offset = relative(wbRoot, canonical);
+		return (
+			stat.isDirectory() &&
+			!stat.isSymbolicLink() &&
+			!isAbsolute(offset) &&
+			!offset.startsWith("..")
+		);
 	} catch {
 		return false;
 	}
@@ -47,10 +56,21 @@ function commitResolves(
 	commit: string | null | undefined,
 ): boolean {
 	if (!commit || !/^[0-9a-f]{7,64}$/i.test(commit)) return false;
-	const result = spawnSync("git", ["cat-file", "-e", `${commit}^{commit}`], {
-		cwd: root,
-		stdio: "ignore",
-	});
+	const canonicalRoot = realpathSync(root);
+	const result = spawnSync(
+		"git",
+		[
+			"--no-replace-objects",
+			"-C",
+			canonicalRoot,
+			"cat-file",
+			"-e",
+			`${commit}^{commit}`,
+		],
+		{
+			stdio: "ignore",
+		},
+	);
 	return result.status === 0;
 }
 
@@ -84,7 +104,7 @@ export function evaluateSessionLink(
 			: evidence("automatic_link_not_verified"),
 		verified_commit: verified ? (input.verifiedCommit ?? null) : null,
 		confirmation_required: !verified,
-		eligible_for_learning: verified,
+		eligible_for_learning: false,
 	};
 }
 
@@ -113,7 +133,7 @@ export function confirmManualSessionLink(
 		evidence: evidence("explicit_local_confirmation"),
 		canonical_decision_ref: input.canonicalDecisionRef,
 		confirmation_required: false,
-		eligible_for_learning: true,
+		eligible_for_learning: false,
 	};
 }
 

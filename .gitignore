@@ -53,6 +53,14 @@ src/project-template/.afol/data/index/*
 !.afol/tmp/
 !.afol/tmp/README.md
 
+# External harness transcripts stay local; only the policy README is versioned.
+.afol/external/*
+!.afol/external/
+!.afol/external/README.md
+src/project-template/.afol/external/*
+!src/project-template/.afol/external/
+!src/project-template/.afol/external/README.md
+
 # Generated repo-map evidence; regenerate on demand instead of committing.
 docs/map/extra/
 
