@@ -829,6 +829,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Re-derive one proposal preview by deterministic id",
 			},
 			{
+				usage: "apply <proposal-id> [--json]",
+				sideEffect: "write",
+				description:
+					"Apply one re-derived proposal in the active workbench task",
+			},
+			{
+				usage: "rollback <proposal-id> [--json]",
+				sideEffect: "write",
+				description:
+					"Roll back one applied proposal in the active workbench task",
+			},
+			{
 				usage: "status [--json]",
 				sideEffect: "read",
 				description:

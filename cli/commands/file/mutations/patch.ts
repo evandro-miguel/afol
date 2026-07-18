@@ -178,6 +178,7 @@ export function runPatchMutation(
 	runtime: {
 		afterInitialRead?: () => void;
 		afterPrepared?: () => void;
+		beforePrepared?: (mutationId: string) => void;
 	} = {},
 ): CommandResult {
 	const resolved = resolveSafePath(projectRoot, args.path);
@@ -290,6 +291,7 @@ export function runPatchMutation(
 				beforeExisted: lockedExisted,
 				...(lockedDiffPreview ? { diffPreview: lockedDiffPreview } : {}),
 			};
+			runtime.beforePrepared?.(mutationId);
 			appendMutationRecord(projectRoot, record);
 			try {
 				runtime.afterPrepared?.();

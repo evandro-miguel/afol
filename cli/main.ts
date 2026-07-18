@@ -236,10 +236,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	// Resolve restricted operation context from env/flags early so mutation
 	// gates in schema/pstr/library/memory/file commands work for agent/remote
-	// callers. Default is local interactive (trusted, no approval required).
+	// callers. Privileged local evolution mutations require a real terminal.
 	let operationCtx: OperationContext = defaultOperationContext();
 	{
-		const resolved = resolveOperationContext(args);
+		const resolved = resolveOperationContext(
+			args,
+			process.env,
+			Boolean(process.stdin.isTTY && process.stderr.isTTY),
+		);
 		operationCtx = resolved.ctx;
 		args = resolved.remainingArgs;
 	}
