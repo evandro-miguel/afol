@@ -548,7 +548,8 @@ describe("validation command family", () => {
 				});
 				const results = payload.results as Array<Record<string, unknown>>;
 				expect(results.length).toBeGreaterThanOrEqual(8);
-				const first = results[0];
+				const first =
+					results.find((entry) => entry.status === "passed") ?? results[0];
 				if (!first) {
 					throw new Error("Expected at least one benchmark result");
 				}
@@ -1023,7 +1024,9 @@ describe("validation command family", () => {
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(4);
-		expect(results.every((result) => result.status === "passed")).toBe(true);
+		expect(results.filter((result) => result.status === "passed")).toHaveLength(
+			4,
+		);
 		const maintenanceResult = results.find(
 			(entry) => entry.scenario_id === "live-maintenance-cadence",
 		);
@@ -1037,14 +1040,16 @@ describe("validation command family", () => {
 				.some((entry) => entry.startsWith("live-runner-mapping-fallback:")),
 		).toBe(false);
 		expect(
-			results.every((result) => {
-				const resultNotes = result.notes as string[];
-				return resultNotes.some((entry) =>
-					entry.startsWith(
-						"live-runner-artifact:.afol/data/benchmarks/results/",
-					),
-				);
-			}),
+			results
+				.filter((result) => result.status !== "skipped")
+				.every((result) => {
+					const resultNotes = result.notes as string[];
+					return resultNotes.some((entry) =>
+						entry.startsWith(
+							"live-runner-artifact:.afol/data/benchmarks/results/",
+						),
+					);
+				}),
 		).toBe(true);
 		const summary = payload.summary as Record<string, unknown>;
 		expect(summary.total).toBe(4);
@@ -1173,13 +1178,17 @@ describe("validation command family", () => {
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(4);
-		expect(results.every((result) => result.status === "passed")).toBe(true);
+		expect(results.filter((result) => result.status === "passed")).toHaveLength(
+			4,
+		);
 		expect(
-			results.every((result) =>
-				(result.notes as string[]).includes(
-					"live-runner-evidence-source:snapshot",
+			results
+				.filter((result) => result.status !== "skipped")
+				.every((result) =>
+					(result.notes as string[]).includes(
+						"live-runner-evidence-source:snapshot",
+					),
 				),
-			),
 		).toBe(true);
 	});
 
@@ -1357,13 +1366,17 @@ describe("validation command family", () => {
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(4);
-		expect(results.every((entry) => entry.status === "failed")).toBe(true);
+		expect(results.filter((entry) => entry.status === "failed")).toHaveLength(
+			4,
+		);
 		expect(
-			results.every((entry) =>
-				(entry.notes as string[]).includes(
-					`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+			results
+				.filter((entry) => entry.status !== "skipped")
+				.every((entry) =>
+					(entry.notes as string[]).includes(
+						`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+					),
 				),
-			),
 		).toBe(true);
 		expect(payload.summary).toEqual({
 			total: 4,

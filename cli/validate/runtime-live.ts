@@ -495,6 +495,43 @@ function failedRuntimeLiveResult(
 	};
 }
 
+function plannedRuntimeLiveResult(
+	projectRoot: string,
+	scenario: Scenario,
+	baselinePath: string,
+): BenchmarkResult {
+	const metrics = scenario.deterministic_metrics;
+	return {
+		schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
+		run_id: `live-runtime-live-agent-${scenario.scenario_id}-${scenario.scenario_version}`,
+		scenario_id: scenario.scenario_id,
+		scenario_version: scenario.scenario_version,
+		pack_id: scenario.pack_id,
+		status: "skipped",
+		baseline_id: scenario.baseline_id,
+		baseline_reference: relative(projectRoot, baselinePath).replaceAll(
+			"\\",
+			"/",
+		),
+		threshold_reference: scenario.thresholds,
+		pass: false,
+		duration_ms: metrics.duration_ms ?? 0,
+		timing_p50_ms: metrics.timing_p50_ms ?? metrics.duration_ms ?? 0,
+		timing_p95_ms: metrics.timing_p95_ms ?? metrics.duration_ms ?? 0,
+		error_count: 0,
+		retry_count: 0,
+		context_tokens: metrics.context_tokens ?? 0,
+		prompt_tokens: metrics.prompt_tokens ?? 0,
+		output_tokens: metrics.output_tokens ?? 0,
+		context_bytes: metrics.context_bytes ?? 0,
+		output_bytes: metrics.output_bytes ?? 0,
+		tool_call_count: 0,
+		tool_success_rate: 1,
+		git_commit: getGitCommit(projectRoot),
+		notes: ["planned-no-execution"],
+	};
+}
+
 function getGitCommit(projectRoot: string): string {
 	const result = boundedSpawn("git", ["rev-parse", "--short=12", "HEAD"], {
 		cwd: projectRoot,
@@ -698,7 +735,9 @@ export function buildRuntimeLiveAgentResults(
 		const note = (error as Error).message;
 		return {
 			results: scenarios.map((scenario) =>
-				failedRuntimeLiveResult(projectRoot, scenario, baselinePath, note),
+				scenario.implementation_status === "planned"
+					? plannedRuntimeLiveResult(projectRoot, scenario, baselinePath)
+					: failedRuntimeLiveResult(projectRoot, scenario, baselinePath, note),
 			),
 			notes: [note],
 		};
@@ -712,6 +751,9 @@ export function buildRuntimeLiveAgentResults(
 	let matchedDirectEvidenceCount = 0;
 	let incompleteArtifact = false;
 	const results = scenarios.map((scenario) => {
+		if (scenario.implementation_status === "planned") {
+			return plannedRuntimeLiveResult(projectRoot, scenario, baselinePath);
+		}
 		const outcome = buildRuntimeLiveScenarioResult(
 			projectRoot,
 			scenario,
@@ -725,7 +767,10 @@ export function buildRuntimeLiveAgentResults(
 		return outcome.result;
 	});
 
-	if (matchedDirectEvidenceCount !== scenarios.length) {
+	const proofScenarioCount = scenarios.filter(
+		(scenario) => scenario.implementation_status !== "planned",
+	).length;
+	if (matchedDirectEvidenceCount !== proofScenarioCount) {
 		incompleteArtifact = true;
 	}
 
@@ -736,7 +781,7 @@ export function buildRuntimeLiveAgentResults(
 			`runtime-live-agent-evidence-source:${evidence.payloadSource}`,
 			...(incompleteArtifact
 				? [
-						`runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${scenarios.length};run:${LIVE_BENCHMARK_REFRESH_COMMAND};note:${LIVE_BENCHMARK_REFRESH_NOTE}`,
+						`runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${proofScenarioCount};run:${LIVE_BENCHMARK_REFRESH_COMMAND};note:${LIVE_BENCHMARK_REFRESH_NOTE}`,
 					]
 				: []),
 			`runtime-live-agent-refresh:${LIVE_BENCHMARK_REFRESH_COMMAND}`,

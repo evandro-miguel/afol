@@ -588,13 +588,12 @@ export async function validateProjectStructure(
 					message: "no session health warnings",
 				};
 			}
-			const hasDuplicates = warnings.some((w) => w.type === "duplicate_theme");
 			const hasUnavailableSession = warnings.some(
 				(w) => w.type === "unreadable_session_directory",
 			);
 			return {
 				id: "session_health" as const,
-				ok: !hasDuplicates && !hasUnavailableSession,
+				ok: !hasUnavailableSession,
 				message: warnings.map((w) => w.message).join("; "),
 			};
 		})(),

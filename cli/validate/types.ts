@@ -46,7 +46,7 @@ export interface Scenario {
 	thresholds: Record<string, number>;
 	baseline_id: string;
 	deterministic_metrics: Record<string, number>;
-	implementation_status?: "implemented" | "skipped";
+	implementation_status?: "implemented" | "planned" | "skipped";
 	live_runner_scenario_id?: string;
 	compiled_binary?: boolean;
 }

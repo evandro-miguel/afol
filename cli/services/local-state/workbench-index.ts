@@ -1425,7 +1425,6 @@ export function validateWorkBenchIndex(root: string): {
 
 export type SessionHealthWarning = {
 	type:
-		| "duplicate_theme"
 		| "stale_open_tasks"
 		| "missing_session_directory"
 		| "unreadable_session_directory";
@@ -1439,24 +1438,6 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 	const lifecycle = collectSessionLifecycleEvents(root);
 	const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 	const now = Date.now();
-
-	// Detect duplicate themes (same suffix after timestamp prefix)
-	const themeToSessions = new Map<string, string[]>();
-	for (const session of allSessionIds) {
-		const theme = session.replace(/^\d{6}_\d{4}_/, "");
-		const existing = themeToSessions.get(theme) ?? [];
-		existing.push(session);
-		themeToSessions.set(theme, existing);
-	}
-	for (const [theme, sessions] of themeToSessions) {
-		if (sessions.length > 1) {
-			warnings.push({
-				type: "duplicate_theme",
-				session: sessions.join(", "),
-				message: `Duplicate session theme: "${theme}" appears in ${sessions.length} sessions: ${sessions.join(", ")}`,
-			});
-		}
-	}
 
 	// Detect stale open tasks (>7 days since last touched)
 	const wbRoot = resolveWorkbenchRoot(root);

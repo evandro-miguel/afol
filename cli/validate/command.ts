@@ -257,6 +257,7 @@ export function buildResult(
 		typeof scenario.command === "string" && scenario.command.trim().length > 0;
 	const execution =
 		hasCommand &&
+		scenario.implementation_status !== "planned" &&
 		(scenario.sandbox || scenario.implementation_status !== "skipped")
 			? runScenarioCommand(projectRoot, scenario)
 			: null;
@@ -321,7 +322,12 @@ export function buildResult(
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 		git_commit: getGitCommit(projectRoot),
-		notes: status === "skipped" ? ["not-implemented-live-runner"] : notes,
+		notes:
+			status === "skipped"
+				? scenario.implementation_status === "planned"
+					? ["planned-no-execution"]
+					: ["not-implemented-live-runner"]
+				: notes,
 	});
 }
 
@@ -332,6 +338,9 @@ function resolveResultStatus(
 	thresholdNotes: readonly string[],
 	regressionNotes: readonly string[],
 ): BenchmarkResult["status"] {
+	if (scenario.implementation_status === "planned") {
+		return "skipped";
+	}
 	if (scenario.implementation_status === "skipped" && !scenario.sandbox) {
 		return "skipped";
 	}
