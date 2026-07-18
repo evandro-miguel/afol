@@ -13,6 +13,7 @@ import {
 	writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { withSessionLock } from "../io/session-lock";
 import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
@@ -25,13 +26,17 @@ import {
 
 const GENESIS = "GENESIS";
 const DEFAULT_EVENTS_DIR = ".afol/data/events/evolution";
+const CHECKPOINT_LOCK = "__evolution-projection-checkpoint__";
 
 type ProjectionCheckpoint = {
+	checkpoint_schema_version?: 2;
 	sequence: number;
 	event_id: string;
 	project_id: string;
 	observation_tail_digest: string;
 	receipt_tail_digest: string;
+	apply_tail_digest?: string;
+	evaluation_tail_digest?: string;
 	active_projection_digest: string;
 	active_receipt_digest: string;
 	previous_event_digest: string;
@@ -134,7 +139,7 @@ function tailDigest(path: string): string {
 	return journalTailFingerprint(path)?.tail_digest ?? GENESIS;
 }
 
-export function writeEvolutionProjectionCheckpoint(input: {
+function writeEvolutionProjectionCheckpointUnlocked(input: {
 	root: string;
 	db: Database;
 	projectId: string;
@@ -147,6 +152,7 @@ export function writeEvolutionProjectionCheckpoint(input: {
 	const latest = readLatestCheckpoint(path);
 	const active = readActiveSuggestionProjection(input.db, input.projectId);
 	const base = {
+		checkpoint_schema_version: 2 as const,
 		sequence: (latest?.sequence ?? 0) + 1,
 		event_id: `CHK-${randomUUID()}`,
 		project_id: input.projectId,
@@ -155,6 +161,12 @@ export function writeEvolutionProjectionCheckpoint(input: {
 		),
 		receipt_tail_digest: tailDigest(
 			eventJournalPath(input.root, input.eventsDir, "receipts.jsonl"),
+		),
+		apply_tail_digest: tailDigest(
+			eventJournalPath(input.root, input.eventsDir, "applies.jsonl"),
+		),
+		evaluation_tail_digest: tailDigest(
+			eventJournalPath(input.root, input.eventsDir, "evaluations.jsonl"),
 		),
 		active_projection_digest: active.digest,
 		active_receipt_digest: activeReceiptIntegrityDigest(
@@ -230,7 +242,21 @@ export function writeEvolutionProjectionCheckpoint(input: {
 	return checkpoint;
 }
 
-export function repairEvolutionProjectionCheckpointTail(input: {
+export function writeEvolutionProjectionCheckpoint(input: {
+	root: string;
+	db: Database;
+	projectId: string;
+	eventsDir?: string;
+	now?: Date;
+	writeBytes?: (fd: number, value: string) => number;
+	syncFile?: (fd: number) => void;
+}): ProjectionCheckpoint {
+	return withSessionLock(input.root, CHECKPOINT_LOCK, () =>
+		writeEvolutionProjectionCheckpointUnlocked(input),
+	);
+}
+
+function repairEvolutionProjectionCheckpointTailUnlocked(input: {
 	root: string;
 	eventsDir?: string;
 }): boolean {
@@ -290,7 +316,16 @@ export function repairEvolutionProjectionCheckpointTail(input: {
 	return true;
 }
 
-export function assertEvolutionProjectionCheckpoint(input: {
+export function repairEvolutionProjectionCheckpointTail(input: {
+	root: string;
+	eventsDir?: string;
+}): boolean {
+	return withSessionLock(input.root, CHECKPOINT_LOCK, () =>
+		repairEvolutionProjectionCheckpointTailUnlocked(input),
+	);
+}
+
+function assertEvolutionProjectionCheckpointUnlocked(input: {
 	root: string;
 	db: Database;
 	projectId: string;
@@ -301,15 +336,28 @@ export function assertEvolutionProjectionCheckpoint(input: {
 	);
 	if (!latest || latest.project_id !== input.projectId)
 		throw new Error("evolution projection checkpoint is missing");
+	if (latest.checkpoint_schema_version !== 2)
+		throw new Error("evolution projection checkpoint is stale");
 	const observationTail = tailDigest(
 		eventJournalPath(input.root, input.eventsDir, "observations.jsonl"),
 	);
 	const receiptTail = tailDigest(
 		eventJournalPath(input.root, input.eventsDir, "receipts.jsonl"),
 	);
+	const applyTail = tailDigest(
+		eventJournalPath(input.root, input.eventsDir, "applies.jsonl"),
+	);
+	const evaluationTail = tailDigest(
+		eventJournalPath(input.root, input.eventsDir, "evaluations.jsonl"),
+	);
 	if (
 		latest.observation_tail_digest !== observationTail ||
-		latest.receipt_tail_digest !== receiptTail
+		latest.receipt_tail_digest !== receiptTail ||
+		((latest.apply_tail_digest !== undefined || applyTail !== GENESIS) &&
+			latest.apply_tail_digest !== applyTail) ||
+		((latest.evaluation_tail_digest !== undefined ||
+			evaluationTail !== GENESIS) &&
+			latest.evaluation_tail_digest !== evaluationTail)
 	)
 		throw new Error("evolution projection checkpoint is stale");
 	const active = readActiveSuggestionProjection(input.db, input.projectId);
@@ -325,12 +373,25 @@ export function assertEvolutionProjectionCheckpoint(input: {
 		throw new Error("evolution active projection differs from checkpoint");
 }
 
+export function assertEvolutionProjectionCheckpoint(input: {
+	root: string;
+	db: Database;
+	projectId: string;
+	eventsDir?: string;
+}): void {
+	withSessionLock(input.root, CHECKPOINT_LOCK, () =>
+		assertEvolutionProjectionCheckpointUnlocked(input),
+	);
+}
+
 export function validateEvolutionProjectionCheckpoint(input: {
 	root: string;
 	db: Database;
 	projectId: string;
 	eventsDir?: string;
 }): void {
-	readCheckpoints(projectionCheckpointPath(input.root, input.eventsDir));
-	assertEvolutionProjectionCheckpoint(input);
+	withSessionLock(input.root, CHECKPOINT_LOCK, () => {
+		readCheckpoints(projectionCheckpointPath(input.root, input.eventsDir));
+		assertEvolutionProjectionCheckpointUnlocked(input);
+	});
 }

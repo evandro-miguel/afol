@@ -15,6 +15,7 @@
 			"evolve weekly [--json]",
 			"evolve after-merge <base>..<head> [--json]",
 			"evolve review <proposal-id> [--json]",
+			"evolve evaluate <id> [--record] [--superseded-by <id>] [-j]",
 			"evolve apply <proposal-id> [--json]",
 			"evolve rollback <proposal-id> [--json]",
 			"evolve suggest --first-session [--claimed-by <provider>] [--json]",

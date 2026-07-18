@@ -809,6 +809,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		],
 		subcommands: [
 			{
+				usage: "evaluate <id> [--record] [--superseded-by <id>] [-j]",
+				sideEffect: "preview",
+				description: "Evaluate one proposal deterministically",
+			},
+			{
 				usage: "analyze [--json]",
 				sideEffect: "read",
 				description: "Analyze recurrence, scorecard, and proposal previews",

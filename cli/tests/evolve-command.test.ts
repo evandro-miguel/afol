@@ -16,6 +16,7 @@ import { runEvolveCommand, runObserveCommand } from "../commands/evolve";
 import {
 	agentOperationContext,
 	defaultOperationContext,
+	localNonInteractiveOperationContext,
 	resolveOperationContext,
 } from "../core/operation-context";
 import { kernelRegistry } from "../registry";
@@ -187,6 +188,44 @@ describe("evolve status", () => {
 			action: "rollback",
 			args: ["EVO-1", "--json"],
 		});
+		expect(resolveCommand(["evolve", "evaluate", "M-1", "--json"])).toEqual({
+			kind: "subcommand",
+			group: "evolve",
+			action: "evaluate",
+			args: ["M-1", "--json"],
+		});
+	});
+
+	test("evaluation recording is restricted to a local operator", async () => {
+		const root = fixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand(
+					"evaluate",
+					["M-1", "--record", "--json"],
+					root,
+					captured.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(captured.stdout.join("\n")).toContain("local interactive mode");
+			const nonInteractive = captureIo();
+			expect(
+				await runEvolveCommand(
+					"evaluate",
+					["M-1", "--record", "--json"],
+					root,
+					nonInteractive.io,
+					localNonInteractiveOperationContext(),
+				),
+			).toBe(2);
+			expect(nonInteractive.stdout.join("\n")).toContain(
+				"local interactive mode",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("apply and rollback fail closed before mutation without valid CLI context", async () => {

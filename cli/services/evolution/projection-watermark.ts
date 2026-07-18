@@ -8,7 +8,7 @@ import {
 import { assertSafeEvolutionTarget } from "./db";
 
 const MAX_TAIL_BYTES = 65_536;
-const KINDS = new Set(["observation", "receipt"]);
+const KINDS = new Set(["observation", "receipt", "apply", "evaluation"]);
 
 function metadataKey(kind: string): string {
 	if (!KINDS.has(kind))
@@ -47,7 +47,7 @@ export function journalTailFingerprint(
 
 export function writeProjectionWatermark(
 	db: Database,
-	kind: "observation" | "receipt",
+	kind: "observation" | "receipt" | "apply" | "evaluation",
 	path: string,
 ): void {
 	const current = journalTailFingerprint(path);
@@ -60,7 +60,7 @@ export function writeProjectionWatermark(
 
 export function clearProjectionWatermark(
 	db: Database,
-	kind: "observation" | "receipt",
+	kind: "observation" | "receipt" | "apply" | "evaluation",
 ): void {
 	db.query("DELETE FROM evolution_metadata WHERE key = ?").run(
 		metadataKey(kind),
@@ -69,7 +69,7 @@ export function clearProjectionWatermark(
 
 export function assertProjectionWatermark(
 	db: Database,
-	kind: "observation" | "receipt",
+	kind: "observation" | "receipt" | "apply" | "evaluation",
 	path: string,
 	required: boolean,
 ): void {

@@ -1,5 +1,34 @@
 import { createHash } from "node:crypto";
-import type { ObservationRecord } from "./observation-model";
+import type { ObservationRecord, Scorecard } from "./observation-model";
+
+export const EVALUATION_CONTRACT_VERSION = 1 as const;
+export const EVALUATION_COMPARATOR_VERSION = "scorecard-v1" as const;
+export const EVALUATION_MINIMUM_COMPARABLE_SESSIONS = 3 as const;
+export const EVALUATION_PRODUCTION_DAY_WINDOW = 5 as const;
+
+export type EvaluationContractV1 = {
+	contract_version: typeof EVALUATION_CONTRACT_VERSION;
+	comparator_version: typeof EVALUATION_COMPARATOR_VERSION;
+	task_type: string;
+	cluster_id: string;
+	baseline: {
+		window: "recorded";
+		production_day_range: { start: number; end: number };
+		observation_ids: string[];
+		session_ids: string[];
+		observation_digest: string;
+		anchor_journal_sequence: number;
+		observation_count: number;
+		production_day_count: number;
+		scorecard: Scorecard;
+	};
+	targets: {
+		minimum_comparable_sessions: typeof EVALUATION_MINIMUM_COMPARABLE_SESSIONS;
+		production_day_window: typeof EVALUATION_PRODUCTION_DAY_WINDOW;
+		state: "canary";
+		metrics: Readonly<Record<string, number | null>>;
+	};
+};
 
 export type SuggestionCluster = {
 	fingerprint: string;
@@ -26,6 +55,7 @@ export type SuggestionCandidate = {
 	project_id: string;
 	local_date: string;
 	cluster_id: string;
+	task_type: string;
 	fingerprint_version: 1;
 	problem: string;
 	risk: string;
@@ -112,6 +142,46 @@ function stableJson(value: unknown): string {
 
 function digest(value: unknown): string {
 	return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+export function evaluationContractDigest(
+	contract: EvaluationContractV1,
+): string {
+	return digest(contract);
+}
+
+export function assertEvaluationContract(contract: EvaluationContractV1): void {
+	if (
+		contract.contract_version !== EVALUATION_CONTRACT_VERSION ||
+		contract.comparator_version !== EVALUATION_COMPARATOR_VERSION
+	)
+		throw new Error("unsupported evolution evaluation contract");
+	if (!contract.task_type || !contract.cluster_id)
+		throw new Error("invalid evolution evaluation contract identity");
+	const range = contract.baseline?.production_day_range;
+	if (
+		!range ||
+		!Number.isInteger(range.start) ||
+		!Number.isInteger(range.end) ||
+		range.start < 1 ||
+		range.end < range.start ||
+		range.end - range.start >= EVALUATION_PRODUCTION_DAY_WINDOW
+	)
+		throw new Error("invalid evolution evaluation production-day range");
+	if (
+		!Array.isArray(contract.baseline.observation_ids) ||
+		!Array.isArray(contract.baseline.session_ids) ||
+		!contract.baseline.observation_digest ||
+		!Number.isInteger(contract.baseline.anchor_journal_sequence) ||
+		contract.baseline.anchor_journal_sequence < 0
+	)
+		throw new Error("invalid evolution evaluation baseline anchors");
+	if (
+		contract.targets?.minimum_comparable_sessions !==
+			EVALUATION_MINIMUM_COMPARABLE_SESSIONS ||
+		contract.targets.production_day_window !== EVALUATION_PRODUCTION_DAY_WINDOW
+	)
+		throw new Error("invalid evolution evaluation targets");
 }
 
 function uniqueRefs(
@@ -224,6 +294,13 @@ export function buildSuggestionCandidate(input: {
 		throw new Error("unsupported suggestion fingerprint version");
 	if (input.observations.length === 0)
 		throw new Error("suggestion requires at least one observation");
+	const taskTypes = new Set(
+		input.observations.map((observation) => observation.task_type),
+	);
+	if (taskTypes.size !== 1)
+		throw new Error("suggestion cluster contains mixed task types");
+	const taskType = [...taskTypes][0];
+	if (!taskType) throw new Error("suggestion cluster requires a task type");
 	const critical = isCriticalSuggestion(input.observations);
 	const evidenceDigest = suggestionEvidenceDigest(input);
 	const refs = uniqueRefs([
@@ -250,6 +327,7 @@ export function buildSuggestionCandidate(input: {
 		project_id: input.projectId,
 		local_date: input.localDate,
 		cluster_id: input.cluster.fingerprint,
+		task_type: taskType,
 		fingerprint_version: 1,
 		problem: `${observationKind(input.observations[0] as ObservationRecord) || "workflow friction"} recurred across ${input.cluster.distinct_session_count} sessions`,
 		risk: critical ? "critical alert; no automatic suggestion" : "low",
@@ -280,6 +358,97 @@ export function buildSuggestionCandidate(input: {
 		critical,
 		state: "available",
 		source_refs: refs,
+	};
+}
+
+export function selectEvaluationBaselineObservations(input: {
+	candidate: Pick<SuggestionCandidate, "cluster_id" | "task_type">;
+	observations: readonly ObservationRecord[];
+}): ObservationRecord[] {
+	const taskType = input.candidate.task_type;
+	if (!taskType) throw new Error("evolution proposal requires a task type");
+	const taskObservations = input.observations.filter(
+		(observation) => observation.task_type === taskType,
+	);
+	const days = taskObservations
+		.map((observation) => observation.production_day_sequence)
+		.filter((day) => Number.isInteger(day) && day > 0);
+	const end = days.length > 0 ? Math.max(...days) : 0;
+	if (end < 1)
+		throw new Error("evolution proposal requires a production-day baseline");
+	const start = Math.max(1, end - EVALUATION_PRODUCTION_DAY_WINDOW + 1);
+	return taskObservations
+		.filter(
+			(observation) =>
+				observation.production_day_sequence >= start &&
+				observation.production_day_sequence <= end,
+		)
+		.sort(
+			(left, right) =>
+				left.journal_sequence - right.journal_sequence ||
+				left.id.localeCompare(right.id),
+		);
+}
+
+/** Build the immutable, task-type-scoped baseline carried by a proposal. */
+export function buildEvaluationContract(input: {
+	candidate: Pick<SuggestionCandidate, "cluster_id" | "task_type">;
+	baselineObservations: readonly ObservationRecord[];
+	scorecard: Scorecard;
+	targetMetrics: Readonly<Record<string, number | null>>;
+}): EvaluationContractV1 {
+	const taskType = input.candidate.task_type;
+	if (!taskType) throw new Error("evolution proposal requires a task type");
+	const baselineObservations = [...input.baselineObservations];
+	const days = baselineObservations.map(
+		(observation) => observation.production_day_sequence,
+	);
+	const end = Math.max(...days);
+	const start = Math.max(1, end - EVALUATION_PRODUCTION_DAY_WINDOW + 1);
+	const observationIds = baselineObservations.map(
+		(observation) => observation.id,
+	);
+	const sessionIds = [
+		...new Set(
+			baselineObservations.map((observation) => observation.session_id),
+		),
+	].sort();
+	return {
+		contract_version: EVALUATION_CONTRACT_VERSION,
+		comparator_version: EVALUATION_COMPARATOR_VERSION,
+		task_type: taskType,
+		cluster_id: input.candidate.cluster_id,
+		baseline: {
+			window: "recorded",
+			production_day_range: { start, end },
+			observation_ids: observationIds,
+			session_ids: sessionIds,
+			observation_digest: digest(
+				baselineObservations.map((observation) => ({
+					id: observation.id,
+					journal_sequence: observation.journal_sequence,
+					session_id: observation.session_id,
+					production_day_sequence: observation.production_day_sequence,
+				})),
+			),
+			anchor_journal_sequence: baselineObservations.reduce(
+				(max, observation) => Math.max(max, observation.journal_sequence),
+				0,
+			),
+			observation_count: baselineObservations.length,
+			production_day_count: new Set(
+				baselineObservations.map(
+					(observation) => observation.production_day_sequence,
+				),
+			).size,
+			scorecard: input.scorecard,
+		},
+		targets: {
+			minimum_comparable_sessions: EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
+			production_day_window: EVALUATION_PRODUCTION_DAY_WINDOW,
+			state: "canary",
+			metrics: input.targetMetrics,
+		},
 	};
 }
 

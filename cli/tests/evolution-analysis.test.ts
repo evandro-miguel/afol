@@ -59,6 +59,7 @@ function candidate(index: number, critical = false): SuggestionCandidate {
 		project_id: PROJECT_ID,
 		local_date: "2026-07-21",
 		cluster_id: `cluster-${index}`,
+		task_type: "documentation",
 		fingerprint_version: 1,
 		problem: "workflow friction recurred",
 		risk: critical ? "critical" : "low",

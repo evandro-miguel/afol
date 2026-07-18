@@ -1,6 +1,7 @@
 export * from "./analysis";
 export {
 	APPLY_POLICY_VERSION,
+	APPLY_VALIDATOR_V1,
 	APPLY_VALIDATOR_VERSION,
 	type ApplyBinding,
 	type ApplyJournalEvent,
@@ -13,6 +14,20 @@ export type { ApplyResult } from "./apply-service";
 export * from "./config";
 export * from "./db";
 export * from "./derived-state";
+export {
+	appendEvaluationEvent,
+	appendEvaluationEventUnlocked,
+	type EvaluationEventInput,
+	type EvaluationEventType,
+	type EvaluationJournalEvent,
+	evaluationDigest,
+	evaluationJournalPath,
+	readEvaluationJournal,
+	rebuildEvaluationProjection,
+	validateEvaluationProjection,
+	withEvaluationLock,
+} from "./evaluation-journal";
+export * from "./evaluation-service";
 export * from "./health";
 export {
 	type ExternalImportManifest,

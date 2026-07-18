@@ -27,9 +27,9 @@
           "type": "object",
           "properties": {
             "external_dir": { "const": ".afol/external" },
-            "evolution_db": { "const": ".afol/state/evolution.db" },
+            "evolution_db": { "$ref": "#/$defs/projectRelativePath" },
             "evolution_data_dir": { "const": ".afol/data/evolution" },
-            "evolution_events_dir": { "const": ".afol/data/events/evolution" }
+            "evolution_events_dir": { "$ref": "#/$defs/projectRelativePath" }
           },
           "additionalProperties": true
         },
@@ -102,6 +102,11 @@
     "projectId": {
       "type": "string",
       "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "projectRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*/$)[^\\u0000]+$"
     },
     "ianaTimezone": {
       "type": "string",

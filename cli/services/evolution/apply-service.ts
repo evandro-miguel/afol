@@ -22,6 +22,7 @@ import {
 } from "./analysis";
 import {
 	APPLY_POLICY_VERSION,
+	APPLY_VALIDATOR_V1,
 	APPLY_VALIDATOR_VERSION,
 	type ApplyBinding,
 	type ApplyInvocationClass,
@@ -33,7 +34,10 @@ import {
 	unmatchedApplyPrepares,
 	withApplyLock,
 } from "./apply-journal";
+import { evolutionDbPath, openEvolutionDb } from "./db";
+import { writeEvolutionProjectionCheckpoint } from "./projection-checkpoint";
 import { resolveEvolutionConfig } from "./runtime-config";
+import { evaluationContractDigest } from "./suggestion-model";
 
 type ApplyPolicyMode = "canary" | "lessons_memory_only" | "none";
 
@@ -308,6 +312,8 @@ function bind(input: {
 	return {
 		project_id: input.apply.projectId,
 		proposal_id: input.proposal.id,
+		cluster_id: input.proposal.cluster_id,
+		task_type: input.proposal.task_type,
 		proposal_digest: applyDigest(input.proposal),
 		evidence_digest: input.proposal.evidence_digest,
 		evidence_refs: safeSourceRefs(input.proposal),
@@ -320,6 +326,11 @@ function bind(input: {
 		policy_mode: input.apply.policyMode,
 		policy_version: APPLY_POLICY_VERSION,
 		validator_version: APPLY_VALIDATOR_VERSION,
+		contract_version: input.proposal.contract_version,
+		evaluation_contract: structuredClone(input.proposal.evaluation_contract),
+		evaluation_contract_digest: evaluationContractDigest(
+			input.proposal.evaluation_contract,
+		),
 		target_kind: input.targetKind,
 		target_path: input.targetPath,
 		before_state: "absent",
@@ -342,7 +353,7 @@ function appendTerminal(input: {
 	taskId: string;
 	now?: Date;
 }) {
-	return appendApplyEventUnlocked({
+	const event = appendApplyEventUnlocked({
 		root: input.root,
 		phase: input.phase,
 		binding: input.binding,
@@ -350,6 +361,25 @@ function appendTerminal(input: {
 		commandTaskId: input.taskId,
 		...(input.now ? { now: input.now } : {}),
 	});
+	refreshApplyCheckpoint(input.root);
+	return event;
+}
+
+function refreshApplyCheckpoint(root: string): void {
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId)
+		throw new Error("evolution project id is required for apply checkpoint");
+	const db = openEvolutionDb(evolutionDbPath(root, resolved.paths.evolutionDb));
+	try {
+		writeEvolutionProjectionCheckpoint({
+			root,
+			db,
+			projectId: resolved.projectId,
+			eventsDir: resolved.paths.evolutionEventsDir,
+		});
+	} finally {
+		db.close();
+	}
 }
 
 function committedMutation(
@@ -505,6 +535,7 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 							commandTaskId: input.taskId,
 							...(input.now ? { now: input.now } : {}),
 						});
+						refreshApplyCheckpoint(input.root);
 					},
 				},
 			);
@@ -661,8 +692,10 @@ function assertMutationBinding(
 }
 
 function revalidateRecovery(root: string, binding: ApplyBinding): void {
+	if (binding.policy_version !== APPLY_POLICY_VERSION)
+		throw new Error("evolution recovery validator version mismatch");
 	if (
-		binding.policy_version !== APPLY_POLICY_VERSION ||
+		binding.validator_version !== APPLY_VALIDATOR_V1 &&
 		binding.validator_version !== APPLY_VALIDATOR_VERSION
 	)
 		throw new Error("evolution recovery validator version mismatch");
@@ -671,16 +704,11 @@ function revalidateRecovery(root: string, binding: ApplyBinding): void {
 		policyMode(root) !== "canary"
 	)
 		throw new Error("evolution recovery policy no longer permits canary");
-	const analysis = analyzeEvolutionProject(root);
-	const proposal = analysis.proposals.find(
-		(candidate) => candidate.id === binding.proposal_id,
-	);
-	if (
-		analysis.project_id !== binding.project_id ||
-		!proposal ||
-		applyDigest(proposal) !== binding.proposal_digest ||
-		proposal.evidence_digest !== binding.evidence_digest
-	)
+	if (binding.validator_version === APPLY_VALIDATOR_V1) {
+		validateArtifact(root, binding);
+		return;
+	}
+	if (currentProjectId(root) !== binding.project_id)
 		throw new Error("evolution recovery proposal is stale");
 	validateArtifact(root, binding);
 }

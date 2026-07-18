@@ -73,7 +73,7 @@ describe("evolution observation model", () => {
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(7);
+			).toBe(8);
 			expect(
 				db
 					.query(
@@ -132,7 +132,7 @@ describe("evolution observation model", () => {
 		const db = new Database(":memory:");
 		try {
 			applyMigrations(db);
-			expect(EVOLUTION_SCHEMA_VERSION).toBe(7);
+			expect(EVOLUTION_SCHEMA_VERSION).toBe(8);
 			expect(
 				db
 					.query(

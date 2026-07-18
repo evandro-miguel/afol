@@ -8,6 +8,11 @@ import {
 	evolutionDbPath,
 	openEvolutionDb,
 } from "./db";
+import {
+	readEvaluationJournal,
+	rebuildEvaluationProjection,
+	validateEvaluationProjection,
+} from "./evaluation-journal";
 import { readImportJournal } from "./import-journal";
 import {
 	rebuildExternalImportProjection,
@@ -61,10 +66,12 @@ export type EvolutionDerivedStateResult = {
 	observation_events: number;
 	receipt_events: number;
 	import_events: number;
+	evaluation_events: number;
 	production_projection_rebuilt: boolean;
 	observation_projection_rebuilt: boolean;
 	receipt_projection_rebuilt: boolean;
 	import_projection_rebuilt: boolean;
+	evaluation_projection_rebuilt: boolean;
 	checkpoint_tail_repaired: boolean;
 	checkpoint_written: boolean;
 	changed: boolean;
@@ -112,6 +119,7 @@ function baseResult(
 	observationEvents: number,
 	receiptEvents: number,
 	importEvents: number,
+	evaluationEvents: number,
 	migrationVersion: number,
 ): EvolutionDerivedStateResult {
 	return {
@@ -123,10 +131,12 @@ function baseResult(
 		observation_events: observationEvents,
 		receipt_events: receiptEvents,
 		import_events: importEvents,
+		evaluation_events: evaluationEvents,
 		production_projection_rebuilt: false,
 		observation_projection_rebuilt: false,
 		receipt_projection_rebuilt: false,
 		import_projection_rebuilt: false,
+		evaluation_projection_rebuilt: false,
 		checkpoint_tail_repaired: false,
 		checkpoint_written: false,
 		changed: false,
@@ -162,6 +172,11 @@ export function previewEvolutionDerivedState(
 		resolved.projectId,
 		resolved.eventsDir,
 	).length;
+	const evaluationEvents = readEvaluationJournal(
+		resolved.root,
+		resolved.projectId,
+		resolved.eventsDir,
+	).length;
 
 	let db: Database | null = input.db ?? null;
 	let owned = false;
@@ -177,6 +192,7 @@ export function previewEvolutionDerivedState(
 			observationEvents,
 			receiptEvents,
 			importEvents,
+			evaluationEvents,
 			readVersion(db),
 		);
 	} finally {
@@ -215,12 +231,18 @@ export function repairEvolutionDerivedState(
 				resolved.projectId,
 				resolved.eventsDir,
 			).length;
+			const evaluationEvents = readEvaluationJournal(
+				resolved.root,
+				resolved.projectId,
+				resolved.eventsDir,
+			).length;
 			const result = baseResult(
 				"repair",
 				resolved,
 				observationEvents,
 				receiptEvents,
 				importEvents,
+				evaluationEvents,
 				readVersion(db),
 			);
 
@@ -233,6 +255,12 @@ export function repairEvolutionDerivedState(
 					db,
 				});
 				validateExternalImportProjection({
+					root: resolved.root,
+					projectId: resolved.projectId,
+					eventsDir: resolved.eventsDir,
+					db,
+				});
+				validateEvaluationProjection({
 					root: resolved.root,
 					projectId: resolved.projectId,
 					eventsDir: resolved.eventsDir,
@@ -289,12 +317,19 @@ export function repairEvolutionDerivedState(
 				eventsDir: resolved.eventsDir,
 				db,
 			});
+			rebuildEvaluationProjection({
+				root: resolved.root,
+				projectId: resolved.projectId,
+				eventsDir: resolved.eventsDir,
+				db,
+			});
 			return {
 				...result,
 				production_projection_rebuilt: productionProjectionRebuilt,
 				observation_projection_rebuilt: true,
 				receipt_projection_rebuilt: true,
 				import_projection_rebuilt: true,
+				evaluation_projection_rebuilt: true,
 				checkpoint_tail_repaired: checkpointTailRepaired,
 				checkpoint_written: true,
 				changed: true,
