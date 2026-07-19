@@ -715,7 +715,7 @@ describe("validate registry", () => {
 				),
 				"utf8",
 			);
-			expect(validateRegistryContract(snapshot)).toContain(
+			expect(validateRegistryContract(snapshot)).not.toContain(
 				"scenario-feature-coverage-missing:F-30",
 			);
 

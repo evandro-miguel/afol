@@ -1014,11 +1014,13 @@ Follow-on slices under this direction:
   import, automatic application, or daemon. Do not combine F-30 slices with
   SQLite, memory, library, context, or maintenance rewrites.
 
-#### F-30 Agent Submission and Batch Review
+#### Agent Submission and Batch Review (F-30 child)
 
-- Status: active
+- Child status: active
 - Governing spec:
   .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
+- Parent spec:
+  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
 - Intent: explore a bounded one-worker submission and review workflow that may
   reduce lifecycle round trips while preserving AFOL's existing authority and
   evidence boundaries.
