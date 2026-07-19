@@ -46,6 +46,8 @@ benchmark catalog contract:
   `.afol/adm/specs/*.md`.
 - `scenario.implementation_status: implemented` is required before command or
   subcommand coverage counts as production proof.
+- `scenario.implementation_status: planned` records an intentional backlog
+  lane. Planned scenarios do not execute and never count as production proof.
 - `registry.json.coverage.exemptions` and
   `registry.json.coverage.subcommand_exemptions` must stay empty for a
   full-surface claim. Any entry is visible backlog, not passing proof.
@@ -55,11 +57,14 @@ benchmark catalog contract:
 - An implemented scenario that declares command or subcommand coverage without
   a journey fails validation with
   `scenario-journey-coverage-missing:<pack>:<scenario>`.
+- Unknown command, subcommand, feature, or spec references fail for every
+  scenario status, including planned and skipped backlog metadata.
 - A `### F-xx` roadmap feature without a concrete governing spec fails with
   `roadmap-feature-governing-spec-missing:<feature>`.
-- A roadmap feature or root spec without implemented scenario coverage fails
-  with `scenario-feature-coverage-missing:<feature>` or
-  `scenario-spec-coverage-missing:<spec-id>`.
+- A final or release roadmap feature or root spec without implemented scenario
+  coverage fails with `scenario-feature-coverage-missing:<feature>` or
+  `scenario-spec-coverage-missing:<spec-id>`. Active and planned intent may
+  remain unimplemented until promoted.
 
 This gate covers the 44 canonical commands and 94 documented subcommands as a
 contract. The registry currently has zero command or subcommand exemptions. The
@@ -223,12 +228,16 @@ coverage when the command changes or a production incident exposes a weak path:
 - Scripted surface scenarios cover every `subcommands[].usage` entry.
 - Skipped scenarios, disabled scenarios, and exemption rows do not count as
   production proof.
+- Planned scenarios are non-executing backlog metadata and do not count as
+  production proof until promoted to implemented with fresh evidence.
 - Multi-step and live-agent scenarios carry `coverage.journeys` and bind to
   evidence, not only command strings.
 - Every `### F-xx` roadmap feature has exactly one concrete governing spec in
   `.afol/adm/specs/*.md`.
-- Every roadmap feature appears in implemented `scenario.coverage.features`.
-- Every root spec appears in implemented `scenario.coverage.specs`.
+- Every final or release roadmap feature appears in implemented
+  `scenario.coverage.features`.
+- Every final or release root spec appears in implemented
+  `scenario.coverage.specs`.
 - Runtime live-agent validation fails when the saved result artifact is missing.
 - Live-agent results log actual tool calls, not only final prose.
 - Maintenance scenarios verify the warning behavior for stale sessions, memory,

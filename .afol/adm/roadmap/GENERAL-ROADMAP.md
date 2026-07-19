@@ -943,6 +943,23 @@ Follow-on slices under this direction:
   complete, full-suite evidence `E-20260715211444533-1df252`, and independent
   downstream scaffold review.
 
+### F-30 Agent Submission and Batch Review
+
+- Status: active
+- Governing spec:
+  .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
+- Intent: explore a bounded one-worker submission and review workflow that may
+  reduce lifecycle round trips while preserving AFOL's existing authority and
+  evidence boundaries.
+- Architectural decision:
+  .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md
+- No public `dispatch`, `submit`, or F-30 benchmark pack exists in the current
+  registry. These names remain design vocabulary only until an implementation
+  slice is approved and shipped.
+- Backlog acceptance requires a governing child spec, registered commands and
+  scenarios, deterministic authority/integrity tests, and fresh observed
+  evidence. Planned intent is not production proof.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command

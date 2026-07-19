@@ -16,9 +16,9 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 75 |
+| Total | 76 |
 | Draft | 0 |
-| Active | 3 |
+| Active | 4 |
 | Final | 54 |
 | Superseded | 18 |
 
@@ -101,6 +101,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260716_1234_agent-cli-sequential-verification-runs_spec-child_01 | agent-cli-sequential-verification-runs | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
+| 260717_agent-submission-and-batch-review_spec_01 | agent-submission-and-batch-review | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

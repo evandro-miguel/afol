@@ -35,6 +35,9 @@ lifecycle changes.
 - Command strings, skipped scenarios, disabled scenarios, and exemption rows are
   not production proof by themselves. They are routing metadata or visible
   backlog until tied to executable scenario evidence.
+- Planned scenarios are explicit non-executing backlog metadata. They do not
+  count as production proof. Command, subcommand, feature, and spec references
+  remain strict regardless of implementation status.
 - Multi-step and live-agent scenarios must carry journey metadata that names the
   user flow and points to saved evidence before they are accepted as live
   coverage.

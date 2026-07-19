@@ -554,6 +554,9 @@ describe("validate registry", () => {
 				200,
 			);
 			expect(validateRegistryContract(snapshot)).toEqual([]);
+			expect(validateRegistryContract(snapshot)).not.toContain(
+				"scenario-feature-coverage-missing:F-30",
+			);
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
 			const routingScenarios = snapshot.scenariosByPack["routing-accuracy"];
@@ -633,6 +636,111 @@ describe("validate registry", () => {
 			expect(issues).toContain(
 				"baseline-schema-version-mismatch:cli-kernel-local:0.0.0",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("requires an explicit supported implementation status", () => {
+		const root = createFixtureRoot();
+		try {
+			const scenarioPath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"scenarios",
+				"cli-kernel-local",
+				"cli-status-json.json",
+			);
+			const scenario = readJson(scenarioPath);
+			delete scenario.implementation_status;
+			writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+			expect(() => loadRegistry(root)).toThrow(
+				"Invalid or missing implementation_status field",
+			);
+			writeFileSync(
+				scenarioPath,
+				`${JSON.stringify({ ...scenario, implementation_status: "invented" }, null, 2)}\n`,
+			);
+			expect(() => loadRegistry(root)).toThrow(
+				"Invalid or missing implementation_status field",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed on missing or noncanonical roadmap/spec statuses", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const originalRoadmap = readFileSync(roadmapPath, "utf8");
+			const f30Start = originalRoadmap.indexOf("### F-30 ");
+			const f30End = originalRoadmap.indexOf("\n### ", f30Start + 1);
+			const f30Section = originalRoadmap.slice(
+				f30Start,
+				f30End === -1 ? undefined : f30End,
+			);
+			for (const [statusLine, expected] of [
+				["- Status:", "roadmap-feature-status-invalid:F-30:missing"],
+				["- Status: Active", "roadmap-feature-status-invalid:F-30:Active"],
+				["- Status: actve", "roadmap-feature-status-invalid:F-30:actve"],
+			] as const) {
+				writeFileSync(
+					roadmapPath,
+					originalRoadmap.replace(
+						f30Section,
+						f30Section.replace(/^- Status:.*$/m, statusLine),
+					),
+					"utf8",
+				);
+				const issues = validateRegistryContract(snapshot);
+				expect(issues).toContain(expected);
+				expect(issues).not.toContain("scenario-feature-coverage-missing:F-30");
+			}
+			writeFileSync(
+				roadmapPath,
+				originalRoadmap.replace(
+					f30Section,
+					f30Section.replace(/^- Status:.*$/m, "- Status: final"),
+				),
+				"utf8",
+			);
+			expect(validateRegistryContract(snapshot)).toContain(
+				"scenario-feature-coverage-missing:F-30",
+			);
+
+			const specId = "260717_agent-submission-and-batch-review_spec_01";
+			const specPath = join(root, ".afol", "adm", "specs", `${specId}.md`);
+			const originalSpec = readFileSync(specPath, "utf8");
+			for (const [status, expected] of [
+				["", `spec-status-invalid:${specId}:missing`],
+				["Final", `spec-status-invalid:${specId}:Final`],
+				["actve", `spec-status-invalid:${specId}:actve`],
+			] as const) {
+				writeFileSync(
+					specPath,
+					originalSpec.replace(
+						/^status:.*$/m,
+						status ? `status: ${status}` : "status:",
+					),
+					"utf8",
+				);
+				const issues = validateRegistryContract(snapshot);
+				expect(issues).toContain(expected);
+				expect(issues).not.toContain(
+					`scenario-spec-coverage-missing:${specId}`,
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -819,7 +927,9 @@ describe("validate registry", () => {
 			writeFileSync(f20SpecPath, originalF20Spec, "utf8");
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
-			const cliKernelScenario = cliKernelScenarios?.[0];
+			const cliKernelScenario = cliKernelScenarios?.find(
+				(scenario) => scenario.implementation_status === "implemented",
+			);
 			if (!cliKernelScenarios || !cliKernelScenario) {
 				throw new Error("Expected cli-kernel-local scenarios fixture");
 			}
@@ -838,6 +948,30 @@ describe("validate registry", () => {
 			};
 			expect(validateRegistryContract(unknownScenarioCoverage)).toContain(
 				`scenario-tool-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:not-a-command`,
+			);
+			const plannedUnknownCoverage: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"cli-kernel-local": [
+						{
+							...cliKernelScenario,
+							implementation_status: "planned",
+							coverage: {
+								commands: ["not-a-command"],
+								subcommands: ["status --definitely-nope"],
+								journeys: ["fixture-journey"],
+							},
+						},
+						...cliKernelScenarios.slice(1),
+					],
+				},
+			};
+			expect(validateRegistryContract(plannedUnknownCoverage)).toEqual(
+				expect.arrayContaining([
+					`scenario-tool-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:not-a-command`,
+					`scenario-tool-subcommand-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:status --definitely-nope`,
+				]),
 			);
 			const unknownScenarioSubcommandCoverage: RegistrySnapshot = {
 				...snapshot,
@@ -1095,6 +1229,20 @@ describe("scenario benchmark execution", () => {
 			expect(
 				failure.result.notes.some((note) => note.startsWith("sample-failed:")),
 			).toBe(true);
+
+			const plannedScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-planned-no-execution",
+				implementation_status: "planned",
+				command: `node -e 'require("node:fs").writeFileSync("planned-ran.txt","unexpected\\n")'`,
+			};
+			const planned = withCapturedConsoleError(() =>
+				buildResult(root, plannedScenario, baselinePath, baseline),
+			);
+			expect(planned.result.status).toBe("skipped");
+			expect(planned.result.pass).toBe(false);
+			expect(planned.result.notes).toEqual(["planned-no-execution"]);
+			expect(existsSync(join(root, "planned-ran.txt"))).toBe(false);
 
 			const sideEffectScenario: Scenario = {
 				...successScenario,
@@ -2091,9 +2239,9 @@ describe("runtime live validation helpers", () => {
 				baselinePath,
 			);
 			expect(fallback.results).toHaveLength(4);
-			expect(fallback.results.every((entry) => entry.status === "passed")).toBe(
-				true,
-			);
+			expect(
+				fallback.results.filter((entry) => entry.status === "passed"),
+			).toHaveLength(4);
 			expect(fallback.notes).toContain(
 				"runtime-live-agent-evidence-source:result",
 			);
@@ -2116,16 +2264,18 @@ describe("runtime live validation helpers", () => {
 			);
 			expect(missingSavedResult.results).toHaveLength(4);
 			expect(
-				missingSavedResult.results.every((entry) => entry.status === "passed"),
+				missingSavedResult.results.filter((entry) => entry.status === "passed"),
+			).toHaveLength(4);
+			expect(
+				missingSavedResult.results
+					.filter((entry) => entry.status !== "skipped")
+					.every((entry) =>
+						entry.notes.includes("live-runner-evidence-source:snapshot"),
+					),
 			).toBe(true);
 			expect(missingSavedResult.notes).toContain(
 				"runtime-live-agent-evidence-source:snapshot",
 			);
-			expect(
-				missingSavedResult.results.every((entry) =>
-					entry.notes.includes("live-runner-evidence-source:snapshot"),
-				),
-			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2189,18 +2339,18 @@ describe("runtime live validation helpers", () => {
 				".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
 			);
 			const valid = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
-			expect(valid.results.every((entry) => entry.status === "passed")).toBe(
-				true,
-			);
+			expect(
+				valid.results.filter((entry) => entry.status === "passed"),
+			).toHaveLength(4);
 
 			const snapshotPath = getRuntimeLiveSnapshotPath(root);
 			const snapshot = readJson(snapshotPath);
 			snapshot.generated_at = "2020-01-01T00:00:00.000Z";
 			writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 			const stale = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
-			expect(stale.results.every((entry) => entry.status === "failed")).toBe(
-				true,
-			);
+			expect(
+				stale.results.filter((entry) => entry.status === "failed"),
+			).toHaveLength(4);
 			expect(stale.notes[0]).toStartWith("runtime-live-snapshot-stale:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -2338,9 +2488,9 @@ describe("runtime live validation helpers", () => {
 				scenarios,
 				baselinePath,
 			);
-			expect(missing.results.every((entry) => entry.status === "failed")).toBe(
-				true,
-			);
+			expect(
+				missing.results.filter((entry) => entry.status === "failed"),
+			).toHaveLength(4);
 			expect(missing.notes).toContain(
 				`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
 			);

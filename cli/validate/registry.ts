@@ -34,6 +34,26 @@ const ROADMAP_RELATIVE_PATHS = [
 	".afol/adm/roadmap.md",
 ] as const;
 const SPECS_RELATIVE_PATH = ".afol/adm/specs";
+const IMPLEMENTATION_STATUSES = ["implemented", "planned", "skipped"] as const;
+type ImplementationStatus = (typeof IMPLEMENTATION_STATUSES)[number];
+const ROADMAP_STATUSES = [
+	"active",
+	"final",
+	"planned",
+	"planned follow-on",
+	"release",
+] as const;
+const SPEC_STATUSES = [
+	"active",
+	"approved",
+	"deprecated",
+	"draft",
+	"final",
+	"planned",
+	"release",
+	"review",
+	"superseded",
+] as const;
 
 function parsePackId(value: unknown, key: string): PackId {
 	const packId = asString(value, key);
@@ -180,14 +200,18 @@ function parseScenario(
 	if (expectedExit !== undefined) {
 		scenario.expected_exit = expectedExit;
 	}
-	if (typeof data.implementation_status === "string") {
-		if (
-			data.implementation_status === "implemented" ||
-			data.implementation_status === "skipped"
-		) {
-			scenario.implementation_status = data.implementation_status;
-		}
+	if (
+		typeof data.implementation_status !== "string" ||
+		!IMPLEMENTATION_STATUSES.includes(
+			data.implementation_status as ImplementationStatus,
+		)
+	) {
+		throw new Error(
+			`Invalid or missing implementation_status field: ${sourcePath}.implementation_status`,
+		);
 	}
+	scenario.implementation_status =
+		data.implementation_status as ImplementationStatus;
 	const liveRunnerScenarioId = asOptionalString(
 		data.live_runner_scenario_id,
 		`${sourcePath}.live_runner_scenario_id`,
@@ -592,13 +616,35 @@ function validateToolCoverage(
 interface RoadmapFeature {
 	id: string;
 	title: string;
+	status?: string;
 	governingSpec?: string;
 }
 
 interface SpecEntry {
 	id: string;
 	fileName: string;
+	status?: string;
 	roadmapFeature?: string;
+}
+
+function requiresProductionProof(status: string | undefined): boolean {
+	return status === "final" || status === "release";
+}
+
+function validateGovernanceStatus(
+	status: string | undefined,
+	allowedStatuses: readonly string[],
+	issuePrefix: string,
+	identifier: string,
+	issues: string[],
+): boolean {
+	if (status === undefined || !allowedStatuses.includes(status)) {
+		issues.push(
+			`${issuePrefix}-status-invalid:${identifier}:${status ?? "missing"}`,
+		);
+		return false;
+	}
+	return true;
 }
 
 function cleanMarkdownScalar(value: string | undefined): string | undefined {
@@ -666,6 +712,14 @@ function parseRoadmapFeatures(source: string): RoadmapFeature[] {
 		if (current === undefined) {
 			continue;
 		}
+		const status = line.match(/^- Status:\s*(.*)$/);
+		if (status) {
+			const parsedStatus = cleanMarkdownScalar(status[1]);
+			if (parsedStatus !== undefined) {
+				current.status = parsedStatus;
+			}
+			continue;
+		}
 		const governingSpec = line.match(/^- Governing spec:\s*(.*)$/);
 		if (governingSpec) {
 			const parsedGoverningSpec = cleanMarkdownScalar(governingSpec[1]);
@@ -724,6 +778,10 @@ function loadSpecEntries(projectRoot: string): Map<string, SpecEntry> {
 			id,
 			fileName: entry.name,
 		};
+		const status = parseFrontmatterScalar(source, "status");
+		if (status !== undefined) {
+			specEntry.status = status;
+		}
 		const roadmapFeature = parseFrontmatterScalar(source, "roadmap_feature");
 		if (roadmapFeature !== undefined) {
 			specEntry.roadmapFeature = roadmapFeature;
@@ -743,7 +801,10 @@ function collectFeatureAndSpecCoverage(
 	knownFeatures: ReadonlySet<string>,
 	knownSpecs: ReadonlySet<string>,
 	issues: string[],
-): { features: Set<string>; specs: Set<string> } {
+): {
+	features: Set<string>;
+	specs: Set<string>;
+} {
 	const features = new Set<string>();
 	const specs = new Set<string>();
 	for (const [packId, scenarios] of Object.entries(snapshot.scenariosByPack)) {
@@ -797,6 +858,13 @@ function validateFeatureSpecCoverage(
 		issues,
 	);
 	for (const feature of roadmapFeatures) {
+		const validStatus = validateGovernanceStatus(
+			feature.status,
+			ROADMAP_STATUSES,
+			"roadmap-feature",
+			feature.id,
+			issues,
+		);
 		const rawGoverningSpec = cleanMarkdownScalar(feature.governingSpec);
 		if (
 			rawGoverningSpec === undefined ||
@@ -819,11 +887,22 @@ function validateFeatureSpecCoverage(
 				);
 			}
 		}
-		if (!coverage.features.has(feature.id)) {
+		if (
+			validStatus &&
+			requiresProductionProof(feature.status) &&
+			!coverage.features.has(feature.id)
+		) {
 			issues.push(`scenario-feature-coverage-missing:${feature.id}`);
 		}
 	}
 	for (const spec of specs.values()) {
+		const validStatus = validateGovernanceStatus(
+			spec.status,
+			SPEC_STATUSES,
+			"spec",
+			spec.id,
+			issues,
+		);
 		if (
 			spec.roadmapFeature !== undefined &&
 			!knownFeatures.has(spec.roadmapFeature)
@@ -832,7 +911,11 @@ function validateFeatureSpecCoverage(
 				`spec-roadmap-feature-unknown:${spec.id}:${spec.roadmapFeature}`,
 			);
 		}
-		if (!coverage.specs.has(spec.id)) {
+		if (
+			validStatus &&
+			requiresProductionProof(spec.status) &&
+			!coverage.specs.has(spec.id)
+		) {
 			issues.push(`scenario-spec-coverage-missing:${spec.id}`);
 		}
 	}

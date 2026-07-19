@@ -850,19 +850,30 @@ describe("verifyWorkbenchTasks", () => {
 		}
 	});
 
-	test("detectSessionHealth catches duplicate themes", () => {
+	test("detectSessionHealth ignores timestamp-distinct closed sessions with the same theme", () => {
 		const root = mkRoot("dup-theme");
 		try {
-			// Two sessions sharing the same theme "same-feature"
+			// Closed sessions may legitimately reuse a descriptive theme.
 			const sessionA = "260609_1001_same-feature";
 			const sessionB = "260610_1002_same-feature";
 			mkdirSync(join(root, ".afol", "wb", sessionA), { recursive: true });
 			mkdirSync(join(root, ".afol", "wb", sessionB), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "data", "events", "events.jsonl"),
+				[
+					{ type: "workbench.new", session: sessionA },
+					{ type: "workbench.close", session: sessionA },
+					{ type: "workbench.new", session: sessionB },
+					{ type: "workbench.close", session: sessionB },
+				]
+					.map((event, index) => JSON.stringify({ ...event, id: `E-${index}` }))
+					.join("\n") + "\n",
+				"utf8",
+			);
 
 			const warnings = detectSessionHealth(root);
-			const duplicates = warnings.filter((w) => w.type === "duplicate_theme");
-			expect(duplicates.length).toBeGreaterThanOrEqual(1);
-			expect(duplicates[0]?.message).toContain("same-feature");
+			expect(warnings).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

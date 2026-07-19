@@ -243,14 +243,6 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 			);
 			continue;
 		}
-		findings.push(
-			makeFinding(
-				"wb",
-				"warn",
-				warning.message,
-				"dedupe or rename the sessions",
-			),
-		);
 	}
 
 	if (deep && findings.length === 0) {
