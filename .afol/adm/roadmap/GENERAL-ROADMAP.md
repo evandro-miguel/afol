@@ -639,12 +639,24 @@ Minimum acceptance:
   project work when agents never run the explicit proposal/promotion flows.
   Empty stores are valid when there is no reusable material, but AFOL should
   distinguish "nothing worth retaining" from "workflow never asked".
+- Current gap: AFOL exposes manual memory and library proposal/promotion
+  primitives, while healthy empty stores remain valid. Those primitives and a
+  green health result do not satisfy this slice because no session-to-candidate
+  adoption path exists yet.
+- Evolution boundary: implement this direction as a future read-only AFOL
+  Evolution candidate-review slice. It may inspect completed project artifacts
+  and emit candidates with source/session provenance, but it must not promote,
+  mutate, auto-ingest, or imply that an Evolution command already exists.
+- Governance gate: approve a dedicated F-18.S10 child spec that cross-references
+  the AFOL Evolution governance before any CLI or lifecycle implementation.
+  The current final specs define the memory/library primitives, not the missing
+  adoption integration.
 - Scope:
   - Add a compact post-session or maintenance review path that inspects
     workbench reports, evidence, lessons, decisions, and sourced research for
     memory/library candidates.
   - Produce reviewable candidates only; promotion stays explicit and
-    human-auditable.
+    human-auditable through the existing proposal/promotion mutation paths.
   - Keep memory for durable project continuity and library for sourced claims;
     do not merge them into hidden prompt memory, raw transcript storage, or
     automatic research ingest.
@@ -666,9 +678,11 @@ Follow-on slices under this direction:
 
 - Implement each feature above as narrow slices.
 - Immediate adoption gap: Memory and Library Adoption Loop v1. Connect
-  workbench closeout or maintenance review to explicit candidate generation so
-  real project usage can feed reviewed memory/library proposals instead of
-  leaving those stores empty by default.
+  completed workbench or maintenance artifacts to read-only candidate discovery
+  so real project usage can feed reviewed memory/library proposals instead of
+  leaving those stores empty by default. Implementation waits for the dedicated
+  child spec and AFOL Evolution governance; this roadmap clarification delivers
+  direction only.
 - Immediate next slice: Temporal Reliability v1. Implement explicit path
   config, `afol pstr stale --json`, trusted-context stale gates,
   `afol health --area state|library|memory`, weekly/monthly maintenance dry-run
