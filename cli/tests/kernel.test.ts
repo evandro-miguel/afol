@@ -1902,6 +1902,23 @@ describe("kernel front-door", () => {
 					expected: "API_KEY_NOTE=synthetic-note bun test",
 					raw: "synthetic-note",
 				},
+				{
+					command: "DB_URL=synthetic-database-url bun test",
+					expected: "DB_URL=[REDACTED] bun test",
+					raw: "synthetic-database-url",
+				},
+				{
+					command:
+						'curl -H "Authorization: Bearer synthetic-bearer" https://example.test',
+					expected:
+						'curl -H "Authorization: Bearer [REDACTED]" https://example.test',
+					raw: "synthetic-bearer",
+				},
+				{
+					command: "curl https://demo-user:synthetic-password@example.test",
+					expected: "curl https://demo-user:[REDACTED]@example.test",
+					raw: "synthetic-password",
+				},
 			];
 
 			for (const fixture of cases) {
@@ -1948,7 +1965,8 @@ describe("kernel front-door", () => {
 				);
 				expect(event?.command).toBe(entry.command);
 			}
-			for (const fixture of cases.slice(0, 3)) {
+			for (const [index, fixture] of cases.entries()) {
+				if (index === 3) continue;
 				expect(evidenceText).not.toContain(fixture.raw);
 				expect(eventText).not.toContain(fixture.raw);
 			}
@@ -1960,6 +1978,9 @@ describe("kernel front-door", () => {
 				"bun",
 				"bun",
 				"API_KEY_NOTE=synthetic-note",
+				"DB_URL=[REDACTED]",
+				"curl",
+				"curl",
 			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

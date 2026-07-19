@@ -54,6 +54,7 @@
 			"validate project --check-drift --json",
 			"validate drift --json",
 			"validate bench --pack <pack-id> --json",
+			"validate bench --pack governance-history --timing-mode observe --json",
 			"validate select --changed-path <path>",
 			"validate run --changed-path <path>",
 			"init --dry-run",

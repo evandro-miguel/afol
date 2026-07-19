@@ -16,9 +16,9 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 74 |
+| Total | 75 |
 | Draft | 0 |
-| Active | 2 |
+| Active | 3 |
 | Final | 54 |
 | Superseded | 18 |
 
@@ -100,6 +100,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
 | 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260716_1234_agent-cli-sequential-verification-runs_spec-child_01 | agent-cli-sequential-verification-runs | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

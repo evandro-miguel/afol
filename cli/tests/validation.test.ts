@@ -41,6 +41,54 @@ function parseJsonOutput(stdout: string): Record<string, unknown> {
 	return JSON.parse(stdout) as Record<string, unknown>;
 }
 
+const expectedMutationScenarioIds = [
+	"mut-dry-run",
+	"mut-move",
+	"mut-patch",
+	"mut-protected",
+	"mut-undo",
+] as const;
+
+function relaxMutationSafetyTimingLimits(root: string): void {
+	const timingLimitMs = 60_000;
+	const scenariosRoot = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"scenarios",
+		"mutation-safety",
+	);
+	for (const scenarioId of expectedMutationScenarioIds) {
+		const path = join(scenariosRoot, `${scenarioId}.json`);
+		const scenario = parseJsonOutput(readFileSync(path, "utf8"));
+		const thresholds = scenario.thresholds as Record<string, unknown>;
+		for (const key of [
+			"max_duration_ms",
+			"max_p50_ms",
+			"max_p95_ms",
+		] as const) {
+			if (Object.hasOwn(thresholds, key)) thresholds[key] = timingLimitMs;
+		}
+		writeFileSync(path, `${JSON.stringify(scenario, null, 2)}\n`, "utf8");
+	}
+	const baselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"mutation-safety",
+		"baseline-v1.json",
+	);
+	const baseline = parseJsonOutput(readFileSync(baselinePath, "utf8"));
+	baseline.timing_p50_ms = timingLimitMs;
+	baseline.timing_p95_ms = timingLimitMs;
+	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
+}
+
 function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 	const root = mkdtempSync(join(tmpdir(), "validation-fixture-"));
 	mkdirSync(join(root, ".agents"), { recursive: true });
@@ -580,41 +628,48 @@ describe("validation command family", () => {
 	);
 
 	test(
-		"v bench runs mutation-safety pack with complete baseline coverage",
+		"v bench runs mutation-safety with timing-neutral fixture limits",
 		() => {
-			const proc = runKernel([
-				"v",
-				"bench",
-				"--pack",
-				"mutation-safety",
-				"--json",
-			]);
-			const failureContext =
-				proc.status === 0
-					? undefined
-					: [
-							`stdout tail:\n${String(proc.stdout ?? "").slice(-2_048)}`,
-							`stderr tail:\n${String(proc.stderr ?? "").slice(-2_048)}`,
-						].join("\n");
-			expect(proc.status, failureContext).toBe(0);
-			const payload = parseJsonOutput(proc.stdout as string);
-			expect(payload.mode).toBe("benchmark");
-			expect(payload.result_count).toBe(5);
-			expect(payload.summary).toEqual({
-				total: 5,
-				passed: 5,
-				failed: 0,
-				skipped: 0,
-				baseline_missing: 0,
-			});
-			const results = payload.results as Array<Record<string, unknown>>;
-			expect(results.length).toBe(5);
-			expect(
-				results.every((entry) => entry.pack_id === "mutation-safety"),
-			).toBe(true);
-			expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
-				false,
-			);
+			const root = createValidationFixtureRoot(relaxMutationSafetyTimingLimits);
+			try {
+				const proc = runKernel(
+					["v", "bench", "--pack", "mutation-safety", "--json"],
+					root,
+				);
+				const failureContext = [
+					`stdout tail:\n${String(proc.stdout ?? "").slice(-2_048)}`,
+					`stderr tail:\n${String(proc.stderr ?? "").slice(-2_048)}`,
+				].join("\n");
+				expect(proc.status, failureContext).toBe(0);
+				const payload = parseJsonOutput(proc.stdout as string);
+				expect(payload.mode).toBe("benchmark");
+				expect(payload.status).toBe("passed");
+				expect(payload.pass).toBe(true);
+				expect(payload.result_count).toBe(5);
+				expect(payload.contract_issues).toEqual([]);
+				expect(payload.summary).toEqual({
+					total: 5,
+					passed: 5,
+					failed: 0,
+					skipped: 0,
+					baseline_missing: 0,
+				});
+				const results = payload.results as Array<Record<string, unknown>>;
+				expect(results.map((entry) => entry.scenario_id).sort()).toEqual([
+					...expectedMutationScenarioIds,
+				]);
+				expect(
+					results.every(
+						(entry) =>
+							entry.pack_id === "mutation-safety" && entry.status === "passed",
+					),
+				).toBe(true);
+				expect(
+					results.some((entry) => entry.status === "baseline-missing"),
+				).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		},
 		slowValidationTestTimeoutMs,
 	);

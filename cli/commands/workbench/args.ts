@@ -341,12 +341,59 @@ export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
 	};
 }
 
+const DONE_MAX_VERIFICATION_STEPS = 8;
+const DONE_MAX_ARGV_ENTRIES = 128;
+const DONE_MAX_COMMAND_SIZE = 4_096;
+
+function assertNonEmptyVerificationCommand(
+	value: string,
+	route: "--test" | "--test-shell" | "positional",
+	argv?: readonly string[],
+): void {
+	if (!value.trim() || (argv && !(argv[0] ?? "").trim())) {
+		throw new Error(`Empty ${route} command in done.`);
+	}
+}
+
+function assertDoneVerificationLimits(
+	verifications: readonly VerificationSpec[],
+): void {
+	if (verifications.length > DONE_MAX_VERIFICATION_STEPS) {
+		throw new Error("done supports at most 8 --test verification steps.");
+	}
+	let aggregateUnicodeLength = 0;
+	let aggregateByteLength = 0;
+	for (const verification of verifications) {
+		if (verification.mode !== "argv") continue;
+		const argv = [verification.executable, ...verification.args];
+		if (argv.length > DONE_MAX_ARGV_ENTRIES) {
+			throw new Error("done supports at most 128 argv entries per step.");
+		}
+		aggregateUnicodeLength += argv.reduce(
+			(total, token) => total + Array.from(token).length,
+			0,
+		);
+		aggregateByteLength += argv.reduce(
+			(total, token) => total + Buffer.byteLength(token, "utf8"),
+			0,
+		);
+	}
+	if (
+		aggregateUnicodeLength > DONE_MAX_COMMAND_SIZE ||
+		aggregateByteLength > DONE_MAX_COMMAND_SIZE
+	) {
+		throw new Error(
+			"done verification commands have an aggregate limit of 4,096 Unicode characters and UTF-8 bytes.",
+		);
+	}
+}
+
 export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let session = "";
 	let taskId = "";
-	let testCommand: string | null = null;
+	const testCommands: string[] = [];
 	let testShellCommand: string | null = null;
-	let verification: VerificationSpec | null = null;
+	const verifications: VerificationSpec[] = [];
 	let evidenceCommand: string | null = null;
 	let evidenceResult: string | null = null;
 	let requireSpecCheck = false;
@@ -357,7 +404,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		const arg = args[i];
 		const value = args[i + 1];
 		if (arg === "--") {
-			if (testCommand || testShellCommand) {
+			if (testCommands.length > 0 || testShellCommand) {
 				throw new Error(
 					"Cannot combine positional verification with --test or --test-shell in done.",
 				);
@@ -366,11 +413,14 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			if (argv.length === 0) {
 				throw new Error("Missing verification command after -- in done.");
 			}
-			verification = {
+			assertNonEmptyVerificationCommand(argv[0] ?? "", "positional", argv);
+			const verification: VerificationSpec = {
 				mode: "argv",
 				executable: argv[0] ?? "",
 				args: argv.slice(1),
 			};
+			assertDoneVerificationLimits([verification]);
+			verifications.push(verification);
 			break;
 		}
 		if (arg === "--json" || arg === "-j") {
@@ -400,13 +450,16 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			if (testShellCommand) {
 				throw new Error("Cannot use both --test and --test-shell in done.");
 			}
-			testCommand = value;
 			const argv = splitCommandLine(value);
-			verification = {
+			assertNonEmptyVerificationCommand(value, "--test", argv);
+			const verification: VerificationSpec = {
 				mode: "argv",
 				executable: argv[0] ?? "",
 				args: argv.slice(1),
 			};
+			testCommands.push(value);
+			verifications.push(verification);
+			assertDoneVerificationLimits(verifications);
 			i += 1;
 			continue;
 		}
@@ -414,11 +467,14 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			if (!value) {
 				throw new Error("Missing value for --test-shell in done.");
 			}
-			if (testCommand) {
+			if (testCommands.length > 0) {
 				throw new Error("Cannot use both --test and --test-shell in done.");
 			}
+			if (testShellCommand) {
+				throw new Error("done supports only one --test-shell value.");
+			}
+			assertNonEmptyVerificationCommand(value, "--test-shell");
 			testShellCommand = value;
-			verification = { mode: "shell", command: value };
 			i += 1;
 			continue;
 		}
@@ -478,9 +534,9 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	return {
 		session: resolveSession(root, session, "done"),
 		taskId,
-		testCommand,
+		testCommands,
 		testShellCommand,
-		verification,
+		verifications,
 		evidenceCommand,
 		evidenceResult,
 		...(artifact ? { artifact } : {}),

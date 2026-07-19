@@ -211,6 +211,11 @@ Minimum acceptance:
   .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
 - Living residual:
   .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
+- Sequential verification residual:
+  .afol/adm/specs/260716_1234_agent-cli-sequential-verification-runs_spec-child_01.md
+- Sequential residual state: implementation is complete on PR #46. The final
+  residual is clean CI proof for the explicit governance timing-observation
+  mode discovered by the closeout merge-candidate run.
 - Why: Agents need extreme ease of use, extremely low latency, low
   **write-token** cost for CLI argv, low forced stdout, and very high
   reliability. Long commands and long default output train agents to waste
@@ -227,7 +232,9 @@ Minimum acceptance:
   `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
   passed. The residual child is final on `E-20260715181045803-75a16e` in
   `.afol/wb/260715_1628_afol-1-0-agent-cli-residual/`; final-status session
-  `260715_1811_afol-1-0-final-status` recorded the reconciled closure.
+  `260715_1811_afol-1-0-final-status` recorded the reconciled closure. Sequential
+  verification remains active until its timing-gate follow-up passes both
+  required PR #46 CI events.
 
 ### F-04 Governance Workbench System
 

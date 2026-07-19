@@ -267,6 +267,10 @@ describe("help formatter", () => {
 		expect(validateHelp).toContain("Subcommands:");
 		expect(validateHelp).toContain("project --json [read]");
 		expect(validateHelp).toContain("bench --pack <pack-id> --json [read]");
+		expect(validateHelp).toContain(
+			"bench --pack governance-history --timing-mode observe --json [read]",
+		);
+		expect(validateHelp).toContain("Observe timing; non-timing gates block");
 		expect(updateHelp).toContain("Guidance:");
 		expect(updateHelp).toContain(
 			"Prefer check, then preview, then apply --dry-run before real apply.",

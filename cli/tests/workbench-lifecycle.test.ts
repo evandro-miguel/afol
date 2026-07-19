@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -22,6 +23,7 @@ import { validateFilesIndex } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
+import { resolveTaskCompletionLockPath } from "../services/workbench/completion-lock";
 import {
 	advanceTaskAfterObservedTest,
 	appendTimelineEntry,
@@ -30,15 +32,19 @@ import {
 	doneTask,
 	isSessionClosed,
 	newWorkstream,
+	prepareVerificationRun,
 	type RecordEvidenceInput,
 	recordEvidence as recordEvidenceRaw,
+	recordVerificationRunStep,
 	startTask,
+	taskAttemptSnapshot,
 	transitionTask,
 } from "../services/workbench/lifecycle";
 import {
 	briefingUnavailableFor,
 	buildStartBriefing,
 } from "../services/workbench/start-briefing";
+import { appendVerificationRunTerminal } from "../services/workbench/verification-runs";
 import { verifyWorkbenchTasks } from "../services/workbench/verify";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -754,6 +760,10 @@ describe("workbench lifecycle service", () => {
 			expect((payload.error as Record<string, unknown>).message).toContain(
 				"spec check failed",
 			);
+			expect((payload.error as Record<string, unknown>).code).toBe(
+				"workbench.error",
+			);
+			expect((payload as Record<string, unknown>).data).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -764,6 +774,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			writeCliProjectContract(root);
 			const created = newWorkstream(root, "done-test-failure");
+			startTask(root, { session: created.session, taskId: "T-01" });
 			const proc = runKernel(root, [
 				"done",
 				"--session",
@@ -783,9 +794,11 @@ describe("workbench lifecycle service", () => {
 				action: "workbench.done",
 				exit_code: 1,
 			});
-			expect((payload.error as Record<string, unknown>).message).toContain(
-				"--test failed",
-			);
+			expect(payload.error).toMatchObject({
+				code: "workbench.error",
+				message: "--test failed with exit code 3",
+			});
+			expect(payload.data).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -815,9 +828,53 @@ describe("workbench lifecycle service", () => {
 				action: "workbench.done",
 				exit_code: 1,
 			});
-			expect((payload.error as Record<string, unknown>).message).toContain(
-				"--test-shell failed",
-			);
+			expect(payload.error).toMatchObject({
+				code: "workbench.error",
+				message: "--test-shell failed with exit code 1",
+			});
+			expect(payload.data).toBeUndefined();
+			expect(
+				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done positional argv failure keeps the legacy JSON envelope", () => {
+		const root = mkRoot("done-positional-failure");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-positional-failure");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"--json",
+				"--",
+				"bun",
+				"-e",
+				"process.exit(4)",
+			]);
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "workbench.done",
+				exit_code: 1,
+			});
+			expect(payload.error).toMatchObject({
+				code: "workbench.error",
+				message: "--test failed with exit code 4",
+			});
+			expect(payload.data).toBeUndefined();
+			expect(
+				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2977,6 +3034,736 @@ describe("workbench lifecycle service", () => {
 			expect(wbTypes.has("workbench.record_evidence")).toBe(true);
 			expect(wbTypes.has("workbench.mark_done")).toBe(true);
 			expect(wbTypes.has("workbench.close")).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("sequential done verification runs", () => {
+	test("rejects an ineligible task before spawning step one", () => {
+		const root = mkRoot("done-sequence-preflight-state");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence preflight state");
+			const marker = join(root, "should-not-run");
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				`bun -e "require('node:fs').writeFileSync('${marker}', 'bad')"`,
+				"-x",
+				"bun --version",
+				"--json",
+			]);
+			expect(proc.status).toBe(2);
+			expect(existsSync(marker)).toBe(false);
+			expect(
+				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps single --test on legacy evidence without run metadata", () => {
+		const root = mkRoot("done-single-legacy-evidence");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done single legacy evidence");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				"bun --version",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const envelope = parseEnvelope(proc.stdout as string);
+			expect(envelope.data).not.toHaveProperty("verification_run_id");
+			expect(envelope.data).not.toHaveProperty("step_count");
+			expect(
+				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
+			).toBe(false);
+			const evidence = JSON.parse(
+				readFileSync(created.evidencePath, "utf8").trim(),
+			) as Record<string, unknown>;
+			expect(evidence).toMatchObject({
+				command: "bun --version",
+				result: "passed",
+				provenance: "observed",
+				exit_code: 0,
+			});
+			expect(evidence).not.toHaveProperty("verification_run_id");
+			expect(evidence).not.toHaveProperty("step_index");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps positional argv on legacy evidence without a run ledger", () => {
+		const root = mkRoot("done-positional-legacy-evidence");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done positional legacy evidence");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"--json",
+				"--",
+				"bun",
+				"--version",
+			]);
+			expect(proc.status).toBe(0);
+			expect(
+				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
+			).toBe(false);
+			const evidence = JSON.parse(
+				readFileSync(created.evidencePath, "utf8").trim(),
+			) as Record<string, unknown>;
+			expect(evidence).not.toHaveProperty("verification_run_id");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves one-step revalidation for a legacy task already done", () => {
+		const root = mkRoot("done-sequence-legacy-done");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence legacy done");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const legacyCompletion = completeObservedTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "legacy-check",
+				exitCode: 0,
+			});
+			expect(legacyCompletion.done).toBeDefined();
+			const ledgerPath = join(created.sessionDir, ".verification-runs.jsonl");
+			expect(existsSync(ledgerPath)).toBe(false);
+
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				"true",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			expect(existsSync(ledgerPath)).toBe(false);
+			const evidence = readFileSync(created.evidencePath, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(evidence).toHaveLength(2);
+			expect(evidence.at(-1)).toMatchObject({
+				command: "true",
+				provenance: "observed",
+				exit_code: 0,
+			});
+			expect(evidence.at(-1)).not.toHaveProperty("verification_run_id");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("records ordered evidence and one terminal for repeated --test", () => {
+		const root = mkRoot("done-sequence-success");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence success");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const verificationArgs = Array.from({ length: 8 }, () => [
+				"--test",
+				'bun -e "process.exit(0)"',
+			]).flat();
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				...verificationArgs,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(0);
+			const envelope = parseEnvelope(proc.stdout as string);
+			const data = envelope.data as Record<string, unknown>;
+			expect(data.step_count).toBe(8);
+			expect(data.evidence_count).toBe(8);
+			expect(Array.isArray(data.evidence_ids)).toBe(true);
+			expect((proc.stdout as string).length / 4).toBeLessThanOrEqual(500);
+
+			const runRecords = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				runRecords.filter((record) => record.record_type === "start"),
+			).toHaveLength(1);
+			expect(
+				runRecords.filter((record) => record.record_type === "step"),
+			).toHaveLength(8);
+			expect(
+				runRecords.filter((record) => record.record_type === "terminal"),
+			).toHaveLength(1);
+			const evidence = readFileSync(created.evidencePath, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(evidence.map((entry) => entry.step_index)).toEqual([
+				1, 2, 3, 4, 5, 6, 7, 8,
+			]);
+			expect(evidence.every((entry) => entry.command_digest)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails fast at a middle step and skips later commands", () => {
+		const root = mkRoot("done-sequence-failure");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence failure");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const skippedPath = join(root, "skipped-step.txt");
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				'bun -e "process.exit(0)"',
+				"--test",
+				'bun -e "process.exit(3)"',
+				"--test",
+				`bun -e "require('node:fs').writeFileSync('${skippedPath}', 'bad')"`,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(1);
+			const envelope = parseEnvelope(proc.stdout as string);
+			expect(envelope.error).toMatchObject({
+				code: "workbench.verification_failed",
+			});
+			const data = envelope.data as Record<string, unknown>;
+			expect(data).toMatchObject({
+				status: "failed",
+				step_index: 2,
+				step_count: 3,
+				evidence_count: 2,
+			});
+			expect(data).not.toHaveProperty("authorizing_evidence_id");
+			expect(existsSync(skippedPath)).toBe(false);
+			const records = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				records.filter((record) => record.record_type === "step"),
+			).toHaveLength(2);
+			expect(
+				records.find((record) => record.record_type === "terminal"),
+			).toMatchObject({ status: "failed", failed_step: 2 });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("records a child signal without persisting child output", () => {
+		if (process.platform === "win32") return;
+		const root = mkRoot("done-sequence-signal");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence signal");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const rawOutput = "RAW_CHILD_OUTPUT_SHOULD_NOT_PERSIST";
+			const codePoints = Array.from(rawOutput, (char) => char.charCodeAt(0));
+			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.kill(process.pid, "SIGTERM")`;
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				`bun -e ${JSON.stringify(script)}`,
+				"-x",
+				"bun --version",
+				"--json",
+			]);
+			expect(proc.status).toBe(1);
+			const envelope = parseEnvelope(proc.stdout as string);
+			expect(envelope.data).toMatchObject({ status: "signaled" });
+			const evidenceBody = readFileSync(created.evidencePath, "utf8");
+			const ledgerBody = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			);
+			const evidence = JSON.parse(evidenceBody.trim()) as Record<
+				string,
+				unknown
+			>;
+			const step = ledgerBody
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>)
+				.find((record) => record.record_type === "step");
+			expect(evidence).toMatchObject({
+				verification_status: "signaled",
+				signal: "SIGTERM",
+			});
+			expect(step).toMatchObject({ status: "signaled", signal: "SIGTERM" });
+			expect(evidenceBody).not.toContain(rawOutput);
+			expect(ledgerBody).not.toContain(rawOutput);
+			expect(proc.stdout as string).not.toContain(rawOutput);
+			expect(proc.stderr as string).not.toContain(rawOutput);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("uses a new verification attempt without changing the task attempt", () => {
+		const root = mkRoot("done-sequence-retry");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence retry");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const first = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				'bun -e "process.exit(4)"',
+				"-x",
+				"bun --version",
+				"--json",
+			]);
+			expect(first.status).toBe(1);
+			const second = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				'bun -e "process.exit(0)"',
+				"-x",
+				"bun --version",
+				"--json",
+			]);
+			expect(second.status).toBe(0);
+
+			const starts = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>)
+				.filter((record) => record.record_type === "start");
+			expect(starts).toHaveLength(2);
+			expect(starts.map((record) => record.verification_attempt)).toEqual([
+				1, 2,
+			]);
+			expect(new Set(starts.map((record) => record.task_attempt)).size).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recovers a terminal passed run before the task transition", () => {
+		const root = mkRoot("done-sequence-terminal-recovery");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence terminal recovery");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const command = 'bun -e "process.exit(0)"';
+			const prepared = prepareVerificationRun(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					taskAttemptSnapshot: taskAttemptSnapshot(root, {
+						session: created.session,
+						taskId: "T-01",
+					}),
+					commands: [command, command],
+				},
+				{ fencingCheck: () => {} },
+			);
+			expect(prepared.kind).toBe("new");
+			if (prepared.kind !== "new") throw new Error("expected new run");
+			const firstEvidence = recordVerificationRunStep(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					run: prepared.run,
+					stepIndex: 1,
+					command,
+					status: "passed",
+					exitCode: 0,
+					durationMs: 1,
+				},
+				{ fencingCheck: () => {} },
+			);
+			const secondEvidence = recordVerificationRunStep(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					run: prepared.run,
+					stepIndex: 2,
+					command,
+					status: "passed",
+					exitCode: 0,
+					durationMs: 1,
+				},
+				{ fencingCheck: () => {} },
+			);
+			appendVerificationRunTerminal(
+				root,
+				created.session,
+				{
+					record_type: "terminal",
+					verification_run_id: prepared.run.verification_run_id,
+					task_id: "T-01",
+					task_attempt: prepared.run.task_attempt,
+					verification_attempt: prepared.run.verification_attempt,
+					status: "passed",
+					evidence_ids: [firstEvidence.id, secondEvidence.id],
+					evidence_count: 2,
+					authorizing_evidence_id: secondEvidence.id,
+					created_at: new Date().toISOString(),
+				},
+				() => {},
+			);
+
+			const recovered = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				command,
+				"-x",
+				command,
+				"--json",
+			]);
+			expect(recovered.status).toBe(0);
+			const records = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				records.filter((record) => record.record_type === "start"),
+			).toHaveLength(1);
+			expect(
+				records.filter((record) => record.record_type === "terminal"),
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("serializes two kernel processes without duplicate completion", async () => {
+		const root = mkRoot("done-sequence-process-race");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence process race");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const marker = join(root, "first-verification-started");
+			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "started"); setTimeout(() => {}, 300);`;
+			const baseArgs = [
+				kernelPath,
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+			];
+			const first = spawn(
+				"bun",
+				[
+					...baseArgs,
+					"-x",
+					`bun -e ${JSON.stringify(script)}`,
+					"-x",
+					"bun --version",
+					"--json",
+				],
+				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+			);
+			for (
+				let attempts = 0;
+				attempts < 100 && !existsSync(marker);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(marker)).toBe(true);
+			const second = spawn(
+				"bun",
+				[
+					...baseArgs,
+					"-x",
+					`bun -e ${JSON.stringify(script)}`,
+					"-x",
+					"bun --version",
+					"--json",
+				],
+				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+			);
+			const [firstResult, secondResult] = await Promise.all([
+				waitForExit(first),
+				waitForExit(second),
+			]);
+			expect(firstResult.code).toBe(0);
+			expect(secondResult.code).toBe(0);
+			const firstEnvelope = parseEnvelope(firstResult.stdout);
+			const secondEnvelope = parseEnvelope(secondResult.stdout);
+			expect(secondEnvelope.data).toMatchObject({
+				verification_run_id: (firstEnvelope.data as Record<string, unknown>)
+					.verification_run_id,
+				evidence_ids: (firstEnvelope.data as Record<string, unknown>)
+					.evidence_ids,
+			});
+
+			const runRecords = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				runRecords.filter((record) => record.record_type === "start"),
+			).toHaveLength(1);
+			expect(
+				runRecords.filter((record) => record.record_type === "terminal"),
+			).toHaveLength(1);
+			const evidence = readFileSync(created.evidencePath, "utf8")
+				.trim()
+				.split("\n")
+				.filter(Boolean);
+			expect(evidence).toHaveLength(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("terminates a running child and fails closed after fencing loss", async () => {
+		if (process.platform === "win32") return;
+		const root = mkRoot("done-sequence-fencing-loss");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence fencing loss");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const marker = join(root, "fenced-child.pid");
+			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setTimeout(() => {}, 5000);`;
+			const child = spawn(
+				"bun",
+				[
+					kernelPath,
+					"done",
+					"-S",
+					created.session,
+					"-T",
+					"T-01",
+					"-x",
+					`bun -e ${JSON.stringify(script)}`,
+					"-x",
+					"bun --version",
+					"--json",
+				],
+				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+			);
+			for (
+				let attempts = 0;
+				attempts < 200 && !existsSync(marker);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(marker)).toBe(true);
+			const verificationPid = Number.parseInt(readFileSync(marker, "utf8"), 10);
+			const lockPath = resolveTaskCompletionLockPath(
+				root,
+				created.session,
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
+			const generation = Number.parseInt(readFileSync(fencePath, "utf8"), 10);
+			const fencedAt = Date.now();
+			writeFileSync(fencePath, `${generation + 1}\n`, "utf8");
+
+			const result = await waitForExit(child);
+			expect(Date.now() - fencedAt).toBeLessThan(3_000);
+			expect(result.code).toBe(1);
+			const envelope = parseEnvelope(result.stdout);
+			expect(envelope.error).toMatchObject({
+				code: "workbench.verification_failed",
+			});
+			expect(envelope.data).toMatchObject({
+				status: "lock_lost",
+				step_index: 1,
+				step_count: 2,
+				evidence_count: 0,
+			});
+			let verificationAlive = true;
+			try {
+				process.kill(verificationPid, 0);
+			} catch {
+				verificationAlive = false;
+			}
+			expect(verificationAlive).toBe(false);
+			expect(readFileSync(created.evidencePath, "utf8").trim()).toBe("");
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | in_progress |",
+			);
+			const records = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				records.filter((record) => record.record_type === "step"),
+			).toHaveLength(0);
+			// The lost fence makes terminal persistence unauthorized; the stale-state
+			// integration below covers the persistable interrupted-terminal branch.
+			expect(
+				records.filter((record) => record.record_type === "terminal"),
+			).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports a typed stale conflict when task state changes during a child", async () => {
+		const root = mkRoot("done-sequence-stale-conflict");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence stale conflict");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const marker = join(root, "stale-verification-started");
+			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "started"); setTimeout(() => {}, 300);`;
+			const child = spawn(
+				"bun",
+				[
+					kernelPath,
+					"done",
+					"-S",
+					created.session,
+					"-T",
+					"T-01",
+					"-x",
+					`bun -e ${JSON.stringify(script)}`,
+					"-x",
+					"bun --version",
+					"--json",
+				],
+				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+			);
+			for (
+				let attempts = 0;
+				attempts < 100 && !existsSync(marker);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(marker)).toBe(true);
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "moved",
+			});
+			const result = await waitForExit(child);
+			expect(result.code).toBe(1);
+			const envelope = parseEnvelope(result.stdout);
+			expect(envelope.data).toMatchObject({ status: "stale_conflict" });
+			const records = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				records.find((record) => record.record_type === "terminal"),
+			).toMatchObject({ status: "interrupted", evidence_count: 0 });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("terminalizes an evidence persistence failure as interrupted", () => {
+		if (process.platform === "win32") return;
+		const root = mkRoot("done-sequence-evidence-write-failure");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done sequence evidence failure");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			chmodSync(created.evidencePath, 0o444);
+			const proc = runKernel(root, [
+				"done",
+				"-S",
+				created.session,
+				"-T",
+				"T-01",
+				"-x",
+				'bun -e "process.exit(0)"',
+				"-x",
+				"bun --version",
+				"--json",
+			]);
+			expect(proc.status).toBe(1);
+			const envelope = parseEnvelope(proc.stdout as string);
+			expect(envelope.data).toMatchObject({
+				status: "persistence_failed",
+				evidence_count: 0,
+			});
+			const records = readFileSync(
+				join(created.sessionDir, ".verification-runs.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(
+				records.find((record) => record.record_type === "terminal"),
+			).toMatchObject({ status: "interrupted", evidence_count: 0 });
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
