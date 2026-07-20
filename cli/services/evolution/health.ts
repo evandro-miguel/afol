@@ -10,6 +10,7 @@ import {
 	EVOLUTION_SCHEMA_VERSION,
 	readUserVersion,
 } from "./migrations";
+import { validatePreferenceProjection } from "./preference-journal";
 import type { ProductionDay } from "./production-days";
 
 export type EvolutionDbFinding = {
@@ -25,6 +26,7 @@ export type EvolutionDbHealth = {
 	expected_migration_version: number;
 	migration_stale: boolean;
 	production_day_count: number;
+	preference_count: number;
 	project_id: string | null;
 	size_bytes: number;
 	findings: EvolutionDbFinding[];
@@ -34,6 +36,7 @@ export type EvolutionStatus = {
 	migration_version: number;
 	project_id: string | null;
 	production_day_count: number;
+	preference_count: number;
 	latest_production_day: ProductionDay | null;
 };
 export type EvolutionHealthContext = Omit<EvolutionJournalContext, "db">;
@@ -96,7 +99,9 @@ function assertProjectIdentity(
 ): string | null {
 	const metadataProjectId = readProjectId(db);
 	const rows = db
-		.query("SELECT DISTINCT project_id FROM production_days")
+		.query(
+			"SELECT project_id FROM production_days UNION SELECT project_id FROM preferences UNION SELECT project_id FROM preference_evidence",
+		)
 		.all() as Array<{ project_id?: unknown }>;
 	const rowProjectIds = rows.map((row) => String(row.project_id ?? ""));
 	const projectId = expectedProjectId ?? metadataProjectId;
@@ -140,6 +145,11 @@ export function getEvolutionStatus(
 			db,
 			projectId,
 		});
+		validatePreferenceProjection({
+			...canonicalContext,
+			db,
+			projectId,
+		});
 	}
 	const latest = db
 		.query(
@@ -149,11 +159,15 @@ export function getEvolutionStatus(
 	const count = db
 		.query("SELECT COUNT(*) AS count FROM production_days")
 		.get() as Record<string, unknown>;
+	const preferenceCount = db
+		.query("SELECT COUNT(*) AS count FROM preferences")
+		.get() as Record<string, unknown>;
 	return {
 		schema_version: EVOLUTION_SCHEMA_VERSION,
 		migration_version: readUserVersion(db),
 		project_id: projectId,
 		production_day_count: scalarNumber(count),
+		preference_count: scalarNumber(preferenceCount),
 		latest_production_day: latest ? rowToProductionDay(latest) : null,
 	};
 }
@@ -173,6 +187,7 @@ export function checkEvolutionDbHealth(
 			expected_migration_version: EVOLUTION_SCHEMA_VERSION,
 			migration_stale: true,
 			production_day_count: 0,
+			preference_count: 0,
 			project_id: null,
 			size_bytes: 0,
 			findings: [
@@ -185,6 +200,7 @@ export function checkEvolutionDbHealth(
 	let walEnabled = false;
 	let migrationVersion = 0;
 	let productionDayCount = 0;
+	let preferenceCount = 0;
 	let projectId: string | null = null;
 	try {
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
@@ -235,6 +251,13 @@ export function checkEvolutionDbHealth(
 				message: "evolution schema is stale or incomplete",
 			});
 		}
+		if (!tables.has("preferences") || !tables.has("preference_evidence")) {
+			schemaOk = false;
+			findings.push({
+				severity: "fail",
+				message: "preference schema is stale or incomplete",
+			});
+		}
 		if (migrationVersion > EVOLUTION_SCHEMA_VERSION) {
 			schemaOk = false;
 			findings.push({
@@ -270,6 +293,14 @@ export function checkEvolutionDbHealth(
 					.query("SELECT COUNT(*) AS count FROM production_days")
 					.get() as Record<string, unknown>,
 			);
+			if (tables.has("preferences")) {
+				preferenceCount = scalarNumber(
+					db.query("SELECT COUNT(*) AS count FROM preferences").get() as Record<
+						string,
+						unknown
+					>,
+				);
+			}
 			for (const row of db
 				.query("SELECT qualifying_events FROM production_days")
 				.all() as Array<{ qualifying_events: unknown }>) {
@@ -298,6 +329,21 @@ export function checkEvolutionDbHealth(
 						message: (error as Error).message,
 					});
 				}
+				if (schemaOk) {
+					try {
+						validatePreferenceProjection({
+							...canonicalContext,
+							db,
+							projectId: expectedProjectId,
+						});
+					} catch (error) {
+						schemaOk = false;
+						findings.push({
+							severity: "fail",
+							message: (error as Error).message,
+						});
+					}
+				}
 			}
 		}
 	} catch (error) {
@@ -318,6 +364,7 @@ export function checkEvolutionDbHealth(
 		expected_migration_version: EVOLUTION_SCHEMA_VERSION,
 		migration_stale: migrationVersion !== EVOLUTION_SCHEMA_VERSION,
 		production_day_count: productionDayCount,
+		preference_count: preferenceCount,
 		project_id: projectId,
 		size_bytes: Bun.file(dbPath).size,
 		findings,

@@ -21,6 +21,8 @@ import {
 	assertSafeEvolutionTarget,
 } from "./db";
 import { applyMigrations } from "./migrations";
+import { refreshPreferenceDecayProjection } from "./preference-decay";
+import { readPreferenceJournal } from "./preference-journal";
 import {
 	allocateProductionDay,
 	allocateProductionDayInTransaction,
@@ -567,13 +569,43 @@ function rebuildProductionDayProjectionUnlocked(
 		input.timezone,
 		input.evolutionEventsDir,
 	);
+	const canonicalProjection = replayProjection(events);
+	const canonicalMax = canonicalProjection.at(-1)?.ordinal_sequence ?? 0;
+	const reinforcementBeyondCanonical = readPreferenceJournal(
+		input.root,
+		input.projectId,
+		input.evolutionEventsDir,
+	).find(
+		(event) =>
+			event.payload.preference.last_reinforced_production_day > canonicalMax,
+	);
+	if (reinforcementBeyondCanonical) {
+		throw new Error(
+			`preference reinforcement ordinal exceeds canonical production ordinal: ${reinforcementBeyondCanonical.payload.preference.id}`,
+		);
+	}
 	assertWalEnabled(input.db);
 	input.db.exec("BEGIN IMMEDIATE");
 	try {
 		input.db.exec(
 			"DELETE FROM production_days; DELETE FROM evolution_metadata;",
 		);
+		input.db
+			.prepare(
+				"INSERT INTO evolution_metadata(key, value) VALUES ('project_id', ?)",
+			)
+			.run(input.projectId);
 		projectEvents(input.db, events, true);
+		const latest = input.db
+			.query(
+				"SELECT MAX(ordinal_sequence) AS sequence FROM production_days WHERE project_id = ?",
+			)
+			.get(input.projectId) as { sequence?: number } | null;
+		refreshPreferenceDecayProjection(
+			input.db,
+			input.projectId,
+			Number(latest?.sequence ?? 0),
+		);
 		input.db.exec("COMMIT");
 	} catch (error) {
 		try {

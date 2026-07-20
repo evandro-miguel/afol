@@ -21,11 +21,11 @@ import {
 	localDateForTimezone,
 	openEvolutionDb,
 	readProductionDayJournal,
-	rebuildProductionDayProjection,
 	resolveEvolutionConfig,
 	resolveEvolutionIdentity,
 	validateEvolutionIdentity,
 } from "../services/evolution";
+import { rebuildProductionDayProjection } from "../services/evolution/journal";
 import { allocateProductionDay } from "../services/evolution/production-days";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";

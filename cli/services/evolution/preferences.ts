@@ -1,10 +1,25 @@
 import type { Database } from "bun:sqlite";
 import { validateEvolutionIdentity } from "./config";
-import type { PreferenceJournalEvent } from "./preference-journal";
+import { validateProductionDayProjection } from "./journal";
 import {
-	appendPreferenceJournalEvent,
+	assertPreferenceAuthority,
+	type PreferenceAuthorityCapability,
+} from "./preference-authority";
+import {
+	effectivePreferenceConfidence,
+	preferenceFreshness,
+	preferenceStatus,
+	refreshPreferenceDecayProjection,
+} from "./preference-decay";
+import type {
+	LockedPreferenceAppender,
+	PreferenceJournalEvent,
+} from "./preference-journal";
+import {
 	readPreferenceJournal,
 	rebuildPreferenceProjection,
+	validatePreferenceProjection,
+	withPreferenceMutationLock,
 } from "./preference-journal";
 
 export type PreferenceProvenance = "explicit" | "inferred" | "structural";
@@ -56,7 +71,8 @@ export type PreferenceCreateInput = {
 	id: string;
 	statement: string;
 	provenance: PreferenceProvenance;
-	productionDaySequence?: number;
+	timezone: string;
+	authority?: PreferenceAuthorityCapability;
 	confidence?: number;
 	sourceRefs: PreferenceSourceRef[];
 	evidenceId?: string;
@@ -65,6 +81,7 @@ export type PreferenceCreateInput = {
 	trust?: "local" | "untrusted";
 	now?: Date;
 	evolutionEventsDir?: string;
+	syncDirectory?: (directory: string) => void;
 };
 
 export type PreferenceEvidenceInput = {
@@ -75,11 +92,13 @@ export type PreferenceEvidenceInput = {
 	evidenceId: string;
 	kind: PreferenceEvidenceKind;
 	weight: number;
-	productionDaySequence?: number;
+	timezone: string;
+	authority?: PreferenceAuthorityCapability;
 	sourceRefs: PreferenceSourceRef[];
 	trust?: "local" | "untrusted";
 	now?: Date;
 	evolutionEventsDir?: string;
+	syncDirectory?: (directory: string) => void;
 };
 
 const PRECEDENCE: Record<PreferenceProvenance, number> = {
@@ -92,45 +111,7 @@ function clamp(value: number): number {
 	return Math.max(0, Math.min(1, value));
 }
 
-export function preferenceFreshness(age: number): number {
-	if (!Number.isFinite(age) || age < 0)
-		throw new Error("preference age must be non-negative");
-	if (age < 7) return 1;
-	if (age >= 20) return 0;
-	return (20 - age) / 13;
-}
-
-export function effectivePreferenceConfidence(
-	confidence: number,
-	lastReinforcedProductionDay: number,
-	currentProductionDay: number,
-): number {
-	return (
-		clamp(confidence) *
-		preferenceFreshness(
-			Math.max(0, currentProductionDay - lastReinforcedProductionDay),
-		)
-	);
-}
-
-export function preferenceStatus(
-	confidence: number,
-	lastReinforcedProductionDay: number,
-	currentProductionDay: number,
-	status: PreferenceStatus = "active",
-): PreferenceStatus {
-	if (status === "rejected") return "rejected";
-	const age = Math.max(0, currentProductionDay - lastReinforcedProductionDay);
-	if (
-		effectivePreferenceConfidence(
-			confidence,
-			lastReinforcedProductionDay,
-			currentProductionDay,
-		) <= 0
-	)
-		return "dormant";
-	return age >= 7 ? "aging" : "active";
-}
+export { effectivePreferenceConfidence, preferenceFreshness, preferenceStatus };
 
 export function preferencePrecedence(provenance: PreferenceProvenance): number {
 	return PRECEDENCE[provenance];
@@ -176,21 +157,9 @@ export function refreshPreferenceProjection(
 ): PreferenceRecord[] {
 	if (!Number.isInteger(currentProductionDay) || currentProductionDay < 0)
 		throw new Error("current production day must be a non-negative integer");
-	const rows = projectPreferenceRows(db, projectId).map((row) =>
-		evaluatePreference(row, currentProductionDay),
-	);
 	db.exec("BEGIN IMMEDIATE");
 	try {
-		for (const row of rows)
-			db.prepare(
-				"UPDATE preferences SET current_production_day = ?, effective_confidence = ?, status = ? WHERE project_id = ? AND id = ?",
-			).run(
-				row.current_production_day,
-				row.effective_confidence,
-				row.status,
-				projectId,
-				row.id,
-			);
+		refreshPreferenceDecayProjection(db, projectId, currentProductionDay);
 		db.exec("COMMIT");
 	} catch (error) {
 		try {
@@ -198,7 +167,7 @@ export function refreshPreferenceProjection(
 		} catch {}
 		throw error;
 	}
-	return rows;
+	return projectPreferenceRows(db, projectId);
 }
 
 function scalar(row: Record<string, unknown> | null, key: string): number {
@@ -261,12 +230,36 @@ export function getPreference(
 	return row ? rowToPreference(row) : null;
 }
 
-function currentProductionDay(db: Database, projectId: string): number {
-	const row = db
+function currentProductionDay(input: {
+	root: string;
+	db: Database;
+	projectId: string;
+	timezone: string;
+	evolutionEventsDir?: string;
+}): number {
+	validateProductionDayProjection({
+		root: input.root,
+		db: input.db,
+		projectId: input.projectId,
+		timezone: input.timezone,
+		...(input.evolutionEventsDir
+			? { evolutionEventsDir: input.evolutionEventsDir }
+			: {}),
+	});
+	validatePreferenceProjection({
+		root: input.root,
+		projectId: input.projectId,
+		timezone: input.timezone,
+		db: input.db,
+		...(input.evolutionEventsDir
+			? { evolutionEventsDir: input.evolutionEventsDir }
+			: {}),
+	});
+	const row = input.db
 		.query(
 			"SELECT MAX(ordinal_sequence) AS sequence FROM production_days WHERE project_id = ?",
 		)
-		.get(projectId) as Record<string, unknown> | null;
+		.get(input.projectId) as Record<string, unknown> | null;
 	return scalar(row, "sequence");
 }
 
@@ -291,16 +284,67 @@ function assertInput(input: {
 		throw new Error("preference source refs are required");
 }
 
+function requiredAuthority(
+	kind: PreferenceEvidenceKind | PreferenceProvenance,
+): PreferenceAuthorityCapability["kind"] {
+	return kind === "structural" ? "policy" : "project_user";
+}
+
+function admittedAuthority(
+	projectId: string,
+	kind: PreferenceEvidenceKind | PreferenceProvenance,
+	authority?: PreferenceAuthorityCapability,
+	binding?: ReturnType<typeof mutationBinding>,
+): PreferenceAuthorityCapability {
+	const required = requiredAuthority(kind);
+	const admitted = authority;
+	assertPreferenceAuthority(admitted, projectId, required, binding);
+	return admitted as PreferenceAuthorityCapability;
+}
+
+function assertMutationSourceRefs(refs: PreferenceSourceRef[]): void {
+	if (
+		refs.some((ref) =>
+			["external", "import", "external_session"].includes(String(ref.kind)),
+		)
+	)
+		throw new Error("external or imported evidence cannot mutate preferences");
+}
+
+function mutationBinding(
+	preferenceId: string,
+	action: "create" | "reinforce" | "contradict" | "reject" | "reopen",
+	provenance: PreferenceProvenance,
+) {
+	return { preferenceId, action, provenance } as const;
+}
+
 export function createPreference(
 	input: PreferenceCreateInput,
 ): PreferenceRecord {
+	return withPreferenceMutationLock(input.root, (append) =>
+		createPreferenceUnlocked(input, append),
+	);
+}
+
+function createPreferenceUnlocked(
+	input: PreferenceCreateInput,
+	append: LockedPreferenceAppender,
+): PreferenceRecord {
 	assertInput(input);
-	if (input.evidenceKind === "external" && input.provenance !== "inferred")
-		throw new Error("external evidence cannot create an explicit preference");
+	if (input.evidenceKind === "external")
+		throw new Error("external evidence cannot mutate preferences directly");
+	assertMutationSourceRefs(input.sourceRefs);
+	const evidenceKind = input.evidenceKind ?? input.provenance;
+	const authority = admittedAuthority(
+		input.projectId,
+		evidenceKind,
+		input.authority,
+		mutationBinding(input.id, "create", input.provenance),
+	);
+	const sourceRefs = input.sourceRefs;
 	const now = (input.now ?? new Date()).toISOString();
-	const productionDay =
-		input.productionDaySequence ??
-		currentProductionDay(input.db, input.projectId);
+	const productionDay = currentProductionDay(input);
 	assertProductionDay(productionDay);
 	const existing = getPreference(input.db, input.projectId, input.id);
 	if (existing) {
@@ -348,33 +392,35 @@ export function createPreference(
 		created_at: now,
 		updated_at: now,
 		journal_event_id: "pending",
-		source_refs: input.sourceRefs,
+		source_refs: sourceRefs,
 	};
 	const evidence = input.evidenceId
 		? makeEvidence(
 				input.projectId,
 				input.evidenceId,
-				input.evidenceKind ?? input.provenance,
+				evidenceKind,
 				input.weight ?? 0,
 				productionDay,
 				input.trust ?? "local",
-				input.sourceRefs,
+				sourceRefs,
 				now,
 				"pending",
 			)
 		: undefined;
-	const event = appendPreferenceJournalEvent({
+	const event = append({
 		root: input.root,
 		db: input.db,
 		projectId: input.projectId,
+		authority,
 		preference,
 		action: "create",
-		sourceRefs: input.sourceRefs,
+		sourceRefs,
 		...(evidence ? { evidence } : {}),
 		...(input.now ? { now: input.now } : {}),
 		...(input.evolutionEventsDir
 			? { evolutionEventsDir: input.evolutionEventsDir }
 			: {}),
+		...(input.syncDirectory ? { syncDirectory: input.syncDirectory } : {}),
 	});
 	return (
 		getPreference(input.db, input.projectId, input.id) ??
@@ -413,18 +459,77 @@ function makeEvidence(
 export function recordPreferenceEvidence(
 	input: PreferenceEvidenceInput,
 ): PreferenceRecord {
+	return withPreferenceMutationLock(input.root, (append) =>
+		recordPreferenceEvidenceUnlocked(input, append),
+	);
+}
+
+function recordPreferenceEvidenceUnlocked(
+	input: PreferenceEvidenceInput,
+	append: LockedPreferenceAppender,
+): PreferenceRecord {
 	assertInput({
 		projectId: input.projectId,
 		id: input.preferenceId,
 		sourceRefs: input.sourceRefs,
 	});
+	if (input.kind === "external")
+		throw new Error("external evidence cannot mutate preferences directly");
+	assertMutationSourceRefs(input.sourceRefs);
 	const current = getPreference(input.db, input.projectId, input.preferenceId);
+	const duplicateEvent = !current
+		? readPreferenceJournal(
+				input.root,
+				input.projectId,
+				input.evolutionEventsDir,
+			).find((event) => event.payload.evidence?.id === input.evidenceId)
+		: undefined;
+	const existingEvidence = current
+		? (input.db
+				.query(
+					"SELECT kind, weight, preference_id FROM preference_evidence WHERE project_id = ? AND id = ?",
+				)
+				.get(input.projectId, input.evidenceId) as Record<
+				string,
+				unknown
+			> | null)
+		: null;
+	if (
+		input.kind === "accepted" &&
+		current?.status !== "rejected" &&
+		!duplicateEvent
+	)
+		throw new Error("preference reopen requires a rejected preference");
+	if (
+		current?.status === "rejected" &&
+		input.kind !== "accepted" &&
+		!existingEvidence
+	)
+		throw new Error(
+			"rejected preference can only reopen through accepted evidence",
+		);
+	const mutationAction =
+		input.kind === "contradiction"
+			? "contradict"
+			: input.kind === "rejected"
+				? "reject"
+				: input.kind === "accepted"
+					? "reopen"
+					: "reinforce";
+	const authority = admittedAuthority(
+		input.projectId,
+		input.kind,
+		input.authority,
+		mutationBinding(
+			input.preferenceId,
+			mutationAction,
+			current?.provenance ??
+				duplicateEvent?.payload.preference.provenance ??
+				"explicit",
+		),
+	);
+	const sourceRefs = input.sourceRefs;
 	if (!current) {
-		const duplicateEvent = readPreferenceJournal(
-			input.root,
-			input.projectId,
-			input.evolutionEventsDir,
-		).find((event) => event.payload.evidence?.id === input.evidenceId);
 		if (duplicateEvent) {
 			if (duplicateEvent.payload.preference.id !== input.preferenceId)
 				throw new Error("preference evidence belongs to another preference");
@@ -432,6 +537,7 @@ export function recordPreferenceEvidence(
 				root: input.root,
 				db: input.db,
 				projectId: input.projectId,
+				timezone: input.timezone,
 				...(input.evolutionEventsDir
 					? { evolutionEventsDir: input.evolutionEventsDir }
 					: {}),
@@ -444,11 +550,8 @@ export function recordPreferenceEvidence(
 		}
 		throw new Error("preference does not exist");
 	}
-	const existingEvidence = input.db
-		.query(
-			"SELECT kind, weight, preference_id FROM preference_evidence WHERE project_id = ? AND id = ?",
-		)
-		.get(input.projectId, input.evidenceId) as Record<string, unknown> | null;
+	const productionDay = currentProductionDay(input);
+	assertProductionDay(productionDay);
 	if (existingEvidence) {
 		const expectedWeight =
 			input.kind === "contradiction" || input.kind === "rejected"
@@ -465,10 +568,6 @@ export function recordPreferenceEvidence(
 		return current;
 	}
 	const now = (input.now ?? new Date()).toISOString();
-	const productionDay =
-		input.productionDaySequence ??
-		currentProductionDay(input.db, input.projectId);
-	assertProductionDay(productionDay);
 	const effectiveWeight =
 		input.kind === "contradiction" || input.kind === "rejected"
 			? -Math.abs(input.weight)
@@ -494,7 +593,11 @@ export function recordPreferenceEvidence(
 			confidence,
 			reinforces ? productionDay : current.last_reinforced_production_day,
 			productionDay,
-			input.kind === "rejected" ? "rejected" : current.status,
+			input.kind === "rejected"
+				? "rejected"
+				: reinforces
+					? "active"
+					: current.status,
 		),
 		journal_event_id: "pending",
 	};
@@ -505,28 +608,25 @@ export function recordPreferenceEvidence(
 		effectiveWeight,
 		productionDay,
 		input.trust ?? "local",
-		input.sourceRefs,
+		sourceRefs,
 		now,
 		"pending",
 	);
 	evidence.preference_id = input.preferenceId;
-	const event = appendPreferenceJournalEvent({
+	const event = append({
 		root: input.root,
 		db: input.db,
 		projectId: input.projectId,
+		authority,
 		preference: next,
 		evidence,
-		action:
-			input.kind === "contradiction"
-				? "contradict"
-				: input.kind === "rejected"
-					? "reject"
-					: "reinforce",
-		sourceRefs: input.sourceRefs,
+		action: mutationAction,
+		sourceRefs,
 		...(input.now ? { now: input.now } : {}),
 		...(input.evolutionEventsDir
 			? { evolutionEventsDir: input.evolutionEventsDir }
 			: {}),
+		...(input.syncDirectory ? { syncDirectory: input.syncDirectory } : {}),
 	});
 	return (
 		getPreference(input.db, input.projectId, input.preferenceId) ??

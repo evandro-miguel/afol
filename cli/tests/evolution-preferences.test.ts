@@ -1,32 +1,98 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	agentOperationContext,
+	defaultOperationContext,
+} from "../core/operation-context";
+import {
+	appendProductionDayAllocation,
 	applyMigrations,
-	createPreference,
 	EVOLUTION_MIGRATIONS,
 	EVOLUTION_SCHEMA_VERSION,
 	effectivePreferenceConfidence,
 	evolutionDbPath,
+	getPreference,
 	openEvolutionDb,
-	preferenceDigest,
 	preferenceFreshness,
-	preferenceJournalPath,
 	preferencePrecedence,
 	readPreferenceJournal,
-	recordPreferenceEvidence,
-	refreshPreferenceProjection,
 } from "../services/evolution";
+import { dispatchPreferenceDecision } from "../services/evolution/preference-authority";
+import {
+	createPreference,
+	recordPreferenceEvidence,
+} from "../services/evolution/preferences";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const OTHER_PROJECT_ID = "7b7d91ca-496b-4f0c-8537-5c4993810d15";
+const TIMEZONE = "UTC";
 
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), "evolution-preferences-"));
 	const db = openEvolutionDb(evolutionDbPath(root));
 	return { root, db };
+}
+
+function userAuthority(
+	_root: string,
+	preferenceId: string,
+	action: "create" | "reinforce" | "contradict" | "reject" | "reopen",
+	provenance: "explicit" | "inferred" = "explicit",
+) {
+	return dispatchPreferenceDecision({
+		projectId: PROJECT_ID,
+		preferenceId,
+		action,
+		provenance,
+		operationContext: defaultOperationContext(),
+	});
+}
+
+function policyAuthority(_root: string, preferenceId: string) {
+	return dispatchPreferenceDecision({
+		projectId: PROJECT_ID,
+		preferenceId,
+		action: "create",
+		provenance: "structural",
+		operationContext: defaultOperationContext(),
+	});
+}
+
+function appendProductionDays(root: string, db: Database, count: number): void {
+	const sessionId = "S-production";
+	const sessionDir = join(root, ".afol", "wb", sessionId);
+	mkdirSync(sessionDir, { recursive: true });
+	const rows = Array.from({ length: count }, (_, index) => ({
+		id: `E-prod-${index + 1}`,
+		project_id: PROJECT_ID,
+		session_id: sessionId,
+		created_at: `2026-01-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
+		result: "passed",
+		provenance: "observed",
+		exit_code: 0,
+	}));
+	writeFileSync(
+		join(sessionDir, ".evidence.jsonl"),
+		`${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+	);
+	for (const row of rows)
+		appendProductionDayAllocation({
+			root,
+			db,
+			projectId: PROJECT_ID,
+			timezone: TIMEZONE,
+			sessionId,
+			evidenceId: row.id,
+		});
 }
 
 describe("Evolution preference projection", () => {
@@ -106,6 +172,7 @@ describe("Evolution preference projection", () => {
 	test("reactivates aged preferences and applies explicit contradiction", () => {
 		const { root, db } = fixture();
 		try {
+			const createAuthority = userAuthority(root, "P-slices", "create");
 			createPreference({
 				root,
 				db,
@@ -113,10 +180,12 @@ describe("Evolution preference projection", () => {
 				id: "P-slices",
 				statement: "Use small slices",
 				provenance: "explicit",
-				productionDaySequence: 1,
+				timezone: TIMEZONE,
+				authority: createAuthority,
 				sourceRefs: [{ id: "S-1", kind: "session" }],
 			});
-			const aging = refreshPreferenceProjection(db, PROJECT_ID, 8)[0];
+			appendProductionDays(root, db, 8);
+			const aging = getPreference(db, PROJECT_ID, "P-slices");
 			expect(aging?.status).toBe("aging");
 			const reactivated = recordPreferenceEvidence({
 				root,
@@ -126,11 +195,12 @@ describe("Evolution preference projection", () => {
 				evidenceId: "PE-reinforce",
 				kind: "explicit",
 				weight: 0.1,
-				productionDaySequence: 21,
+				timezone: TIMEZONE,
+				authority: userAuthority(root, "P-slices", "reinforce"),
 				sourceRefs: [{ id: "D-1", kind: "decision" }],
 			});
 			expect(reactivated.status).toBe("active");
-			expect(reactivated.last_reinforced_production_day).toBe(21);
+			expect(reactivated.last_reinforced_production_day).toBe(8);
 			const contradicted = recordPreferenceEvidence({
 				root,
 				db,
@@ -139,7 +209,8 @@ describe("Evolution preference projection", () => {
 				evidenceId: "PE-contradict",
 				kind: "contradiction",
 				weight: 0.2,
-				productionDaySequence: 22,
+				timezone: TIMEZONE,
+				authority: userAuthority(root, "P-slices", "contradict"),
 				sourceRefs: [{ id: "D-2", kind: "decision" }],
 			});
 			expect(contradicted.confidence).toBeLessThan(reactivated.confidence);
@@ -162,6 +233,7 @@ describe("Evolution preference projection", () => {
 	test("is idempotent for duplicate evidence and retains refs", () => {
 		const { root, db } = fixture();
 		try {
+			const createAuthority = userAuthority(root, "P-idempotent", "create");
 			const first = createPreference({
 				root,
 				db,
@@ -169,7 +241,8 @@ describe("Evolution preference projection", () => {
 				id: "P-idempotent",
 				statement: "Keep docs current",
 				provenance: "explicit",
-				productionDaySequence: 1,
+				timezone: TIMEZONE,
+				authority: createAuthority,
 				sourceRefs: [{ id: "S-2", kind: "session" }],
 				evidenceId: "PE-same",
 				evidenceKind: "explicit",
@@ -183,7 +256,8 @@ describe("Evolution preference projection", () => {
 				evidenceId: "PE-same",
 				kind: "explicit",
 				weight: 0.1,
-				productionDaySequence: 1,
+				timezone: TIMEZONE,
+				authority: userAuthority(root, "P-idempotent", "reinforce"),
 				sourceRefs: [{ id: "S-2", kind: "session" }],
 			});
 			expect(duplicate.journal_event_id).toBe(first.journal_event_id);
@@ -196,7 +270,8 @@ describe("Evolution preference projection", () => {
 				evidenceId: "PE-same",
 				kind: "explicit",
 				weight: 0.1,
-				productionDaySequence: 1,
+				timezone: TIMEZONE,
+				authority: userAuthority(root, "P-idempotent", "reinforce"),
 				sourceRefs: [{ id: "S-2", kind: "session" }],
 			});
 			expect(replayed.id).toBe("P-idempotent");
@@ -223,6 +298,7 @@ describe("Evolution preference projection", () => {
 	test("fails closed for tampered or cross-project journals", () => {
 		const { root, db } = fixture();
 		try {
+			const authority = userAuthority(root, "P-tamper", "create", "inferred");
 			createPreference({
 				root,
 				db,
@@ -230,7 +306,8 @@ describe("Evolution preference projection", () => {
 				id: "P-tamper",
 				statement: "Validate",
 				provenance: "inferred",
-				productionDaySequence: 1,
+				timezone: TIMEZONE,
+				authority,
 				sourceRefs: [{ id: "S-3", kind: "session" }],
 			});
 			const path = join(
@@ -256,7 +333,7 @@ describe("Evolution preference projection", () => {
 		}
 	});
 
-	test("rejects recomputed authority drift and enforces external trust", () => {
+	test("rejects external and imported sources before journal mutation", () => {
 		const { root, db } = fixture();
 		try {
 			expect(() =>
@@ -267,38 +344,200 @@ describe("Evolution preference projection", () => {
 					id: "P-ext",
 					statement: "External",
 					provenance: "inferred",
-					productionDaySequence: 1,
+					timezone: TIMEZONE,
 					sourceRefs: [{ id: "I-1", kind: "import" }],
 					evidenceId: "PE-ext",
 					evidenceKind: "external",
 					trust: "local",
 				}),
-			).toThrow(/external preference evidence/);
+			).toThrow(/external evidence cannot mutate/);
+			expect(() =>
+				createPreference({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					id: "P-import",
+					statement: "Imported",
+					provenance: "explicit",
+					timezone: TIMEZONE,
+					sourceRefs: [{ id: "I-1", kind: "import" }],
+				}),
+			).toThrow(/external or imported/);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects forged privileged authority and import-to-explicit promotion", () => {
+		const { root, db } = fixture();
+		try {
+			expect(() =>
+				dispatchPreferenceDecision({
+					projectId: PROJECT_ID,
+					preferenceId: "P-restricted",
+					action: "create",
+					provenance: "explicit",
+					operationContext: agentOperationContext(),
+				}),
+			).toThrow(/trusted local interactive context/);
+			expect(() =>
+				createPreference({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					id: "P-import-explicit",
+					statement: "Imported instruction",
+					provenance: "explicit",
+					timezone: TIMEZONE,
+					sourceRefs: [{ id: "I-2", kind: "import" }],
+				}),
+			).toThrow(/external or imported/);
+			expect(() =>
+				createPreference({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					id: "P-forged-structural",
+					statement: "Forged policy",
+					provenance: "structural",
+					timezone: TIMEZONE,
+					authority: { projectId: PROJECT_ID, kind: "policy" } as never,
+					sourceRefs: [{ id: "D-fake", kind: "decision" }],
+				}),
+			).toThrow(/admitted policy authority/);
+			const policy = policyAuthority(root, "P-structural");
+			const structural = createPreference({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				id: "P-structural",
+				statement: "Real policy",
+				provenance: "structural",
+				timezone: TIMEZONE,
+				authority: policy,
+				sourceRefs: [{ id: "D-policy", kind: "decision" }],
+			});
+			expect(structural.provenance).toBe("structural");
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("derives ordinals from production journal and automatically goes dormant", () => {
+		const { root, db } = fixture();
+		try {
+			const authority = userAuthority(root, "P-decay", "create", "inferred");
+			const created = createPreference({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				id: "P-decay",
+				statement: "Old inferred preference",
+				provenance: "inferred",
+				timezone: TIMEZONE,
+				authority,
+				sourceRefs: [{ id: "S-decay", kind: "session" }],
+				...({ productionDaySequence: 999 } as Record<string, unknown>),
+			});
+			expect(created.current_production_day).toBe(0);
+			appendProductionDays(root, db, 20);
+			const dormant = getPreference(db, PROJECT_ID, "P-decay");
+			expect(dormant).toMatchObject({
+				current_production_day: 20,
+				status: "dormant",
+				effective_confidence: 0,
+			});
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reopens a rejected preference only with admitted positive evidence", () => {
+		const { root, db } = fixture();
+		try {
+			const createAuthority = userAuthority(root, "P-reopen", "create");
 			createPreference({
 				root,
 				db,
 				projectId: PROJECT_ID,
-				id: "P-ext",
-				statement: "External",
-				provenance: "inferred",
-				productionDaySequence: 1,
-				sourceRefs: [{ id: "I-1", kind: "import" }],
-				evidenceId: "PE-ext",
-				evidenceKind: "external",
-				trust: "untrusted",
+				id: "P-reopen",
+				statement: "Review before applying",
+				provenance: "explicit",
+				timezone: TIMEZONE,
+				authority: createAuthority,
+				sourceRefs: [{ id: "D-user", kind: "decision" }],
 			});
-			const path = preferenceJournalPath(root);
-			const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<
-				string,
-				unknown
-			>;
-			parsed.authority_kind = "explicit_project_user";
-			const { event_digest: _old, ...withoutDigest } = parsed;
-			parsed.event_digest = preferenceDigest(withoutDigest);
-			writeFileSync(path, `${JSON.stringify(parsed)}\n`);
-			expect(() => readPreferenceJournal(root, PROJECT_ID)).toThrow(
-				/authority/,
-			);
+			expect(() =>
+				recordPreferenceEvidence({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					preferenceId: "P-reopen",
+					evidenceId: "PE-forged-reject",
+					kind: "rejected",
+					weight: 0.4,
+					timezone: TIMEZONE,
+					authority: { projectId: PROJECT_ID, kind: "project_user" } as never,
+					sourceRefs: [{ id: "D-fake", kind: "decision" }],
+				}),
+			).toThrow(/admitted project_user authority/);
+			const rejected = recordPreferenceEvidence({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				preferenceId: "P-reopen",
+				evidenceId: "PE-reject",
+				kind: "rejected",
+				weight: 0.4,
+				timezone: TIMEZONE,
+				authority: userAuthority(root, "P-reopen", "reject"),
+				sourceRefs: [{ id: "D-user", kind: "decision" }],
+			});
+			expect(rejected.status).toBe("rejected");
+			expect(() =>
+				recordPreferenceEvidence({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					preferenceId: "P-reopen",
+					evidenceId: "PE-explicit-after-reject",
+					kind: "explicit",
+					weight: 0.2,
+					timezone: TIMEZONE,
+					authority: userAuthority(root, "P-reopen", "reinforce"),
+					sourceRefs: [{ id: "D-user", kind: "decision" }],
+				}),
+			).toThrow(/only reopen through accepted evidence/);
+			expect(() =>
+				recordPreferenceEvidence({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					preferenceId: "P-reopen",
+					evidenceId: "PE-forged-reopen",
+					kind: "accepted",
+					weight: 0.2,
+					timezone: TIMEZONE,
+					authority: { projectId: PROJECT_ID, kind: "project_user" } as never,
+					sourceRefs: [{ id: "D-fake", kind: "decision" }],
+				}),
+			).toThrow(/admitted project_user authority/);
+			const reopened = recordPreferenceEvidence({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				preferenceId: "P-reopen",
+				evidenceId: "PE-reopen",
+				kind: "accepted",
+				weight: 0.2,
+				timezone: TIMEZONE,
+				authority: userAuthority(root, "P-reopen", "reopen"),
+				sourceRefs: [{ id: "D-user", kind: "decision" }],
+			});
+			expect(reopened.status).toBe("active");
 		} finally {
 			db.close();
 			rmSync(root, { recursive: true, force: true });

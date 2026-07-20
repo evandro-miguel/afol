@@ -19,9 +19,9 @@ import {
 	getEvolutionStatus,
 	openEvolutionDb,
 	productionDayJournalPath,
-	rebuildProductionDayProjection,
 	validateProductionDayProjection,
 } from "../services/evolution";
+import { rebuildProductionDayProjection } from "../services/evolution/journal";
 import { withSessionLock } from "../services/io/session-lock";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
@@ -79,12 +79,16 @@ describe("Evolution canonical projection and concurrency", () => {
 		seedEvidence(root, "S-01", "E-01");
 		append(root, db, "S-01", "E-01");
 		const marker = join(root, "rebuild.marker");
-		const modulePath = join(import.meta.dir, "../services/evolution");
+		const journalModulePath = join(
+			import.meta.dir,
+			"../services/evolution/journal",
+		);
+		const dbModulePath = join(import.meta.dir, "../services/evolution");
 		const child = Bun.spawn(
 			[
 				"bun",
 				"-e",
-				`import { openEvolutionDb, rebuildProductionDayProjection } from ${JSON.stringify(modulePath)}; import { writeFileSync } from "node:fs"; const db=openEvolutionDb(${JSON.stringify(dbPath)}); rebuildProductionDayProjection({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)}}); writeFileSync(${JSON.stringify(marker)},"done"); db.close();`,
+				`import { openEvolutionDb } from ${JSON.stringify(dbModulePath)}; import { rebuildProductionDayProjection } from ${JSON.stringify(journalModulePath)}; import { writeFileSync } from "node:fs"; const db=openEvolutionDb(${JSON.stringify(dbPath)}); rebuildProductionDayProjection({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)}}); writeFileSync(${JSON.stringify(marker)},"done"); db.close();`,
 			],
 			{ stdout: "pipe", stderr: "pipe" },
 		);
