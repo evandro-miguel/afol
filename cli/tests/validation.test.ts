@@ -20,10 +20,11 @@ const runtimeLiveBenchmarkProfile = {
 	model: "gpt-5.4-mini",
 	reasoning_effort: "medium",
 };
-const runtimeLiveBenchmarkRefreshCommand =
+const runtimeLiveBenchmarkRefreshCommand = "afol bench run --all --save";
+const runtimeLiveBenchmarkValidationCommand =
 	"afol validate bench --pack runtime-live-agent --json";
-const runtimeLiveBenchmarkRefreshNote =
-	"snapshot validation; live runner pending (spec 260423_2006 in .afol/adm/specs/)";
+const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand}`;
+const runtimeLiveBenchmarkRefreshNote = `refresh live benchmark artifacts with ${runtimeLiveBenchmarkRefreshCommand}; then validate with ${runtimeLiveBenchmarkValidationCommand}`;
 const slowValidationTestTimeoutMs = 30_000;
 
 function runKernel(
@@ -1390,7 +1391,7 @@ describe("validation command family", () => {
 		expect(payload.pass).toBe(false);
 		const notes = payload.notes as string[];
 		expect(notes).toContain(
-			`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+			`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;${runtimeLiveBenchmarkRefreshGuidance}`,
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(4);
@@ -1402,7 +1403,7 @@ describe("validation command family", () => {
 				.filter((entry) => entry.status !== "skipped")
 				.every((entry) =>
 					(entry.notes as string[]).includes(
-						`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+						`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;${runtimeLiveBenchmarkRefreshGuidance}`,
 					),
 				),
 		).toBe(true);
