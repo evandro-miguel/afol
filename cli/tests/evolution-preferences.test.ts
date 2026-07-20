@@ -261,6 +261,36 @@ describe("Evolution preference projection", () => {
 				sourceRefs: [{ id: "S-2", kind: "session" }],
 			});
 			expect(duplicate.journal_event_id).toBe(first.journal_event_id);
+			expect(() =>
+				recordPreferenceEvidence({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					preferenceId: "P-idempotent",
+					evidenceId: "PE-same",
+					kind: "explicit",
+					weight: 0.1,
+					trust: "untrusted",
+					timezone: TIMEZONE,
+					authority: userAuthority(root, "P-idempotent", "reinforce"),
+					sourceRefs: [{ id: "S-2", kind: "session" }],
+				}),
+			).toThrow(/different content/);
+			expect(() =>
+				recordPreferenceEvidence({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					preferenceId: "P-idempotent",
+					evidenceId: "PE-same",
+					kind: "explicit",
+					weight: 0.1,
+					timezone: TIMEZONE,
+					authority: userAuthority(root, "P-idempotent", "reinforce"),
+					sourceRefs: [{ id: "S-other", kind: "session" }],
+				}),
+			).toThrow(/different content/);
+			expect(readPreferenceJournal(root, PROJECT_ID)).toHaveLength(1);
 			db.exec("DELETE FROM preference_evidence; DELETE FROM preferences;");
 			const replayed = recordPreferenceEvidence({
 				root,

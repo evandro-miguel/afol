@@ -16,6 +16,7 @@ import type {
 	PreferenceJournalEvent,
 } from "./preference-journal";
 import {
+	preferenceDigest,
 	readPreferenceJournal,
 	rebuildPreferenceProjection,
 	validatePreferenceProjection,
@@ -456,6 +457,28 @@ function makeEvidence(
 	};
 }
 
+function comparableEvidenceSourceRefs(
+	refs: PreferenceSourceRef[],
+): PreferenceSourceRef[] {
+	return refs.filter((ref) => ref.kind !== "decision");
+}
+
+function evidenceSourceRefsMatch(
+	stored: unknown,
+	input: PreferenceSourceRef[],
+): boolean {
+	try {
+		const parsed = JSON.parse(String(stored));
+		return (
+			Array.isArray(parsed) &&
+			preferenceDigest(comparableEvidenceSourceRefs(parsed)) ===
+				preferenceDigest(comparableEvidenceSourceRefs(input))
+		);
+	} catch {
+		return false;
+	}
+}
+
 export function recordPreferenceEvidence(
 	input: PreferenceEvidenceInput,
 ): PreferenceRecord {
@@ -487,7 +510,7 @@ function recordPreferenceEvidenceUnlocked(
 	const existingEvidence = current
 		? (input.db
 				.query(
-					"SELECT kind, weight, preference_id FROM preference_evidence WHERE project_id = ? AND id = ?",
+					"SELECT kind, trust, weight, preference_id, source_refs FROM preference_evidence WHERE project_id = ? AND id = ?",
 				)
 				.get(input.projectId, input.evidenceId) as Record<
 				string,
@@ -560,7 +583,9 @@ function recordPreferenceEvidenceUnlocked(
 		if (
 			String(existingEvidence.preference_id) !== input.preferenceId ||
 			String(existingEvidence.kind) !== input.kind ||
-			Number(existingEvidence.weight) !== expectedWeight
+			Number(existingEvidence.weight) !== expectedWeight ||
+			String(existingEvidence.trust) !== (input.trust ?? "local") ||
+			!evidenceSourceRefsMatch(existingEvidence.source_refs, input.sourceRefs)
 		)
 			throw new Error(
 				"preference evidence id already exists with different content",
