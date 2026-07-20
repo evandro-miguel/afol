@@ -30,13 +30,14 @@ ADRs document:
 ├── ADR-005-adm-canonical-authority-transfer.md
 ├── ADR-006-f22-core-readiness-and-mutation-policy.md
 ├── ADR-007-agent-submission-review-boundary.md
+├── ADR-008-afol-evolution-autonomy-and-evidence-boundary.md
 └── ...
 ```
 
 ### Available ADRs
 
 | ID | Title | Status | Date |
-|----|-------|--------|------|
+| --- | --- | --- | --- |
 | ADR-001 | Bun/TypeScript as Canonical Runtime | Accepted | 2026-06-09 |
 | ADR-002 | AFOL as Sole Public Entrypoint | Accepted | 2026-06-09 |
 | ADR-003 | JSON Operational State and Markdown Projection | Superseded | 2026-06-12 |
@@ -44,6 +45,7 @@ ADRs document:
 | ADR-005 | AFOL Administration Canonical Authority Transfer | Accepted | 2026-06-14 |
 | ADR-006 | F-22 Core Readiness and Selective Mutation Policy | Accepted | 2026-07-12 |
 | ADR-007 | Proposed F-30 Agent Submission and Review Boundary | Proposed | 2026-07-18 |
+| ADR-008 | AFOL Evolution Autonomy and Evidence Boundary | Accepted | 2026-07-16 |
 
 ### Creating an ADR
 

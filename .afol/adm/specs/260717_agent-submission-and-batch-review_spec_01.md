@@ -1,8 +1,9 @@
 ---
-doc_type: spec
+doc_type: spec-child
 id: 260717_agent-submission-and-batch-review_spec_01
 theme: agent-submission-and-batch-review
 status: active
+implementation_status: planned
 owners:
 - F-30 governance owner
 workstream_intent: Explore a governed one-worker submission and review boundary.
@@ -10,10 +11,13 @@ artifact_purpose: Backlog intent only; this spec authorizes no implementation or
 created_at: '2026-07-17T00:00:00-03:00'
 updated_at: '2026-07-18T00:00:00-03:00'
 roadmap_feature: F-30
-spec_role: parent
-parent_spec: ''
+spec_role: child
+parent_spec: 260716_2155_afol-evolution-system_spec_01
 links:
   roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
+  adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md
+  evolution_adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md
   plan: ''
   task: ''
   report: ''
@@ -27,11 +31,11 @@ scope:
 risk_level: high
 ---
 
-# SPEC: Agent Submission and Batch Review
+# SPEC CHILD: Agent Submission and Batch Review
 
 ## Intent and status
 
-F-30 records a possible one-worker `dispatch -> submit -> review` workflow.
+This F-30 child records a possible one-worker `dispatch -> submit -> review` workflow.
 The current repository has no public commands, registry entries, benchmark
 pack, or live scenario for this route. This document is a nonimplemented
 backlog contract and does not authorize implementation, lifecycle mutation, or
@@ -75,4 +79,4 @@ to an active or final spec requires fresh evidence and index updates.
 
 ---
 
-*Planned parent backlog for roadmap feature `F-30`; not an implementation claim.*
+*Planned child spec under F-30’s AFOL Evolution parent; not an implementation claim.*

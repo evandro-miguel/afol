@@ -637,11 +637,13 @@ Minimum acceptance:
 
 #### F-18.S10 Memory and Library Adoption Loop
 
-- Status: planned follow-on
+- Status: active
 - Governing specs:
   .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md
   and
   .afol/adm/specs/260612_global-project-research-library_spec-child_01.md
+  and
+  .afol/adm/specs/260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01.md
 - Why: health-green memory/library systems can still remain empty after real
   project work when agents never run the explicit proposal/promotion flows.
   Empty stores are valid when there is no reusable material, but AFOL should
@@ -650,12 +652,15 @@ Minimum acceptance:
   primitives, while healthy empty stores remain valid. Those primitives and a
   green health result do not satisfy this slice because no session-to-candidate
   adoption path exists yet.
-- Evolution boundary: implement this direction as a future read-only AFOL
+- Evolution boundary: implement this direction as a planned, read-only AFOL
   Evolution candidate-review slice. It may inspect completed project artifacts
-  and emit candidates with source/session provenance, but it must not promote,
-  mutate, auto-ingest, or imply that an Evolution command already exists.
-- Governance gate: approve a dedicated F-18.S10 child spec that cross-references
-  the AFOL Evolution governance before any CLI or lifecycle implementation.
+  and emit `adoption_candidate` records with source/session provenance, but it
+  must not promote, mutate, or auto-ingest canonical knowledge.
+- Governance gate: the dedicated F-18.S10 child spec is approved and
+  cross-references the AFOL Evolution governance; implementation remains
+  planned until its bounded slice is authorized. The approved governance
+  parent is F-30 and its dedicated spec is
+  `.afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md`.
   The current final specs define the memory/library primitives, not the missing
   adoption integration.
 - Scope:
@@ -687,9 +692,8 @@ Follow-on slices under this direction:
 - Immediate adoption gap: Memory and Library Adoption Loop v1. Connect
   completed workbench or maintenance artifacts to read-only candidate discovery
   so real project usage can feed reviewed memory/library proposals instead of
-  leaving those stores empty by default. Implementation waits for the dedicated
-  child spec and AFOL Evolution governance; this roadmap clarification delivers
-  direction only.
+  leaving those stores empty by default. The child spec is active and
+  implementation is planned under F-30; promotion remains explicit.
 - Immediate next slice: Temporal Reliability v1. Implement explicit path
   config, `afol pstr stale --json`, trusted-context stale gates,
   `afol health --area state|library|memory`, weekly/monthly maintenance dry-run
@@ -943,11 +947,80 @@ Follow-on slices under this direction:
   complete, full-suite evidence `E-20260715211444533-1df252`, and independent
   downstream scaffold review.
 
-### F-30 Agent Submission and Batch Review
+### F-30 AFOL Evolution System
 
 - Status: active
 - Governing spec:
+  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
+- Why: AFOL needs a controlled learning loop that connects native and
+  explicitly imported session evidence, user decisions, recurring friction,
+  production-day metrics, and later evaluation without silently changing
+  critical project behavior.
+- Relationship to prior features: F-30 consumes the workbench, evidence,
+  telemetry, maintenance, memory, library, context, and Universal Skills
+  surfaces delivered by F-04, F-07, F-18, and F-29. It is the governance
+  parent for the F-18.S10 adoption loop and must not create a parallel
+  canonical knowledge store.
+- Core contract: `Observer -> Analyst -> Proposal -> Critic -> User/Policy ->
+  Apply -> Evaluate`. Observation and derived counters may be automatic;
+  critical surfaces remain approval-gated and every proposal must retain
+  evidence, risk, validation, and evaluation references.
+- Product modes:
+  - one short, report-first daily suggestion per project on the first session
+    of the local calendar date, with shared receipts across harnesses;
+  - intentional, read-only analysis and preview through `afol evolve`, with
+    application only through the normal AFOL workbench lifecycle.
+- Scope includes production-day ledger, preference evidence with temporal
+  decay, deterministic recurrence detection, scorecards, suggestion receipts,
+  proposal/evaluation/canary state, explicit external-session imports,
+  normalization/redaction/linking, low-risk undoable lessons/memory updates,
+  and maintenance of derived evolution state.
+- Autonomy boundary: no daemon, silent provider reads, cloud chat sync,
+  automatic rule/skill/config/spec/ADR/roadmap/code changes, global preference
+  promotion, merge, or automatic research generation in the first release.
+- Planned child slices:
+  0. Governance, schemas, threat model, UX journey, metrics, and canonical vs
+     derived-state boundary.
+  1. Evolution config, project identity, migrations, health, and production-day
+     ledger.
+  2. Preference evidence, precedence, confidence, and 7/20 production-day
+     degradation.
+  3. Observation normalization, fingerprints, recurrence clusters, and
+     comparable-task scorecards.
+  4. Daily suggestion queue, project/day deduplication, TTL claims, skip,
+     reject, reminders, and critical-alert separation.
+  5. Intentional `afol evolve` analysis/status/proposal/review flow.
+  6. Explicit Codex and Pi imports first, then additional versioned adapters;
+     streaming, resumability, redaction, idempotency, linking, and hostile
+     transcript boundaries.
+  7. Bounded low-risk lessons/memory application with canonical mutation
+     journal, undo, validation, and initial first-release
+     `auto_apply_mode: canary`; `none` remains selectable and promotion to
+     `lessons_memory_only` requires successful evaluation plus explicit
+     policy/configuration approval.
+  8. Comparable-session evaluation, canary, stabilization, reopening, and
+     rollback.
+  9. Universal Skills integration for read-only `good-morning` and
+     session-retro consumption, without moving evolution logic into skills.
+- Acceptance direction: every suggestion/proposal is traceable to source
+  evidence; daily dedupe is concurrency-safe; skipped work can be reprioritized;
+  explicit rejection suppresses recurrence until material evidence changes;
+  preferences age by production ordinals; imports are explicit, redacted,
+  idempotent, resumable, and fail closed; critical knowledge surfaces are
+  never silently mutated; and improvements are accepted only when quality,
+  integrity, and user-load metrics do not regress.
+- Delivery policy: implement in independent PRs by child slice. The first
+  slice must remain schema/governance-only, with no LLM call, external
+  import, automatic application, or daemon. Do not combine F-30 slices with
+  SQLite, memory, library, context, or maintenance rewrites.
+
+#### Agent Submission and Batch Review (F-30 child)
+
+- Child status: active
+- Governing spec:
   .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
+- Parent spec:
+  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
 - Intent: explore a bounded one-worker submission and review workflow that may
   reduce lifecycle round trips while preserving AFOL's existing authority and
   evidence boundaries.
