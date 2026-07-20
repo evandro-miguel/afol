@@ -2862,7 +2862,7 @@ describe("runtime live validation helpers", () => {
 				missing.results.filter((entry) => entry.status === "failed"),
 			).toHaveLength(4);
 			expect(missing.notes).toContain(
-				`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
+				"runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol bench run --all --save;then:afol validate bench --pack runtime-live-agent --json",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

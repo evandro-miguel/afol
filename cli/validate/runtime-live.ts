@@ -27,10 +27,11 @@ const LIVE_BENCHMARK_SCENARIO_IDS: Record<string, string> = {
 	"file-inspection-vs-command": "live-implement-next-governance-preflight",
 	"validation-flow": "live-tools-benchmark-discovery",
 };
-const LIVE_BENCHMARK_REFRESH_COMMAND =
+const LIVE_BENCHMARK_REFRESH_COMMAND = "afol bench run --all --save";
+const LIVE_BENCHMARK_VALIDATE_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
-const LIVE_BENCHMARK_REFRESH_NOTE =
-	"snapshot validation; live runner pending (spec 260423_2006 in .afol/adm/specs/)";
+const LIVE_BENCHMARK_REFRESH_GUIDANCE = `run:${LIVE_BENCHMARK_REFRESH_COMMAND};then:${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
+const LIVE_BENCHMARK_REFRESH_NOTE = `refresh live benchmark artifacts with ${LIVE_BENCHMARK_REFRESH_COMMAND}; then validate with ${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
 
 interface LiveRunnerProfile {
 	runtime: string;
@@ -347,14 +348,14 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 	const snapshotPath = join(projectRoot, LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH);
 	if (!existsSync(snapshotPath)) {
 		throw new Error(
-			`runtime-live-artifact-missing:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-artifact-missing:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	const snapshot = loadJsonObject(snapshotPath);
 	const snapshotPackId = asString(snapshot.pack_id, `${snapshotPath}.pack_id`);
 	if (snapshotPackId !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
 		throw new Error(
-			`runtime-live-artifact-pack-mismatch:${snapshotPackId};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-artifact-pack-mismatch:${snapshotPackId};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	const snapshotProfile = parseLiveRunnerProfile(
@@ -366,7 +367,7 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 		snapshotProfile.reasoning_effort !== "medium"
 	) {
 		throw new Error(
-			`runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	const savedResultPathRaw = asOptionalString(
@@ -384,7 +385,7 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 	);
 	if (schemaVersion !== LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION) {
 		throw new Error(
-			`runtime-live-snapshot-schema-mismatch:${schemaVersion};expected:${LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-snapshot-schema-mismatch:${schemaVersion};expected:${LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	const staleAfterDays = asOptionalNumber(
@@ -399,13 +400,13 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 		staleAfterDays !== LIVE_BENCHMARK_STALE_AFTER_DAYS
 	) {
 		throw new Error(
-			`runtime-live-snapshot-freshness-invalid:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-snapshot-freshness-invalid:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	const ageMs = Date.now() - generatedAt;
 	if (ageMs < 0 || ageMs > staleAfterDays * 24 * 60 * 60 * 1000) {
 		throw new Error(
-			`runtime-live-snapshot-stale:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};generated-at:${snapshot.generated_at};max-age-days:${staleAfterDays};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-snapshot-stale:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};generated-at:${snapshot.generated_at};max-age-days:${staleAfterDays};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	const snapshotPayload = parseLiveRunnerPayload(snapshot, snapshotPath);
@@ -433,7 +434,7 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 	}
 	if (payload.pack_id !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
 		throw new Error(
-			`runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	if (
@@ -441,7 +442,7 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 		payload.benchmark_profile.reasoning_effort !== "medium"
 	) {
 		throw new Error(
-			`runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/medium;${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
 	return {
@@ -590,7 +591,7 @@ function runtimeLiveDirectEvidenceNote(
 		| "runtime-live-direct-evidence-reused",
 ): string {
 	const mappedId = scenario.live_runner_scenario_id ?? "missing";
-	return `${reason}:${scenario.scenario_id}:${mappedId};artifact:${evidence.savedResultPathRelative};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`;
+	return `${reason}:${scenario.scenario_id}:${mappedId};artifact:${evidence.savedResultPathRelative};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`;
 }
 
 interface RuntimeLiveScenarioOutcome {
@@ -781,7 +782,7 @@ export function buildRuntimeLiveAgentResults(
 			`runtime-live-agent-evidence-source:${evidence.payloadSource}`,
 			...(incompleteArtifact
 				? [
-						`runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${proofScenarioCount};run:${LIVE_BENCHMARK_REFRESH_COMMAND};note:${LIVE_BENCHMARK_REFRESH_NOTE}`,
+						`runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${proofScenarioCount};${LIVE_BENCHMARK_REFRESH_GUIDANCE};note:${LIVE_BENCHMARK_REFRESH_NOTE}`,
 					]
 				: []),
 			`runtime-live-agent-refresh:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
