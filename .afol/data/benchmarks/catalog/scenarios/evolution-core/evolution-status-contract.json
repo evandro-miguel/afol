@@ -8,11 +8,21 @@
   "objective": "Prove Evolution status is runnable for uninitialized, healthy, and copied cross-project databases.",
   "expected_result": "The smoke verifies ready_uninitialized without SQLite sidecars, healthy initialized state, and fail-closed cross-project state.",
   "coverage": {
-    "commands": ["evolve"],
-    "subcommands": ["evolve status [--json]"],
-    "journeys": ["afol-evolution-system"],
-    "features": ["F-30"],
-    "specs": ["260716_2155_afol-evolution-system_spec_01"]
+    "commands": [
+      "evolve"
+    ],
+    "subcommands": [
+      "evolve status [--json]"
+    ],
+    "journeys": [
+      "afol-evolution-system"
+    ],
+    "features": [
+      "F-30"
+    ],
+    "specs": [
+      "260716_2155_afol-evolution-system_spec_01"
+    ]
   },
   "expected_exit": 0,
   "result_schema": "1.0.0",
@@ -25,9 +35,9 @@
   },
   "baseline_id": "evolution-core-v1",
   "deterministic_metrics": {
-    "duration_ms": 261,
-    "timing_p50_ms": 261,
-    "timing_p95_ms": 273,
+    "duration_ms": 198,
+    "timing_p50_ms": 198,
+    "timing_p95_ms": 211,
     "error_count": 0,
     "retry_count": 0,
     "context_tokens": 0,
@@ -43,8 +53,8 @@
     "source": "fresh-local-runnable-smoke",
     "sample_count": 3,
     "warmup_count": 1,
-    "git_commit": "27e758d0a8bf",
-    "timestamp": "2026-07-17T12:29:48.156Z"
+    "git_commit": "e6436bdd2fc3",
+    "timestamp": "2026-07-20T10:44:42.625Z"
   },
   "implementation_status": "implemented"
 }

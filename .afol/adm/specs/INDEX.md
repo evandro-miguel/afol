@@ -16,9 +16,9 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 76 |
+| Total | 78 |
 | Draft | 0 |
-| Active | 4 |
+| Active | 6 |
 | Final | 54 |
 | Superseded | 18 |
 

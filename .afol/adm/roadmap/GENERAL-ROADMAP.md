@@ -1032,27 +1032,9 @@ Follow-on slices under this direction:
 - Backlog acceptance requires a governing child spec, registered commands and
   scenarios, deterministic authority/integrity tests, and fresh observed
   evidence. Planned intent is not production proof.
-- ID ownership: F-30 and ADR-007 are reserved for submission/review. Do not
-  reuse either id for the Evolution System stack; that work lands as F-31 and
-  must introduce ADR-008 (or the next free ADR) instead of overwriting ADR-007.
-
-### F-31 AFOL Evolution System (reserved)
-
-- Status: reserved (implementation stack open; do not claim F-30)
-- Intended governing parent (on stack branches until rebased):
-  `.afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md`
-- Why reserved: Evolution adoption loops were developed in parallel and still
-  label themselves F-30/ADR-007 on feature branches. On `dev`, those ids are
-  already owned by F-30 Agent Submission. Before merging evolution loops into
-  `dev`, renumber Evolution to **F-31** and move evolution autonomy decisions
-  to a new ADR id (recommended **ADR-008**). Keep submission F-30/ADR-007
-  intact.
-- Scope (product intent, not yet on `dev`): project-local evolution core,
-  preferences, recurrence, daily suggestions, read-only analysis, explicit
-  imports, bounded apply/rollback, posterior evaluation, capability markers.
-- Merge rule for agents landing the evolution stack: rewrite roadmap/spec/ADR
-  indexes and any `roadmap_feature: F-30` workbench bindings that mean
-  Evolution so they bind to F-31; leave F-30 submission artifacts unchanged.
+- Governance: F-30 is the shared Evolution parent and submission/review child
+  lane. ADR-007 governs submission/review boundaries, while ADR-008 governs
+  Evolution autonomy and evidence boundaries; both decisions remain distinct.
 
 ## 6) Recommended Delivery Phases
 
