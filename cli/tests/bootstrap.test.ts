@@ -580,9 +580,17 @@ describe("bootstrap provider-compatible mutable state", () => {
 			const config = JSON.parse(
 				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
+				project: { id: string; timezone: string };
 				paths: Record<string, string>;
+				evolution: {
+					autonomy: { auto_apply_mode: string };
+				};
 				skills_sync: Record<string, string>;
 			};
+			expect(config.project.id).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+			);
+			expect(config.project.timezone.length).toBeGreaterThan(0);
 			expect(config.paths.agents_dir).toBe(".agents");
 			expect(config.paths.mutable_dir).toBe(".afol");
 			expect(config.paths.adm_dir).toBe(".afol/adm");
@@ -596,6 +604,11 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(config.paths.events_file).toBe(".afol/data/events/events.jsonl");
 			expect(config.paths.data_index_dir).toBe(".afol/data/index");
 			expect(config.paths.mutations_dir).toBe(".afol/data/mutations");
+			expect(config.paths.evolution_db).toBe(".afol/state/evolution.db");
+			expect(config.paths.evolution_events_dir).toBe(
+				".afol/data/events/evolution",
+			);
+			expect(config.evolution.autonomy.auto_apply_mode).toBe("none");
 			expect(config.skills_sync.project_dir).toBe(".agents/skills");
 		} finally {
 			rmSync(target, { recursive: true, force: true });
@@ -608,10 +621,69 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
 				0,
 			);
+			const firstConfig = JSON.parse(
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
+			) as { project: { id: string; timezone: string } };
 			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
 				0,
 			);
+			const secondConfig = JSON.parse(
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
+			) as { project: { id: string; timezone: string } };
+			expect(secondConfig.project).toEqual(firstConfig.project);
 		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("generates a distinct stable UUID for each new project", async () => {
+		const first = mkdtempSync(join(tmpdir(), "bootstrap-afol-first-"));
+		const second = mkdtempSync(join(tmpdir(), "bootstrap-afol-second-"));
+		try {
+			expect(await runBootstrapCommand([first, "--provider-compatible"])).toBe(
+				0,
+			);
+			expect(await runBootstrapCommand([second, "--provider-compatible"])).toBe(
+				0,
+			);
+			const readProjectId = (root: string): string => {
+				const config = JSON.parse(
+					readFileSync(join(root, ".afol", "config.json"), "utf8"),
+				) as { project: { id: string } };
+				return config.project.id;
+			};
+			expect(readProjectId(first)).not.toBe(readProjectId(second));
+		} finally {
+			rmSync(first, { recursive: true, force: true });
+			rmSync(second, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed when an existing evolution identity is invalid", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-identity-"));
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+			const configPath = join(target, ".afol", "config.json");
+			const config = JSON.parse(readFileSync(configPath, "utf8")) as {
+				project: { id: string };
+			};
+			config.project.id = "not-a-uuid";
+			writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+			console.error = (...values: unknown[]) => errors.push(values.join(" "));
+
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				2,
+			);
+			expect(errors.join("\n")).toContain(
+				"Existing project.id is not a valid stable UUID",
+			);
+			expect(readFileSync(configPath, "utf8")).toContain('"id": "not-a-uuid"');
+		} finally {
+			console.error = originalError;
 			rmSync(target, { recursive: true, force: true });
 		}
 	});

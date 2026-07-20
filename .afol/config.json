@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "project": {
+    "id": "db97afff-2026-4eb1-a799-5d34fd505267",
+    "timezone": "America/Asuncion",
     "name": "afol"
   },
   "paths": {
@@ -19,7 +21,49 @@
     "mutations_dir": ".afol/data/mutations",
     "mutation_backups_dir": ".afol/data/mutations/backups",
     "mutation_archives_dir": ".afol/data/mutations/archives",
+    "external_dir": ".afol/external",
+    "evolution_db": ".afol/state/evolution.db",
+    "evolution_data_dir": ".afol/data/evolution",
+    "evolution_events_dir": ".afol/data/events/evolution",
     "docs_dir": "docs"
+  },
+  "evolution": {
+    "enabled": true,
+    "suggestions": {
+      "first_session_of_day": true,
+      "dedupe_scope": "project",
+      "max_visible_per_day": 1,
+      "remind_skipped_next_day": true,
+      "deep_review_after_production_days": 5
+    },
+    "preferences": {
+      "soft_decay_after_production_days": 7,
+      "stop_guiding_after_production_days": 20,
+      "minimum_effective_confidence": 0.65,
+      "decay_curve": "linear"
+    },
+    "recurrence": {
+      "minimum_occurrences": 3,
+      "minimum_distinct_sessions": 2,
+      "minimum_distinct_production_days": 2
+    },
+    "large_change": {
+      "changed_files": 20,
+      "changed_lines": 1000,
+      "critical_paths_trigger": true
+    },
+    "external": {
+      "mode": "explicit_import_only",
+      "storage": "normalized_sections",
+      "store_raw": false,
+      "redact_before_persist": true
+    },
+    "autonomy": {
+      "auto_observe": true,
+      "auto_refresh_preference_projections": true,
+      "auto_clean_derived_state": true,
+      "auto_apply_mode": "none"
+    }
   },
   "skills_sync": {
     "project_dir": ".agents/skills"

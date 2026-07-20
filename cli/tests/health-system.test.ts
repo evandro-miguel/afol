@@ -617,7 +617,10 @@ describe("health system", () => {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			writeMemory(root, hoursAgo(24 * 45));
 			const report = runDoctor(root);
-			expect(report.scores).toHaveLength(8);
+			expect(report.scores).toHaveLength(9);
+			expect(report.scores.some((score) => score.area === "evolution")).toBe(
+				true,
+			);
 			expect(
 				report.scores.some(
 					(score) => score.area === "pstr" && score.score < 100,
@@ -737,6 +740,11 @@ describe("health system", () => {
 			expect(Array.isArray(payload.remediation)).toBe(true);
 			expect(payload.remediation_plan).toBe(false);
 			expect(payload.scope).toBe("full");
+			expect(payload.configuration.evolution).toMatchObject({
+				valid: true,
+				configured: false,
+				timezone: "UTC",
+			});
 			expect(payload.data.scores).toHaveLength(payload.scores.length);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1379,6 +1387,7 @@ describe("health system", () => {
 			const captured = captureIo();
 			expect(await runDoctorCommand([], root, captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("doctor scope: full");
+			expect(captured.stdout.join("\n")).toContain("evolution config:");
 			expect(captured.stdout.join("\n")).toContain("doctor scores:");
 			expect(captured.stdout.join("\n")).toContain("pstr:");
 			expect(captured.stdout.join("\n")).toContain(

@@ -50,7 +50,14 @@ export async function runDoctorCommand(
 				stringifyEnvelope(
 					envelopeWithLegacyKeys(
 						envelopeOk(data, { action: "doctor", exitCode: 0 }),
-						["ok", "scores", "remediation", "remediation_plan", "scope"],
+						[
+							"ok",
+							"configuration",
+							"scores",
+							"remediation",
+							"remediation_plan",
+							"scope",
+						],
 					),
 				),
 			);
@@ -72,6 +79,7 @@ export async function runDoctorCommand(
 		io.stdout(
 			[
 				"doctor scope: full",
+				`evolution config: enabled=${String(report.configuration.evolution?.enabled ?? false)} project_id=${String(report.configuration.evolution?.project_id ?? "missing")} timezone=${String(report.configuration.evolution?.timezone ?? "unknown")}`,
 				"doctor scores:",
 				...report.scores.map(
 					(score) => `  ${score.area}: ${score.score}/${score.max}`,

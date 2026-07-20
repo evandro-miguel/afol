@@ -25,6 +25,7 @@ export type CommandKind =
 	| "hydrate"
 	| "library"
 	| "memory"
+	| "evolve"
 	| "adm"
 	| "governance"
 	| "spec"
@@ -795,6 +796,26 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect memory entries",
 		category: "inspect",
+	},
+	{
+		command: "evolve",
+		aliases: [],
+		kind: "evolve",
+		sideEffect: "read",
+		description: "Inspect project evolution state",
+		category: "inspect",
+		guidance: [
+			"Use evolve status for the read-only Slice 1 health summary.",
+			"Analysis, imports, and proposal mutation are not available in Slice 1.",
+		],
+		subcommands: [
+			{
+				usage: "status [--json]",
+				sideEffect: "read",
+				description:
+					"Inspect evolution config, migration, and production-day state",
+			},
+		],
 	},
 	{
 		command: "adm",

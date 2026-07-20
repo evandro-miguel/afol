@@ -2,6 +2,11 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { getSectionIndex } from "../context";
 import { runDriftCheck } from "../drift";
+import {
+	checkEvolutionDbHealth,
+	evolutionDbPath,
+	resolveEvolutionConfig,
+} from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import { getTopic, listTopics } from "../library";
 import {
@@ -10,7 +15,7 @@ import {
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { readMemory } from "../memory";
-import { resolveProjectPaths } from "../project/paths";
+import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { checkPstrStale, validatePstrIndex } from "../pstr";
 import { readMaintenanceReviewSummary } from "./maintenance-review";
 import type { HealthArea, HealthFinding, HealthReport } from "./types";
@@ -23,6 +28,7 @@ const HEALTH_AREAS: readonly HealthArea[] = [
 	"library",
 	"state",
 	"ctx",
+	"evolution",
 	"token_budget",
 ];
 const CORE_HEALTH_AREAS: readonly HealthArea[] = ["wb"];
@@ -490,6 +496,87 @@ function checkTokenHealth(root: string, deep: boolean): HealthFinding[] {
 		: [];
 }
 
+function checkEvolutionHealth(root: string, deep: boolean): HealthFinding[] {
+	try {
+		const config = resolveEvolutionConfig(readProjectConfig(root));
+		if (!config.configured) {
+			return deep
+				? [
+						makeFinding(
+							"evolution",
+							"info",
+							"legacy project config uses in-memory evolution defaults",
+							"add project.id, project.timezone, evolution paths, and evolution config through an approved config change",
+						),
+					]
+				: [];
+		}
+		if (!config.enabled) {
+			return deep
+				? [makeFinding("evolution", "info", "evolution is disabled")]
+				: [];
+		}
+		if (!config.projectId) {
+			return [
+				makeFinding(
+					"evolution",
+					"warn",
+					"evolution requires a stable project UUID",
+					"add project.id through an approved config change",
+				),
+			];
+		}
+		const dbPath = evolutionDbPath(root, config.paths.evolutionDb);
+		if (!existsSync(dbPath)) {
+			return deep
+				? [
+						makeFinding(
+							"evolution",
+							"info",
+							"evolution derived database is not initialized",
+							"it will be created when a qualifying production event is projected",
+						),
+					]
+				: [];
+		}
+		const health = checkEvolutionDbHealth(dbPath, config.projectId, {
+			root,
+			projectId: config.projectId,
+			timezone: config.timezone,
+			evolutionEventsDir: config.paths.evolutionEventsDir,
+		});
+		const findings = health.findings.map((finding) =>
+			makeFinding(
+				"evolution",
+				finding.severity,
+				finding.message,
+				finding.severity === "fail"
+					? "rebuild the derived evolution database from canonical journal events"
+					: undefined,
+			),
+		);
+		if (deep && health.ok) {
+			findings.push(
+				makeFinding(
+					"evolution",
+					"info",
+					`evolution schema current at version ${health.migration_version}`,
+				),
+			);
+		}
+		return findings;
+	} catch (error) {
+		return [
+			makeFinding(
+				"evolution",
+				"fail",
+				`invalid evolution configuration: ${(error as Error).message}`,
+				"run afol validate project --json and correct the approved project config",
+			),
+		];
+	}
+}
+
 const CHECKERS: Record<
 	HealthArea,
 	(root: string, deep: boolean) => HealthFinding[]
@@ -501,6 +588,7 @@ const CHECKERS: Record<
 	library: checkLibraryHealth,
 	state: checkStateHealth,
 	ctx: checkCtxHealth,
+	evolution: checkEvolutionHealth,
 	token_budget: checkTokenHealth,
 };
 

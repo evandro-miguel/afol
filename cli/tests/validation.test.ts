@@ -89,6 +89,33 @@ function relaxMutationSafetyTimingLimits(root: string): void {
 	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
 }
 
+function rebindEvolutionProvenance(root: string): void {
+	const commit = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], {
+		cwd: root,
+		encoding: "utf8",
+	}).stdout.trim();
+	const timestamp = new Date().toISOString();
+	const baselinePath = join(
+		root,
+		".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v1.json",
+	);
+	const scenarioPath = join(
+		root,
+		".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+	);
+	const baseline = readJson(baselinePath);
+	baseline.git_commit = commit;
+	baseline.timestamp = timestamp;
+	baseline.provenance = "test-fixture-rebind";
+	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
+	const scenario = readJson(scenarioPath);
+	const measurement = scenario.measurement as Record<string, unknown>;
+	measurement.git_commit = commit;
+	measurement.timestamp = timestamp;
+	measurement.source = "test-fixture-rebind";
+	writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`, "utf8");
+}
+
 function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 	const root = mkdtempSync(join(tmpdir(), "validation-fixture-"));
 	mkdirSync(join(root, ".agents"), { recursive: true });
@@ -130,6 +157,7 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 			);
 		}
 	}
+	rebindEvolutionProvenance(root);
 	mutate?.(root);
 	return root;
 }
@@ -1469,13 +1497,14 @@ describe("validation command family", () => {
 		expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
 	}, 10000);
 
-	test("registry contract remains complete for the fifteen-pack matrix", () => {
+	test("registry contract remains complete for the sixteen-pack matrix", () => {
 		const proc = runKernel(["v", "select", "--json"]);
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		const registry = payload.registry as Array<Record<string, unknown>>;
 		expect(registry.map((entry) => entry.pack_id)).toEqual([
 			"cli-kernel-local",
+			"evolution-core",
 			"routing-accuracy",
 			"mutation-safety",
 			"update-safety",

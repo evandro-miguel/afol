@@ -39,7 +39,10 @@ import {
 	outputTail,
 	registrySummary,
 } from "../validate/output";
-import { validateRegistryContract } from "../validate/registry";
+import {
+	validateBenchmarkProvenance,
+	validateRegistryContract,
+} from "../validate/registry";
 import {
 	buildRuntimeLiveAgentResults,
 	collectThresholdNotes,
@@ -141,6 +144,60 @@ function createFixtureRoot(): string {
 		if (result.status !== 0) {
 			throw new Error(
 				result.stderr || result.stdout || `git ${args.join(" ")} failed`,
+			);
+		}
+	}
+	// The copied catalog may carry provenance from the source checkout. Rebind
+	// measured fixtures to this disposable repository so registry validation
+	// exercises the same ancestor/timestamp contract without trusting that hash.
+	const fixtureCommit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
+	const fixtureTimestamp = gitFixtureValue(root, [
+		"show",
+		"-s",
+		"--format=%cI",
+		fixtureCommit,
+	]);
+	const evolutionScenarioPath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"scenarios",
+		"evolution-core",
+		"evolution-status-contract.json",
+	);
+	const evolutionBaselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"evolution-core",
+		"baseline-v1.json",
+	);
+	if (existsSync(evolutionScenarioPath) && existsSync(evolutionBaselinePath)) {
+		const evolutionScenario = readJson(evolutionScenarioPath);
+		const measurement = evolutionScenario.measurement;
+		if (isObject(measurement)) {
+			evolutionScenario.measurement = {
+				...measurement,
+				git_commit: fixtureCommit,
+				timestamp: fixtureTimestamp,
+			};
+			writeFileSync(
+				evolutionScenarioPath,
+				`${JSON.stringify(evolutionScenario, null, 2)}\n`,
+				"utf8",
+			);
+			const evolutionBaseline = readJson(evolutionBaselinePath);
+			evolutionBaseline.git_commit = fixtureCommit;
+			evolutionBaseline.timestamp = fixtureTimestamp;
+			writeFileSync(
+				evolutionBaselinePath,
+				`${JSON.stringify(evolutionBaseline, null, 2)}\n`,
+				"utf8",
 			);
 		}
 	}
@@ -292,6 +349,60 @@ function getCliKernelPaths(root: string): {
 	};
 }
 
+function gitFixtureValue(root: string, args: string[]): string {
+	const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+	if (result.status !== 0) {
+		throw new Error(result.stderr || `git ${args.join(" ")} failed`);
+	}
+	return result.stdout.trim();
+}
+
+function createProvenanceFixtures(root: string): {
+	scenario: Scenario;
+	baseline: Baseline;
+	commitTime: Date;
+	commit: string;
+} {
+	const commit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
+	const commitTime = new Date(
+		gitFixtureValue(root, ["show", "-s", "--format=%cI", commit]),
+	);
+	const timestamp = commitTime.toISOString();
+	return {
+		scenario: {
+			schema_version: "1.0.0",
+			scenario_id: "provenance-fixture",
+			scenario_version: "1.0.0",
+			pack_id: "evolution-core",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_duration_ms: 1000 },
+			baseline_id: "provenance-fixture-v1",
+			deterministic_metrics: { duration_ms: 1 },
+			measurement: {
+				status: "observed",
+				source: "fixture",
+				sample_count: 3,
+				warmup_count: 1,
+				git_commit: commit,
+				timestamp,
+			},
+		},
+		baseline: {
+			baseline_id: "provenance-fixture-v1",
+			pack_id: "evolution-core",
+			schema_version: "1.0.0",
+			sample_count: 3,
+			warmup_count: 1,
+			git_commit: commit,
+			timestamp,
+			provenance: "fixture",
+		},
+		commitTime,
+		commit,
+	};
+}
+
 describe("validate shared helpers", () => {
 	test("validate known values and reject invalid inputs", () => {
 		expect(isObject({ ok: true })).toBe(true);
@@ -376,7 +487,7 @@ describe("validate output helpers", () => {
 		expect(outputTail("x".repeat(4100))).toBe("x".repeat(4000));
 
 		const summary = registrySummary(snapshot);
-		expect(summary).toHaveLength(15);
+		expect(summary).toHaveLength(16);
 		expect(summary[0]).toMatchObject({
 			pack_id: "cli-kernel-local",
 			min_scenarios: 6,
@@ -431,9 +542,20 @@ describe("validate selector", () => {
 			]),
 		);
 
+		expect(
+			selectPacks({
+				scope: "default",
+				changedPaths: ["cli/services/evolution/journal.ts"],
+			}),
+		).toEqual({
+			selected_pack_ids: ["evolution-core"],
+			reasons: ["evolution-change:cli/services/evolution/journal.ts"],
+		});
+
 		expect(selectPacks({ scope: "default", changedPaths: [] })).toEqual({
 			selected_pack_ids: [
 				"cli-kernel-local",
+				"evolution-core",
 				"routing-accuracy",
 				"mutation-safety",
 				"update-safety",
@@ -455,12 +577,168 @@ describe("validate selector", () => {
 });
 
 describe("validate registry", () => {
+	test("accepts an observed baseline bound to an ancestor commit", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects missing and mismatched observed metadata", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const missing = {
+				...fixture.scenario,
+				measurement: { ...fixture.scenario.measurement, source: undefined },
+			} as unknown as Scenario;
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					missing,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-missing:evolution-core:provenance-fixture:measurement.source",
+			);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					{ ...fixture.baseline, sample_count: 4 },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-mismatch:evolution-core:provenance-fixture:sample_count",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects unknown and non-ancestor commits", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const unknownCommit = "f".repeat(40);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					{
+						...fixture.scenario,
+						measurement: {
+							...fixture.scenario.measurement,
+							git_commit: unknownCommit,
+						},
+					},
+					{ ...fixture.baseline, git_commit: unknownCommit },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				`benchmark-provenance-commit-not-found:evolution-core:provenance-fixture:${unknownCommit}`,
+			);
+
+			const orphan = gitFixtureValue(root, ["mktree"]);
+			const nonAncestor = spawnSync("git", ["commit-tree", orphan], {
+				cwd: root,
+				encoding: "utf8",
+				input: "non-ancestor\n",
+			}).stdout.trim();
+			expect(nonAncestor).toMatch(/^[0-9a-f]{40}$/);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					{
+						...fixture.scenario,
+						measurement: {
+							...fixture.scenario.measurement,
+							git_commit: nonAncestor,
+						},
+					},
+					{ ...fixture.baseline, git_commit: nonAncestor },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				`benchmark-provenance-commit-not-ancestor:evolution-core:provenance-fixture:${nonAncestor}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects timestamps before the recorded commit", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const beforeCommit = new Date(
+				fixture.commitTime.getTime() - 1_000,
+			).toISOString();
+			const issues = validateBenchmarkProvenance(
+				root,
+				{
+					...fixture.scenario,
+					measurement: {
+						...fixture.scenario.measurement,
+						timestamp: beforeCommit,
+					},
+				},
+				{ ...fixture.baseline, timestamp: beforeCommit },
+				new Date(fixture.commitTime.getTime() + 1_000),
+			);
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-timestamp-before-commit:evolution-core:provenance-fixture:measurement.timestamp",
+					"benchmark-provenance-timestamp-before-commit:evolution-core:provenance-fixture:baseline.timestamp",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects timestamps in the future", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const now = new Date(fixture.commitTime.getTime() + 1_000);
+			const future = new Date(now.getTime() + 1_000).toISOString();
+			const issues = validateBenchmarkProvenance(
+				root,
+				{
+					...fixture.scenario,
+					measurement: { ...fixture.scenario.measurement, timestamp: future },
+				},
+				{ ...fixture.baseline, timestamp: future },
+				now,
+			);
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-timestamp-future:evolution-core:provenance-fixture:measurement.timestamp",
+					"benchmark-provenance-timestamp-future:evolution-core:provenance-fixture:baseline.timestamp",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("loads the real catalog and flags contract issues", () => {
 		const root = createFixtureRoot();
 		try {
 			const snapshot = loadRegistry(root);
 			expect(snapshot.schema_version).toBe("1.0.0");
-			expect(snapshot.packs).toHaveLength(15);
+			expect(snapshot.packs).toHaveLength(16);
 			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["pstr-integrity"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);
@@ -556,6 +834,98 @@ describe("validate registry", () => {
 			expect(validateRegistryContract(snapshot)).toEqual([]);
 			expect(validateRegistryContract(snapshot)).not.toContain(
 				"scenario-feature-coverage-missing:F-30",
+			);
+
+			const evolutionScenarios = snapshot.scenariosByPack["evolution-core"];
+			if (!evolutionScenarios?.[0]) {
+				throw new Error("Expected evolution-core scenario fixture");
+			}
+			const evolutionBaseline = snapshot.baselinesByPack["evolution-core"];
+			if (!evolutionBaseline) {
+				throw new Error("Expected evolution-core baseline fixture");
+			}
+			const missingEvolutionScenario = { ...evolutionScenarios[0] };
+			delete missingEvolutionScenario.measurement;
+			const missingEvolutionMeasurement: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"evolution-core": [
+						missingEvolutionScenario,
+						...evolutionScenarios.slice(1),
+					],
+				},
+			};
+			expect(validateRegistryContract(missingEvolutionMeasurement)).toContain(
+				`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+			);
+			const missingStatus = { ...missingEvolutionScenario };
+			delete missingStatus.implementation_status;
+			const skippedStatus = {
+				...missingEvolutionScenario,
+				implementation_status: "skipped" as const,
+			};
+			const invalidStatus = {
+				...missingEvolutionScenario,
+				implementation_status: "invalid",
+			} as unknown as Scenario;
+			for (const [scenario, status] of [
+				[missingStatus, "missing"],
+				[skippedStatus, "skipped"],
+				[invalidStatus, "invalid"],
+			] as const) {
+				const issues = validateRegistryContract({
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"evolution-core": [scenario],
+					},
+				});
+				expect(issues).toContain(
+					`scenario-implementation-status-required:evolution-core:${evolutionScenarios[0].scenario_id}:${status}`,
+				);
+				expect(issues).toContain(
+					`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+				);
+			}
+			const mismatchedPack = {
+				...evolutionScenarios[0],
+				pack_id: "cli-kernel-local" as const,
+			};
+			expect(
+				validateRegistryContract({
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"evolution-core": [mismatchedPack],
+					},
+				}),
+			).toContain(
+				`scenario-pack-mismatch:evolution-core:${evolutionScenarios[0].scenario_id}`,
+			);
+			const weakSampleScenario = {
+				...evolutionScenarios[0],
+				measurement: {
+					...evolutionScenarios[0].measurement,
+					sample_count: 1,
+				},
+			};
+			const weakSampleIssues = validateRegistryContract({
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"evolution-core": [weakSampleScenario],
+				},
+				baselinesByPack: {
+					...snapshot.baselinesByPack,
+					"evolution-core": {
+						...evolutionBaseline,
+						sample_count: 1,
+					},
+				},
+			});
+			expect(weakSampleIssues).toContain(
+				`benchmark-provenance-sample-count-required:evolution-core:${evolutionScenarios[0].scenario_id}:3`,
 			);
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];

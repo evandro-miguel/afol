@@ -12,6 +12,7 @@ import {
 import { dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
+import { resolveEvolutionConfig } from "../evolution";
 import {
 	buildGovernanceFrontmatter,
 	recordPendingSpecForSession,
@@ -21,7 +22,7 @@ import { withSessionLock } from "../io/session-lock";
 import { rebuildFilesIndex } from "../local-state/project-indexes";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
-import { resolveProjectPaths } from "../project/paths";
+import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
 import {
 	appendVerificationRunStart,
@@ -89,6 +90,8 @@ export type EvidenceProvenance = "declared" | "observed";
 export type EvidenceEntry = {
 	id: string;
 	task_id: string;
+	project_id?: string;
+	session_id?: string;
 	created_at: string;
 	command: string;
 	result: string;
@@ -1506,6 +1509,17 @@ export function recordEvidence(
 					}
 				: {}),
 		};
+		if (provenance === "observed") {
+			const evolution = resolveEvolutionConfig(readProjectConfig(root));
+			if (evolution.configured) {
+				if (!evolution.projectId)
+					throw new Error(
+						"configured evolution project is missing a stable project UUID",
+					);
+				evidence.project_id = evolution.projectId;
+				evidence.session_id = input.session;
+			}
+		}
 		if (input.exitCode !== undefined) {
 			evidence.exit_code = input.exitCode;
 		}

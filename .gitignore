@@ -48,6 +48,7 @@ src/project-template/.afol/data/index/*
 .agents/cache/universal-skills/
 
 # Local temporary/reference workspace
+.tmp/
 .afol/tmp/*
 !.afol/tmp/
 !.afol/tmp/README.md

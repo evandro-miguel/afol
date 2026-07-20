@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_id": "evolution-core-v1",
+  "pack_id": "evolution-core",
+  "host_profile_id": "ci-linux-x64",
+  "sample_count": 3,
+  "warmup_count": 1,
+  "timing_p50_ms": 198,
+  "timing_p95_ms": 211,
+  "tokenizer_id": "tiktoken-o200k-base",
+  "tokenizer_version": "recorded",
+  "git_commit": "e6436bdd2fc3",
+  "run_id": "bench-evolution-core-evolution-status-contract-1.0.0",
+  "timestamp": "2026-07-20T10:44:42.625Z",
+  "results_count": 1,
+  "provenance": "fresh-local-runnable-smoke"
+}
