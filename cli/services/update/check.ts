@@ -243,6 +243,10 @@ function collectCurrentManifestEntries(
 			if (typeof rawPath !== "string") {
 				continue;
 			}
+			const exactOwnershipPath = resolveManifestTemplatePath(
+				rawPath,
+				templatePathSet,
+			);
 			const patterns = manifestTemplatePatterns(rawPath);
 			for (const templatePath of targetPaths) {
 				if (
@@ -252,13 +256,16 @@ function collectCurrentManifestEntries(
 				) {
 					continue;
 				}
-				if (manifest[templatePath]?.hash) {
+				if (
+					manifest[templatePath]?.hash &&
+					(ownerName === "managed" || exactOwnershipPath !== templatePath)
+				) {
 					continue;
 				}
-				manifest[templatePath] = {
-					...manifest[templatePath],
-					owner: ownerName,
-				};
+				manifest[templatePath] =
+					ownerName === "managed"
+						? { ...manifest[templatePath], owner: ownerName }
+						: { owner: ownerName };
 			}
 		}
 	}
@@ -377,6 +384,26 @@ function hasUnsafeManifestEdits(
 			return true;
 		}
 		if (key === "managed_hashes") {
+			continue;
+		}
+		if (key === "ownership") {
+			const sourceOwnership = source[key];
+			if (!isObject(sourceOwnership) || !isObject(currentValue)) {
+				return true;
+			}
+			for (const [owner, currentPaths] of Object.entries(currentValue)) {
+				const sourcePaths = sourceOwnership[owner];
+				if (
+					!Array.isArray(sourcePaths) ||
+					!Array.isArray(currentPaths) ||
+					!currentPaths.every((path) => typeof path === "string") ||
+					!sourcePaths.every(
+						(path) => typeof path === "string" && currentPaths.includes(path),
+					)
+				) {
+					return true;
+				}
+			}
 			continue;
 		}
 		if (key === "commands") {

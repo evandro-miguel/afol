@@ -709,6 +709,88 @@ describe("update command", () => {
 		}
 	});
 
+	test("project-owned ownership overrides a stale managed hash", async () => {
+		const root = mkRoot();
+		try {
+			writeFileSync(
+				join(root, ".agents", "lock.json"),
+				templateText(".agents/lock.json"),
+				"utf8",
+			);
+			const manifest = templateJson<{
+				ownership: { "project-owned": string[] };
+			}>(".agents/manifest.json");
+			manifest.ownership["project-owned"].push(
+				".afol/adm/rules/RULE-004-validation-linting.md",
+			);
+			writeFileSync(
+				join(root, ".agents", "manifest.json"),
+				`${JSON.stringify(manifest, null, 2)}\n`,
+				"utf8",
+			);
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				`${JSON.stringify(
+					{
+						schema_version: 1,
+						project: { name: "project-owned-customization" },
+						paths: {},
+					},
+					null,
+					2,
+				)}\n`,
+				"utf8",
+			);
+			mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "RULE-004-validation-linting.md"),
+				"# Project validation\n\nRun the project-native gates.\n",
+				"utf8",
+			);
+
+			const dryRun = capture();
+			expect(
+				await runUpdateCommand(
+					["apply", "--dry-run", "--verbose", "--json"],
+					root,
+					dryRun.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(dryRun.stdout[0] ?? "{}") as {
+				data?: { operations?: Array<{ kind: string; path: string }> };
+			};
+			expect(
+				payload.data?.operations?.find(
+					(operation) => operation.path === ".afol/config.json",
+				),
+			).toMatchObject({
+				kind: "preserve-project-owned",
+				path: ".afol/config.json",
+			});
+			expect(
+				payload.data?.operations?.find(
+					(operation) =>
+						operation.path ===
+						".afol/adm/rules/RULE-004-validation-linting.md",
+				),
+			).toMatchObject({
+				kind: "preserve-project-owned",
+				path: ".afol/adm/rules/RULE-004-validation-linting.md",
+			});
+			expect(
+				payload.data?.operations?.find(
+					(operation) => operation.path === ".agents/manifest.json",
+				),
+			).toMatchObject({
+				kind: "preserve-project-owned",
+				path: ".agents/manifest.json",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("apply accepts registered binary provenance without package.json", async () => {
 		const root = mkRoot();
 		const cliRoot = mkCliRuntimeRoot({
