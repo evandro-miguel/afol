@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 1;
+export const EVOLUTION_SCHEMA_VERSION = 2;
 
 const MIGRATIONS = [
 	{
@@ -27,6 +27,50 @@ CREATE TABLE IF NOT EXISTS production_days (
 
 CREATE INDEX IF NOT EXISTS production_days_project_sequence_idx
 	ON production_days(project_id, ordinal_sequence);
+		`,
+	},
+	{
+		version: 2,
+		sql: `
+CREATE TABLE IF NOT EXISTS preferences (
+	project_id TEXT NOT NULL,
+	id TEXT NOT NULL,
+	statement TEXT NOT NULL CHECK (length(trim(statement)) > 0),
+	scope TEXT NOT NULL CHECK (scope = 'project'),
+	status TEXT NOT NULL CHECK (status IN ('active', 'aging', 'dormant', 'rejected')),
+	provenance TEXT NOT NULL CHECK (provenance IN ('explicit', 'inferred', 'structural')),
+	confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+	effective_confidence REAL NOT NULL CHECK (effective_confidence >= 0 AND effective_confidence <= 1),
+	positive_evidence INTEGER NOT NULL CHECK (positive_evidence >= 0),
+	negative_evidence INTEGER NOT NULL CHECK (negative_evidence >= 0),
+	last_reinforced_production_day INTEGER NOT NULL CHECK (last_reinforced_production_day >= 0),
+	current_production_day INTEGER NOT NULL CHECK (current_production_day >= 0),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	PRIMARY KEY (project_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS preference_evidence (
+	project_id TEXT NOT NULL,
+	id TEXT NOT NULL,
+	preference_id TEXT NOT NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('explicit', 'inferred', 'structural', 'external', 'accepted', 'rejected', 'contradiction')),
+	trust TEXT NOT NULL CHECK (trust IN ('local', 'untrusted')),
+	weight REAL NOT NULL,
+	production_day_sequence INTEGER NOT NULL CHECK (production_day_sequence >= 0),
+	created_at TEXT NOT NULL,
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+	PRIMARY KEY (project_id, id),
+	FOREIGN KEY (project_id, preference_id) REFERENCES preferences(project_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS preferences_project_status_idx
+	ON preferences(project_id, status);
+CREATE INDEX IF NOT EXISTS preference_evidence_project_preference_idx
+	ON preference_evidence(project_id, preference_id, production_day_sequence);
 `,
 	},
 ] as const;

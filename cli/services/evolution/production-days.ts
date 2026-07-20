@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 import { resolveProjectWritePath } from "../project/root";
 import { validateEvolutionIdentity } from "./config";
 import { assertSafeEvolutionProjectRoot } from "./db";
+import { refreshPreferenceDecayProjection } from "./preference-decay";
 
 const LOCAL_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
@@ -239,7 +240,14 @@ function allocateProductionDayUnsafe(
 				"UPDATE production_days SET qualifying_events = ? WHERE project_id = ? AND local_date = ?",
 			).run(mergedEventsJson, input.projectId, input.localDate);
 		}
-		return rowToProductionDay(existing);
+		const row = rowToProductionDay(existing);
+		const latest = db
+			.query(
+				"SELECT MAX(ordinal_sequence) AS sequence FROM production_days WHERE project_id = ?",
+			)
+			.get(input.projectId) as Record<string, unknown> | null;
+		refreshPreferenceDecayProjection(db, input.projectId, scalarNumber(latest));
+		return row;
 	}
 	const last = db
 		.query(
@@ -267,6 +275,7 @@ function allocateProductionDayUnsafe(
 		JSON.stringify(row.qualifying_events),
 		row.journal_event_id,
 	);
+	refreshPreferenceDecayProjection(db, input.projectId, sequence);
 	return row;
 }
 
