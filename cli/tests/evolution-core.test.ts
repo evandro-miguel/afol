@@ -505,7 +505,7 @@ describe("Evolution Slice 1 persistence core", () => {
 		mkdirSync(join(root, ".afol", "state"), { recursive: true });
 		const db = new Database(dbPath);
 		try {
-			db.exec("PRAGMA user_version = 2");
+			db.exec("PRAGMA user_version = 3");
 			expect(() => applyMigrations(db)).toThrow("newer than supported");
 			expect(
 				db
