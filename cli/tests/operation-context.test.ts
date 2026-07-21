@@ -78,6 +78,17 @@ describe("operation-context", () => {
 		).toBe(true);
 	});
 
+	test("evolve observe resolves as a write action and is denied when restricted", () => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "observe",
+			args: ["--session", "S-01"],
+		});
+		expect(policy).toEqual({ action: "evolve.observe", sideEffect: "write" });
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
+	});
+
 	test.each([
 		["note", "annotate"],
 		["clear", "purge"],

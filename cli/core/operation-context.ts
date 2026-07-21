@@ -17,9 +17,9 @@ function admitOperationContext(context: OperationContext): OperationContext {
 }
 
 export function assertAdmittedOperationContext(
-	context: OperationContext,
-): void {
-	if (!ADMITTED_OPERATION_CONTEXTS.has(context))
+	context: OperationContext | undefined,
+): asserts context is OperationContext {
+	if (!context || !ADMITTED_OPERATION_CONTEXTS.has(context))
 		throw new Error("operation context was not admitted by the CLI boundary");
 }
 
@@ -135,6 +135,9 @@ export function resolveCanonicalAction(
 	if (resolution.kind === "subcommand") {
 		const group = resolution.group ?? "";
 		const action = resolution.action ?? "";
+		if (group === "evolve" && action === "observe") {
+			return { action: "evolve.observe", sideEffect: "write" };
+		}
 		if (group === "adm" && action === "migrate") {
 			return {
 				action: dryRun ? "adm.migrate.preview" : "adm.migrate.apply",

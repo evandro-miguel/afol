@@ -316,10 +316,12 @@ function projectEvents(
 	}
 	return latest;
 }
-function projectionRows(db: Database): ProductionDay[] {
+function projectionRows(db: Database, projectId: string): ProductionDay[] {
 	return db
-		.query("SELECT * FROM production_days ORDER BY ordinal_sequence")
-		.all()
+		.query(
+			"SELECT * FROM production_days WHERE project_id = ? ORDER BY ordinal_sequence",
+		)
+		.all(projectId)
 		.map((row) => {
 			const value = row as Record<string, unknown>;
 			return {
@@ -334,13 +336,14 @@ function projectionRows(db: Database): ProductionDay[] {
 		});
 }
 function replayProjection(
+	projectId: string,
 	events: readonly ProductionDayJournalEvent[],
 ): ProductionDay[] {
 	const db = new Database(":memory:");
 	try {
 		applyMigrations(db);
 		projectEvents(db, events, true);
-		return projectionRows(db);
+		return projectionRows(db, projectId);
 	} finally {
 		db.close();
 	}
@@ -354,8 +357,8 @@ function validateProductionDayProjectionUnlocked(
 		context.timezone,
 		context.evolutionEventsDir,
 	);
-	const expected = replayProjection(events);
-	const actual = projectionRows(context.db);
+	const expected = replayProjection(context.projectId, events);
+	const actual = projectionRows(context.db, context.projectId);
 	if (digest(actual) !== digest(expected)) {
 		throw new Error(
 			"evolution db projection differs from canonical production-day journal",
@@ -374,15 +377,15 @@ export function validateProductionDayProjection(
 				context.timezone,
 				context.evolutionEventsDir,
 			);
-			const expected = replayProjection(before);
-			const actual = projectionRows(context.db);
+			const expected = replayProjection(context.projectId, before);
+			const actual = projectionRows(context.db, context.projectId);
 			const after = readProductionDayJournal(
 				context.root,
 				context.projectId,
 				context.timezone,
 				context.evolutionEventsDir,
 			);
-			const actualAfter = projectionRows(context.db);
+			const actualAfter = projectionRows(context.db, context.projectId);
 			if (
 				digest(before) !== digest(after) ||
 				digest(actual) !== digest(actualAfter)
@@ -569,7 +572,7 @@ function rebuildProductionDayProjectionUnlocked(
 		input.timezone,
 		input.evolutionEventsDir,
 	);
-	const canonicalProjection = replayProjection(events);
+	const canonicalProjection = replayProjection(input.projectId, events);
 	const canonicalMax = canonicalProjection.at(-1)?.ordinal_sequence ?? 0;
 	const reinforcementBeyondCanonical = readPreferenceJournal(
 		input.root,
@@ -613,5 +616,5 @@ function rebuildProductionDayProjectionUnlocked(
 		} catch {}
 		throw error;
 	}
-	return projectionRows(input.db);
+	return projectionRows(input.db, input.projectId);
 }

@@ -106,13 +106,7 @@ function assertProjectIdentity(
 	expectedProjectId?: string,
 ): string | null {
 	const metadataProjectId = readProjectId(db);
-	const rows = db
-		.query(
-			"SELECT project_id FROM production_days UNION SELECT project_id FROM preferences UNION SELECT project_id FROM preference_evidence UNION SELECT project_id FROM observations UNION SELECT project_id FROM recurrence_decisions UNION SELECT project_id FROM issue_clusters",
-		)
-		.all() as Array<{ project_id?: unknown }>;
-	const rowProjectIds = rows.map((row) => String(row.project_id ?? ""));
-	const projectId = expectedProjectId ?? metadataProjectId;
+	// Configured-expected vs metadata mismatch: fail closed.
 	if (
 		expectedProjectId &&
 		metadataProjectId &&
@@ -121,24 +115,38 @@ function assertProjectIdentity(
 		throw new Error(
 			"evolution db project UUID does not match configured project",
 		);
-	if (
-		rowProjectIds.some(
-			(rowProjectId) => !projectId || rowProjectId !== projectId,
-		)
-	)
-		throw new Error(
-			"evolution db production day project UUID does not match configured project",
+	// Metadata missing but rows exist: fail closed (can't determine ownership).
+	if (metadataProjectId === null) {
+		const tables = new Set(
+			(
+				db
+					.query("SELECT name FROM sqlite_master WHERE type = 'table'")
+					.all() as Array<{ name: string }>
+			).map((row) => row.name),
 		);
-	if (rowProjectIds.length > 0 && !metadataProjectId)
-		throw new Error("evolution db project UUID metadata is missing");
-	if (
-		metadataProjectId &&
-		rowProjectIds.some((rowProjectId) => rowProjectId !== metadataProjectId)
-	)
-		throw new Error(
-			"evolution db production day project UUID does not match metadata",
-		);
-	return metadataProjectId;
+		const recurrenceTables = [
+			"production_days",
+			"preferences",
+			"preference_evidence",
+			"observations",
+			"recurrence_decisions",
+			"issue_clusters",
+		].filter((table) => tables.has(table));
+		const anyRow = db
+			.query(
+				recurrenceTables.length > 0
+					? `${recurrenceTables
+							.map((table) => `SELECT 1 AS found FROM ${table}`)
+							.join(" UNION ")} LIMIT 1`
+					: "SELECT NULL AS found WHERE 0",
+			)
+			.get() as { found?: unknown } | null;
+		if (anyRow)
+			throw new Error("evolution db project UUID metadata is missing");
+	}
+	// Foreign rows from other projects are tolerated — queries are scoped to
+	// the asserted projectId.
+	return metadataProjectId ?? expectedProjectId ?? null;
 }
 
 export function getEvolutionStatus(
@@ -164,25 +172,37 @@ export function getEvolutionStatus(
 			projectId,
 		});
 	}
+	if (!projectId) {
+		return {
+			schema_version: EVOLUTION_SCHEMA_VERSION,
+			migration_version: readUserVersion(db),
+			project_id: null,
+			production_day_count: 0,
+			preference_count: 0,
+			observation_count: 0,
+			recurring_cluster_count: 0,
+			latest_production_day: null,
+		};
+	}
 	const latest = db
 		.query(
-			"SELECT * FROM production_days ORDER BY ordinal_sequence DESC LIMIT 1",
+			"SELECT * FROM production_days WHERE project_id = ? ORDER BY ordinal_sequence DESC LIMIT 1",
 		)
-		.get() as Record<string, unknown> | null;
+		.get(projectId) as Record<string, unknown> | null;
 	const count = db
-		.query("SELECT COUNT(*) AS count FROM production_days")
-		.get() as Record<string, unknown>;
+		.query("SELECT COUNT(*) AS count FROM production_days WHERE project_id = ?")
+		.get(projectId) as Record<string, unknown>;
 	const preferenceCount = db
-		.query("SELECT COUNT(*) AS count FROM preferences")
-		.get() as Record<string, unknown>;
+		.query("SELECT COUNT(*) AS count FROM preferences WHERE project_id = ?")
+		.get(projectId) as Record<string, unknown>;
 	const observationCount = db
-		.query("SELECT COUNT(*) AS count FROM observations")
-		.get() as Record<string, unknown>;
+		.query("SELECT COUNT(*) AS count FROM observations WHERE project_id = ?")
+		.get(projectId) as Record<string, unknown>;
 	const recurringClusterCount = db
 		.query(
-			"SELECT COUNT(*) AS count FROM issue_clusters WHERE state IN ('recurring','reopened','proposal_open','mitigation_canary')",
+			"SELECT COUNT(*) AS count FROM issue_clusters WHERE project_id = ? AND state IN ('recurring','reopened','proposal_open','mitigation_canary')",
 		)
-		.get() as Record<string, unknown>;
+		.get(projectId) as Record<string, unknown>;
 	return {
 		schema_version: EVOLUTION_SCHEMA_VERSION,
 		migration_version: readUserVersion(db),
@@ -319,45 +339,66 @@ export function checkEvolutionDbHealth(
 					});
 				}
 			}
-		if (tables.has("production_days")) {
+		const recurrenceTables = [
+			"production_days",
+			"preferences",
+			"preference_evidence",
+			"observations",
+			"recurrence_decisions",
+			"issue_clusters",
+		];
+		let identityValid = true;
+		if (recurrenceTables.some((table) => tables.has(table))) {
 			try {
 				projectId = assertProjectIdentity(db, expectedProjectId);
 			} catch (error) {
+				identityValid = false;
 				schemaOk = false;
 				findings.push({ severity: "fail", message: (error as Error).message });
 			}
+		}
+		if (tables.has("production_days") && identityValid && projectId) {
 			productionDayCount = scalarNumber(
 				db
-					.query("SELECT COUNT(*) AS count FROM production_days")
-					.get() as Record<string, unknown>,
+					.query(
+						"SELECT COUNT(*) AS count FROM production_days WHERE project_id = ?",
+					)
+					.get(projectId) as Record<string, unknown>,
 			);
 			if (tables.has("preferences")) {
 				preferenceCount = scalarNumber(
-					db.query("SELECT COUNT(*) AS count FROM preferences").get() as Record<
-						string,
-						unknown
-					>,
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM preferences WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
 				);
 			}
 			if (tables.has("observations")) {
 				observationCount = scalarNumber(
 					db
-						.query("SELECT COUNT(*) AS count FROM observations")
-						.get() as Record<string, unknown>,
+						.query(
+							"SELECT COUNT(*) AS count FROM observations WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
 				);
 			}
 			if (tables.has("issue_clusters")) {
 				recurringClusterCount = scalarNumber(
 					db
 						.query(
-							"SELECT COUNT(*) AS count FROM issue_clusters WHERE state IN ('recurring','reopened','proposal_open','mitigation_canary')",
+							"SELECT COUNT(*) AS count FROM issue_clusters WHERE project_id = ? AND state IN ('recurring','reopened','proposal_open','mitigation_canary')",
 						)
-						.get() as Record<string, unknown>,
+						.get(projectId) as Record<string, unknown>,
 				);
 			}
 			for (const row of db
-				.query("SELECT qualifying_events FROM production_days")
-				.all() as Array<{ qualifying_events: unknown }>) {
+				.query(
+					"SELECT qualifying_events FROM production_days WHERE project_id = ?",
+				)
+				.all(projectId) as Array<{
+				qualifying_events: unknown;
+			}>) {
 				try {
 					qualifyingEvents(row.qualifying_events);
 				} catch (error) {

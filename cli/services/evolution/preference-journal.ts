@@ -483,12 +483,12 @@ function preferenceProjectionSnapshot(
 	};
 }
 
-function preferenceProjectIds(db: Database): string[] {
+function preferenceProjectIds(db: Database, projectId: string): string[] {
 	const rows = db
 		.query(
-			"SELECT project_id FROM preferences UNION SELECT project_id FROM preference_evidence",
+			"SELECT project_id FROM preferences WHERE project_id = ? UNION SELECT project_id FROM preference_evidence WHERE project_id = ?",
 		)
-		.all() as Array<{ project_id?: unknown }>;
+		.all(projectId, projectId) as Array<{ project_id?: unknown }>;
 	return rows.map((row) => String(row.project_id ?? ""));
 }
 
@@ -547,7 +547,7 @@ export function validatePreferenceProjection(
 					continue;
 				}
 				if (
-					preferenceProjectIds(context.db).some(
+					preferenceProjectIds(context.db, context.projectId).some(
 						(projectId) => projectId !== context.projectId,
 					) ||
 					preferenceDigest(actual) !== preferenceDigest(expected)
@@ -823,9 +823,12 @@ export function rebuildPreferenceProjection(
 		applyMigrations(context.db);
 		context.db.exec("BEGIN IMMEDIATE");
 		try {
-			context.db.exec(
-				"DELETE FROM preference_evidence; DELETE FROM preferences;",
-			);
+			context.db
+				.prepare("DELETE FROM preference_evidence WHERE project_id = ?")
+				.run(context.projectId);
+			context.db
+				.prepare("DELETE FROM preferences WHERE project_id = ?")
+				.run(context.projectId);
 			for (const event of events)
 				applyPreferenceJournalEvent(context.db, event, true);
 			const production = context.db

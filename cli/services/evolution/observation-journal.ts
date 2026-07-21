@@ -692,9 +692,10 @@ function replayObservationProjection(
 	}
 }
 
-function appendUnlocked(
-	input: AppendObservationJournalInput,
-): ObservationJournalEvent {
+function appendUnlocked(input: AppendObservationJournalInput): {
+	event: ObservationJournalEvent;
+	appended: boolean;
+} {
 	const context = resolvedJournalContext(input.root, input.projectId, input);
 	if (input.observation.project_id !== input.projectId)
 		throw new Error("observation belongs to another project");
@@ -775,7 +776,7 @@ function appendUnlocked(
 			throw new Error(
 				"observation occurrence already exists with different content",
 			);
-		return duplicate;
+		return { event: duplicate, appended: false };
 	}
 	const payload = { project_id: input.projectId, observation };
 	const base = {
@@ -841,7 +842,7 @@ function appendUnlocked(
 				throw error;
 			}
 		}
-		return event;
+		return { event, appended: true };
 	} catch (error) {
 		try {
 			truncate(path, previousSize);
@@ -853,6 +854,12 @@ function appendUnlocked(
 export function appendObservationJournalEvent(
 	input: AppendObservationJournalInput,
 ): ObservationJournalEvent {
+	return appendObservationJournalEventWithStatus(input).event;
+}
+
+export function appendObservationJournalEventWithStatus(
+	input: AppendObservationJournalInput,
+): { event: ObservationJournalEvent; appended: boolean } {
 	return withSessionLock(input.root, LOCK, () => appendUnlocked(input));
 }
 

@@ -26,6 +26,7 @@ import {
 	validateEvolutionIdentity,
 } from "../services/evolution";
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
+import { rebuildPreferenceProjection } from "../services/evolution/preference-journal";
 import { allocateProductionDay } from "../services/evolution/production-days";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
@@ -420,7 +421,7 @@ describe("Evolution Slice 1 persistence core", () => {
 		}
 	});
 
-	test("rejects copied production rows from another project", () => {
+	test("tolerates foreign production rows; scopes counts to native project", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-cross-project-"));
 		const dbPath = evolutionDbPath(root);
 		const db = openEvolutionDb(dbPath);
@@ -431,6 +432,7 @@ describe("Evolution Slice 1 persistence core", () => {
 				qualifyingEvents: ["task:T-01"],
 				journalEventId: "J-01",
 			});
+			// Insert a foreign production day — new semantics tolerate this.
 			db.prepare(
 				"INSERT INTO production_days(project_id, local_date, ordinal_sequence, ordinal, created_at, qualifying_events, journal_event_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			).run(
@@ -447,16 +449,9 @@ describe("Evolution Slice 1 persistence core", () => {
 		}
 		try {
 			const health = checkEvolutionDbHealth(dbPath, PROJECT_ID);
-			expect(health.ok).toBe(false);
-			expect(health.findings).toEqual(
-				expect.arrayContaining([
-					expect.objectContaining({
-						message: expect.stringContaining(
-							"does not match configured project",
-						),
-					}),
-				]),
-			);
+			// Foreign rows are tolerated; only the native project's row counted.
+			expect(health.ok).toBe(true);
+			expect(health.production_day_count).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -558,6 +553,148 @@ describe("Evolution Slice 1 persistence core", () => {
 				autonomy: { auto_apply_mode: "none" },
 			},
 		});
+	});
+
+	test("mixed-project health scopes counts to native project, tolerates foreign qualifying_events", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-mixed-health-"));
+		const dbPath = evolutionDbPath(root);
+		const db = openEvolutionDb(dbPath);
+		try {
+			allocateProductionDay(db, {
+				projectId: PROJECT_ID,
+				localDate: "2026-07-16",
+				qualifyingEvents: ["task:T-01"],
+				journalEventId: "J-01",
+			});
+			// Insert a foreign production day (malformed qualifying_events).
+			db.prepare(
+				"INSERT INTO production_days(project_id, local_date, ordinal_sequence, ordinal, created_at, qualifying_events, journal_event_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			).run(
+				"7b7d91ca-496b-4f0c-8537-5c4993810d15",
+				"2026-07-17",
+				2,
+				"PD-0002",
+				"2026-07-17T12:00:00.000Z",
+				JSON.stringify({ invalid: "not-an-array" }),
+				"J-02",
+			);
+		} finally {
+			db.close();
+		}
+		try {
+			const health = checkEvolutionDbHealth(dbPath, PROJECT_ID);
+			// Foreign malformed qualifying_events are ignored (scoped query).
+			expect(health.ok).toBe(true);
+			expect(health.production_day_count).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("mixed-project preference rebuild deletes only native rows, preserves foreign", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-pref-mixed-"));
+		const dbPath = evolutionDbPath(root);
+		const db = openEvolutionDb(dbPath);
+		try {
+			// Seed a production day for the native project so the validation /
+			// decay projection does not fail.
+			seedObservedEvidence(root);
+			const journalModule = join(
+				import.meta.dir,
+				"../services/evolution/journal.ts",
+			);
+			const dbModule = join(import.meta.dir, "../services/evolution/db.ts");
+			const seedScript = `import { openEvolutionDb } from ${JSON.stringify(dbModule)}; import { appendProductionDayAllocation } from ${JSON.stringify(journalModule)}; const db = openEvolutionDb(${JSON.stringify(dbPath)}); appendProductionDayAllocation({ root: ${JSON.stringify(root)}, db, projectId: ${JSON.stringify(PROJECT_ID)}, timezone: "America/Asuncion", sessionId: "S-01", evidenceId: "E-01" }); db.close();`;
+			const seedProc = Bun.spawnSync(["bun", "-e", seedScript], {
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			if (seedProc.exitCode !== 0) throw new Error(seedProc.stderr.toString());
+
+			// Insert foreign preference rows directly.
+			db.prepare(
+				"INSERT INTO preferences(project_id,id,statement,scope,status,provenance,confidence,effective_confidence,positive_evidence,negative_evidence,last_reinforced_production_day,current_production_day,source_refs,created_at,updated_at,journal_event_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+			).run(
+				"foreign-proj",
+				"PREF-foreign-1",
+				"foreign preference",
+				"project",
+				"active",
+				"explicit",
+				0.9,
+				0.9,
+				3,
+				0,
+				1,
+				1,
+				JSON.stringify([{ id: "E-foreign", kind: "evidence" }]),
+				"2026-07-16T12:00:00.000Z",
+				"2026-07-16T12:00:00.000Z",
+				"J-foreign",
+			);
+			db.prepare(
+				"INSERT INTO preference_evidence(project_id,id,preference_id,kind,trust,weight,production_day_sequence,created_at,journal_event_id,source_refs) VALUES(?,?,?,?,?,?,?,?,?,?)",
+			).run(
+				"foreign-proj",
+				"PE-foreign-1",
+				"PREF-foreign-1",
+				"explicit",
+				"local",
+				1.0,
+				1,
+				"2026-07-16T12:00:00.000Z",
+				"J-foreign-e",
+				JSON.stringify([{ id: "E-foreign", kind: "evidence" }]),
+			);
+
+			// Snapshot foreign rows before rebuild.
+			const foreignPrefsBefore = (
+				db
+					.query(
+						"SELECT id, project_id, statement FROM preferences WHERE project_id = ?",
+					)
+					.all("foreign-proj") as Array<Record<string, unknown>>
+			).map((r) => JSON.stringify(r));
+			const foreignEvidenceBefore = (
+				db
+					.query(
+						"SELECT id, project_id FROM preference_evidence WHERE project_id = ?",
+					)
+					.all("foreign-proj") as Array<Record<string, unknown>>
+			).map((r) => JSON.stringify(r));
+
+			// Rebuild — should only affect native project rows.
+			const rebuilt = rebuildPreferenceProjection({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				timezone: "America/Asuncion",
+			});
+
+			// Foreign rows preserved unchanged.
+			const foreignPrefsAfter = (
+				db
+					.query(
+						"SELECT id, project_id, statement FROM preferences WHERE project_id = ?",
+					)
+					.all("foreign-proj") as Array<Record<string, unknown>>
+			).map((r) => JSON.stringify(r));
+			const foreignEvidenceAfter = (
+				db
+					.query(
+						"SELECT id, project_id FROM preference_evidence WHERE project_id = ?",
+					)
+					.all("foreign-proj") as Array<Record<string, unknown>>
+			).map((r) => JSON.stringify(r));
+			expect(foreignPrefsAfter).toEqual(foreignPrefsBefore);
+			expect(foreignEvidenceAfter).toEqual(foreignEvidenceBefore);
+
+			// Rebuilt preferences are non-empty (rebuild succeeded).
+			expect(Array.isArray(rebuilt)).toBe(true);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("rejects escaped or symlinked configured database paths", () => {
