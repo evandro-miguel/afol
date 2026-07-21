@@ -4,7 +4,11 @@ import { type ParsedValidationArgs, parseValidationArgs } from "./args";
 import { saveBenchmarkPayload } from "./benchmark-files";
 import { runValidationCommands } from "./command-runner";
 import { outputJson, outputJsonWithStatus, registrySummary } from "./output";
-import { loadRegistry, validateRegistryContract } from "./registry";
+import {
+	baselineFilename,
+	loadRegistry,
+	validateRegistryContract,
+} from "./registry";
 import {
 	buildRuntimeLiveAgentResults,
 	collectThresholdNotes,
@@ -218,7 +222,7 @@ function collectBenchmarkPackResults(
 		projectRoot,
 		BASELINES_RELATIVE_PATH,
 		packId,
-		"baseline-v1.json",
+		baselineFilename(packId),
 	);
 	const baseline = snapshot.baselinesByPack[packId];
 	if (packId === "runtime-live-agent") {

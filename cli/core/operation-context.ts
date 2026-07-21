@@ -140,6 +140,12 @@ export function resolveCanonicalAction(
 		}
 		if (
 			group === "evolve" &&
+			["status", "analyze", "weekly", "after-merge", "review"].includes(action)
+		) {
+			return { action: `evolve.${action}`, sideEffect: "read" };
+		}
+		if (
+			group === "evolve" &&
 			["suggest", "skip", "accept", "reject", "decision", "repair"].includes(
 				action,
 			)

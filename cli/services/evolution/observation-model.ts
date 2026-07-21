@@ -5,6 +5,9 @@ export const OBSERVATION_FINGERPRINT_VERSION = 1;
 export const RECURRENCE_MINIMUM_OCCURRENCES = 3;
 export const RECURRENCE_MINIMUM_SESSIONS = 2;
 export const RECURRENCE_MINIMUM_PRODUCTION_DAYS = 2;
+export const MAX_OBSERVATION_SOURCE_REFS = 16;
+export const MAX_OBSERVATION_TEXT_BYTES = 4_000;
+export const MAX_NORMALIZED_FIELDS_BYTES = 4_096;
 
 export type ObservationFingerprintFields = {
 	kind: string;
@@ -120,13 +123,16 @@ function text(value: unknown): string {
 	return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
-function redact(value: unknown): string {
-	return text(value)
+export function redactSensitiveText(
+	value: unknown,
+	options: { redactPaths?: boolean } = {},
+): string {
+	let redacted = text(value)
 		.replace(
-			/\b(authorization)\s*[:=]\s*(?:bearer\s+)?[^\s,;]+/gi,
+			/(?:["']?)(authorization|api[_ -]?key|access[_ -]?token|password|secret|token)(?:["']?)\s*[:=]\s*(?:"(?:bearer\s+)?[^"]*"|'(?:bearer\s+)?[^']*'|(?:bearer\s+)?[^\s,;}]+)/gi,
 			"$1=<redacted>",
 		)
-		.replace(/\b(bearer)\s+[^\s,;]+/gi, "$1 <redacted>")
+		.replace(/\b(bearer)\s+[^\s,;"'}]+/gi, "$1 <redacted>")
 		.replace(
 			/(--(?:api[_-]?key|access[_-]?token|authorization|password|secret|token))\s+[^\s,;]+/gi,
 			"$1 <redacted>",
@@ -139,10 +145,20 @@ function redact(value: unknown): string {
 			/(api[_ -]?key|access[_ -]?token|auth(?:orization)?|bearer|password|secret|token)\s*[:=]\s*[^\s,;]+/gi,
 			"$1=<redacted>",
 		)
-		.replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "<redacted>")
-		.replace(/\s+/g, " ")
-		.trim()
-		.toLowerCase();
+		.replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "<redacted>");
+	if (options.redactPaths) {
+		redacted = redacted
+			.replace(
+				/(?<![A-Za-z0-9:])\/(?:[^/\s"'<>]+\/)*[^/\s"'<>]+/g,
+				"<redacted-path>",
+			)
+			.replace(/(?:[A-Za-z]:[\\/]|\\\\)[^\s"'<>]+/g, "<redacted-path>");
+	}
+	return redacted.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function redact(value: unknown): string {
+	return redactSensitiveText(value);
 }
 
 function normalizePath(value: unknown): string {
@@ -163,10 +179,16 @@ function digest(value: unknown): string {
 	return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
+function boundedText(value: string, field: string): string {
+	if (Buffer.byteLength(value, "utf8") > MAX_OBSERVATION_TEXT_BYTES)
+		throw new Error(`observation ${field} exceeds the text limit`);
+	return value;
+}
+
 function required(value: unknown, field: string): string {
 	const normalized = text(value).trim();
 	if (!normalized) throw new Error(`observation ${field} must be non-empty`);
-	return normalized;
+	return boundedText(normalized, field);
 }
 
 function projectId(input: ObservationInput): string {
@@ -180,7 +202,7 @@ function sessionId(input: ObservationInput): string {
 export function normalizeObservation(
 	input: ObservationInput,
 ): ObservationFingerprintFields {
-	return {
+	const normalized = {
 		kind: redact(input.kind ?? input.observation_kind ?? input.observationKind),
 		error_code: redact(input.error_code ?? input.errorCode),
 		test: redact(input.test),
@@ -191,6 +213,9 @@ export function normalizeObservation(
 		stack_digest: redact(input.stack_digest ?? input.stackDigest),
 		provider: redact(input.provider),
 	};
+	for (const [field, value] of Object.entries(normalized))
+		boundedText(value, field);
+	return normalized;
 }
 
 export function observationFingerprint(
@@ -237,7 +262,25 @@ export function normalizeObservationRecord(
 	const source_refs = input.source_refs ?? input.sourceRefs ?? [];
 	if (!Array.isArray(source_refs))
 		throw new Error("observation source refs must be an array");
+	if (source_refs.length > MAX_OBSERVATION_SOURCE_REFS)
+		throw new Error("observation source refs exceed the limit");
+	for (const ref of source_refs) {
+		if (
+			ref === null ||
+			typeof ref !== "object" ||
+			Array.isArray(ref) ||
+			!Object.values(ref).every((value) => typeof value === "string")
+		)
+			throw new Error("observation source ref is invalid");
+		for (const [field, value] of Object.entries(ref))
+			boundedText(value, `source ref ${field}`);
+	}
 	const normalized_fields = normalizeObservation(input);
+	if (
+		Buffer.byteLength(JSON.stringify(normalized_fields), "utf8") >
+		MAX_NORMALIZED_FIELDS_BYTES
+	)
+		throw new Error("observation normalized fields exceed the limit");
 	const journal_sequence = Number(
 		input.journal_sequence ?? input.journalSequence ?? 1,
 	);
@@ -428,7 +471,7 @@ export function compareScorecards(
 export function observationRecordFromRow(
 	row: Record<string, unknown>,
 ): ObservationRecord {
-	return {
+	const record: ObservationRecord = {
 		project_id: String(row.project_id),
 		id: String(row.id),
 		kind: String(row.kind),
@@ -449,6 +492,8 @@ export function observationRecordFromRow(
 		journal_sequence: Number(row.journal_sequence),
 		journal_event_id: String(row.journal_event_id),
 	};
+	assertObservationRecordBounds(record);
+	return record;
 }
 
 export function projectObservation(
@@ -500,4 +545,28 @@ export function projectObservations(
 		)
 		.all(projectId)
 		.map((row) => observationRecordFromRow(row as Record<string, unknown>));
+}
+
+export function assertObservationRecordBounds(record: ObservationRecord): void {
+	for (const [field, value] of Object.entries(record)) {
+		if (typeof value === "string") boundedText(value, field);
+	}
+	if (record.source_refs.length > MAX_OBSERVATION_SOURCE_REFS)
+		throw new Error("observation source refs exceed the limit");
+	for (const ref of record.source_refs) {
+		if (
+			ref === null ||
+			typeof ref !== "object" ||
+			Array.isArray(ref) ||
+			!Object.values(ref).every((value) => typeof value === "string")
+		)
+			throw new Error("observation source ref is invalid");
+		for (const [field, value] of Object.entries(ref))
+			boundedText(value, `source ref ${field}`);
+	}
+	if (
+		Buffer.byteLength(JSON.stringify(record.normalized_fields), "utf8") >
+		MAX_NORMALIZED_FIELDS_BYTES
+	)
+		throw new Error("observation normalized fields exceed the limit");
 }

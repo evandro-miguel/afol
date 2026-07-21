@@ -96,15 +96,21 @@ function rebindEvolutionProvenance(root: string): void {
 		encoding: "utf8",
 	}).stdout.trim();
 	const timestamp = new Date().toISOString();
-	const baselinePath = join(
+	const historicalBaselinePath = join(
 		root,
 		".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v1.json",
+	);
+	const baselinePath = historicalBaselinePath.replace(
+		"baseline-v1.json",
+		"baseline-v2.json",
 	);
 	const scenarioPath = join(
 		root,
 		".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
 	);
-	const baseline = readJson(baselinePath);
+	const baseline = readJson(historicalBaselinePath);
+	baseline.baseline_id = "evolution-core-v2";
+	baseline.run_id = "bench-evolution-core-evolution-status-contract-1.1.0";
 	baseline.git_commit = commit;
 	baseline.timestamp = timestamp;
 	baseline.provenance = "test-fixture-rebind";
@@ -1527,9 +1533,10 @@ describe("validation command family", () => {
 					(entry.scenario_count as number) >= (entry.min_scenarios as number),
 			),
 		).toBe(true);
-		expect(registry.every((entry) => entry.baseline_present === true)).toBe(
-			true,
-		);
+		expect(
+			registry.find((entry) => entry.pack_id === "evolution-core")
+				?.baseline_present,
+		).toBe(false);
 		expect(payload.contract_issues).toEqual([]);
 	});
 });

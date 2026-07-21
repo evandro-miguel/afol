@@ -8,16 +8,23 @@ import { atomicWriteText } from "../services/io/atomic";
 
 const PACK_ID = "evolution-core";
 const SCENARIO_ID = "evolution-status-contract";
-const SCENARIO_VERSION = "1.0.0";
-const BASELINE_ID = "evolution-core-v1";
+const SCENARIO_VERSION = "1.1.0";
+const BASELINE_ID = "evolution-core-v2";
+const BASELINE_REFERENCE =
+	".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v2.json";
 const PROVENANCE = "fresh-local-runnable-smoke";
 const SAMPLE_COUNT = 3;
 const WARMUP_COUNT = 1;
+const MAX_DURATION_MS = 1500;
+const MAX_P95_MS = 1500;
+const MAX_OUTPUT_TOKENS = 250;
+const MAX_OUTPUT_BYTES = 4000;
+const MIN_TOOL_SUCCESS_RATE = 0.98;
 
 const RELATIVE_PATHS = [
-	".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v1.json",
+	".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v2.json",
 	".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
-	"src/project-template/.afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v1.json",
+	"src/project-template/.afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v2.json",
 	"src/project-template/.afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
 ] as const;
 
@@ -93,7 +100,70 @@ function currentCommit(repoRoot: string): string {
 	}
 }
 
-function validateInput(payload: JsonObject, head: string): JsonObject {
+function validateBootstrapMetrics(result: JsonObject): void {
+	const duration = requiredNumber(result.duration_ms, "results[0].duration_ms");
+	const p95 = requiredNumber(result.timing_p95_ms, "results[0].timing_p95_ms");
+	const errors = requiredNumber(result.error_count, "results[0].error_count");
+	const retries = requiredNumber(result.retry_count, "results[0].retry_count");
+	const outputTokens = requiredNumber(
+		result.output_tokens,
+		"results[0].output_tokens",
+	);
+	const toolSuccessRate = requiredNumber(
+		result.tool_success_rate,
+		"results[0].tool_success_rate",
+	);
+	if (duration > MAX_DURATION_MS) {
+		throw new Error(`Bootstrap duration exceeds ${MAX_DURATION_MS}ms`);
+	}
+	if (p95 > MAX_P95_MS) {
+		throw new Error(`Bootstrap p95 exceeds ${MAX_P95_MS}ms`);
+	}
+	if (errors !== 0) throw new Error("Bootstrap result must have zero errors");
+	if (retries !== 0) throw new Error("Bootstrap result must have zero retries");
+	if (outputTokens > MAX_OUTPUT_TOKENS) {
+		throw new Error(`Bootstrap output_tokens exceeds ${MAX_OUTPUT_TOKENS}`);
+	}
+	if (result.output_bytes !== undefined) {
+		const outputBytes = requiredNumber(
+			result.output_bytes,
+			"results[0].output_bytes",
+		);
+		if (outputBytes > MAX_OUTPUT_BYTES) {
+			throw new Error(`Bootstrap output_bytes exceeds ${MAX_OUTPUT_BYTES}`);
+		}
+	}
+	if (toolSuccessRate < MIN_TOOL_SUCCESS_RATE) {
+		throw new Error(
+			`Bootstrap tool_success_rate is below ${MIN_TOOL_SUCCESS_RATE}`,
+		);
+	}
+}
+
+function validateContractIssues(
+	payload: JsonObject,
+	allowMissingBaseline: boolean,
+): void {
+	const issues = payload.contract_issues;
+	if (
+		!Array.isArray(issues) ||
+		issues.some((issue) => typeof issue !== "string")
+	) {
+		throw new Error("Benchmark input contract_issues must be a string array");
+	}
+	const allowed = allowMissingBaseline
+		? ["missing-baseline:evolution-core"]
+		: [];
+	if (issues.some((issue) => !allowed.includes(issue))) {
+		throw new Error("Benchmark input contains unrelated contract issues");
+	}
+}
+
+function validateInput(
+	payload: JsonObject,
+	head: string,
+	baselinePresent: boolean,
+): JsonObject {
 	if (payload.mode !== "benchmark") {
 		throw new Error("Benchmark input must have mode=benchmark");
 	}
@@ -116,9 +186,6 @@ function validateInput(payload: JsonObject, head: string): JsonObject {
 	) {
 		throw new Error("Benchmark input scenario does not match evolution-core");
 	}
-	if (result.status !== "passed" || result.pass !== true) {
-		throw new Error("Benchmark scenario must pass");
-	}
 	const commit = requiredString(result.git_commit, "results[0].git_commit");
 	if (commit !== head) {
 		throw new Error(
@@ -127,7 +194,12 @@ function validateInput(payload: JsonObject, head: string): JsonObject {
 	}
 	if (result.baseline_id !== BASELINE_ID) {
 		throw new Error(
-			"Benchmark scenario baseline_id does not match evolution-core-v1",
+			"Benchmark scenario baseline_id does not match evolution-core-v2",
+		);
+	}
+	if (result.baseline_reference !== BASELINE_REFERENCE) {
+		throw new Error(
+			"Benchmark scenario baseline_reference does not match baseline-v2.json",
 		);
 	}
 	for (const key of [
@@ -140,28 +212,47 @@ function validateInput(payload: JsonObject, head: string): JsonObject {
 		"prompt_tokens",
 		"output_tokens",
 		"context_bytes",
-		"output_bytes",
 		"tool_call_count",
 		"tool_success_rate",
 	] as const) {
 		requiredNumber(result[key], `results[0].${key}`);
 	}
-	const staleIssuePrefix =
-		"benchmark-provenance-commit-not-ancestor:evolution-core:evolution-status-contract:";
-	if (payload.status !== "passed") {
-		const issues = payload.contract_issues;
-		if (
-			!Array.isArray(issues) ||
-			issues.length !== 1 ||
-			typeof issues[0] !== "string" ||
-			!issues[0].startsWith(staleIssuePrefix) ||
-			issues[0].slice(staleIssuePrefix.length) === head
-		) {
-			throw new Error(
-				"Benchmark input must pass, except for the stale evolution baseline provenance issue",
-			);
-		}
+	const notes = result.notes;
+	if (
+		Array.isArray(notes) &&
+		notes.some(
+			(note) =>
+				typeof note === "string" && note.startsWith("baseline-regression:"),
+		)
+	) {
+		throw new Error("Benchmark input must not contain baseline-regression");
 	}
+	if (result.status === "baseline-missing" && result.pass === false) {
+		if (baselinePresent) {
+			throw new Error("Cannot bootstrap an existing baseline");
+		}
+		if (payload.status !== "failed" || payload.pass !== false) {
+			throw new Error("Baseline-missing bootstrap must fail the benchmark run");
+		}
+		validateContractIssues(payload, true);
+		validateBootstrapMetrics(result);
+		return result;
+	}
+	if (result.status !== "passed" || result.pass !== true) {
+		throw new Error(
+			"Benchmark scenario must pass or be a valid baseline-missing bootstrap",
+		);
+	}
+	if (!baselinePresent) {
+		throw new Error(
+			"Cannot refresh a missing baseline without baseline-missing status",
+		);
+	}
+	if (payload.status !== "passed" || payload.pass !== true) {
+		throw new Error("Passed benchmark result must pass the benchmark run");
+	}
+	validateContractIssues(payload, false);
+	validateBootstrapMetrics(result);
 	return result;
 }
 
@@ -217,6 +308,7 @@ function scenarioFromResult(
 		if (result[key] !== undefined) metrics[key] = result[key];
 	}
 	scenario.baseline_id = BASELINE_ID;
+	scenario.scenario_version = SCENARIO_VERSION;
 	scenario.deterministic_metrics = metrics;
 	scenario.measurement = {
 		status: "observed",
@@ -236,14 +328,18 @@ export function updateEvolutionBenchmarkBaseline(
 ): string[] {
 	const payload = readObject(inputPath);
 	const head = options.currentCommit ?? currentCommit(repoRoot);
-	const result = validateInput(payload, head);
+	const rootBaselinePath = join(repoRoot, RELATIVE_PATHS[0]);
+	const templateBaselinePath = join(repoRoot, RELATIVE_PATHS[2]);
+	const result = validateInput(
+		payload,
+		head,
+		existsSync(rootBaselinePath) || existsSync(templateBaselinePath),
+	);
 	const now = options.now ?? new Date();
 	if (!Number.isFinite(now.getTime()))
 		throw new Error("Writer timestamp is invalid");
 	const timestamp = now.toISOString();
-	const rootBaselinePath = join(repoRoot, RELATIVE_PATHS[0]);
 	const rootScenarioPath = join(repoRoot, RELATIVE_PATHS[1]);
-	const templateBaselinePath = join(repoRoot, RELATIVE_PATHS[2]);
 	const templateScenarioPath = join(repoRoot, RELATIVE_PATHS[3]);
 	const baseline = baselineFromResult(result, timestamp);
 	const rootScenario = scenarioFromResult(rootScenarioPath, result, timestamp);

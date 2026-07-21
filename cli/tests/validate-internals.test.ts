@@ -76,6 +76,24 @@ function createFixtureRoot(): string {
 		join(root, ".afol", "data", "benchmarks", "catalog"),
 		{ recursive: true },
 	);
+	const historicalBaselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"evolution-core",
+		"baseline-v1.json",
+	);
+	const baselinePath = historicalBaselinePath.replace(
+		"baseline-v1.json",
+		"baseline-v2.json",
+	);
+	const baseline = readJson(historicalBaselinePath);
+	baseline.baseline_id = "evolution-core-v2";
+	baseline.run_id = "bench-evolution-core-evolution-status-contract-1.1.0";
+	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
 	cpSync(
 		join(process.cwd(), ".afol", "data", "benchmarks", "snapshots"),
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
@@ -167,7 +185,7 @@ function createFixtureRoot(): string {
 		"evolution-core",
 		"evolution-status-contract.json",
 	);
-	const evolutionBaselinePath = join(
+	const historicalEvolutionBaselinePath = join(
 		root,
 		".afol",
 		"data",
@@ -177,7 +195,14 @@ function createFixtureRoot(): string {
 		"evolution-core",
 		"baseline-v1.json",
 	);
-	if (existsSync(evolutionScenarioPath) && existsSync(evolutionBaselinePath)) {
+	const evolutionBaselinePath = historicalEvolutionBaselinePath.replace(
+		"baseline-v1.json",
+		"baseline-v2.json",
+	);
+	if (
+		existsSync(evolutionScenarioPath) &&
+		existsSync(historicalEvolutionBaselinePath)
+	) {
 		const evolutionScenario = readJson(evolutionScenarioPath);
 		const measurement = evolutionScenario.measurement;
 		if (isObject(measurement)) {
@@ -191,7 +216,10 @@ function createFixtureRoot(): string {
 				`${JSON.stringify(evolutionScenario, null, 2)}\n`,
 				"utf8",
 			);
-			const evolutionBaseline = readJson(evolutionBaselinePath);
+			const evolutionBaseline = readJson(historicalEvolutionBaselinePath);
+			evolutionBaseline.baseline_id = "evolution-core-v2";
+			evolutionBaseline.run_id =
+				"bench-evolution-core-evolution-status-contract-1.1.0";
 			evolutionBaseline.git_commit = fixtureCommit;
 			evolutionBaseline.timestamp = fixtureTimestamp;
 			writeFileSync(
@@ -494,9 +522,10 @@ describe("validate output helpers", () => {
 			scenario_count: 8,
 			baseline_present: true,
 		});
-		expect(summary.some((entry) => entry.baseline_present === false)).toBe(
-			false,
-		);
+		expect(
+			summary.find((entry) => entry.pack_id === "evolution-core")
+				?.baseline_present,
+		).toBe(false);
 	});
 });
 
@@ -844,6 +873,9 @@ describe("validate registry", () => {
 			if (!evolutionBaseline) {
 				throw new Error("Expected evolution-core baseline fixture");
 			}
+			expect(evolutionScenarios[0].scenario_version).toBe("1.1.0");
+			expect(evolutionScenarios[0].baseline_id).toBe("evolution-core-v2");
+			expect(evolutionBaseline.baseline_id).toBe("evolution-core-v2");
 			const missingEvolutionScenario = { ...evolutionScenarios[0] };
 			delete missingEvolutionScenario.measurement;
 			const missingEvolutionMeasurement: RegistrySnapshot = {

@@ -225,7 +225,7 @@ describe("evolve status", () => {
 		}
 	});
 
-	test("reports migrated production state and supports the no-action preview", async () => {
+	test("uses the no-action form for a read-only analysis preview", async () => {
 		const root = fixture();
 		try {
 			const db = openSeededProductionDb(root, PROJECT_ID);
@@ -234,8 +234,10 @@ describe("evolve status", () => {
 			expect(await runEvolveCommand("", ["--json"], root, captured.io)).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.data).toMatchObject({
-				state: "healthy",
-				db_status: { production_day_count: 1 },
+				mode: "analyze",
+				status: "empty",
+				baseline: { production_day_count: 1 },
+				proposals: [],
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -622,10 +624,10 @@ describe("evolve status", () => {
 		});
 	});
 
-	test("evolve status is read-only (no mutation)", async () => {
+	test("evolve analysis is read-only (no mutation)", async () => {
 		const root = fixture();
 		try {
-			// First status call
+			// First analysis call
 			const c1 = captureIo();
 			expect(await runEvolveCommand("", ["--json"], root, c1.io)).toBe(0);
 			const p1 = JSON.parse(c1.stdout[0] ?? "{}");
@@ -634,13 +636,13 @@ describe("evolve status", () => {
 			const db = openSeededProductionDb(root, PROJECT_ID);
 			db.close();
 
-			// Second status call after setup — still read-only, no journal mutation
+			// Second analysis call after setup — still read-only, no journal mutation
 			const c2 = captureIo();
 			expect(await runEvolveCommand("", ["--json"], root, c2.io)).toBe(0);
 			const p2 = JSON.parse(c2.stdout[0] ?? "{}");
-			expect(p2.data.db_status).toBeTruthy();
-			// Both calls used the same db_path and did not write journal files
-			expect(p1.data.db_path).toBe(p2.data.db_path);
+			expect(p1.data.mode).toBe("analyze");
+			expect(p2.data.mode).toBe("analyze");
+			expect(p2.data.baseline.production_day_count).toBe(1);
 
 			// Verify no journal file was created by the status command itself
 			const journalPath = observationJournalPath(root);

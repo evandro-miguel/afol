@@ -1,3 +1,4 @@
+export * from "./analysis";
 export * from "./config";
 export * from "./db";
 export * from "./derived-state";
@@ -12,6 +13,7 @@ export {
 } from "./journal";
 export * from "./migrations";
 export {
+	appendObservationJournalEvent,
 	type ObservationJournalContext,
 	type ObservationJournalEvent,
 	observationDigest,
@@ -20,10 +22,14 @@ export {
 	validateObservationProjection,
 } from "./observation-journal";
 export {
+	assertObservationRecordBounds,
 	type ComparableCohort,
 	comparableCohort,
 	compareScorecards,
 	deriveRecurrenceDecision,
+	MAX_NORMALIZED_FIELDS_BYTES,
+	MAX_OBSERVATION_SOURCE_REFS,
+	MAX_OBSERVATION_TEXT_BYTES,
 	normalizeObservation,
 	normalizeObservationRecord,
 	OBSERVATION_FINGERPRINT_VERSION,
@@ -38,6 +44,7 @@ export {
 	type RecurrenceDecision,
 	type RecurrenceState,
 	type RecurrenceThresholds,
+	redactSensitiveText,
 	type Scorecard,
 	type ScorecardComparison,
 	type ScorecardDimension,

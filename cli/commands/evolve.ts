@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
-import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
 import {
 	envelopeErr,
 	envelopeOk,
@@ -14,6 +15,7 @@ import {
 	type OperationContext,
 } from "../core/operation-context";
 import {
+	analyzeEvolutionProject,
 	assertSafeEvolutionProjectRoot,
 	checkEvolutionDbHealth,
 	type DailySuggestionPreview,
@@ -30,6 +32,7 @@ import {
 	readObservationJournal,
 	readPreferenceJournal,
 	readProductionDayJournal,
+	redactSensitiveText,
 	repairEvolutionDerivedState,
 	resolveDailySuggestion,
 	resolveEvolutionConfig,
@@ -53,6 +56,8 @@ import { type CommandIo, DEFAULT_IO } from "./io";
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
 const MAX_OBSERVE_IDENTIFIER_LENGTH = 256;
+const MAX_ANALYSIS_OUTPUT_BYTES = 4_000;
+const MAX_ANALYSIS_PUBLIC_TEXT_BYTES = 128;
 
 function assertObserveIdentifier(value: string, label: string): void {
 	if (
@@ -265,6 +270,134 @@ function parseDecisionArgs(args: readonly string[]): {
 	return { json, suggestionId, ...(reason === undefined ? {} : { reason }) };
 }
 
+type EvolutionAnalysisAction = "analyze" | "weekly" | "after-merge" | "review";
+const MAX_ANALYSIS_ARGUMENT_LENGTH = 256;
+const ANALYSIS_CONTROL_CHARACTER = /\p{Cc}/u;
+
+function parseAnalysisArgs(
+	action: EvolutionAnalysisAction,
+	args: readonly string[],
+): { json: boolean; mergeRange?: string; proposalId?: string } {
+	let json = false;
+	let positional: string | undefined;
+	for (const arg of args) {
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (!positional && arg && !arg.startsWith("-")) {
+			if (
+				arg.length > MAX_ANALYSIS_ARGUMENT_LENGTH ||
+				ANALYSIS_CONTROL_CHARACTER.test(arg)
+			)
+				throw new Error(`evolve ${action} argument is invalid`);
+			positional = arg;
+		} else throw new Error(`Unsupported evolve ${action} argument`);
+	}
+	if (action === "after-merge") {
+		if (!positional)
+			throw new Error("evolve after-merge requires <base>..<head>");
+		return { json, mergeRange: positional };
+	}
+	if (action === "review") {
+		if (!positional) throw new Error("evolve review requires <proposal-id>");
+		return { json, proposalId: positional };
+	}
+	if (positional)
+		throw new Error(`evolve ${action} does not accept positional arguments`);
+	return { json };
+}
+
+function controlledGitExecutable(): string {
+	const candidates =
+		process.platform === "win32"
+			? ["C:\\Program Files\\Git\\cmd\\git.exe"]
+			: ["/usr/bin/git", "/bin/git", "/usr/local/bin/git"];
+	for (const candidate of candidates) {
+		if (!existsSync(candidate)) continue;
+		try {
+			return realpathSync(candidate);
+		} catch {
+			// Try the next fixed system location.
+		}
+	}
+	throw new Error(
+		"evolve after-merge requires a controlled local git executable",
+	);
+}
+
+function gitReadOnlyEnv(): NodeJS.ProcessEnv {
+	const env = Object.fromEntries(
+		["PATH", "LANG", "LC_ALL", "LC_CTYPE"].flatMap((key) =>
+			process.env[key] === undefined ? [] : [[key, process.env[key]]],
+		),
+	) as NodeJS.ProcessEnv;
+	return {
+		...env,
+		GIT_NO_LAZY_FETCH: "1",
+		GIT_OPTIONAL_LOCKS: "0",
+		GIT_TERMINAL_PROMPT: "0",
+		GIT_CONFIG_NOSYSTEM: "1",
+		GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+		GIT_CONFIG_SYSTEM: process.platform === "win32" ? "NUL" : "/dev/null",
+	};
+}
+
+function runLocalGit(root: string, args: readonly string[]) {
+	return spawnSync(controlledGitExecutable(), [...args], {
+		cwd: root,
+		env: gitReadOnlyEnv(),
+		encoding: "utf8",
+		maxBuffer: 1_048_576,
+		shell: false,
+		timeout: 3_000,
+		windowsHide: true,
+	});
+}
+
+function resolveCommitRange(
+	root: string,
+	range: string,
+): { base: string; head: string; commitIds: string[] } {
+	const match = /^([a-f0-9]{7,64})\.\.([a-f0-9]{7,64})$/.exec(range);
+	if (!match)
+		throw new Error("evolve after-merge requires two hexadecimal commit SHAs");
+	const base = match[1];
+	const head = match[2];
+	if (!base || !head)
+		throw new Error("evolve after-merge requires two hexadecimal commit SHAs");
+	const canonicalRoot = realpathSync(root);
+	for (const sha of [base, head]) {
+		const result = runLocalGit(canonicalRoot, [
+			"--no-pager",
+			"--no-optional-locks",
+			"--no-lazy-fetch",
+			"--no-replace-objects",
+			"cat-file",
+			"-e",
+			`${sha}^{commit}`,
+		]);
+		if (result.error || result.status !== 0)
+			throw new Error("evolve after-merge requires existing commit SHAs");
+	}
+	const rangeResult = runLocalGit(canonicalRoot, [
+		"--no-pager",
+		"--no-optional-locks",
+		"--no-lazy-fetch",
+		"--no-replace-objects",
+		"rev-list",
+		"--max-count=1001",
+		head,
+		`^${base}`,
+	]);
+	if (rangeResult.error || rangeResult.status !== 0)
+		throw new Error("evolve after-merge could not resolve the commit range");
+	const commitIds = rangeResult.stdout.trim().split("\n").filter(Boolean);
+	if (
+		commitIds.length > 1_000 ||
+		commitIds.some((commit) => !/^[a-f0-9]{40,64}$/.test(commit))
+	)
+		throw new Error("evolve after-merge commit range is invalid or too large");
+	return { base, head, commitIds };
+}
+
 function publicValue(value: unknown, restricted: boolean): unknown {
 	if (Array.isArray(value))
 		return value.map((item) => publicValue(item, restricted));
@@ -299,6 +432,208 @@ function writeEvolutionPayload(
 	else io.stdout(JSON.stringify(safe, null, 2));
 }
 
+type PublicAnalysisMetric = {
+	value: number | null;
+	better: "lower" | "higher";
+};
+type PublicAnalysisScorecard = Record<
+	string,
+	Record<string, PublicAnalysisMetric>
+>;
+type PublicAnalysisProposal = {
+	rank: number;
+	problem: string;
+	recommendation: string;
+	risk: string;
+	validation: string;
+	impact: PublicImpactCategory;
+	score: number;
+	confidence: number;
+	occurrence_count: number;
+	distinct_production_day_count: number;
+	target_metrics: Readonly<Record<string, number | null>>;
+};
+type PublicAnalysisAlert = {
+	problem: string;
+	risk: string;
+	validation: string;
+	impact: PublicImpactCategory;
+	occurrence_count: number;
+	distinct_production_day_count: number;
+};
+type PublicImpactCategory =
+	| "rework"
+	| "quality"
+	| "security"
+	| "integrity"
+	| "data_loss"
+	| "latency"
+	| "efficiency"
+	| "user_load"
+	| "workflow"
+	| "unknown";
+type PublicEvolutionAnalysisDto = {
+	version: number;
+	mode: string;
+	status: string;
+	blocked_reason: string | null;
+	generated_at: string;
+	scorecard: PublicAnalysisScorecard;
+	baseline: {
+		window: "recorded";
+		observation_count: number;
+		production_day_count: number;
+		scorecard: PublicAnalysisScorecard;
+	};
+	proposals: readonly PublicAnalysisProposal[];
+	pending_count: number;
+	critical_alerts: readonly PublicAnalysisAlert[];
+	critical_alert_count: number;
+	critical_alert_pending_count: number;
+};
+
+function boundedPublicText(value: unknown): string {
+	const redacted = redactSensitiveText(value, { redactPaths: true }).replace(
+		/\p{Cc}/gu,
+		" ",
+	);
+	const bytes = Buffer.from(redacted, "utf8");
+	if (bytes.byteLength <= MAX_ANALYSIS_PUBLIC_TEXT_BYTES) return redacted;
+	return `${bytes.subarray(0, MAX_ANALYSIS_PUBLIC_TEXT_BYTES - 3).toString("utf8")}...`;
+}
+
+function publicImpact(value: unknown): PublicImpactCategory {
+	const impact = redactSensitiveText(value).replaceAll("-", "_");
+	if (impact === "rework") return "rework";
+	if (["regression", "test_failure"].includes(impact)) return "quality";
+	if (["security", "security_error", "secret_exposure"].includes(impact))
+		return "security";
+	if (["integrity", "integrity_error"].includes(impact)) return "integrity";
+	if (["data_loss", "data_loss_error"].includes(impact)) return "data_loss";
+	if (impact === "latency_outlier") return "latency";
+	if (impact === "token_outlier") return "efficiency";
+	if (["user_correction", "unnecessary_user_intervention"].includes(impact))
+		return "user_load";
+	if (impact === "workflow_friction") return "workflow";
+	return "unknown";
+}
+
+function publicMetric(value: unknown): PublicAnalysisMetric {
+	const metric = value as { value?: unknown; better?: unknown };
+	return {
+		value:
+			typeof metric.value === "number" && Number.isFinite(metric.value)
+				? metric.value
+				: null,
+		better: metric.better === "higher" ? "higher" : "lower",
+	};
+}
+
+function publicScorecard(value: unknown): PublicAnalysisScorecard {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>).map(
+			([dimension, metrics]) => [
+				dimension,
+				metrics && typeof metrics === "object" && !Array.isArray(metrics)
+					? Object.fromEntries(
+							Object.entries(metrics as Record<string, unknown>)
+								.filter(([key]) => !/token|digest|secret/i.test(key))
+								.map(([key, metric]) => [key, publicMetric(metric)]),
+						)
+					: {},
+			],
+		),
+	);
+}
+
+function publicAnalysisDto(
+	analysis: Record<string, unknown>,
+): PublicEvolutionAnalysisDto {
+	const baseline = (analysis.baseline ?? {}) as Record<string, unknown>;
+	const safeProposal = (
+		proposal: Record<string, unknown>,
+	): PublicAnalysisProposal => ({
+		rank: Number(proposal.rank) || 0,
+		problem: boundedPublicText(proposal.problem),
+		recommendation: boundedPublicText(proposal.recommendation),
+		risk: boundedPublicText(proposal.risk),
+		validation: boundedPublicText(proposal.validation),
+		impact: publicImpact(proposal.impact),
+		score: Number(proposal.score) || 0,
+		confidence: Number(proposal.confidence) || 0,
+		occurrence_count: Number(proposal.occurrence_count) || 0,
+		distinct_production_day_count:
+			Number(proposal.distinct_production_day_count) || 0,
+		target_metrics:
+			proposal.target_metrics && typeof proposal.target_metrics === "object"
+				? Object.fromEntries(
+						Object.entries(
+							proposal.target_metrics as Record<string, unknown>,
+						).map(([key, value]) => [
+							key,
+							typeof value === "number" ? value : null,
+						]),
+					)
+				: {},
+	});
+	const safeAlert = (alert: Record<string, unknown>): PublicAnalysisAlert => ({
+		problem: boundedPublicText(alert.problem),
+		risk: boundedPublicText(alert.risk),
+		validation: boundedPublicText(alert.validation),
+		impact: publicImpact(alert.impact),
+		occurrence_count: Number(alert.occurrence_count) || 0,
+		distinct_production_day_count:
+			Number(alert.distinct_production_day_count) || 0,
+	});
+	const blocked = analysis.status === "blocked";
+	return {
+		version: Number(analysis.version) || 1,
+		mode: boundedPublicText(analysis.mode),
+		status: boundedPublicText(analysis.status),
+		blocked_reason: blocked ? "analysis unavailable" : null,
+		generated_at: boundedPublicText(analysis.generated_at),
+		scorecard: publicScorecard(analysis.scorecard),
+		baseline: {
+			window: "recorded",
+			observation_count: Number(baseline.observation_count) || 0,
+			production_day_count: Number(baseline.production_day_count) || 0,
+			scorecard: publicScorecard(baseline.scorecard),
+		},
+		proposals: Array.isArray(analysis.proposals)
+			? analysis.proposals.map((proposal) =>
+					safeProposal(proposal as Record<string, unknown>),
+				)
+			: [],
+		pending_count: Number(analysis.pending_count) || 0,
+		critical_alerts: Array.isArray(analysis.critical_alerts)
+			? analysis.critical_alerts.map((alert) =>
+					safeAlert(alert as Record<string, unknown>),
+				)
+			: [],
+		critical_alert_count: Number(analysis.critical_alert_count) || 0,
+		critical_alert_pending_count:
+			Number(analysis.critical_alert_pending_count) || 0,
+	};
+}
+
+function writeAnalysisPayload(
+	io: CommandIo,
+	json: boolean,
+	action: string,
+	payload: Record<string, unknown>,
+	operationContext: OperationContext,
+): void {
+	void operationContext;
+	const dto = publicAnalysisDto(payload);
+	const output = json
+		? stringifyEnvelope(envelopeOk(dto, { action }))
+		: JSON.stringify(dto);
+	if (Buffer.byteLength(output, "utf8") > MAX_ANALYSIS_OUTPUT_BYTES)
+		throw new Error("evolution analysis output exceeds the bounded limit");
+	io.stdout(output);
+}
+
 function writeEvolutionError(
 	io: CommandIo,
 	json: boolean,
@@ -308,15 +643,20 @@ function writeEvolutionError(
 	operationContext: OperationContext,
 ): void {
 	const trusted = isTrustedLocalInteractive(operationContext);
-	const safeMessage = trusted
-		? message
-		: code === "approval-required"
-			? `${action} is not allowed; local interactive approval required`
-			: code === "EVOLUTION_REBUILD_REQUIRED"
-				? `${action} requires local interactive rebuild; no mutation was performed`
-				: code === "EVOLVE_REPAIR_DISABLED"
-					? `${action} is disabled; no mutation was performed`
-					: `${action} failed; local interactive diagnostics required`;
+	const analysisMode = ["analyze", "weekly", "after-merge", "review"].includes(
+		action.replace("evolve.", ""),
+	);
+	const safeMessage = analysisMode
+		? "analysis unavailable"
+		: trusted
+			? message
+			: code === "approval-required"
+				? `${action} is not allowed; local interactive approval required`
+				: code === "EVOLUTION_REBUILD_REQUIRED"
+					? `${action} requires local interactive rebuild; no mutation was performed`
+					: code === "EVOLVE_REPAIR_DISABLED"
+						? `${action} is disabled; no mutation was performed`
+						: `${action} failed; local interactive diagnostics required`;
 	if (json)
 		io.stdout(
 			stringifyEnvelope(
@@ -324,6 +664,60 @@ function writeEvolutionError(
 			),
 		);
 	else io.stderr(`${code}: ${safeMessage}`);
+}
+
+async function runAnalysis(
+	action: EvolutionAnalysisAction,
+	args: string[],
+	root: string,
+	io: CommandIo,
+	now: Date,
+	operationContext: OperationContext,
+): Promise<number> {
+	assertAdmittedOperationContext(operationContext);
+	if (
+		!isActionAllowed(operationContext, {
+			action: `evolve.${action}`,
+			sideEffect: "read",
+		})
+	)
+		throw new Error(`evolve.${action} is not allowed for this caller`);
+	const parsed = parseAnalysisArgs(action, args);
+	const mergeScope = parsed.mergeRange
+		? resolveCommitRange(root, parsed.mergeRange)
+		: undefined;
+	const analysis = analyzeEvolutionProject(root, {
+		mode:
+			action === "after-merge"
+				? "after_merge"
+				: action === "weekly"
+					? "weekly"
+					: action === "review"
+						? "review"
+						: "analyze",
+		...(parsed.proposalId ? { reviewProposalId: parsed.proposalId } : {}),
+		...(mergeScope
+			? {
+					base: mergeScope.base,
+					head: mergeScope.head,
+					commitIds: mergeScope.commitIds,
+				}
+			: {}),
+		now,
+	});
+	if (parsed.proposalId && analysis.proposals.length !== 1)
+		throw new Error("evolution proposal preview is missing or stale");
+	const payload = {
+		...analysis,
+	};
+	writeAnalysisPayload(
+		io,
+		parsed.json,
+		`evolve.${action}`,
+		payload,
+		operationContext,
+	);
+	return 0;
 }
 
 async function runSuggest(
@@ -612,7 +1006,7 @@ type EvolutionStatusData = {
 	db_status: EvolutionStatus | null;
 	journal_health: EvolutionJournalHealth;
 	suggestion_queue: DailySuggestionPreview;
-	analysis_available: false;
+	analysis_available: boolean;
 };
 
 const SUGGESTION_CLAIM_PROVIDERS = new Set([
@@ -843,7 +1237,8 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 			error: journalError,
 		},
 		suggestion_queue: suggestionQueue,
-		analysis_available: false,
+		analysis_available:
+			resolved.configured && resolved.enabled && (dbHealth?.ok ?? false),
 	};
 }
 
@@ -870,7 +1265,19 @@ export async function runEvolveCommand(
 ): Promise<number> {
 	assertAdmittedOperationContext(operationContext);
 	const jsonRequested = args.some((arg) => arg === "--json" || arg === "-j");
+	const requestedAction = action || "analyze";
 	try {
+		if (
+			["analyze", "weekly", "after-merge", "review"].includes(requestedAction)
+		)
+			return await runAnalysis(
+				requestedAction as EvolutionAnalysisAction,
+				args,
+				projectRoot,
+				io,
+				now,
+				operationContext,
+			);
 		if (action === "suggest")
 			return await runSuggest(args, projectRoot, io, now, operationContext);
 		if (["skip", "accept", "reject"].includes(action))
@@ -955,7 +1362,7 @@ export async function runEvolveCommand(
 		return exitCode;
 	} catch (error) {
 		const message = (error as Error).message;
-		const actionName = action || "status";
+		const actionName = action || "analyze";
 		const errorCode =
 			actionName === "status"
 				? "EVOLUTION_STATUS_FAILED"
