@@ -5,6 +5,7 @@ import {
 	readFileSync,
 	rmSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +22,7 @@ import {
 	validateObservationProjection,
 } from "../services/evolution/observation-journal";
 import { normalizeObservationRecord } from "../services/evolution/observation-model";
+import { writeEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import { dispatchRecurrenceDecision } from "../services/evolution/recurrence-authority";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
@@ -229,6 +231,93 @@ describe("observation journal", () => {
 				}),
 			).toThrow("injected projection failure");
 			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(0);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restores observation and recurrence projections when checkpoint persistence fails", () => {
+		const { root, db } = setup();
+		try {
+			const first = observation("01", "S-01", 1);
+			appendObservationJournalEvent({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				observation: first,
+			});
+			const before = JSON.stringify({
+				observations: db.query("SELECT * FROM observations").all(),
+				clusters: db.query("SELECT * FROM issue_clusters").all(),
+				decisions: db.query("SELECT * FROM recurrence_decisions").all(),
+			});
+			const checkpointPath = join(
+				root,
+				".afol/data/events/evolution/projection-checkpoints.jsonl",
+			);
+			const checkpointBefore = readFileSync(checkpointPath, "utf8");
+			expect(() =>
+				appendObservationJournalEvent({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					observation: observation("02", "S-02", 2),
+					checkpointWriter: (input) =>
+						writeEvolutionProjectionCheckpoint({
+							...input,
+							writeBytes: (fd, value) =>
+								writeSync(fd, value.slice(0, 16), null, "utf8"),
+						}),
+				}),
+			).toThrow("checkpoint journal write was incomplete");
+			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(1);
+			expect(readFileSync(checkpointPath, "utf8")).toBe(checkpointBefore);
+			expect(
+				JSON.stringify({
+					observations: db.query("SELECT * FROM observations").all(),
+					clusters: db.query("SELECT * FROM issue_clusters").all(),
+					decisions: db.query("SELECT * FROM recurrence_decisions").all(),
+				}),
+			).toBe(before);
+
+			const authority = dispatchRecurrenceDecision({
+				projectId: PROJECT_ID,
+				fingerprintVersion: 1,
+				fingerprint: first.fingerprint,
+				action: "confirm",
+				observationIds: ["01"],
+				sourceDecisionRef: "U-checkpoint",
+				operationContext: defaultOperationContext(),
+				decisionId: "DEC-checkpoint",
+			});
+			expect(() =>
+				appendRecurrenceDecisionReceipt({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					clusterId: first.fingerprint,
+					action: "confirm",
+					authority,
+					fingerprintVersion: 1,
+					observationIds: ["01"],
+					sourceDecisionRef: "U-checkpoint",
+					sourceRefs: [{ id: "U-checkpoint", kind: "decision" }],
+					checkpointWriter: (input) =>
+						writeEvolutionProjectionCheckpoint({
+							...input,
+							syncFile: () => {
+								throw new Error("injected checkpoint fsync failure");
+							},
+						}),
+				}),
+			).toThrow("injected checkpoint fsync failure");
+			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(1);
+			expect(readFileSync(checkpointPath, "utf8")).toBe(checkpointBefore);
+			expect(
+				db.query("SELECT COUNT(*) AS count FROM recurrence_decisions").get(),
+			).toEqual({ count: 0 });
+			validateObservationProjection({ root, db, projectId: PROJECT_ID });
 		} finally {
 			db.close();
 			rmSync(root, { recursive: true, force: true });

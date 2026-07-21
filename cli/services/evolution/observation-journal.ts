@@ -34,6 +34,11 @@ import {
 	projectObservation,
 	type RecurrenceThresholds,
 } from "./observation-model";
+import { writeEvolutionProjectionCheckpoint } from "./projection-checkpoint";
+import {
+	clearProjectionWatermark,
+	writeProjectionWatermark,
+} from "./projection-watermark";
 import {
 	assertRecurrenceAuthority,
 	type RecurrenceAuthorityCapability,
@@ -442,6 +447,7 @@ export type AppendObservationJournalInput = {
 	evolutionEventsDir?: string;
 	recurrenceThresholds?: RecurrenceThresholds;
 	syncDirectory?: (directory: string) => void;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 };
 
 export type AppendRecurrenceDecisionInput = {
@@ -460,6 +466,7 @@ export type AppendRecurrenceDecisionInput = {
 	now?: Date;
 	evolutionEventsDir?: string;
 	recurrenceThresholds?: RecurrenceThresholds;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 };
 
 function insertEvent(
@@ -672,6 +679,7 @@ function replayObservationProjection(
 	projectId: string,
 	events: readonly ObservationJournalEvent[],
 	thresholds: RecurrenceThresholds,
+	path: string,
 ): void {
 	validateObservationProductionDays(db, projectId, events);
 	applyMigrations(db);
@@ -683,6 +691,8 @@ function replayObservationProjection(
 		db.query("DELETE FROM issue_clusters WHERE project_id = ?").run(projectId);
 		db.query("DELETE FROM observations WHERE project_id = ?").run(projectId);
 		for (const event of events) insertEvent(db, event, thresholds);
+		if (events.length > 0) writeProjectionWatermark(db, "observation", path);
+		else clearProjectionWatermark(db, "observation");
 		db.exec("COMMIT");
 	} catch (error) {
 		try {
@@ -734,6 +744,7 @@ function appendUnlocked(input: AppendObservationJournalInput): {
 			input.projectId,
 			events,
 			context.recurrenceThresholds,
+			path,
 		);
 	const observation = {
 		...input.observation,
@@ -833,6 +844,7 @@ function appendUnlocked(input: AppendObservationJournalInput): {
 			input.db.exec("BEGIN IMMEDIATE");
 			try {
 				insertEvent(input.db, event, context.recurrenceThresholds);
+				writeProjectionWatermark(input.db, "observation", path);
 				input.db.exec("COMMIT");
 			} catch (error) {
 				try {
@@ -840,6 +852,32 @@ function appendUnlocked(input: AppendObservationJournalInput): {
 				} catch {}
 				truncate(path, previousSize);
 				throw error;
+			}
+			try {
+				(input.checkpointWriter ?? writeEvolutionProjectionCheckpoint)({
+					root: input.root,
+					db: input.db,
+					projectId: input.projectId,
+					eventsDir: context.evolutionEventsDir,
+					...(input.now ? { now: input.now } : {}),
+				});
+			} catch (checkpointError) {
+				truncate(path, previousSize);
+				try {
+					replayObservationProjection(
+						input.db,
+						input.projectId,
+						events,
+						context.recurrenceThresholds,
+						path,
+					);
+				} catch (restoreError) {
+					throw new AggregateError(
+						[checkpointError, restoreError],
+						"observation checkpoint failed and projection rollback failed",
+					);
+				}
+				throw checkpointError;
 			}
 		}
 		return { event, appended: true };
@@ -888,6 +926,7 @@ export function appendRecurrenceDecisionReceipt(
 				input.projectId,
 				events,
 				context.recurrenceThresholds,
+				path,
 			);
 		const eventId = input.eventId ?? `REC-${randomUUID()}`;
 		const refs = sourceRefs(input.sourceRefs, "explicit_project_user");
@@ -1009,6 +1048,7 @@ export function appendRecurrenceDecisionReceipt(
 				input.db.exec("BEGIN IMMEDIATE");
 				try {
 					insertEvent(input.db, event, context.recurrenceThresholds);
+					writeProjectionWatermark(input.db, "observation", path);
 					input.db.exec("COMMIT");
 				} catch (error) {
 					try {
@@ -1016,6 +1056,32 @@ export function appendRecurrenceDecisionReceipt(
 					} catch {}
 					truncate(path, previousSize);
 					throw error;
+				}
+				try {
+					(input.checkpointWriter ?? writeEvolutionProjectionCheckpoint)({
+						root: input.root,
+						db: input.db,
+						projectId: input.projectId,
+						eventsDir: context.evolutionEventsDir,
+						...(input.now ? { now: input.now } : {}),
+					});
+				} catch (checkpointError) {
+					truncate(path, previousSize);
+					try {
+						replayObservationProjection(
+							input.db,
+							input.projectId,
+							events,
+							context.recurrenceThresholds,
+							path,
+						);
+					} catch (restoreError) {
+						throw new AggregateError(
+							[checkpointError, restoreError],
+							"recurrence checkpoint failed and projection rollback failed",
+						);
+					}
+					throw checkpointError;
 				}
 			}
 			return event;
@@ -1120,7 +1186,20 @@ export function rebuildObservationProjection(
 				.run(context.projectId);
 			for (const event of events)
 				insertEvent(context.db, event, resolved.recurrenceThresholds);
+			if (events.length > 0)
+				writeProjectionWatermark(
+					context.db,
+					"observation",
+					observationJournalPath(context.root, resolved.evolutionEventsDir),
+				);
+			else clearProjectionWatermark(context.db, "observation");
 			context.db.exec("COMMIT");
+			writeEvolutionProjectionCheckpoint({
+				root: context.root,
+				db: context.db,
+				projectId: context.projectId,
+				eventsDir: resolved.evolutionEventsDir,
+			});
 		} catch (error) {
 			try {
 				context.db.exec("ROLLBACK");

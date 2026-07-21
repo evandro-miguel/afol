@@ -166,6 +166,66 @@ function writeCliProjectContract(root: string): void {
 	);
 }
 
+function writeEvolutionConfig(root: string, enabled: boolean | string): void {
+	mkdirSync(join(root, ".afol"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "config.json"),
+		JSON.stringify({
+			schema_version: 1,
+			project: {
+				id: "6b7d91ca-496f-4f0c-8537-5c4993810d15",
+				name: "fixture",
+				timezone: "UTC",
+			},
+			paths: {
+				external_dir: ".afol/external",
+				evolution_db: ".afol/state/evolution.db",
+				evolution_data_dir: ".afol/data/evolution",
+				evolution_events_dir: ".afol/data/events/evolution",
+			},
+			evolution: {
+				enabled,
+				suggestions: {
+					first_session_of_day: true,
+					dedupe_scope: "project",
+					max_visible_per_day: 1,
+					remind_skipped_next_day: true,
+					deep_review_after_production_days: 5,
+				},
+				preferences: {
+					soft_decay_after_production_days: 7,
+					stop_guiding_after_production_days: 20,
+					minimum_effective_confidence: 0.65,
+					decay_curve: "linear",
+				},
+				recurrence: {
+					minimum_occurrences: 3,
+					minimum_distinct_sessions: 2,
+					minimum_distinct_production_days: 2,
+				},
+				large_change: {
+					changed_files: 20,
+					changed_lines: 1000,
+					critical_paths_trigger: true,
+				},
+				external: {
+					mode: "explicit_import_only",
+					storage: "normalized_sections",
+					store_raw: false,
+					redact_before_persist: true,
+				},
+				autonomy: {
+					auto_observe: true,
+					auto_refresh_preference_projections: true,
+					auto_clean_derived_state: true,
+					auto_apply_mode: "none",
+				},
+			},
+		}),
+		"utf8",
+	);
+}
+
 function parseEnvelope(stdout: string): Record<string, unknown> {
 	return JSON.parse(stdout) as Record<string, unknown>;
 }
@@ -1373,6 +1433,57 @@ describe("workbench lifecycle service", () => {
 			expect(briefing.schema).toBe("afol_start_briefing_v1");
 			expect(Array.isArray(briefing.warnings)).toBe(true);
 			expect(Array.isArray(briefing.questions)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing keeps evolution additive and reports disabled state", () => {
+		const root = mkRoot("start-briefing-evolution-disabled");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "briefing-evolution-disabled");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			writeEvolutionConfig(root, false);
+
+			const briefing = buildStartBriefing(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+
+			expect(briefing.evolution).toMatchObject({
+				daily_status: "disabled",
+				suggestion: null,
+				pending_count: 0,
+				critical_alerts: [],
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing safely falls back when evolution config is malformed", () => {
+		const root = mkRoot("start-briefing-evolution-malformed");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "briefing-evolution-malformed");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			writeEvolutionConfig(root, "yes");
+
+			const briefing = buildStartBriefing(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+
+			expect(briefing.evolution).toMatchObject({
+				daily_status: "unavailable",
+				suggestion: null,
+				pending_count: 0,
+				critical_alerts: [],
+			});
+			expect(briefing.warnings).toContain(
+				"evolution suggestion unavailable: local state requires review",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

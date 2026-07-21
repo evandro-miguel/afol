@@ -134,10 +134,11 @@ function formatEntry(spec: CommandSpec): string {
 function formatVerboseEntry(spec: CommandSpec): string[] {
 	const lines = [
 		`  ${spec.command}`,
-		`    aliases: ${spec.aliases.length > 0 ? spec.aliases.join(", ") : "none"}`,
 		`    effect: ${spec.sideEffect}`,
 		`    description: ${spec.description}`,
 	];
+	if (spec.aliases.length > 0)
+		lines.splice(1, 0, `    aliases: ${spec.aliases.join(", ")}`);
 	if (spec.guidance?.length) {
 		lines.push("    guidance:");
 		for (const guidance of spec.guidance) {
