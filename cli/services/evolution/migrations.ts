@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 4;
+export const EVOLUTION_SCHEMA_VERSION = 6;
 
 const MIGRATIONS = [
 	{
@@ -228,6 +228,50 @@ CREATE INDEX recurrence_decisions_project_fingerprint_idx
 	ON recurrence_decisions(project_id, fingerprint_version, fingerprint, journal_sequence);
 CREATE INDEX issue_clusters_project_state_idx
 	ON issue_clusters(project_id, state, priority DESC);
+		`,
+	},
+	{
+		version: 5,
+		sql: `
+CREATE TABLE IF NOT EXISTS daily_suggestion_receipts (
+	project_id TEXT NOT NULL,
+	local_date TEXT NOT NULL,
+	suggestion_id TEXT NOT NULL,
+	receipt_status TEXT NOT NULL CHECK (receipt_status IN ('claimed', 'shown', 'skipped', 'accepted', 'rejected')),
+	claimed_by TEXT NOT NULL CHECK (length(trim(claimed_by)) > 0),
+	claim_token_digest TEXT NOT NULL CHECK (length(trim(claim_token_digest)) = 64),
+	generation INTEGER NOT NULL CHECK (generation > 0),
+	claim_expires_at TEXT NOT NULL,
+	reject_reason TEXT,
+	evidence_digest TEXT NOT NULL CHECK (length(trim(evidence_digest)) = 64),
+	journal_sequence INTEGER NOT NULL CHECK (journal_sequence > 0),
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, local_date)
+);
+
+CREATE INDEX IF NOT EXISTS daily_suggestion_receipts_project_status_idx
+	ON daily_suggestion_receipts(project_id, receipt_status, local_date);
+
+CREATE INDEX IF NOT EXISTS daily_suggestion_receipts_suggestion_feedback_idx
+	ON daily_suggestion_receipts(project_id, suggestion_id, receipt_status, local_date DESC);
+		`,
+	},
+	{
+		version: 6,
+		sql: `
+DROP INDEX IF EXISTS issue_clusters_project_state_idx;
+DROP INDEX IF EXISTS observations_project_fingerprint_idx;
+DROP INDEX IF EXISTS daily_suggestion_receipts_suggestion_feedback_idx;
+
+CREATE INDEX IF NOT EXISTS issue_clusters_active_suggestion_idx
+	ON issue_clusters(project_id, priority DESC, occurrence_count DESC, fingerprint)
+	WHERE state IN ('observed', 'candidate', 'recurring', 'reopened');
+
+CREATE INDEX IF NOT EXISTS observations_suggestion_tail_idx
+	ON observations(project_id, fingerprint_version, fingerprint, journal_sequence DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS daily_suggestion_receipts_feedback_tail_idx
+	ON daily_suggestion_receipts(project_id, suggestion_id, receipt_status, local_date DESC, journal_sequence DESC);
 		`,
 	},
 ] as const;

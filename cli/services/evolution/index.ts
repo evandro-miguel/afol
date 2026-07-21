@@ -1,5 +1,6 @@
 export * from "./config";
 export * from "./db";
+export * from "./derived-state";
 export * from "./health";
 export {
 	appendProductionDayAllocation,
@@ -30,7 +31,9 @@ export {
 	type ObservationInput,
 	type ObservationRecord,
 	observationFingerprint,
+	observationRecordFromRow,
 	occurrenceIdentity,
+	projectObservation,
 	projectObservations,
 	type RecurrenceDecision,
 	type RecurrenceState,
@@ -85,4 +88,21 @@ export type {
 	ProductionDay,
 } from "./production-days";
 export * from "./runtime-config";
+export {
+	projectSuggestionReceipts,
+	readSuggestionReceiptJournal,
+	type SuggestionReceipt,
+	type SuggestionReceiptEvent,
+	type SuggestionReceiptStatus,
+	suggestionJournalPath,
+	validateSuggestionReceiptProjection,
+} from "./suggestion-journal";
+export * from "./suggestion-model";
+export {
+	type DailySuggestionPreview,
+	type DailySuggestionStatus,
+	previewDailySuggestion,
+	resolveDailySuggestion,
+	suggestionInternalCandidate,
+} from "./suggestion-query";
 export * from "./validation";

@@ -399,12 +399,12 @@
         "local_date": { "$ref": "#/$defs/date" },
         "suggestion_id": { "$ref": "#/$defs/id" },
         "claimed_by": { "$ref": "#/$defs/id" },
-        "claim_token": { "type": "string", "minLength": 32 },
+        "claim_token_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "generation": { "type": "integer", "minimum": 1 },
         "claim_expires_at": { "$ref": "#/$defs/dateTime" },
         "receipt_status": { "enum": ["claimed", "shown", "skipped", "accepted", "rejected"] }
       },
-      "required": ["local_date", "suggestion_id", "claimed_by", "claim_token", "generation", "claim_expires_at", "receipt_status", "journal_event_id"]
+      "required": ["local_date", "suggestion_id", "claimed_by", "claim_token_digest", "generation", "claim_expires_at", "receipt_status", "journal_event_id"]
     },
     "externalImport": {
       "allOf": [{ "$ref": "#/$defs/baseRecord" }],

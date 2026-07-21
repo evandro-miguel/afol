@@ -805,8 +805,8 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Inspect project evolution state",
 		category: "inspect",
 		guidance: [
-			"Use evolve status for the read-only Slice 1 health summary.",
-			"Analysis, imports, and proposal mutation are not available in Slice 1.",
+			"Use evolve suggest --first-session for one evidence-backed daily suggestion.",
+			"Suggestion decisions require a shown receipt; reject requires --reason.",
 		],
 		subcommands: [
 			{
@@ -814,6 +814,31 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				sideEffect: "read",
 				description:
 					"Inspect evolution config, migration, and production-day state",
+			},
+			{
+				usage: "suggest --first-session [--claimed-by <provider>] [--json]",
+				sideEffect: "write",
+				description: "Show one daily suggestion",
+			},
+			{
+				usage: "skip <suggestion-id> [--json]",
+				sideEffect: "write",
+				description: "Skip shown suggestion",
+			},
+			{
+				usage: "accept <suggestion-id> [--json]",
+				sideEffect: "write",
+				description: "Accept shown suggestion",
+			},
+			{
+				usage: "reject <suggestion-id> --reason <reason> [--json]",
+				sideEffect: "write",
+				description: "Reject shown suggestion",
+			},
+			{
+				usage: "repair [--json]",
+				sideEffect: "write",
+				description: "Repair evolution derived state",
 			},
 		],
 	},

@@ -14,6 +14,8 @@ import { validateObservationProjection } from "./observation-journal";
 import type { RecurrenceThresholds } from "./observation-model";
 import { validatePreferenceProjection } from "./preference-journal";
 import type { ProductionDay } from "./production-days";
+import { validateEvolutionProjectionCheckpoint } from "./projection-checkpoint";
+import { validateSuggestionReceiptProjection } from "./suggestion-journal";
 
 export type EvolutionDbFinding = {
 	severity: "fail" | "warn" | "info";
@@ -31,6 +33,7 @@ export type EvolutionDbHealth = {
 	preference_count: number;
 	observation_count: number;
 	recurring_cluster_count: number;
+	daily_suggestion_receipt_count: number;
 	project_id: string | null;
 	size_bytes: number;
 	findings: EvolutionDbFinding[];
@@ -43,6 +46,7 @@ export type EvolutionStatus = {
 	preference_count: number;
 	observation_count: number;
 	recurring_cluster_count: number;
+	daily_suggestion_receipt_count: number;
 	latest_production_day: ProductionDay | null;
 };
 export type EvolutionHealthContext = Omit<EvolutionJournalContext, "db"> & {
@@ -171,6 +175,40 @@ export function getEvolutionStatus(
 			db,
 			projectId,
 		});
+		const tables = new Set(
+			(
+				db
+					.query("SELECT name FROM sqlite_master WHERE type = 'table'")
+					.all() as Array<{ name: string }>
+			).map((row) => row.name),
+		);
+		if (tables.has("daily_suggestion_receipts"))
+			validateSuggestionReceiptProjection({
+				root: canonicalContext.root,
+				projectId,
+				db,
+				...(canonicalContext.evolutionEventsDir
+					? { eventsDir: canonicalContext.evolutionEventsDir }
+					: {}),
+			});
+		const suggestionState = tables.has("daily_suggestion_receipts")
+			? scalarNumber(
+					db
+						.query(
+							"SELECT EXISTS(SELECT 1 FROM observations WHERE project_id = ?) OR EXISTS(SELECT 1 FROM daily_suggestion_receipts WHERE project_id = ?) AS present",
+						)
+						.get(projectId, projectId) as Record<string, unknown>,
+				)
+			: 0;
+		if (suggestionState > 0)
+			validateEvolutionProjectionCheckpoint({
+				root: canonicalContext.root,
+				db,
+				projectId,
+				...(canonicalContext.evolutionEventsDir
+					? { eventsDir: canonicalContext.evolutionEventsDir }
+					: {}),
+			});
 	}
 	if (!projectId) {
 		return {
@@ -181,6 +219,7 @@ export function getEvolutionStatus(
 			preference_count: 0,
 			observation_count: 0,
 			recurring_cluster_count: 0,
+			daily_suggestion_receipt_count: 0,
 			latest_production_day: null,
 		};
 	}
@@ -203,6 +242,19 @@ export function getEvolutionStatus(
 			"SELECT COUNT(*) AS count FROM issue_clusters WHERE project_id = ? AND state IN ('recurring','reopened','proposal_open','mitigation_canary')",
 		)
 		.get(projectId) as Record<string, unknown>;
+	const hasSuggestionReceipts =
+		db
+			.query(
+				"SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'daily_suggestion_receipts'",
+			)
+			.get() !== null;
+	const dailySuggestionReceiptCount = hasSuggestionReceipts
+		? (db
+				.query(
+					"SELECT COUNT(*) AS count FROM daily_suggestion_receipts WHERE project_id = ?",
+				)
+				.get(projectId) as Record<string, unknown>)
+		: { count: 0 };
 	return {
 		schema_version: EVOLUTION_SCHEMA_VERSION,
 		migration_version: readUserVersion(db),
@@ -211,6 +263,7 @@ export function getEvolutionStatus(
 		preference_count: scalarNumber(preferenceCount),
 		observation_count: scalarNumber(observationCount),
 		recurring_cluster_count: scalarNumber(recurringClusterCount),
+		daily_suggestion_receipt_count: scalarNumber(dailySuggestionReceiptCount),
 		latest_production_day: latest ? rowToProductionDay(latest) : null,
 	};
 }
@@ -233,6 +286,7 @@ export function checkEvolutionDbHealth(
 			preference_count: 0,
 			observation_count: 0,
 			recurring_cluster_count: 0,
+			daily_suggestion_receipt_count: 0,
 			project_id: null,
 			size_bytes: 0,
 			findings: [
@@ -248,6 +302,7 @@ export function checkEvolutionDbHealth(
 	let preferenceCount = 0;
 	let observationCount = 0;
 	let recurringClusterCount = 0;
+	let dailySuggestionReceiptCount = 0;
 	let projectId: string | null = null;
 	try {
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
@@ -314,6 +369,13 @@ export function checkEvolutionDbHealth(
 			findings.push({
 				severity: "fail",
 				message: "observation schema is stale or incomplete",
+			});
+		}
+		if (migrationVersion >= 5 && !tables.has("daily_suggestion_receipts")) {
+			schemaOk = false;
+			findings.push({
+				severity: "fail",
+				message: "suggestion receipt schema is stale or incomplete",
 			});
 		}
 		if (migrationVersion > EVOLUTION_SCHEMA_VERSION) {
@@ -392,6 +454,15 @@ export function checkEvolutionDbHealth(
 						.get(projectId) as Record<string, unknown>,
 				);
 			}
+			if (tables.has("daily_suggestion_receipts")) {
+				dailySuggestionReceiptCount = scalarNumber(
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM daily_suggestion_receipts WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
+				);
+			}
 			for (const row of db
 				.query(
 					"SELECT qualifying_events FROM production_days WHERE project_id = ?",
@@ -454,6 +525,45 @@ export function checkEvolutionDbHealth(
 						});
 					}
 				}
+				if (schemaOk && tables.has("daily_suggestion_receipts")) {
+					try {
+						validateSuggestionReceiptProjection({
+							root: canonicalContext.root,
+							projectId: expectedProjectId,
+							db,
+							...(canonicalContext.evolutionEventsDir
+								? { eventsDir: canonicalContext.evolutionEventsDir }
+								: {}),
+						});
+					} catch (error) {
+						schemaOk = false;
+						findings.push({
+							severity: "fail",
+							message: (error as Error).message,
+						});
+					}
+				}
+				if (
+					schemaOk &&
+					(observationCount > 0 || dailySuggestionReceiptCount > 0)
+				) {
+					try {
+						validateEvolutionProjectionCheckpoint({
+							root: canonicalContext.root,
+							projectId: expectedProjectId,
+							db,
+							...(canonicalContext.evolutionEventsDir
+								? { eventsDir: canonicalContext.evolutionEventsDir }
+								: {}),
+						});
+					} catch (error) {
+						schemaOk = false;
+						findings.push({
+							severity: "fail",
+							message: (error as Error).message,
+						});
+					}
+				}
 			}
 		}
 	} catch (error) {
@@ -477,6 +587,7 @@ export function checkEvolutionDbHealth(
 		preference_count: preferenceCount,
 		observation_count: observationCount,
 		recurring_cluster_count: recurringClusterCount,
+		daily_suggestion_receipt_count: dailySuggestionReceiptCount,
 		project_id: projectId,
 		size_bytes: Bun.file(dbPath).size,
 		findings,

@@ -360,7 +360,7 @@ describe("Evolution Slice 0 governance schema", () => {
 			local_date: "2026-07-16",
 			suggestion_id: "SUG-01",
 			claimed_by: "codex",
-			claim_token: "12345678901234567890123456789012",
+			claim_token_digest: "a".repeat(64),
 			generation: 1,
 			claim_expires_at: "2026-07-16T20:05:00Z",
 			receipt_status: "claimed",

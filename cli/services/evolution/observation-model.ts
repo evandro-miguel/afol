@@ -425,7 +425,9 @@ export function compareScorecards(
 	};
 }
 
-function rowToObservation(row: Record<string, unknown>): ObservationRecord {
+export function observationRecordFromRow(
+	row: Record<string, unknown>,
+): ObservationRecord {
 	return {
 		project_id: String(row.project_id),
 		id: String(row.id),
@@ -460,7 +462,7 @@ export function projectObservation(
 		unknown
 	> | null;
 	if (existing) {
-		const existingRecord = rowToObservation(existing);
+		const existingRecord = observationRecordFromRow(existing);
 		if (stableJson(existingRecord) !== stableJson(observation))
 			throw new Error("observation id already exists with different content");
 		return observation;
@@ -497,5 +499,5 @@ export function projectObservations(
 			"SELECT * FROM observations WHERE project_id = ? ORDER BY created_at, id",
 		)
 		.all(projectId)
-		.map((row) => rowToObservation(row as Record<string, unknown>));
+		.map((row) => observationRecordFromRow(row as Record<string, unknown>));
 }

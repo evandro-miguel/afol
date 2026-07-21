@@ -12,7 +12,12 @@
       "evolve"
     ],
     "subcommands": [
-      "evolve status [--json]"
+      "evolve status [--json]",
+      "evolve suggest --first-session [--claimed-by <provider>] [--json]",
+      "evolve skip <suggestion-id> [--json]",
+      "evolve accept <suggestion-id> [--json]",
+      "evolve reject <suggestion-id> --reason <reason> [--json]",
+      "evolve repair [--json]"
     ],
     "journeys": [
       "afol-evolution-system"

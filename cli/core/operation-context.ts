@@ -138,6 +138,14 @@ export function resolveCanonicalAction(
 		if (group === "evolve" && action === "observe") {
 			return { action: "evolve.observe", sideEffect: "write" };
 		}
+		if (
+			group === "evolve" &&
+			["suggest", "skip", "accept", "reject", "decision", "repair"].includes(
+				action,
+			)
+		) {
+			return { action: `evolve.${action}`, sideEffect: "write" };
+		}
 		if (group === "adm" && action === "migrate") {
 			return {
 				action: dryRun ? "adm.migrate.preview" : "adm.migrate.apply",
@@ -173,11 +181,24 @@ export function resolveCanonicalAction(
 	return undefined;
 }
 
+export function isTrustedLocalInteractive(context: OperationContext): boolean {
+	assertAdmittedOperationContext(context);
+	return (
+		context.callerType === "local" &&
+		context.interactive &&
+		context.trustLevel === "trusted"
+	);
+}
+
 export function isActionAllowed(
 	ctx: OperationContext,
 	policy: ActionPolicy | undefined,
 ): boolean {
 	if (!policy || !requiresApproval(ctx)) return true;
+	// Daily suggestion claim/show is a fenced derived-state receipt. Agents may
+	// perform this narrow operation; user decisions remain local-only.
+	if (policy.action === "evolve.suggest" && ctx.callerType === "agent")
+		return true;
 	return policy.sideEffect === "read" || policy.sideEffect === "preview";
 }
 

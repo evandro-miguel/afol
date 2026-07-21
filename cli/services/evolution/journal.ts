@@ -590,9 +590,12 @@ function rebuildProductionDayProjectionUnlocked(
 	assertWalEnabled(input.db);
 	input.db.exec("BEGIN IMMEDIATE");
 	try {
-		input.db.exec(
-			"DELETE FROM production_days; DELETE FROM evolution_metadata;",
-		);
+		input.db
+			.query("DELETE FROM production_days WHERE project_id = ?")
+			.run(input.projectId);
+		input.db
+			.query("DELETE FROM evolution_metadata WHERE key = 'project_id'")
+			.run();
 		input.db
 			.prepare(
 				"INSERT INTO evolution_metadata(key, value) VALUES ('project_id', ?)",

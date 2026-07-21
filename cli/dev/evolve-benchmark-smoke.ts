@@ -41,6 +41,21 @@ const TEMPLATE_MANIFEST = readFileSync(
 
 type StatusPayload = { data?: { state?: string } };
 
+function invoke(
+	root: string,
+	args: string[],
+): { exit: number; stdout: string } {
+	const result = Bun.spawnSync(["bun", CLI, ...args], {
+		cwd: root,
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	return {
+		exit: result.exitCode,
+		stdout: new TextDecoder().decode(result.stdout).trim(),
+	};
+}
+
 function projectConfig(projectId: string): Record<string, unknown> {
 	const config = structuredClone(TEMPLATE_CONFIG);
 	const project = config.project as Record<string, unknown>;
@@ -153,10 +168,40 @@ try {
 	if (mismatch.exit !== 1 || mismatch.payload.data?.state !== "unhealthy")
 		throw new Error("cross-project status contract failed");
 
+	const disabled = fixture(PROJECT_A);
+	roots.push(disabled);
+	const disabledConfig = projectConfig(PROJECT_A);
+	(disabledConfig.evolution as Record<string, unknown>).enabled = false;
+	writeFileSync(
+		join(disabled, ".afol", "config.json"),
+		`${JSON.stringify(disabledConfig, null, 2)}\n`,
+		"utf8",
+	);
+	const suggestion = invoke(disabled, [
+		"evolve",
+		"suggest",
+		"--first-session",
+		"--json",
+	]);
+	if (suggestion.exit !== 0 || !suggestion.stdout.includes('"disabled"'))
+		throw new Error("disabled suggestion preview contract failed");
+	for (const args of [
+		["evolve", "skip", "SUG-benchmark", "--json"],
+		["evolve", "accept", "SUG-benchmark", "--json"],
+		["evolve", "reject", "SUG-benchmark", "--reason", "benchmark", "--json"],
+		["evolve", "repair", "--json"],
+	]) {
+		const decision = invoke(disabled, args);
+		if (decision.exit !== 2 || !decision.stdout)
+			throw new Error(`disabled decision contract failed: ${args[1]}`);
+	}
+	if (existsSync(evolutionDbPath(disabled)))
+		throw new Error("disabled suggestion commands created evolution state");
+
 	console.log(
 		JSON.stringify({
 			ok: true,
-			states: ["ready_uninitialized", "healthy", "unhealthy"],
+			states: ["ready_uninitialized", "healthy", "unhealthy", "disabled"],
 		}),
 	);
 } finally {
