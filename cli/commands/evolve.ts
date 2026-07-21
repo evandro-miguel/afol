@@ -7,19 +7,198 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import {
+	assertAdmittedOperationContext,
+	isActionAllowed,
+	type OperationContext,
+} from "../core/operation-context";
+import {
 	assertSafeEvolutionProjectRoot,
 	checkEvolutionDbHealth,
 	type EvolutionDbHealth,
 	type EvolutionStatus,
 	evolutionDbPath,
 	getEvolutionStatus,
+	observationJournalPath,
+	preferenceJournalPath,
 	productionDayJournalPath,
+	type RecurrenceThresholds,
+	readObservationJournal,
+	readPreferenceJournal,
 	readProductionDayJournal,
 	resolveEvolutionConfig,
 } from "../services/evolution";
+import { ingestObservationsForSession } from "../services/evolution/observation-ingest";
 import { observeSessionLock } from "../services/io/session-lock";
 import { readProjectConfig } from "../services/project/paths";
 import { type CommandIo, DEFAULT_IO } from "./io";
+
+const CONTROL_CHARACTER = /\p{Cc}/u;
+const MAX_OBSERVE_IDENTIFIER_LENGTH = 256;
+
+function assertObserveIdentifier(value: string, label: string): void {
+	if (
+		value.length > MAX_OBSERVE_IDENTIFIER_LENGTH ||
+		CONTROL_CHARACTER.test(value)
+	)
+		throw new Error(`${label} is invalid`);
+}
+
+export function parseObserveArgs(
+	args: readonly string[],
+):
+	| { session: string; feedbackId: string; json: boolean }
+	| { session: string; json: boolean } {
+	let session = "";
+	let feedbackId: string | undefined;
+	let json = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (!arg) continue;
+		if (arg === "--session" || arg === "-S") {
+			i++;
+			const value = args[i];
+			if (!value || value.startsWith("-"))
+				throw new Error("--session requires a value");
+			assertObserveIdentifier(value, "session identifier");
+			session = value;
+			continue;
+		}
+		if (arg === "--feedback-id" || arg === "-F") {
+			i++;
+			const value = args[i];
+			if (!value || value.startsWith("-"))
+				throw new Error("--feedback-id requires a value");
+			assertObserveIdentifier(value, "feedback identifier");
+			feedbackId = value;
+			continue;
+		}
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
+		throw new Error(`Unknown evolve observe argument: ${arg}`);
+	}
+	if (!session) throw new Error("evolve observe requires --session <id>");
+	return {
+		session,
+		...(feedbackId !== undefined ? { feedbackId } : {}),
+		json,
+	};
+}
+
+export function runObserveCommand(
+	args: readonly string[],
+	projectRoot: string,
+	io: CommandIo = DEFAULT_IO,
+	operationContext: OperationContext | undefined,
+): number {
+	assertAdmittedOperationContext(operationContext);
+	if (
+		!isActionAllowed(operationContext, {
+			action: "evolve.observe",
+			sideEffect: "write",
+		})
+	) {
+		const message = "evolve.observe requires local interactive approval";
+		if (args.includes("--json") || args.includes("-j")) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("approval-required", message, {
+						action: "evolve.observe",
+						exitCode: 2,
+					}),
+				),
+			);
+		} else {
+			io.stderr(message);
+		}
+		return 2;
+	}
+	let parsed: ReturnType<typeof parseObserveArgs>;
+	try {
+		parsed = parseObserveArgs(args);
+	} catch (parseError) {
+		const message = (parseError as Error).message;
+		const json = args.includes("--json") || args.includes("-j");
+		if (json) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("EVOLVE_OBSERVE_FAILED", message, {
+						action: "evolve.observe",
+						exitCode: 2,
+					}),
+				),
+			);
+		} else {
+			io.stderr(message);
+		}
+		return 2;
+	}
+
+	const resolved = resolveEvolutionConfig(readProjectConfig(projectRoot));
+	if (!resolved.configured || !resolved.projectId || !resolved.enabled) {
+		const message = !resolved.enabled
+			? "evolution is disabled"
+			: "evolution is not configured or lacks a project id";
+		if (parsed.json) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("EVOLVE_OBSERVE_FAILED", message, {
+						action: "evolve.observe",
+						exitCode: 1,
+					}),
+				),
+			);
+		} else {
+			io.stderr(message);
+		}
+		return 1;
+	}
+	try {
+		const result = ingestObservationsForSession({
+			root: projectRoot,
+			projectId: resolved.projectId,
+			session: parsed.session,
+			...("feedbackId" in parsed ? { feedbackId: parsed.feedbackId } : {}),
+		});
+		if (parsed.json) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeOk(result, {
+						action: "evolve.observe",
+						exitCode: 0,
+					}),
+				),
+			);
+		} else {
+			const lines: string[] = [];
+			lines.push(
+				`appended=${result.appended} duplicates=${result.duplicates} skipped=${result.skipped}`,
+			);
+			if (result.observation_ids.length > 0)
+				lines.push(`observation_ids=${result.observation_ids.join(",")}`);
+			if (result.warnings.length > 0)
+				lines.push(`warnings=${result.warnings.join("; ")}`);
+			io.stdout(lines.join("\n"));
+		}
+		return 0;
+	} catch (error) {
+		const message = (error as Error).message;
+		if (parsed.json) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("EVOLVE_OBSERVE_FAILED", message, {
+						action: "evolve.observe",
+						exitCode: 2,
+					}),
+				),
+			);
+		} else {
+			io.stderr(message);
+		}
+		return 2;
+	}
+}
 
 type EvolutionStatusState =
 	| "disabled"
@@ -70,6 +249,7 @@ function readDbStatus(
 		projectId: string;
 		timezone: string;
 		evolutionEventsDir?: string;
+		recurrenceThresholds?: RecurrenceThresholds;
 	},
 ): EvolutionStatus {
 	const db = new Database(path, { readonly: true });
@@ -78,6 +258,19 @@ function readDbStatus(
 	} finally {
 		db.close();
 	}
+}
+
+function recurrenceThresholds(
+	settings: Record<string, unknown>,
+): RecurrenceThresholds {
+	const recurrence = settings.recurrence as Record<string, unknown>;
+	return {
+		minimum_occurrences: Number(recurrence.minimum_occurrences),
+		minimum_distinct_sessions: Number(recurrence.minimum_distinct_sessions),
+		minimum_distinct_production_days: Number(
+			recurrence.minimum_distinct_production_days,
+		),
+	};
 }
 
 function statusState(
@@ -107,29 +300,70 @@ function statusState(
 function buildStatus(projectRoot: string): EvolutionStatusData {
 	assertSafeEvolutionProjectRoot(projectRoot);
 	const resolved = resolveEvolutionConfig(readProjectConfig(projectRoot));
+	const thresholds = recurrenceThresholds(resolved.settings);
 	const journalLockActiveBefore = observeSessionLock(
 		projectRoot,
 		"__evolution-journal__",
 	).active;
 	const dbPath = evolutionDbPath(projectRoot, resolved.paths.evolutionDb);
-	const journalPath =
+	const journalPaths =
 		resolved.configured && resolved.projectId
-			? productionDayJournalPath(projectRoot, resolved.paths.evolutionEventsDir)
-			: null;
-	const journalExists = journalPath ? existsSync(journalPath) : false;
-	let journalValid: boolean | null = journalExists ? false : null;
+			? [
+					{
+						label: "production-days",
+						path: productionDayJournalPath(
+							projectRoot,
+							resolved.paths.evolutionEventsDir,
+						),
+						read: () =>
+							readProductionDayJournal(
+								projectRoot,
+								resolved.projectId as string,
+								resolved.timezone,
+								resolved.paths.evolutionEventsDir,
+							),
+					},
+					{
+						label: "preferences",
+						path: preferenceJournalPath(
+							projectRoot,
+							resolved.paths.evolutionEventsDir,
+						),
+						read: () =>
+							readPreferenceJournal(
+								projectRoot,
+								resolved.projectId as string,
+								resolved.paths.evolutionEventsDir,
+							),
+					},
+					{
+						label: "observations",
+						path: observationJournalPath(
+							projectRoot,
+							resolved.paths.evolutionEventsDir,
+						),
+						read: () =>
+							readObservationJournal(
+								projectRoot,
+								resolved.projectId as string,
+								resolved.paths.evolutionEventsDir,
+							),
+					},
+				]
+			: [];
+	const existingJournals = journalPaths.filter((journal) =>
+		existsSync(journal.path),
+	);
+	const journalExists = existingJournals.length > 0;
+	let journalValid: boolean | null = journalExists ? true : null;
 	let journalError: string | null = null;
-	if (journalExists && resolved.projectId) {
+	for (const journal of existingJournals) {
 		try {
-			readProductionDayJournal(
-				projectRoot,
-				resolved.projectId,
-				resolved.timezone,
-				resolved.paths.evolutionEventsDir,
-			);
-			journalValid = true;
+			journal.read();
 		} catch (error) {
-			journalError = (error as Error).message;
+			journalValid = false;
+			journalError = `${journal.label}: ${(error as Error).message}`;
+			break;
 		}
 	}
 	const dbExists = existsSync(dbPath);
@@ -140,6 +374,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 					projectId: resolved.projectId,
 					timezone: resolved.timezone,
 					evolutionEventsDir: resolved.paths.evolutionEventsDir,
+					recurrenceThresholds: thresholds,
 				})
 			: null;
 	const dbNeedsRebuild =
@@ -175,6 +410,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 						projectId: resolved.projectId,
 						timezone: resolved.timezone,
 						evolutionEventsDir: resolved.paths.evolutionEventsDir,
+						recurrenceThresholds: thresholds,
 					})
 				: null,
 		journal_health: {
@@ -203,9 +439,30 @@ export async function runEvolveCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	operationContext?: OperationContext,
 ): Promise<number> {
 	const jsonRequested = args.some((arg) => arg === "--json" || arg === "-j");
 	try {
+		if (action === "observe") {
+			try {
+				return runObserveCommand(args, projectRoot, io, operationContext);
+			} catch (error) {
+				const message = (error as Error).message;
+				if (jsonRequested) {
+					io.stdout(
+						stringifyEnvelope(
+							envelopeErr("EVOLVE_OBSERVE_FAILED", message, {
+								action: "evolve.observe",
+								exitCode: 2,
+							}),
+						),
+					);
+				} else {
+					io.stderr(message);
+				}
+				return 2;
+			}
+		}
 		if (action && action !== "status") {
 			throw new Error(`Unknown evolve action: ${action}`);
 		}

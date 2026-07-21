@@ -72,6 +72,7 @@
               { "$ref": "#/$defs/preferenceEvidence" },
               { "$ref": "#/$defs/observation" },
               { "$ref": "#/$defs/issueCluster" },
+              { "$ref": "#/$defs/recurrenceDecision" },
               { "$ref": "#/$defs/suggestion" },
               { "$ref": "#/$defs/proposal" },
               { "$ref": "#/$defs/evaluation" },
@@ -304,11 +305,14 @@
         "state_class": { "const": "derived" },
         "kind": { "type": "string", "minLength": 1 },
         "fingerprint": { "$ref": "#/$defs/id" },
+        "fingerprint_version": { "const": 1 },
+        "occurrence_identity": { "$ref": "#/$defs/id" },
         "session_id": { "$ref": "#/$defs/id" },
         "production_day": { "type": "integer", "minimum": 0 },
+        "task_type": { "type": "string", "minLength": 1 },
         "impact": { "type": "string", "minLength": 1 }
       },
-      "required": ["kind", "fingerprint", "session_id", "impact", "journal_event_id"]
+      "required": ["kind", "fingerprint", "fingerprint_version", "occurrence_identity", "session_id", "task_type", "impact", "journal_event_id"]
     },
     "issueCluster": {
       "allOf": [{ "$ref": "#/$defs/baseRecord" }],
@@ -316,12 +320,34 @@
         "record_type": { "const": "issue_cluster" },
         "state_class": { "const": "derived" },
         "fingerprint": { "$ref": "#/$defs/id" },
+        "fingerprint_version": { "const": 1 },
+        "status": { "enum": ["observed", "candidate", "recurring", "proposal_open", "mitigation_canary", "resolved", "reopened", "dismissed"] },
         "occurrence_count": { "type": "integer", "minimum": 1 },
         "distinct_sessions": { "type": "integer", "minimum": 1 },
-        "distinct_production_days": { "type": "integer", "minimum": 1 },
+        "distinct_production_days": { "type": "integer", "minimum": 0 },
         "user_confirmed_recurrence": { "type": "boolean" }
       },
-      "required": ["fingerprint", "occurrence_count", "distinct_sessions", "distinct_production_days", "user_confirmed_recurrence"]
+      "required": ["fingerprint", "fingerprint_version", "occurrence_count", "distinct_sessions", "distinct_production_days", "user_confirmed_recurrence", "journal_event_id"]
+    },
+    "recurrenceDecision": {
+      "allOf": [{ "$ref": "#/$defs/baseRecord" }],
+      "properties": {
+        "record_type": { "const": "recurrence_decision" },
+        "state_class": { "const": "canonical" },
+        "fingerprint": { "$ref": "#/$defs/id" },
+        "fingerprint_version": { "const": 1 },
+        "action": { "enum": ["confirm", "dismiss", "reopen"] },
+        "observation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "observation_membership_digest": { "$ref": "#/$defs/id" },
+        "source_decision_ref": { "$ref": "#/$defs/id" },
+        "decision_digest": { "$ref": "#/$defs/id" }
+      },
+      "required": ["fingerprint", "fingerprint_version", "action", "observation_ids", "observation_membership_digest", "source_decision_ref", "decision_digest", "journal_event_id"]
     },
     "suggestion": {
       "allOf": [{ "$ref": "#/$defs/baseRecord" }],
@@ -504,7 +530,7 @@
         "sequence": { "type": "integer", "minimum": 1 },
         "event_id": { "$ref": "#/$defs/id" },
         "event_type": {
-          "enum": ["import_acceptance", "session_link", "observation", "proposal", "decision", "receipt_claim", "receipt_shown", "receipt_decision", "production_day_allocation", "mutation", "evaluation", "rollback", "tombstone"]
+          "enum": ["import_acceptance", "session_link", "observation", "recurrence_decision", "proposal", "decision", "receipt_claim", "receipt_shown", "receipt_decision", "production_day_allocation", "mutation", "evaluation", "rollback", "tombstone"]
         },
         "action": { "type": "string", "minLength": 1 },
         "authority_kind": { "enum": ["explicit_project_user", "approved_policy", "system_observer"] },
@@ -584,6 +610,17 @@
           },
           "then": {
             "properties": {
+              "authority_kind": { "const": "explicit_project_user" },
+              "caller_type": { "const": "project_user" },
+              "trust_level": { "const": "local_trusted" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "event_type": { "const": "recurrence_decision" } }, "required": ["event_type"] },
+          "then": {
+            "properties": {
+              "action": { "enum": ["confirm", "dismiss", "reopen"] },
               "authority_kind": { "const": "explicit_project_user" },
               "caller_type": { "const": "project_user" },
               "trust_level": { "const": "local_trusted" }

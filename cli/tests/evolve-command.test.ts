@@ -12,13 +12,18 @@ import {
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { runEvolveCommand } from "../commands/evolve";
+import { runEvolveCommand, runObserveCommand } from "../commands/evolve";
+import {
+	agentOperationContext,
+	defaultOperationContext,
+} from "../core/operation-context";
 import { kernelRegistry } from "../registry";
 import { resolveCommand } from "../router";
 import {
 	appendProductionDayAllocation,
 	assertSafeEvolutionProjectRoot,
 	evolutionDbPath,
+	observationJournalPath,
 	openEvolutionDb,
 	validateEvolutionConfigExtension,
 } from "../services/evolution";
@@ -198,6 +203,28 @@ describe("evolve status", () => {
 		}
 	});
 
+	test("fails closed on an invalid observation journal before DB initialization", async () => {
+		const root = fixture();
+		try {
+			const path = observationJournalPath(root);
+			mkdirSync(dirname(path), { recursive: true });
+			writeFileSync(path, "{invalid-json}\n", "utf8");
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({
+				state: "unhealthy",
+				journal_health: { exists: true, valid: false },
+			});
+			expect(payload.data.journal_health.error).toMatch(/^observations:/);
+			expect(existsSync(evolutionDbPath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("reports migrated production state and supports the no-action preview", async () => {
 		const root = fixture();
 		try {
@@ -210,6 +237,102 @@ describe("evolve status", () => {
 				state: "healthy",
 				db_status: { production_day_count: 1 },
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("status isolates mixed-project latest day and recurring cluster without writes", async () => {
+		const root = fixture();
+		try {
+			const db = openSeededProductionDb(root, PROJECT_ID);
+			db.run(
+				"INSERT INTO production_days (project_id,local_date,ordinal_sequence,ordinal,created_at,qualifying_events,journal_event_id) VALUES (?,?,?,?,?,?,?)",
+				[
+					"foreign-project",
+					"2026-07-21",
+					99,
+					"PD-0099",
+					"2026-07-21T12:00:00.000Z",
+					'["E-foreign"]',
+					"J-foreign",
+				],
+			);
+			db.run(
+				"INSERT INTO issue_clusters (project_id,fingerprint_version,fingerprint,state,occurrence_count,distinct_session_count,distinct_production_day_count,user_confirmed_recurrence,first_seen_at,last_seen_at,priority,source_refs,updated_at,journal_event_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+				[
+					"foreign-project",
+					1,
+					"foreign-fingerprint",
+					"recurring",
+					3,
+					2,
+					2,
+					0,
+					"2026-07-20T00:00:00.000Z",
+					"2026-07-21T00:00:00.000Z",
+					2,
+					"[]",
+					"2026-07-21T00:00:00.000Z",
+					"J-cluster",
+				],
+			);
+			db.close();
+			const dbPath = evolutionDbPath(root);
+			const before = readFileSync(dbPath);
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data.db_status).toMatchObject({
+				production_day_count: 1,
+				recurring_cluster_count: 0,
+				latest_production_day: { ordinal_sequence: 1 },
+			});
+			expect(readFileSync(dbPath)).toEqual(before);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("status tolerates malformed foreign qualifying_events; native project healthy and counts isolated", async () => {
+		const root = fixture();
+		try {
+			const db = openSeededProductionDb(root, PROJECT_ID);
+			// Insert a foreign production day with malformed qualifying_events
+			// (object instead of expected JSON array).
+			db.run(
+				"INSERT INTO production_days (project_id,local_date,ordinal_sequence,ordinal,created_at,qualifying_events,journal_event_id) VALUES (?,?,?,?,?,?,?)",
+				[
+					"foreign-malformed",
+					"2026-07-21",
+					99,
+					"PD-0099",
+					"2026-07-21T12:00:00.000Z",
+					JSON.stringify({ invalid: "not-an-array" }),
+					"J-malformed",
+				],
+			);
+			db.close();
+
+			const dbPath = evolutionDbPath(root);
+			const before = readFileSync(dbPath);
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			// Native project healthy and read-only.
+			expect(payload.data).toMatchObject({
+				state: "healthy",
+				db_status: {
+					production_day_count: 1,
+					latest_production_day: { ordinal_sequence: 1 },
+				},
+			});
+			expect(payload.data.journal_health.valid).toBe(true);
+			expect(readFileSync(dbPath)).toEqual(before);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -323,6 +446,234 @@ describe("evolve status", () => {
 				ok: false,
 				error: { code: "EVOLUTION_STATUS_FAILED" },
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("evolve observe writes observations from completed session evidence", async () => {
+		const root = fixture();
+		try {
+			// Seed a completed session with observed passed evidence (creates
+			// production day) and telemetry error (creates observation).
+			const sessionId = "S-observe-test";
+			const sessionDir = join(root, ".afol", "wb", sessionId);
+			mkdirSync(sessionDir, { recursive: true });
+			// Completed State Board so strict completeness passes.
+			writeFileSync(
+				join(sessionDir, `${sessionId}_task_01.md`),
+				"# Tasks\n\n## State Board\n\n| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | done | test | completion_policy=execution |\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionDir, ".evidence.jsonl"),
+				`${[
+					JSON.stringify({
+						id: "E-pass",
+						task_id: "T-01",
+						project_id: PROJECT_ID,
+						session_id: sessionId,
+						created_at: "2026-07-20T10:00:00.000Z",
+						command: "true",
+						result: "passed",
+						provenance: "observed",
+						exit_code: 0,
+						purpose: "completion",
+						authorization_type: "execution",
+					}),
+				].join("\n")}\n`,
+				"utf8",
+			);
+			// Telemetry error for the failure (distinct from evidence).
+			const { appendTelemetryEvent } = await import(
+				"../services/events/telemetry"
+			);
+			appendTelemetryEvent(root, {
+				event_type: "error",
+				session_id: sessionId,
+				task_id: "T-01",
+				error_type: "TypeError",
+				cmd_type: "bun",
+			});
+			const captured = captureIo();
+			const exitCode = await runEvolveCommand(
+				"observe",
+				["--session", sessionId, "--json"],
+				root,
+				captured.io,
+				defaultOperationContext(),
+			);
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.ok).toBe(true);
+			expect(payload.data.appended).toBe(1);
+			expect(payload.data.duplicates).toBe(0);
+			expect(payload.data.observation_ids).toHaveLength(1);
+			// Verify journal file exists and contains the observation.
+			const journalPath = observationJournalPath(root);
+			expect(existsSync(journalPath)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("evolve observe missing session returns structured error", async () => {
+		const root = fixture();
+		try {
+			const captured = captureIo();
+			const exitCode = await runEvolveCommand(
+				"observe",
+				["--session", "does-not-exist", "--json"],
+				root,
+				captured.io,
+				defaultOperationContext(),
+			);
+			expect(exitCode).toBe(2);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload).toMatchObject({
+				ok: false,
+				error: { code: "EVOLVE_OBSERVE_FAILED" },
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("manual observe is disabled when evolution is disabled", async () => {
+		const config = evolutionConfig();
+		(config.evolution as Record<string, unknown>).enabled = false;
+		const root = fixture(config);
+		try {
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand(
+					"observe",
+					["--session", "S-01", "--json"],
+					root,
+					captured.io,
+					defaultOperationContext(),
+				),
+			).toBe(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				ok: false,
+				error: { code: "EVOLVE_OBSERVE_FAILED" },
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restricted contexts deny manual observe through the canonical policy", async () => {
+		const root = fixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand(
+					"observe",
+					["--session", "S-01", "--json"],
+					root,
+					captured.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				ok: false,
+				error: { code: "approval-required" },
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("observe rejects forged or omitted context before reading the project", () => {
+		const root = fixture();
+		const io = captureIo().io;
+		for (const context of [
+			undefined,
+			{
+				callerType: "local",
+				interactive: true,
+				trustLevel: "trusted",
+			} as const,
+		]) {
+			expect(() =>
+				runObserveCommand(["--session", "S-01", "--json"], root, io, context),
+			).toThrow("operation context was not admitted");
+		}
+		expect(existsSync(evolutionDbPath(root))).toBe(false);
+		expect(existsSync(observationJournalPath(root))).toBe(false);
+	});
+
+	test("evolve observe missing --session flag returns nonzero", async () => {
+		const root = fixture();
+		const captured = captureIo();
+		const exitCode = await runEvolveCommand(
+			"observe",
+			["--json"],
+			root,
+			captured.io,
+			defaultOperationContext(),
+		);
+		expect(exitCode).toBe(2);
+		const payload = JSON.parse(captured.stdout[0] ?? "{}");
+		expect(payload).toMatchObject({
+			ok: false,
+			error: { code: "EVOLVE_OBSERVE_FAILED" },
+		});
+	});
+
+	test("evolve status is read-only (no mutation)", async () => {
+		const root = fixture();
+		try {
+			// First status call
+			const c1 = captureIo();
+			expect(await runEvolveCommand("", ["--json"], root, c1.io)).toBe(0);
+			const p1 = JSON.parse(c1.stdout[0] ?? "{}");
+
+			// Set up seeded DB + observation journal
+			const db = openSeededProductionDb(root, PROJECT_ID);
+			db.close();
+
+			// Second status call after setup — still read-only, no journal mutation
+			const c2 = captureIo();
+			expect(await runEvolveCommand("", ["--json"], root, c2.io)).toBe(0);
+			const p2 = JSON.parse(c2.stdout[0] ?? "{}");
+			expect(p2.data.db_status).toBeTruthy();
+			// Both calls used the same db_path and did not write journal files
+			expect(p1.data.db_path).toBe(p2.data.db_path);
+
+			// Verify no journal file was created by the status command itself
+			const journalPath = observationJournalPath(root);
+			expect(existsSync(journalPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("evolve observe JSON config-failure returns EVOLVE_OBSERVE_FAILED with action evolve.observe", async () => {
+		// Config with missing project.id — the validation extension throws
+		// before the graceful "not configured" return, so exit code 2 with
+		// EVOLVE_OBSERVE_FAILED envelope is correct.
+		const config = evolutionConfig();
+		delete (config.project as Record<string, unknown>).id;
+		const root = fixture(config);
+		try {
+			const captured = captureIo();
+			const exitCode = await runEvolveCommand(
+				"observe",
+				["--session", "S-01", "--json"],
+				root,
+				captured.io,
+				defaultOperationContext(),
+			);
+			expect(exitCode).toBeGreaterThan(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload).toMatchObject({
+				ok: false,
+				error: { code: "EVOLVE_OBSERVE_FAILED" },
+				action: "evolve.observe",
+			});
+			expect(captured.stderr).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

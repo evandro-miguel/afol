@@ -1,5 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+	type BoundedSourceLimits,
+	readBoundedSourceFile,
+} from "../io/safe-source";
 import { resolveProjectPaths } from "../project/paths";
 
 /**
@@ -124,6 +128,27 @@ export function readTelemetryEvents(root: string): TelemetryEvent[] {
 		.filter((line: string) => line.length > 0)
 		.map((line: string) => JSON.parse(line) as TelemetryEvent)
 		.filter((e: TelemetryEvent) => e.schema_version === "1");
+}
+
+export function parseTelemetryEvents(text: string): TelemetryEvent[] {
+	return text
+		.split(/\r?\n/)
+		.map((line: string) => line.trim())
+		.filter((line: string) => line.length > 0)
+		.map((line: string) => JSON.parse(line) as TelemetryEvent)
+		.filter((e: TelemetryEvent) => e.schema_version === "1");
+}
+
+export function readBoundedTelemetryEvents(
+	root: string,
+	limits: BoundedSourceLimits,
+): TelemetryEvent[] {
+	const text = readBoundedSourceFile(
+		resolveTelemetryEventPath(root),
+		"project telemetry ledger",
+		limits,
+	);
+	return text === null ? [] : parseTelemetryEvents(text);
 }
 
 import { randomUUID } from "node:crypto";

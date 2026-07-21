@@ -1074,6 +1074,198 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("observer failure after durable completion returns warning but task stays done", () => {
+		const root = mkRoot("observer-failure");
+		try {
+			// Seed evolution config so the observer path is reached.
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: {
+						name: "observer-test",
+						id: "6b7d91ca-496b-4f0c-8537-5c4993810d15",
+						timezone: "UTC",
+					},
+					paths: {
+						external_dir: ".afol/external",
+						evolution_db: ".afol/state/evolution.db",
+						evolution_data_dir: ".afol/data/evolution",
+						evolution_events_dir: ".afol/data/events/evolution",
+					},
+					evolution: {
+						enabled: true,
+						suggestions: {
+							first_session_of_day: true,
+							dedupe_scope: "project",
+							max_visible_per_day: 1,
+							remind_skipped_next_day: true,
+							deep_review_after_production_days: 5,
+						},
+						preferences: {
+							soft_decay_after_production_days: 7,
+							stop_guiding_after_production_days: 20,
+							minimum_effective_confidence: 0.65,
+							decay_curve: "linear",
+						},
+						recurrence: {
+							minimum_occurrences: 3,
+							minimum_distinct_sessions: 2,
+							minimum_distinct_production_days: 2,
+						},
+						large_change: {
+							changed_files: 20,
+							changed_lines: 1000,
+							critical_paths_trigger: true,
+						},
+						external: {
+							mode: "explicit_import_only",
+							storage: "normalized_sections",
+							store_raw: false,
+							redact_before_persist: true,
+						},
+						autonomy: {
+							auto_observe: true,
+							auto_refresh_preference_projections: true,
+							auto_clean_derived_state: true,
+							auto_apply_mode: "none",
+						},
+					},
+				}),
+				"utf8",
+			);
+			const created = newWorkstream(root, "observer failure", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const result = completeObservedTask(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					command: "echo ok",
+					exitCode: 0,
+				},
+				{
+					observerSeam: () => {
+						throw new Error("injected observer failure");
+					},
+				},
+			);
+			// Task is still done.
+			expect(result.done?.authorizingEvidenceId).toBeTruthy();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | done |",
+			);
+			// Evidence was written exactly once.
+			const evidenceLines = readFileSync(created.evidencePath, "utf8")
+				.trim()
+				.split("\n");
+			expect(evidenceLines).toHaveLength(1);
+			expect(JSON.parse(evidenceLines[0] ?? "{}")).toMatchObject({
+				project_id: "6b7d91ca-496b-4f0c-8537-5c4993810d15",
+				session_id: created.session,
+				provenance: "observed",
+			});
+			// Observer failure is captured as a warning.
+			expect(result.warnings).toContain(
+				"observer failed after durable commit: injected observer failure",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("automatic observation requires autonomy.auto_observe", () => {
+		const root = mkRoot("observer-disabled");
+		try {
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: {
+						name: "observer-disabled",
+						id: "6b7d91ca-496b-4f0c-8537-5c4993810d15",
+						timezone: "UTC",
+					},
+					paths: {
+						external_dir: ".afol/external",
+						evolution_db: ".afol/state/evolution.db",
+						evolution_data_dir: ".afol/data/evolution",
+						evolution_events_dir: ".afol/data/events/evolution",
+					},
+					evolution: {
+						enabled: true,
+						suggestions: {
+							first_session_of_day: true,
+							dedupe_scope: "project",
+							max_visible_per_day: 1,
+							remind_skipped_next_day: true,
+							deep_review_after_production_days: 5,
+						},
+						preferences: {
+							soft_decay_after_production_days: 7,
+							stop_guiding_after_production_days: 20,
+							minimum_effective_confidence: 0.65,
+							decay_curve: "linear",
+						},
+						recurrence: {
+							minimum_occurrences: 3,
+							minimum_distinct_sessions: 2,
+							minimum_distinct_production_days: 2,
+						},
+						large_change: {
+							changed_files: 20,
+							changed_lines: 1000,
+							critical_paths_trigger: true,
+						},
+						external: {
+							mode: "explicit_import_only",
+							storage: "normalized_sections",
+							store_raw: false,
+							redact_before_persist: true,
+						},
+						autonomy: {
+							auto_observe: false,
+							auto_refresh_preference_projections: true,
+							auto_clean_derived_state: true,
+							auto_apply_mode: "none",
+						},
+					},
+				}),
+				"utf8",
+			);
+			const created = newWorkstream(root, "observer disabled", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			let called = false;
+			const result = completeObservedTask(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					command: "echo ok",
+					exitCode: 0,
+				},
+				{
+					observerSeam: () => {
+						called = true;
+						throw new Error("must not run");
+					},
+				},
+			);
+			expect(result.warnings).not.toContain(
+				"observer failed after durable commit: must not run",
+			);
+			expect(called).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("startTask marks row in_progress", () => {
 		const root = mkRoot("start");
 		try {
@@ -1847,12 +2039,15 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "done malformed evidence");
 			writeFileSync(created.evidencePath, "{not-json\n", "utf8");
 
-			expect(() =>
-				doneTask(root, { session: created.session, taskId: "T-01" }),
-			).toThrow("Malformed evidence ledger");
-			expect(() =>
-				doneTask(root, { session: created.session, taskId: "T-01" }),
-			).toThrow(`${created.evidencePath}:1`);
+			let message = "";
+			try {
+				doneTask(root, { session: created.session, taskId: "T-01" });
+			} catch (error) {
+				message = (error as Error).message;
+			}
+			expect(message).toContain("Malformed evidence ledger line 1");
+			expect(message).not.toContain(root);
+			expect(message).not.toContain(created.evidencePath);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

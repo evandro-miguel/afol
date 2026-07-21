@@ -8,28 +8,43 @@ export type OperationContext = {
 	trustLevel: TrustLevel;
 };
 
+const ADMITTED_OPERATION_CONTEXTS = new WeakSet<object>();
+
+function admitOperationContext(context: OperationContext): OperationContext {
+	const admitted = Object.freeze(context);
+	ADMITTED_OPERATION_CONTEXTS.add(admitted);
+	return admitted;
+}
+
+export function assertAdmittedOperationContext(
+	context: OperationContext | undefined,
+): asserts context is OperationContext {
+	if (!context || !ADMITTED_OPERATION_CONTEXTS.has(context))
+		throw new Error("operation context was not admitted by the CLI boundary");
+}
+
 export function defaultOperationContext(): OperationContext {
-	return {
+	return admitOperationContext({
 		callerType: "local",
 		interactive: true,
 		trustLevel: "trusted",
-	};
+	});
 }
 
 export function agentOperationContext(): OperationContext {
-	return {
+	return admitOperationContext({
 		callerType: "agent",
 		interactive: false,
 		trustLevel: "restricted",
-	};
+	});
 }
 
 export function remoteOperationContext(): OperationContext {
-	return {
+	return admitOperationContext({
 		callerType: "remote",
 		interactive: false,
 		trustLevel: "restricted",
-	};
+	});
 }
 
 export function requiresApproval(ctx: OperationContext): boolean {
@@ -120,6 +135,9 @@ export function resolveCanonicalAction(
 	if (resolution.kind === "subcommand") {
 		const group = resolution.group ?? "";
 		const action = resolution.action ?? "";
+		if (group === "evolve" && action === "observe") {
+			return { action: "evolve.observe", sideEffect: "write" };
+		}
 		if (group === "adm" && action === "migrate") {
 			return {
 				action: dryRun ? "adm.migrate.preview" : "adm.migrate.apply",

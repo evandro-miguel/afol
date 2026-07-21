@@ -13,6 +13,7 @@ import { dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
 import { resolveEvolutionConfig } from "../evolution";
+import { ingestObservationsForSession } from "../evolution/observation-ingest";
 import {
 	buildGovernanceFrontmatter,
 	recordPendingSpecForSession,
@@ -24,6 +25,7 @@ import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
+import { loadEvidenceEntries, sessionPaths } from "./session-reader";
 import {
 	appendVerificationRunStart,
 	appendVerificationRunStep,
@@ -57,7 +59,6 @@ const BLOCKING_STATES = new Set([
 	"tested_needs_spec_validation",
 	"problem",
 ]);
-const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const NEW_SESSION_LOCK_SESSION = "__workbench-new-session__";
 
 export type WorkbenchTaskRef = {
@@ -202,6 +203,23 @@ export type CloseSessionResult = string[] & {
 export type LifecycleAuxiliaryRuntime = {
 	beforeAuxiliary?: (label: string) => void;
 	fencingCheck?: () => void;
+	/**
+	 * Inject a deterministic observer seam for testing.
+	 * When set, the observer calls this function instead of running
+	 * ingestObservationsForSession.  The seam must return a result
+	 * with the same shape as IngestObservationsResult or throw.
+	 */
+	observerSeam?: (input: {
+		root: string;
+		projectId: string;
+		session: string;
+	}) => {
+		appended: number;
+		duplicates: number;
+		skipped: number;
+		warnings: string[];
+		observation_ids: string[];
+	};
 };
 
 type InternalLifecycleAuxiliaryRuntime = LifecycleAuxiliaryRuntime & {
@@ -273,24 +291,6 @@ function sanitizeTheme(theme: string): string {
 		);
 	}
 	return cleaned.slice(0, 80).replace(/-$/g, "");
-}
-
-function resolveSafeSessionPath(root: string, session: string): string {
-	const normalized = session.trim();
-	if (
-		!SESSION_NAME_RE.test(normalized) ||
-		normalized.includes("..") ||
-		normalized.length === 0
-	) {
-		throw new Error(`Invalid session identifier: ${session}`);
-	}
-
-	const projectPaths = resolveProjectPaths(root);
-	const result = resolveProjectPath(root, join(projectPaths.wbDir, normalized));
-	if (!result.ok) {
-		throw new Error(result.error);
-	}
-	return result.value.path;
 }
 
 function twoDigits(value: number): string {
@@ -472,31 +472,8 @@ function escapeTaskNote(task: string): string {
 	return task.replace(/\|/g, "/");
 }
 
-export function sessionPaths(
-	root: string,
-	session: string,
-): {
-	wbRoot: string;
-	sessionDir: string;
-	planPath: string;
-	taskPath: string;
-	logPath: string;
-	evidencePath: string;
-	activeSessionPath: string;
-} {
-	const projectPaths = resolveProjectPaths(root);
-	const wbRoot = projectPaths.abs.wbDir;
-	const sessionDir = resolveSafeSessionPath(root, session);
-	return {
-		wbRoot,
-		sessionDir,
-		planPath: join(sessionDir, `${session}_plan_01.md`),
-		taskPath: join(sessionDir, `${session}_task_01.md`),
-		logPath: join(sessionDir, `${session}_log_01.md`),
-		evidencePath: join(sessionDir, ".evidence.jsonl"),
-		activeSessionPath: projectPaths.abs.activeSessionFile,
-	};
-}
+// Re-exported from session-reader for backward compat
+export { sessionPaths } from "./session-reader";
 
 function refreshWorkbenchLocalState(root: string, session?: string): void {
 	rebuildWorkBenchIndex(root, session);
@@ -935,133 +912,8 @@ function evidenceId(now: Date): string {
 	return `E-${yyyy}${mm}${dd}${hh}${mi}${ss}${msec}-${randomBytes(3).toString("hex")}`;
 }
 
-function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
-	if (!existsSync(evidencePath)) {
-		return [];
-	}
-	const rows = readFileSync(evidencePath, "utf8")
-		.split("\n")
-		.map((line) => line.trim())
-		.filter((line) => line.length > 0);
-	const entries: EvidenceEntry[] = [];
-	for (const [index, row] of rows.entries()) {
-		try {
-			const parsed = JSON.parse(row) as Partial<EvidenceEntry> & {
-				taskId?: unknown;
-				createdAt?: unknown;
-			};
-			const taskId =
-				typeof parsed.task_id === "string" ? parsed.task_id : parsed.taskId;
-			const createdAt =
-				typeof parsed.created_at === "string"
-					? parsed.created_at
-					: parsed.createdAt;
-			if (
-				typeof parsed.id === "string" &&
-				typeof taskId === "string" &&
-				typeof createdAt === "string" &&
-				typeof parsed.command === "string" &&
-				typeof parsed.result === "string"
-			) {
-				const entry: EvidenceEntry = {
-					id: parsed.id,
-					task_id: taskId,
-					created_at: createdAt,
-					command: parsed.command,
-					result: parsed.result,
-				};
-				if (typeof parsed.exit_code === "number") {
-					entry.exit_code = parsed.exit_code;
-				}
-				if (typeof parsed.signal === "string") {
-					entry.signal = parsed.signal;
-				}
-				if (typeof parsed.artifact === "string") {
-					entry.artifact = parsed.artifact;
-				}
-				if (typeof parsed.note === "string") {
-					entry.note = parsed.note;
-				}
-				if (
-					parsed.authorization_type === "execution" ||
-					parsed.authorization_type === "artifact" ||
-					parsed.authorization_type === "waiver"
-				)
-					entry.authorization_type = parsed.authorization_type;
-				if (typeof parsed.artifact_sha256 === "string")
-					entry.artifact_sha256 = parsed.artifact_sha256;
-				if (typeof parsed.waiver_reason === "string")
-					entry.waiver_reason = parsed.waiver_reason;
-				if (typeof parsed.approved_by === "string")
-					entry.approved_by = parsed.approved_by;
-				if (
-					typeof parsed.attempt === "number" &&
-					Number.isSafeInteger(parsed.attempt) &&
-					parsed.attempt >= 0
-				)
-					entry.attempt = parsed.attempt;
-				if (
-					parsed.provenance === "declared" ||
-					parsed.provenance === "observed"
-				) {
-					entry.provenance = parsed.provenance;
-				}
-				if (
-					parsed.task_state === "pending" ||
-					parsed.task_state === "in_progress" ||
-					parsed.task_state === "done"
-				) {
-					entry.task_state = parsed.task_state;
-				}
-				if (parsed.purpose === "completion") entry.purpose = parsed.purpose;
-				if (typeof parsed.verification_run_id === "string")
-					entry.verification_run_id = parsed.verification_run_id;
-				for (const key of [
-					"task_attempt",
-					"verification_attempt",
-					"step_index",
-					"step_count",
-					"duration_ms",
-				] as const) {
-					const value = parsed[key];
-					if (
-						typeof value === "number" &&
-						Number.isSafeInteger(value) &&
-						value >= 0
-					) {
-						entry[key] = value;
-					}
-				}
-				if (
-					parsed.verification_status === "passed" ||
-					parsed.verification_status === "failed" ||
-					parsed.verification_status === "timed_out" ||
-					parsed.verification_status === "output_limit" ||
-					parsed.verification_status === "signaled" ||
-					parsed.verification_status === "spawn_failed" ||
-					parsed.verification_status === "lock_lost" ||
-					parsed.verification_status === "superseded"
-				) {
-					entry.verification_status = parsed.verification_status;
-				}
-				if (typeof parsed.command_digest === "string")
-					entry.command_digest = parsed.command_digest;
-				if (
-					Array.isArray(parsed.warnings) &&
-					parsed.warnings.every((warning) => typeof warning === "string")
-				) {
-					entry.warnings = parsed.warnings;
-				}
-				entries.push(entry);
-			}
-		} catch (error) {
-			throw new Error(
-				`Malformed evidence ledger ${evidencePath}:${index + 1}: ${(error as Error).message}`,
-			);
-		}
-	}
-	return entries;
-}
+// Re-exported from session-reader for backward compat
+export { loadEvidenceEntries } from "./session-reader";
 
 export function selectSingleOpenTask(root: string, session: string): string {
 	const paths = sessionPaths(root, session);
@@ -2246,6 +2098,40 @@ export function completeObservedTask(
 					deferLocalStateRefresh: true,
 				});
 				warnings.push(...(done.warnings ?? []));
+				// Observer — failures are caught and surfaced as warnings, never roll
+				// back the durable workbench completion.
+				try {
+					const config = resolveEvolutionConfig(readProjectConfig(root));
+					const autonomy = config.settings.autonomy;
+					const autoObserve =
+						autonomy !== null &&
+						typeof autonomy === "object" &&
+						!Array.isArray(autonomy) &&
+						(autonomy as Record<string, unknown>).auto_observe === true;
+					if (
+						config.configured &&
+						config.enabled &&
+						config.projectId &&
+						autoObserve
+					) {
+						const observerResult = runtime.observerSeam
+							? runtime.observerSeam({
+									root,
+									projectId: config.projectId,
+									session: input.session,
+								})
+							: ingestObservationsForSession({
+									root,
+									projectId: config.projectId,
+									session: input.session,
+								});
+						warnings.push(...observerResult.warnings);
+					}
+				} catch (observerError) {
+					warnings.push(
+						`observer failed after durable commit: ${(observerError as Error).message}`,
+					);
+				}
 				result = { done, evidence, warnings };
 			} else {
 				result = { evidence, warnings };

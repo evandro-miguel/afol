@@ -559,6 +559,49 @@ function incrementState(result: VerifyResult, task: VerifyTask): void {
 	result[key] += 1;
 }
 
+function recordTaskState(
+	result: VerifyResult,
+	task: VerifyTask,
+	seenTaskIds: Map<string, VerifyTask>,
+): void {
+	const previous = seenTaskIds.get(task.id);
+	if (previous) {
+		result.issues.push({
+			type: "duplicate_task_id",
+			taskId: task.id,
+			file: task.file,
+			line: task.line,
+			message: `Duplicate task id ${task.id}; first declared at ${previous.file}:${previous.line}`,
+		});
+	} else seenTaskIds.set(task.id, task);
+	result.totalTasks += 1;
+	if (!isCountedTaskState(task.state)) {
+		result.issues.push(invalidTaskStateIssue(task));
+	}
+	incrementState(result, task);
+	if (OPEN_STATES.has(task.state)) result.openTasks.push(task);
+}
+
+/** Verify one captured task document without touching the filesystem. */
+export function verifyTaskText(content: string, file: string): VerifyResult {
+	const result = emptyResult(dirname(file), false);
+	result.taskFiles = [file];
+	const tasks = parseTasks(content, file);
+	if (tasks.length === 0) {
+		result.issues.push({
+			type: "missing_tasks",
+			file,
+			message: "No task rows found in canonical task file",
+		});
+		return result;
+	}
+	const seenTaskIds = new Map<string, VerifyTask>();
+	for (const task of tasks) recordTaskState(result, task, seenTaskIds);
+	result.allCompleted =
+		result.openTasks.length === 0 && result.issues.length === 0;
+	return result;
+}
+
 export function verifyWorkbenchTasks(
 	sessionPath: string,
 	strict = false,
@@ -612,24 +655,7 @@ export function verifyWorkbenchTasks(
 				seenTaskIds = new Map<string, VerifyTask>();
 				seenTaskIdsByScope.set(evidenceScope, seenTaskIds);
 			}
-			const previous = seenTaskIds.get(task.id);
-			if (previous) {
-				result.issues.push({
-					type: "duplicate_task_id",
-					taskId: task.id,
-					file: task.file,
-					line: task.line,
-					message: `Duplicate task id ${task.id}; first declared at ${previous.file}:${previous.line}`,
-				});
-			} else seenTaskIds.set(task.id, task);
-			result.totalTasks += 1;
-			if (!isCountedTaskState(task.state)) {
-				result.issues.push(invalidTaskStateIssue(task));
-			}
-			incrementState(result, task);
-			if (OPEN_STATES.has(task.state)) {
-				result.openTasks.push(task);
-			}
+			recordTaskState(result, task, seenTaskIds);
 			if (strict && task.state === "done") {
 				const issue = doneTaskEvidenceIssue(
 					task,

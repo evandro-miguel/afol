@@ -10,6 +10,8 @@ import {
 	EVOLUTION_SCHEMA_VERSION,
 	readUserVersion,
 } from "./migrations";
+import { validateObservationProjection } from "./observation-journal";
+import type { RecurrenceThresholds } from "./observation-model";
 import { validatePreferenceProjection } from "./preference-journal";
 import type { ProductionDay } from "./production-days";
 
@@ -27,6 +29,8 @@ export type EvolutionDbHealth = {
 	migration_stale: boolean;
 	production_day_count: number;
 	preference_count: number;
+	observation_count: number;
+	recurring_cluster_count: number;
 	project_id: string | null;
 	size_bytes: number;
 	findings: EvolutionDbFinding[];
@@ -37,9 +41,13 @@ export type EvolutionStatus = {
 	project_id: string | null;
 	production_day_count: number;
 	preference_count: number;
+	observation_count: number;
+	recurring_cluster_count: number;
 	latest_production_day: ProductionDay | null;
 };
-export type EvolutionHealthContext = Omit<EvolutionJournalContext, "db">;
+export type EvolutionHealthContext = Omit<EvolutionJournalContext, "db"> & {
+	recurrenceThresholds?: RecurrenceThresholds;
+};
 
 function scalarNumber(row: Record<string, unknown> | null): number {
 	const value = row
@@ -98,13 +106,7 @@ function assertProjectIdentity(
 	expectedProjectId?: string,
 ): string | null {
 	const metadataProjectId = readProjectId(db);
-	const rows = db
-		.query(
-			"SELECT project_id FROM production_days UNION SELECT project_id FROM preferences UNION SELECT project_id FROM preference_evidence",
-		)
-		.all() as Array<{ project_id?: unknown }>;
-	const rowProjectIds = rows.map((row) => String(row.project_id ?? ""));
-	const projectId = expectedProjectId ?? metadataProjectId;
+	// Configured-expected vs metadata mismatch: fail closed.
 	if (
 		expectedProjectId &&
 		metadataProjectId &&
@@ -113,24 +115,38 @@ function assertProjectIdentity(
 		throw new Error(
 			"evolution db project UUID does not match configured project",
 		);
-	if (
-		rowProjectIds.some(
-			(rowProjectId) => !projectId || rowProjectId !== projectId,
-		)
-	)
-		throw new Error(
-			"evolution db production day project UUID does not match configured project",
+	// Metadata missing but rows exist: fail closed (can't determine ownership).
+	if (metadataProjectId === null) {
+		const tables = new Set(
+			(
+				db
+					.query("SELECT name FROM sqlite_master WHERE type = 'table'")
+					.all() as Array<{ name: string }>
+			).map((row) => row.name),
 		);
-	if (rowProjectIds.length > 0 && !metadataProjectId)
-		throw new Error("evolution db project UUID metadata is missing");
-	if (
-		metadataProjectId &&
-		rowProjectIds.some((rowProjectId) => rowProjectId !== metadataProjectId)
-	)
-		throw new Error(
-			"evolution db production day project UUID does not match metadata",
-		);
-	return metadataProjectId;
+		const recurrenceTables = [
+			"production_days",
+			"preferences",
+			"preference_evidence",
+			"observations",
+			"recurrence_decisions",
+			"issue_clusters",
+		].filter((table) => tables.has(table));
+		const anyRow = db
+			.query(
+				recurrenceTables.length > 0
+					? `${recurrenceTables
+							.map((table) => `SELECT 1 AS found FROM ${table}`)
+							.join(" UNION ")} LIMIT 1`
+					: "SELECT NULL AS found WHERE 0",
+			)
+			.get() as { found?: unknown } | null;
+		if (anyRow)
+			throw new Error("evolution db project UUID metadata is missing");
+	}
+	// Foreign rows from other projects are tolerated — queries are scoped to
+	// the asserted projectId.
+	return metadataProjectId ?? expectedProjectId ?? null;
 }
 
 export function getEvolutionStatus(
@@ -150,24 +166,51 @@ export function getEvolutionStatus(
 			db,
 			projectId,
 		});
+		validateObservationProjection({
+			...canonicalContext,
+			db,
+			projectId,
+		});
+	}
+	if (!projectId) {
+		return {
+			schema_version: EVOLUTION_SCHEMA_VERSION,
+			migration_version: readUserVersion(db),
+			project_id: null,
+			production_day_count: 0,
+			preference_count: 0,
+			observation_count: 0,
+			recurring_cluster_count: 0,
+			latest_production_day: null,
+		};
 	}
 	const latest = db
 		.query(
-			"SELECT * FROM production_days ORDER BY ordinal_sequence DESC LIMIT 1",
+			"SELECT * FROM production_days WHERE project_id = ? ORDER BY ordinal_sequence DESC LIMIT 1",
 		)
-		.get() as Record<string, unknown> | null;
+		.get(projectId) as Record<string, unknown> | null;
 	const count = db
-		.query("SELECT COUNT(*) AS count FROM production_days")
-		.get() as Record<string, unknown>;
+		.query("SELECT COUNT(*) AS count FROM production_days WHERE project_id = ?")
+		.get(projectId) as Record<string, unknown>;
 	const preferenceCount = db
-		.query("SELECT COUNT(*) AS count FROM preferences")
-		.get() as Record<string, unknown>;
+		.query("SELECT COUNT(*) AS count FROM preferences WHERE project_id = ?")
+		.get(projectId) as Record<string, unknown>;
+	const observationCount = db
+		.query("SELECT COUNT(*) AS count FROM observations WHERE project_id = ?")
+		.get(projectId) as Record<string, unknown>;
+	const recurringClusterCount = db
+		.query(
+			"SELECT COUNT(*) AS count FROM issue_clusters WHERE project_id = ? AND state IN ('recurring','reopened','proposal_open','mitigation_canary')",
+		)
+		.get(projectId) as Record<string, unknown>;
 	return {
 		schema_version: EVOLUTION_SCHEMA_VERSION,
 		migration_version: readUserVersion(db),
 		project_id: projectId,
 		production_day_count: scalarNumber(count),
 		preference_count: scalarNumber(preferenceCount),
+		observation_count: scalarNumber(observationCount),
+		recurring_cluster_count: scalarNumber(recurringClusterCount),
 		latest_production_day: latest ? rowToProductionDay(latest) : null,
 	};
 }
@@ -188,6 +231,8 @@ export function checkEvolutionDbHealth(
 			migration_stale: true,
 			production_day_count: 0,
 			preference_count: 0,
+			observation_count: 0,
+			recurring_cluster_count: 0,
 			project_id: null,
 			size_bytes: 0,
 			findings: [
@@ -201,6 +246,8 @@ export function checkEvolutionDbHealth(
 	let migrationVersion = 0;
 	let productionDayCount = 0;
 	let preferenceCount = 0;
+	let observationCount = 0;
+	let recurringClusterCount = 0;
 	let projectId: string | null = null;
 	try {
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
@@ -258,6 +305,17 @@ export function checkEvolutionDbHealth(
 				message: "preference schema is stale or incomplete",
 			});
 		}
+		if (
+			!tables.has("observations") ||
+			!tables.has("recurrence_decisions") ||
+			!tables.has("issue_clusters")
+		) {
+			schemaOk = false;
+			findings.push({
+				severity: "fail",
+				message: "observation schema is stale or incomplete",
+			});
+		}
 		if (migrationVersion > EVOLUTION_SCHEMA_VERSION) {
 			schemaOk = false;
 			findings.push({
@@ -281,29 +339,66 @@ export function checkEvolutionDbHealth(
 					});
 				}
 			}
-		if (tables.has("production_days")) {
+		const recurrenceTables = [
+			"production_days",
+			"preferences",
+			"preference_evidence",
+			"observations",
+			"recurrence_decisions",
+			"issue_clusters",
+		];
+		let identityValid = true;
+		if (recurrenceTables.some((table) => tables.has(table))) {
 			try {
 				projectId = assertProjectIdentity(db, expectedProjectId);
 			} catch (error) {
+				identityValid = false;
 				schemaOk = false;
 				findings.push({ severity: "fail", message: (error as Error).message });
 			}
+		}
+		if (tables.has("production_days") && identityValid && projectId) {
 			productionDayCount = scalarNumber(
 				db
-					.query("SELECT COUNT(*) AS count FROM production_days")
-					.get() as Record<string, unknown>,
+					.query(
+						"SELECT COUNT(*) AS count FROM production_days WHERE project_id = ?",
+					)
+					.get(projectId) as Record<string, unknown>,
 			);
 			if (tables.has("preferences")) {
 				preferenceCount = scalarNumber(
-					db.query("SELECT COUNT(*) AS count FROM preferences").get() as Record<
-						string,
-						unknown
-					>,
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM preferences WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
+				);
+			}
+			if (tables.has("observations")) {
+				observationCount = scalarNumber(
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM observations WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
+				);
+			}
+			if (tables.has("issue_clusters")) {
+				recurringClusterCount = scalarNumber(
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM issue_clusters WHERE project_id = ? AND state IN ('recurring','reopened','proposal_open','mitigation_canary')",
+						)
+						.get(projectId) as Record<string, unknown>,
 				);
 			}
 			for (const row of db
-				.query("SELECT qualifying_events FROM production_days")
-				.all() as Array<{ qualifying_events: unknown }>) {
+				.query(
+					"SELECT qualifying_events FROM production_days WHERE project_id = ?",
+				)
+				.all(projectId) as Array<{
+				qualifying_events: unknown;
+			}>) {
 				try {
 					qualifyingEvents(row.qualifying_events);
 				} catch (error) {
@@ -344,6 +439,21 @@ export function checkEvolutionDbHealth(
 						});
 					}
 				}
+				if (schemaOk) {
+					try {
+						validateObservationProjection({
+							...canonicalContext,
+							db,
+							projectId: expectedProjectId,
+						});
+					} catch (error) {
+						schemaOk = false;
+						findings.push({
+							severity: "fail",
+							message: (error as Error).message,
+						});
+					}
+				}
 			}
 		}
 	} catch (error) {
@@ -365,6 +475,8 @@ export function checkEvolutionDbHealth(
 		migration_stale: migrationVersion !== EVOLUTION_SCHEMA_VERSION,
 		production_day_count: productionDayCount,
 		preference_count: preferenceCount,
+		observation_count: observationCount,
+		recurring_cluster_count: recurringClusterCount,
 		project_id: projectId,
 		size_bytes: Bun.file(dbPath).size,
 		findings,

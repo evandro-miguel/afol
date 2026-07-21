@@ -11,6 +11,43 @@ export {
 } from "./journal";
 export * from "./migrations";
 export {
+	type ObservationJournalContext,
+	type ObservationJournalEvent,
+	observationDigest,
+	observationJournalPath,
+	readObservationJournal,
+	validateObservationProjection,
+} from "./observation-journal";
+export {
+	type ComparableCohort,
+	comparableCohort,
+	compareScorecards,
+	deriveRecurrenceDecision,
+	normalizeObservation,
+	normalizeObservationRecord,
+	OBSERVATION_FINGERPRINT_VERSION,
+	type ObservationFingerprintFields,
+	type ObservationInput,
+	type ObservationRecord,
+	observationFingerprint,
+	occurrenceIdentity,
+	projectObservations,
+	type RecurrenceDecision,
+	type RecurrenceState,
+	type RecurrenceThresholds,
+	type Scorecard,
+	type ScorecardComparison,
+	type ScorecardDimension,
+	type ScorecardMetric,
+} from "./observation-model";
+export {
+	type EvidenceObservationSource,
+	type ObservationSourceContext,
+	observationFromEvidence,
+	observationFromFeedback,
+	observationFromTelemetry,
+} from "./observation-sources";
+export {
 	type DecayPreferenceStatus,
 	effectivePreferenceConfidence as decayEffectivePreferenceConfidence,
 	preferenceFreshness as decayPreferenceFreshness,

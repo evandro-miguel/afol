@@ -1,4 +1,12 @@
+import type { RecurrenceThresholds } from "./observation-model";
+
 export const DEFAULT_EVOLUTION_TIMEZONE = "UTC";
+export const DEFAULT_EVOLUTION_RECURRENCE_THRESHOLDS: Readonly<RecurrenceThresholds> =
+	Object.freeze({
+		minimum_occurrences: 3,
+		minimum_distinct_sessions: 2,
+		minimum_distinct_production_days: 2,
+	});
 export type EvolutionPaths = {
 	externalDir: string;
 	evolutionDb: string;
@@ -29,9 +37,7 @@ export const DEFAULT_EVOLUTION_SETTINGS: Readonly<Record<string, unknown>> =
 			decay_curve: "linear",
 		},
 		recurrence: {
-			minimum_occurrences: 3,
-			minimum_distinct_sessions: 2,
-			minimum_distinct_production_days: 2,
+			...DEFAULT_EVOLUTION_RECURRENCE_THRESHOLDS,
 		},
 		large_change: {
 			changed_files: 20,
@@ -51,6 +57,37 @@ export const DEFAULT_EVOLUTION_SETTINGS: Readonly<Record<string, unknown>> =
 			auto_apply_mode: "none",
 		},
 	});
+
+export function recurrenceThresholdsFromSettings(
+	settings: unknown,
+): RecurrenceThresholds {
+	const recurrence =
+		settings !== null &&
+		typeof settings === "object" &&
+		!Array.isArray(settings) &&
+		"recurrence" in settings &&
+		(settings as Record<string, unknown>).recurrence !== null &&
+		typeof (settings as Record<string, unknown>).recurrence === "object" &&
+		!Array.isArray((settings as Record<string, unknown>).recurrence)
+			? ((settings as Record<string, unknown>).recurrence as Record<
+					string,
+					unknown
+				>)
+			: {};
+	const value = (key: keyof RecurrenceThresholds): number => {
+		const candidate = recurrence[key];
+		return typeof candidate === "number" &&
+			Number.isInteger(candidate) &&
+			candidate > 0
+			? candidate
+			: DEFAULT_EVOLUTION_RECURRENCE_THRESHOLDS[key];
+	};
+	return {
+		minimum_occurrences: value("minimum_occurrences"),
+		minimum_distinct_sessions: value("minimum_distinct_sessions"),
+		minimum_distinct_production_days: value("minimum_distinct_production_days"),
+	};
+}
 const UUID_RE =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
