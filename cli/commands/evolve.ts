@@ -309,7 +309,12 @@ function controlledGitExecutable(): string {
 	const candidates =
 		process.platform === "win32"
 			? ["C:\\Program Files\\Git\\cmd\\git.exe"]
-			: ["/usr/bin/git", "/bin/git", "/usr/local/bin/git"];
+			: [
+					"/usr/bin/git",
+					"/bin/git",
+					"/usr/local/bin/git",
+					"/opt/homebrew/bin/git",
+				];
 	for (const candidate of candidates) {
 		if (!existsSync(candidate)) continue;
 		try {
@@ -325,7 +330,15 @@ function controlledGitExecutable(): string {
 
 function gitReadOnlyEnv(): NodeJS.ProcessEnv {
 	const env = Object.fromEntries(
-		["PATH", "LANG", "LC_ALL", "LC_CTYPE"].flatMap((key) =>
+		[
+			"PATH",
+			"LANG",
+			"LC_ALL",
+			"LC_CTYPE",
+			"SystemRoot",
+			"SystemDrive",
+			"windir",
+		].flatMap((key) =>
 			process.env[key] === undefined ? [] : [[key, process.env[key]]],
 		),
 	) as NodeJS.ProcessEnv;
@@ -389,7 +402,7 @@ function resolveCommitRange(
 	]);
 	if (rangeResult.error || rangeResult.status !== 0)
 		throw new Error("evolve after-merge could not resolve the commit range");
-	const commitIds = rangeResult.stdout.trim().split("\n").filter(Boolean);
+	const commitIds = rangeResult.stdout.trim().split(/\r?\n/).filter(Boolean);
 	if (
 		commitIds.length > 1_000 ||
 		commitIds.some((commit) => !/^[a-f0-9]{40,64}$/.test(commit))

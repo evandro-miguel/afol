@@ -566,7 +566,11 @@ function assertAnalysisStateLimits(
 	for (const path of paths.slice(1))
 		assertSafeEvolutionTarget(path, "evolution analysis auxiliary");
 	const snapshots = paths.map(analysisFileSnapshot);
-	if (!snapshots[1]?.exists || !snapshots[2]?.exists)
+	const walSnapshot = snapshots[1];
+	const shmSnapshot = snapshots[2];
+	if (!walSnapshot || !shmSnapshot)
+		throw new Error("evolution analysis auxiliary invariant failed");
+	if (!walSnapshot.exists || !shmSnapshot.exists)
 		throw new Error(
 			"evolution analysis requires stable WAL and SHM auxiliaries",
 		);

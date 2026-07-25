@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { runEvolveCommand } from "../commands/evolve";
 import {
 	analyzeEvolutionProject,
 	appendObservationJournalEvent,
@@ -27,7 +28,6 @@ import {
 
 const PROJECT_A = "db97afff-2026-4eb1-a799-5d34fd505267";
 const PROJECT_B = "f4c7c0ae-50c7-4ea7-81c4-bf20e7f3a1a9";
-const CLI = resolve(import.meta.dir, "..", "main.ts");
 const TEMPLATE_CONFIG = JSON.parse(
 	readFileSync(
 		resolve(import.meta.dir, "../..", "src/project-template/.afol/config.json"),
@@ -59,18 +59,19 @@ const CONTRACT = JSON.parse(
 
 type StatusPayload = { data?: { state?: string } };
 
-function invoke(
+async function invoke(
 	root: string,
 	args: string[],
-): { exit: number; stdout: string } {
-	const result = Bun.spawnSync(["bun", CLI, ...args], {
-		cwd: root,
-		stdout: "pipe",
-		stderr: "pipe",
+): Promise<{ exit: number; stdout: string }> {
+	const [action = "", ...commandArgs] = args.slice(1);
+	const stdout: string[] = [];
+	const exit = await runEvolveCommand(action, commandArgs, root, {
+		stdout: (value) => stdout.push(value),
+		stderr: () => {},
 	});
 	return {
-		exit: result.exitCode,
-		stdout: new TextDecoder().decode(result.stdout).trim(),
+		exit,
+		stdout: stdout.join("\n").trim(),
 	};
 }
 
@@ -281,18 +282,12 @@ function assertPublicAnalysis(
 	return data;
 }
 
-function status(root: string): { exit: number; payload: StatusPayload } {
-	const result = Bun.spawnSync(["bun", CLI, "evolve", "status", "--json"], {
-		cwd: root,
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	const stdout = new TextDecoder().decode(result.stdout).trim();
-	if (!stdout) {
-		const stderr = new TextDecoder().decode(result.stderr).trim();
-		throw new Error(`evolve status produced no output: ${stderr}`);
-	}
-	return { exit: result.exitCode, payload: JSON.parse(stdout) };
+async function status(
+	root: string,
+): Promise<{ exit: number; payload: StatusPayload }> {
+	const result = await invoke(root, ["evolve", "status", "--json"]);
+	if (!result.stdout) throw new Error("evolve status produced no output");
+	return { exit: result.exit, payload: JSON.parse(result.stdout) };
 }
 
 const roots: string[] = [];
@@ -301,7 +296,7 @@ try {
 	const uninitialized = fixture(PROJECT_A);
 	roots.push(uninitialized);
 	const emptyPath = evolutionDbPath(uninitialized);
-	const empty = status(uninitialized);
+	const empty = await status(uninitialized);
 	if (empty.exit !== 0 || empty.payload.data?.state !== "ready_uninitialized")
 		throw new Error("uninitialized status contract failed");
 	if ([emptyPath, `${emptyPath}-wal`, `${emptyPath}-shm`].some(existsSync))
@@ -316,7 +311,7 @@ try {
 	);
 	healthyDb.close();
 	const range = seedAnalysisHistory(healthy, PROJECT_A);
-	const healthyStatus = status(healthy);
+	const healthyStatus = await status(healthy);
 	if (
 		healthyStatus.exit !== 0 ||
 		healthyStatus.payload.data?.state !== "healthy"
@@ -327,27 +322,22 @@ try {
 	const reviewId = internalAnalysis.proposals[0]?.id;
 	if (!reviewId)
 		throw new Error("healthy analysis did not produce a review proposal");
-	assertPublicAnalysis(
-		invoke(healthy, ["evolve", "analyze", "--json"]),
-		"analyze",
-	);
-	assertPublicAnalysis(
-		invoke(healthy, ["evolve", "weekly", "--json"]),
-		"weekly",
-	);
-	assertPublicAnalysis(
-		invoke(healthy, [
-			"evolve",
-			"after-merge",
-			`${range.base}..${range.head}`,
-			"--json",
-		]),
-		"after_merge",
-	);
-	assertPublicAnalysis(
-		invoke(healthy, ["evolve", "review", reviewId, "--json"]),
-		"review",
-	);
+	const [analyzeResult, weeklyResult, afterMergeResult, reviewResult] =
+		await Promise.all([
+			invoke(healthy, ["evolve", "analyze", "--json"]),
+			invoke(healthy, ["evolve", "weekly", "--json"]),
+			invoke(healthy, [
+				"evolve",
+				"after-merge",
+				`${range.base}..${range.head}`,
+				"--json",
+			]),
+			invoke(healthy, ["evolve", "review", reviewId, "--json"]),
+		]);
+	assertPublicAnalysis(analyzeResult, "analyze");
+	assertPublicAnalysis(weeklyResult, "weekly");
+	assertPublicAnalysis(afterMergeResult, "after_merge");
+	assertPublicAnalysis(reviewResult, "review");
 	const dbAfterAnalysis = analysisSnapshot(healthy);
 	if (dbAfterAnalysis !== dbBeforeAnalysis) {
 		const beforeFiles = JSON.parse(dbBeforeAnalysis) as Array<
@@ -373,7 +363,7 @@ try {
 	sourceDb.close();
 	mkdirSync(join(copied, ".afol", "state"), { recursive: true });
 	copyFileSync(evolutionDbPath(source), evolutionDbPath(copied));
-	const mismatch = status(copied);
+	const mismatch = await status(copied);
 	if (mismatch.exit !== 1 || mismatch.payload.data?.state !== "unhealthy")
 		throw new Error("cross-project status contract failed");
 
@@ -386,7 +376,7 @@ try {
 		`${JSON.stringify(disabledConfig, null, 2)}\n`,
 		"utf8",
 	);
-	const suggestion = invoke(disabled, [
+	const suggestion = await invoke(disabled, [
 		"evolve",
 		"suggest",
 		"--first-session",
@@ -394,15 +384,20 @@ try {
 	]);
 	if (suggestion.exit !== 0 || !suggestion.stdout.includes('"disabled"'))
 		throw new Error("disabled suggestion preview contract failed");
-	for (const args of [
+	const disabledDecisions = [
 		["evolve", "skip", "SUG-benchmark", "--json"],
 		["evolve", "accept", "SUG-benchmark", "--json"],
 		["evolve", "reject", "SUG-benchmark", "--reason", "benchmark", "--json"],
 		["evolve", "repair", "--json"],
-	]) {
-		const decision = invoke(disabled, args);
+	];
+	const decisionResults = await Promise.all(
+		disabledDecisions.map((args) => invoke(disabled, args)),
+	);
+	for (const [index, decision] of decisionResults.entries()) {
 		if (decision.exit !== 2 || !decision.stdout)
-			throw new Error(`disabled decision contract failed: ${args[1]}`);
+			throw new Error(
+				`disabled decision contract failed: ${disabledDecisions[index]?.[1]}`,
+			);
 	}
 	if (existsSync(evolutionDbPath(disabled)))
 		throw new Error("disabled suggestion commands created evolution state");

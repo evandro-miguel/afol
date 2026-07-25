@@ -193,12 +193,12 @@ describe("evolution benchmark baseline writer", () => {
 		},
 		{
 			name: "duration limit",
-			result: { status: "baseline-missing", pass: false, duration_ms: 1501 },
+			result: { status: "baseline-missing", pass: false, duration_ms: 4001 },
 			error: "duration exceeds",
 		},
 		{
 			name: "p95 limit",
-			result: { status: "baseline-missing", pass: false, timing_p95_ms: 1501 },
+			result: { status: "baseline-missing", pass: false, timing_p95_ms: 4001 },
 			error: "p95 exceeds",
 		},
 		{
