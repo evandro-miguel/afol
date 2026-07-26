@@ -188,20 +188,34 @@ async function detect(
 		throw new Error(`source provider must be ${provider}`);
 	const state: JsonlReaderState = { bytes: 0, lines: 0, contentDigest: "" };
 	let seen = 0;
-	let confidence = 0.25;
+	let hasConversationMarker = false;
+	let hasMessageShape = false;
 	for await (const entry of readJsonl(source.path, state, source.limits)) {
 		seen += 1;
 		const raw = entry.value;
 		if (
-			first(raw, "session_id", "sessionId", "conversation_id", "conversationId")
+			first(
+				raw,
+				"session_id",
+				"sessionId",
+				"conversation_id",
+				"conversationId",
+				"type",
+				"kind",
+				"event",
+				"role",
+			)
 		)
-			confidence += 0.15;
-		if (first(raw, "message", "role", "content", "text")) confidence += 0.15;
+			hasConversationMarker = true;
+		if (first(raw, "message", "role", "content", "text"))
+			hasMessageShape = true;
 	}
+	const confidence =
+		seen > 0 && hasConversationMarker && hasMessageShape ? 0.85 : 0.25;
 	return {
 		provider,
 		format: "jsonl-v1",
-		confidence: Math.min(1, confidence),
+		confidence,
 		warnings: seen === 0 ? ["source contains no JSONL records"] : [],
 	};
 }

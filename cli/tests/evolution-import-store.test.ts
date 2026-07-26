@@ -101,6 +101,32 @@ describe("external import acceptance store", () => {
 		}
 	});
 
+	test("does not append when an existing projection lost its journal event", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-import-drift-"));
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			acceptExternalImport({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				payload: payload("projection-drift"),
+			});
+			writeFileSync(importJournalPath(root), "");
+			expect(() =>
+				acceptExternalImport({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					payload: payload("projection-drift"),
+				}),
+			).toThrow("import projection and journal disagree");
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rolls back projection and journal together on a failed transaction", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-import-rollback-"));
 		const db = openEvolutionDb(evolutionDbPath(root));

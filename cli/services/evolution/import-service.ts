@@ -163,13 +163,17 @@ function projectIdFor(
 function externalSessionId(
 	provider: ImportProvider,
 	providerSessionId: string,
+	importContentDigest: string,
 ): string {
-	return `EXT-${sha256(`${provider}:${providerSessionId}`).slice(0, 32)}`;
+	const namespace =
+		providerSessionId === "unscoped" ? `:${importContentDigest}` : "";
+	return `EXT-${sha256(`${provider}:${providerSessionId}${namespace}`).slice(0, 32)}`;
 }
 
 function collectSessions(
 	provider: ImportProvider,
 	records: readonly NormalizedRecord[],
+	importContentDigest: string,
 ): ExternalSessionRecord[] {
 	const grouped = new Map<string, NormalizedRecord[]>();
 	for (const record of records) {
@@ -186,7 +190,11 @@ function collectSessions(
 			const ordered = sessionRecords.map((record) => record.recordDigest);
 			const normalizedDigest = digestJson(sessionRecords);
 			return {
-				external_session_id: externalSessionId(provider, providerSessionId),
+				external_session_id: externalSessionId(
+					provider,
+					providerSessionId,
+					importContentDigest,
+				),
 				provider_session_id: String(redactImported(providerSessionId)),
 				content_digest: digestJson(ordered),
 				record_count: sessionRecords.length,
@@ -358,7 +366,11 @@ function buildPreview(
 	links: readonly ExternalSessionLink[] = [],
 ): ExternalImportPreview {
 	const importId = `IMP-${provider}-${read.normalizedDigest}`;
-	const sessions = collectSessions(provider, read.records);
+	const sessions = collectSessions(
+		provider,
+		read.records,
+		read.normalizedDigest,
+	);
 	const normalizedPreview = {
 		...read.first,
 		contentDigest: read.normalizedDigest,
@@ -451,6 +463,7 @@ function artifactFiles(
 		external_session_id: externalSessionId(
 			preview.provider,
 			record.sessionId ?? "unscoped",
+			preview.contentDigest,
 		),
 	}));
 	return {

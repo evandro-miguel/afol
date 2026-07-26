@@ -62,7 +62,6 @@ function commitResolves(
 		[
 			"--no-pager",
 			"--no-optional-locks",
-			"--no-lazy-fetch",
 			"--no-replace-objects",
 			"-C",
 			canonicalRoot,

@@ -78,6 +78,17 @@ describe("external import core", () => {
 		expect(firstRecords[0]?.recordDigest).toBe(secondRecords[0]?.recordDigest);
 	});
 
+	test("detection requires structural transcript markers, not repeated content", async () => {
+		const root = await tempRoot();
+		const path = join(root, "generic.jsonl");
+		await writeFile(
+			path,
+			`${JSON.stringify({ content: "first" })}\n${JSON.stringify({ content: "second" })}\n`,
+		);
+		const detection = await codexAdapter.detect({ provider: "codex", path });
+		expect(detection.confidence).toBeLessThan(0.5);
+	});
+
 	test("redacts sensitive keys and nested values before returning data", () => {
 		const value = redactImported({
 			Authorization: "Bearer secret-value",

@@ -74,6 +74,50 @@ describe("external import service", () => {
 		}
 	});
 
+	test("namespaces unscoped sessions across distinct imports", async () => {
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			writeFileSync(
+				source,
+				`${JSON.stringify({ role: "user", content: "first import" })}\n`,
+			);
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			writeFileSync(
+				source,
+				`${JSON.stringify({ role: "user", content: "second import" })}\n`,
+			);
+			const second = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+
+			expect(first.preview.importId).not.toBe(second.preview.importId);
+			expect(first.preview.sessionRecords[0]?.provider_session_id).toBe(
+				"unscoped",
+			);
+			expect(second.preview.sessionRecords[0]?.provider_session_id).toBe(
+				"unscoped",
+			);
+			expect(first.preview.sessionRecords[0]?.external_session_id).not.toBe(
+				second.preview.sessionRecords[0]?.external_session_id,
+			);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(2);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("fails closed for an ambiguous JSONL format", async () => {
 		const { root, source } = fixture();
 		writeFileSync(source, `${JSON.stringify({ arbitrary: "value" })}\n`);

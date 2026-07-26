@@ -155,20 +155,23 @@ export function acceptExternalImportUnderLock(
 		.get(input.projectId, input.payload.manifest.import_id) as {
 		journal_event_id?: string;
 	} | null;
-	const append = appendImportJournalEventUnlocked({
-		root: input.root,
-		projectId: input.projectId,
-		payload: input.payload,
-		...(input.eventsDir ? { eventsDir: input.eventsDir } : {}),
-		...(input.eventId ? { eventId: input.eventId } : {}),
-		...(input.now ? { now: input.now } : {}),
-	});
-	const duplicate = Boolean(existing);
-	if (duplicate) {
-		if (existing?.journal_event_id !== append.event.event_id)
+	if (existing) {
+		const journalEvent = readImportJournal(
+			input.root,
+			input.projectId,
+			input.eventsDir,
+		).find(
+			(event) =>
+				event.payload.manifest.import_id === input.payload.manifest.import_id,
+		);
+		if (
+			!journalEvent ||
+			existing.journal_event_id !== journalEvent.event_id ||
+			importDigest(journalEvent.payload) !== importDigest(input.payload)
+		)
 			throw new Error("import projection and journal disagree");
 		return {
-			event: append.event,
+			event: journalEvent,
 			checkpoint: readImportCheckpoint(
 				input.db,
 				input.projectId,
@@ -177,6 +180,14 @@ export function acceptExternalImportUnderLock(
 			duplicate: true,
 		};
 	}
+	const append = appendImportJournalEventUnlocked({
+		root: input.root,
+		projectId: input.projectId,
+		payload: input.payload,
+		...(input.eventsDir ? { eventsDir: input.eventsDir } : {}),
+		...(input.eventId ? { eventId: input.eventId } : {}),
+		...(input.now ? { now: input.now } : {}),
+	});
 	try {
 		input.db.exec("BEGIN IMMEDIATE");
 		try {
