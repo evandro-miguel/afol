@@ -142,6 +142,60 @@ describe("Evolution Slice 0 governance schema", () => {
 		expect(validate?.(projectConfig())).toBe(true);
 	});
 
+	test("permits safe custom evolution storage paths and rejects unsafe paths", () => {
+		const validate = ajv.getSchema(schema.$id);
+		const custom = projectConfig({
+			paths: {
+				external_dir: ".afol/external",
+				evolution_db: ".afol/state/custom-evolution.db",
+				evolution_data_dir: ".afol/data/evolution",
+				evolution_events_dir: ".afol/custom-events",
+			},
+		});
+		expect(validate?.(custom)).toBe(true);
+		expect(
+			validate?.({
+				...custom,
+				paths: {
+					...(custom.paths as Record<string, unknown>),
+					evolution_db: "../escape.db",
+				},
+			}),
+		).toBe(false);
+		for (const path of [".agents/runtime/evolution.db", "docs/evolution.db"]) {
+			expect(
+				validate?.({
+					...custom,
+					paths: {
+						...(custom.paths as Record<string, unknown>),
+						evolution_db: path,
+					},
+				}),
+			).toBe(false);
+		}
+	});
+
+	test("rejects dot traversal in every AFOL path segment", () => {
+		const validate = validator("projectRelativePath");
+		for (const path of [
+			".afol/./evolution.db",
+			".afol/../evolution.db",
+			".afol/data/./evolution.db",
+			".afol/data/../evolution.db",
+			".afol/.",
+			".afol/..",
+		]) {
+			expect(validate(path)).toBe(false);
+		}
+		for (const path of [
+			".afol/.cache/evolution.db",
+			".afol/data/v1.2/evolution.db",
+			".afol/data/..cache/evolution.db",
+		]) {
+			expect(validate(path)).toBe(true);
+		}
+	});
+
 	test("rejects invalid project identity and timezone shape", () => {
 		const validate = ajv.getSchema(schema.$id);
 		const invalidId = projectConfig({

@@ -105,9 +105,20 @@ export function readActiveSuggestionProjection(
 		rows.push(observation);
 		observationsByFingerprint.set(observation.fingerprint, rows);
 	}
-	const candidateIds = clusters.map((cluster) =>
-		suggestionId(projectId, cluster.fingerprint),
-	);
+	const candidateIds = [
+		...new Set(
+			clusters.flatMap((cluster) => {
+				const taskTypes = new Set(
+					(observationsByFingerprint.get(cluster.fingerprint) ?? []).map(
+						(observation) => observation.task_type,
+					),
+				);
+				return [...taskTypes].map((taskType) =>
+					suggestionId(projectId, cluster.fingerprint, taskType),
+				);
+			}),
+		),
+	].sort();
 	return {
 		clusters,
 		observations,

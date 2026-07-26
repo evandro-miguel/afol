@@ -22,6 +22,7 @@ import {
 } from "./analysis";
 import {
 	APPLY_POLICY_VERSION,
+	APPLY_VALIDATOR_V1,
 	APPLY_VALIDATOR_VERSION,
 	type ApplyBinding,
 	type ApplyInvocationClass,
@@ -33,7 +34,10 @@ import {
 	unmatchedApplyPrepares,
 	withApplyLock,
 } from "./apply-journal";
+import { evolutionDbPath, openEvolutionDb } from "./db";
+import { writeEvolutionProjectionCheckpoint } from "./projection-checkpoint";
 import { resolveEvolutionConfig } from "./runtime-config";
+import { evaluationContractDigest } from "./suggestion-model";
 
 type ApplyPolicyMode = "canary" | "lessons_memory_only" | "none";
 
@@ -46,6 +50,7 @@ export type ApplyInput = {
 	session: string;
 	taskId: string;
 	now?: Date;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 };
 
 export type RollbackInput = {
@@ -57,6 +62,7 @@ export type RollbackInput = {
 	session: string;
 	taskId: string;
 	now?: Date;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 };
 
 export type ApplyResult = {
@@ -305,9 +311,26 @@ function bind(input: {
 	content: string;
 	mutationId: string;
 }): ApplyBinding {
+	const resolved = resolveEvolutionConfig(readProjectConfig(input.apply.root));
+	const db = openEvolutionDb(
+		evolutionDbPath(input.apply.root, resolved.paths.evolutionDb),
+	);
+	let evaluationAnchorProductionDaySequence = 0;
+	try {
+		const row = db
+			.prepare(
+				"SELECT MAX(ordinal_sequence) AS sequence FROM production_days WHERE project_id = ?",
+			)
+			.get(input.apply.projectId) as { sequence: number | null } | null;
+		evaluationAnchorProductionDaySequence = Number(row?.sequence ?? 0);
+	} finally {
+		db.close();
+	}
 	return {
 		project_id: input.apply.projectId,
 		proposal_id: input.proposal.id,
+		cluster_id: input.proposal.cluster_id,
+		task_type: input.proposal.task_type,
 		proposal_digest: applyDigest(input.proposal),
 		evidence_digest: input.proposal.evidence_digest,
 		evidence_refs: safeSourceRefs(input.proposal),
@@ -320,6 +343,13 @@ function bind(input: {
 		policy_mode: input.apply.policyMode,
 		policy_version: APPLY_POLICY_VERSION,
 		validator_version: APPLY_VALIDATOR_VERSION,
+		contract_version: input.proposal.contract_version,
+		evaluation_contract: structuredClone(input.proposal.evaluation_contract),
+		evaluation_contract_digest: evaluationContractDigest(
+			input.proposal.evaluation_contract,
+		),
+		evaluation_anchor_production_day_sequence:
+			evaluationAnchorProductionDaySequence,
 		target_kind: input.targetKind,
 		target_path: input.targetPath,
 		before_state: "absent",
@@ -341,8 +371,9 @@ function appendTerminal(input: {
 	session: string;
 	taskId: string;
 	now?: Date;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 }) {
-	return appendApplyEventUnlocked({
+	const event = appendApplyEventUnlocked({
 		root: input.root,
 		phase: input.phase,
 		binding: input.binding,
@@ -350,6 +381,40 @@ function appendTerminal(input: {
 		commandTaskId: input.taskId,
 		...(input.now ? { now: input.now } : {}),
 	});
+	refreshApplyCheckpointBestEffort(input.root, input.checkpointWriter);
+	return event;
+}
+
+function refreshApplyCheckpointBestEffort(
+	root: string,
+	checkpointWriter = writeEvolutionProjectionCheckpoint,
+): void {
+	try {
+		refreshApplyCheckpoint(root, checkpointWriter);
+	} catch {
+		// The apply journal is canonical. A stale/missing checkpoint is derived
+		// state and must not turn a durable terminal into a reported failure.
+	}
+}
+
+function refreshApplyCheckpoint(
+	root: string,
+	checkpointWriter = writeEvolutionProjectionCheckpoint,
+): void {
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId)
+		throw new Error("evolution project id is required for apply checkpoint");
+	const db = openEvolutionDb(evolutionDbPath(root, resolved.paths.evolutionDb));
+	try {
+		checkpointWriter({
+			root,
+			db,
+			projectId: resolved.projectId,
+			eventsDir: resolved.paths.evolutionEventsDir,
+		});
+	} finally {
+		db.close();
+	}
 }
 
 function committedMutation(
@@ -447,12 +512,21 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 	return withApplyLock(input.root, () => {
 		assertGovernedTask(input.root, input.session, input.taskId);
 		recoverEvolutionAppliesUnlocked(input.root);
-		const proposal = canonicalProposal(input);
-		const planned = plannedArtifact(input, proposal);
-		const duplicate = exactCommittedApply(input.root, proposal);
+		const duplicate = exactCommittedApply(input.root, input.proposal);
 		if (duplicate) {
+			if (
+				currentProjectId(input.root) !== input.projectId ||
+				duplicate.project_id !== input.projectId
+			)
+				throw new Error("evolution apply project identity mismatch");
+			if (
+				duplicate.invocation_class !== input.invocationClass ||
+				duplicate.policy_mode !== input.policyMode
+			)
+				throw new Error("evolution apply invocation or policy denied");
 			assertDuplicateMutation(input.root, duplicate);
 			validateArtifact(input.root, duplicate);
+			refreshApplyCheckpointBestEffort(input.root, input.checkpointWriter);
 			return {
 				status: "applied",
 				mutation_id: duplicate.mutation_id,
@@ -462,6 +536,8 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 				duplicate: true,
 			};
 		}
+		const proposal = canonicalProposal(input);
+		const planned = plannedArtifact(input, proposal);
 		assertNewTarget(input.root, planned.path);
 		let prepared: ApplyBinding | undefined;
 		try {
@@ -505,6 +581,7 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 							commandTaskId: input.taskId,
 							...(input.now ? { now: input.now } : {}),
 						});
+						refreshApplyCheckpoint(input.root, input.checkpointWriter);
 					},
 				},
 			);
@@ -522,6 +599,9 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 				binding: prepared,
 				session: input.session,
 				taskId: input.taskId,
+				...(input.checkpointWriter
+					? { checkpointWriter: input.checkpointWriter }
+					: {}),
 				...(input.now ? { now: input.now } : {}),
 			});
 			return {
@@ -555,6 +635,9 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 					binding: prepared,
 					session: input.session,
 					taskId: input.taskId,
+					...(input.checkpointWriter
+						? { checkpointWriter: input.checkpointWriter }
+						: {}),
 					...(input.now ? { now: input.now } : {}),
 				});
 			}
@@ -586,14 +669,31 @@ export function rollbackEvolutionProposal(input: RollbackInput): ApplyResult {
 		if (!commit) throw new Error("evolution proposal rollback unavailable");
 		if (commit.binding.project_id !== input.projectId)
 			throw new Error("evolution rollback committed project identity mismatch");
-		if (
-			events.some(
-				(event) =>
-					event.phase === "rollback" &&
-					event.binding.mutation_id === commit.binding.mutation_id,
+		const priorRollback = events.findLast(
+			(event) =>
+				event.phase === "rollback" &&
+				event.binding.mutation_id === commit.binding.mutation_id,
+		);
+		if (priorRollback) {
+			const journal = loadMutationJournalStrict(input.root);
+			const artifact = artifactState(input.root, commit.binding.target_path);
+			if (
+				journal.issues.length > 0 ||
+				!mutationWasUndone(journal.records, commit.binding.mutation_id) ||
+				artifact.exists
 			)
-		)
-			throw new Error("evolution proposal already rolled back");
+				throw new Error(
+					"INTEGRITY_ERROR: evolution rollback terminal state is inconsistent",
+				);
+			refreshApplyCheckpointBestEffort(input.root, input.checkpointWriter);
+			return {
+				status: "rolled_back",
+				mutation_id: commit.binding.mutation_id,
+				target_path: commit.binding.target_path,
+				after_hash: EMPTY_HASH,
+				duplicate: true,
+			};
+		}
 		const mutationJournal = loadMutationJournalStrict(input.root);
 		if (mutationJournal.issues.length > 0)
 			throw new Error("evolution rollback mutation journal is corrupt");
@@ -609,6 +709,9 @@ export function rollbackEvolutionProposal(input: RollbackInput): ApplyResult {
 				binding: commit.binding,
 				session: input.session,
 				taskId: input.taskId,
+				...(input.checkpointWriter
+					? { checkpointWriter: input.checkpointWriter }
+					: {}),
 				...(input.now ? { now: input.now } : {}),
 			});
 			return {
@@ -633,6 +736,9 @@ export function rollbackEvolutionProposal(input: RollbackInput): ApplyResult {
 			binding: commit.binding,
 			session: input.session,
 			taskId: input.taskId,
+			...(input.checkpointWriter
+				? { checkpointWriter: input.checkpointWriter }
+				: {}),
 			...(input.now ? { now: input.now } : {}),
 		});
 		return {
@@ -661,8 +767,10 @@ function assertMutationBinding(
 }
 
 function revalidateRecovery(root: string, binding: ApplyBinding): void {
+	if (binding.policy_version !== APPLY_POLICY_VERSION)
+		throw new Error("evolution recovery validator version mismatch");
 	if (
-		binding.policy_version !== APPLY_POLICY_VERSION ||
+		binding.validator_version !== APPLY_VALIDATOR_V1 &&
 		binding.validator_version !== APPLY_VALIDATOR_VERSION
 	)
 		throw new Error("evolution recovery validator version mismatch");
@@ -671,16 +779,11 @@ function revalidateRecovery(root: string, binding: ApplyBinding): void {
 		policyMode(root) !== "canary"
 	)
 		throw new Error("evolution recovery policy no longer permits canary");
-	const analysis = analyzeEvolutionProject(root);
-	const proposal = analysis.proposals.find(
-		(candidate) => candidate.id === binding.proposal_id,
-	);
-	if (
-		analysis.project_id !== binding.project_id ||
-		!proposal ||
-		applyDigest(proposal) !== binding.proposal_digest ||
-		proposal.evidence_digest !== binding.evidence_digest
-	)
+	if (binding.validator_version === APPLY_VALIDATOR_V1) {
+		validateArtifact(root, binding);
+		return;
+	}
+	if (currentProjectId(root) !== binding.project_id)
 		throw new Error("evolution recovery proposal is stale");
 	validateArtifact(root, binding);
 }

@@ -53,6 +53,30 @@ function requireExact(
 		issues.push(`${path} must be ${String(expected)}`);
 }
 
+function requireAfolOwnedProjectRelativePath(
+	parent: Record<string, unknown>,
+	key: string,
+	path: string,
+	issues: string[],
+): void {
+	const value = parent[key];
+	const safe =
+		typeof value === "string" &&
+		value.startsWith(".afol/") &&
+		value.length > 0 &&
+		value.trim() === value &&
+		!value.includes("\\") &&
+		!value.includes(":") &&
+		!value.startsWith("/") &&
+		!value.includes("\0") &&
+		value
+			.split("/")
+			.every(
+				(segment) => segment !== "" && segment !== "." && segment !== "..",
+			);
+	if (!safe) issues.push(`${path} must be an AFOL-owned project-relative path`);
+}
+
 export function validateEvolutionConfigExtension(config: unknown): string[] {
 	const root = record(config) ?? {};
 	if (root.evolution === undefined) return [];
@@ -73,10 +97,9 @@ export function validateEvolutionConfigExtension(config: unknown): string[] {
 		"paths.external_dir",
 		issues,
 	);
-	requireExact(
+	requireAfolOwnedProjectRelativePath(
 		paths,
 		"evolution_db",
-		DEFAULT_EVOLUTION_PATHS.evolutionDb,
 		"paths.evolution_db",
 		issues,
 	);
@@ -87,10 +110,9 @@ export function validateEvolutionConfigExtension(config: unknown): string[] {
 		"paths.evolution_data_dir",
 		issues,
 	);
-	requireExact(
+	requireAfolOwnedProjectRelativePath(
 		paths,
 		"evolution_events_dir",
-		DEFAULT_EVOLUTION_PATHS.evolutionEventsDir,
 		"paths.evolution_events_dir",
 		issues,
 	);

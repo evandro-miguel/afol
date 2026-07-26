@@ -41,6 +41,37 @@ describe("Evolution identity boundaries", () => {
 		);
 	});
 
+	test("allows safe project-relative evolution storage overrides", () => {
+		const config = structuredClone(templateConfig) as Record<string, unknown>;
+		const paths = config.paths as Record<string, unknown>;
+		paths.evolution_db = ".afol/state/custom-evolution.db";
+		paths.evolution_events_dir = ".afol/custom-events";
+		expect(resolveEvolutionConfig(config).paths).toMatchObject({
+			evolutionDb: ".afol/state/custom-evolution.db",
+			evolutionEventsDir: ".afol/custom-events",
+		});
+	});
+
+	test("rejects unsafe evolution storage overrides", () => {
+		for (const path of [
+			"/tmp/evolution.db",
+			"../evolution.db",
+			"state/../evolution.db",
+			".agents/runtime/evolution.db",
+			"docs/evolution.db",
+			"C:\\evolution.db",
+			"state\\evolution.db",
+			"state/",
+		]) {
+			const config = structuredClone(templateConfig) as Record<string, unknown>;
+			const paths = config.paths as Record<string, unknown>;
+			paths.evolution_db = path;
+			expect(() => resolveEvolutionConfig(config)).toThrow(
+				"paths.evolution_db must be an AFOL-owned project-relative path",
+			);
+		}
+	});
+
 	test("emits explicit project and session identity for configured observed evidence", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-identity-"));
 		try {

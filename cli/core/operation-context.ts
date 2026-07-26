@@ -159,6 +159,12 @@ export function resolveCanonicalAction(
 		) {
 			return { action: `evolve.${action}`, sideEffect: "read" };
 		}
+		if (group === "evolve" && action === "evaluate") {
+			return {
+				action: "evolve.evaluate",
+				sideEffect: hasFlag(args, "--record") ? "write" : "preview",
+			};
+		}
 		if (
 			group === "evolve" &&
 			[
@@ -232,7 +238,9 @@ export function isActionAllowed(
 ): boolean {
 	if (
 		policy &&
-		(policy.action === "evolve.apply" || policy.action === "evolve.rollback")
+		(policy.action === "evolve.apply" ||
+			policy.action === "evolve.rollback" ||
+			policy.action === "evolve.evaluate")
 	) {
 		return (
 			ctx.callerType === "local" &&

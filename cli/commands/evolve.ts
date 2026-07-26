@@ -32,11 +32,14 @@ import {
 	preferenceJournalPath,
 	previewDailySuggestion,
 	previewExternalImport,
+	previewProposalEvaluation,
 	productionDayJournalPath,
 	type RecurrenceThresholds,
 	readObservationJournal,
 	readPreferenceJournal,
 	readProductionDayJournal,
+	recordProposalEvaluation,
+	recordProposalSupersession,
 	redactSensitiveText,
 	repairEvolutionDerivedState,
 	resolveDailySuggestion,
@@ -540,6 +543,109 @@ function runLocalGit(root: string, args: readonly string[]) {
 		timeout: 3_000,
 		windowsHide: true,
 	});
+}
+
+function parseEvaluateArgs(args: readonly string[]): {
+	mutationId: string;
+	json: boolean;
+	record: boolean;
+	supersededBy?: string;
+	reason?: string;
+} {
+	let mutationId = "";
+	let json = false;
+	let record = false;
+	let supersededBy: string | undefined;
+	let reason: string | undefined;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "--record") record = true;
+		else if (arg === "--superseded-by") {
+			supersededBy = args[++index];
+			if (!supersededBy || supersededBy.startsWith("-"))
+				throw new Error("--superseded-by requires a mutation id");
+		} else if (arg === "--reason") {
+			reason = args[++index];
+			if (!reason || reason.startsWith("-"))
+				throw new Error("--reason requires a value");
+		} else if (!mutationId && arg && !arg.startsWith("-")) mutationId = arg;
+		else throw new Error(`Unknown evolve evaluate argument: ${arg}`);
+	}
+	if (!mutationId) throw new Error("evolve evaluate requires <mutation-id>");
+	if (supersededBy && !record)
+		throw new Error("evolve evaluate supersession requires --record");
+	if (supersededBy && !reason)
+		throw new Error("evolve evaluate supersession requires --reason <text>");
+	return {
+		mutationId,
+		json,
+		record,
+		...(supersededBy ? { supersededBy } : {}),
+		...(reason ? { reason } : {}),
+	};
+}
+
+async function runEvaluate(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): Promise<number> {
+	const parsed = parseEvaluateArgs(args);
+	const projectId = resolveEvolutionConfig(readProjectConfig(root)).projectId;
+	if (!projectId) throw new Error("evolution project id is required");
+	if (!parsed.record) {
+		if (parsed.supersededBy)
+			throw new Error("evolve evaluate supersession requires --record");
+		writeEvolutionPayload(
+			io,
+			parsed.json,
+			"evolve.evaluate",
+			previewProposalEvaluation(root, parsed.mutationId, projectId),
+			operationContext,
+		);
+		return 0;
+	}
+	assertAdmittedOperationContext(operationContext);
+	if (
+		!isActionAllowed(operationContext, {
+			action: "evolve.evaluate",
+			sideEffect: "write",
+		})
+	)
+		throw new Error("evolve evaluate --record requires local interactive mode");
+	const { session, taskId } = resolveSingleInProgressTask(root);
+	const result = parsed.supersededBy
+		? recordProposalSupersession({
+				root,
+				projectId,
+				subjectMutationId: parsed.mutationId,
+				successorMutationId: parsed.supersededBy,
+				reason: parsed.reason as string,
+				invocationClass: "explicit_local",
+				session,
+				taskId,
+				now,
+			})
+		: recordProposalEvaluation({
+				root,
+				projectId,
+				mutationId: parsed.mutationId,
+				invocationClass: "explicit_local",
+				session,
+				taskId,
+				now,
+			});
+	writeEvolutionPayload(
+		io,
+		parsed.json,
+		"evolve.evaluate",
+		result,
+		operationContext,
+	);
+	return 0;
 }
 
 function parseProposalMutationArgs(
@@ -1776,6 +1882,8 @@ export async function runEvolveCommand(
 			return await runImport(args, projectRoot, io, operationContext);
 		if (action === "external")
 			return runExternalList(args, projectRoot, io, operationContext);
+		if (action === "evaluate")
+			return await runEvaluate(args, projectRoot, io, operationContext, now);
 		if (action === "apply" || action === "rollback")
 			return await runProposalMutation(
 				action,

@@ -20,9 +20,15 @@ import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
 } from "./db";
+import {
+	assertEvaluationContract,
+	type EvaluationContractV1,
+	evaluationContractDigest,
+} from "./suggestion-model";
 
 export const APPLY_POLICY_VERSION = "v1";
-export const APPLY_VALIDATOR_VERSION = "lesson-apply-v1";
+export const APPLY_VALIDATOR_V1 = "lesson-apply-v1" as const;
+export const APPLY_VALIDATOR_VERSION = "lesson-apply-v2" as const;
 
 export type ApplyPhase = "prepare" | "commit" | "abort" | "rollback";
 export type ApplyInvocationClass = "explicit_local" | "policy_canary";
@@ -36,6 +42,8 @@ export type ApplySourceRef = {
 export type ApplyBinding = {
 	project_id: string;
 	proposal_id: string;
+	cluster_id?: string;
+	task_type?: string;
 	proposal_digest: string;
 	evidence_digest: string;
 	evidence_refs: ApplySourceRef[];
@@ -44,7 +52,11 @@ export type ApplyBinding = {
 	invocation_class: ApplyInvocationClass;
 	policy_mode: "canary" | "lessons_memory_only" | "none";
 	policy_version: typeof APPLY_POLICY_VERSION;
-	validator_version: typeof APPLY_VALIDATOR_VERSION;
+	validator_version: typeof APPLY_VALIDATOR_V1 | typeof APPLY_VALIDATOR_VERSION;
+	contract_version?: 1;
+	evaluation_contract?: EvaluationContractV1;
+	evaluation_contract_digest?: string;
+	evaluation_anchor_production_day_sequence?: number;
 	target_kind: ApplyTargetKind;
 	target_path: string;
 	before_state: "absent";
@@ -118,11 +130,37 @@ function assertBinding(binding: ApplyBinding): void {
 	] as const)
 		if (!SHA256_RE.test(digest))
 			throw new Error(`invalid evolution apply ${label}`);
+	if (binding.policy_version !== APPLY_POLICY_VERSION)
+		throw new Error("unsupported evolution apply policy or validator");
 	if (
-		binding.policy_version !== APPLY_POLICY_VERSION ||
+		binding.validator_version !== APPLY_VALIDATOR_V1 &&
 		binding.validator_version !== APPLY_VALIDATOR_VERSION
 	)
 		throw new Error("unsupported evolution apply policy or validator");
+	if (binding.validator_version === APPLY_VALIDATOR_VERSION) {
+		if (
+			binding.contract_version !== 1 ||
+			!binding.evaluation_contract ||
+			binding.cluster_id !== binding.evaluation_contract.cluster_id ||
+			binding.task_type !== binding.evaluation_contract.task_type
+		)
+			throw new Error("invalid evolution apply evaluation contract");
+		assertEvaluationContract(binding.evaluation_contract);
+		if (
+			!binding.evaluation_contract_digest ||
+			binding.evaluation_contract_digest !==
+				evaluationContractDigest(binding.evaluation_contract)
+		)
+			throw new Error("evolution apply evaluation contract digest mismatch");
+		if (
+			binding.evaluation_anchor_production_day_sequence !== undefined &&
+			(!Number.isSafeInteger(
+				binding.evaluation_anchor_production_day_sequence,
+			) ||
+				binding.evaluation_anchor_production_day_sequence < 0)
+		)
+			throw new Error("invalid evolution apply evaluation anchor");
+	}
 	if (
 		!new Set(["none", "canary", "lessons_memory_only"]).has(binding.policy_mode)
 	)

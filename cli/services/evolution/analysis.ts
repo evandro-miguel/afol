@@ -18,9 +18,16 @@ import { resolveEvolutionConfig } from "./runtime-config";
 import { suggestionJournalPath } from "./suggestion-journal";
 import {
 	applyRejectionNegativeEvidence,
+	buildEvaluationContract,
 	deriveSuggestionCandidates,
+	EVALUATION_COMPARATOR_VERSION,
+	EVALUATION_CONTRACT_VERSION,
+	EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
+	EVALUATION_PRODUCTION_DAY_WINDOW,
+	type EvaluationContractV1,
 	type SuggestionCandidate,
 	type SuggestionCluster,
+	selectEvaluationBaselineObservations,
 	suppressRejectedSuggestion,
 } from "./suggestion-model";
 import {
@@ -101,6 +108,10 @@ export type EvolutionProposalPreview = {
 	id: string;
 	rank: number;
 	cluster_id: string;
+	task_type: string;
+	contract_version: typeof EVALUATION_CONTRACT_VERSION;
+	comparator_version: typeof EVALUATION_COMPARATOR_VERSION;
+	evaluation_contract: EvaluationContractV1;
 	problem: string;
 	recommendation: string;
 	risk: string;
@@ -246,7 +257,7 @@ export function scorecardFromObservations(
 }
 
 function proposalId(projectId: string, candidate: SuggestionCandidate): string {
-	return `EVO-${digest({ projectId, cluster: candidate.cluster_id, evidence: candidate.evidence_digest }).slice(0, 32)}`;
+	return `EVO-${digest({ projectId, cluster: candidate.cluster_id, taskType: candidate.task_type, evidence: candidate.evidence_digest }).slice(0, 32)}`;
 }
 
 function targetMetrics(
@@ -388,36 +399,69 @@ export function analyzeEvolution(
 					.map((candidate, index) => ({ candidate, index }));
 	const proposals: EvolutionProposalPreview[] = blockedReason
 		? []
-		: selectedCandidates.map(({ candidate, index }) => ({
-				id: proposalId(input.projectId, candidate),
-				rank: index + 1,
-				cluster_id: candidate.cluster_id,
-				problem: candidate.problem,
-				recommendation: candidate.recommendation,
-				risk: candidate.risk,
-				validation: candidate.validation,
-				impact: candidate.impact,
-				score: candidate.score,
-				confidence: candidate.confidence,
-				occurrence_count: candidate.occurrence_count,
-				distinct_session_count: candidate.related_session_ids.length,
-				distinct_production_day_count: candidate.distinct_production_day_count,
-				related_session_ids: [...candidate.related_session_ids]
-					.sort()
-					.slice(0, 4),
-				related_session_count: candidate.related_session_ids.length,
-				evidence_refs: publicSourceRefs(candidate.source_refs),
-				evidence_ref_count: candidate.source_refs.length,
-				evidence_digest: candidate.evidence_digest,
-				baseline,
-				targets: {
-					minimum_comparable_sessions: 3,
-					production_day_window: 5,
-					state: "canary",
-					metrics: targetMetrics(candidate),
-				},
-				target_metrics: targetMetrics(candidate),
-			}));
+		: selectedCandidates.map(({ candidate, index }) => {
+				const taskType =
+					candidate.task_type ??
+					observations.find((observation) =>
+						candidate.related_session_ids.includes(observation.session_id),
+					)?.task_type;
+				if (!taskType)
+					throw new Error("evolution proposal requires a task type");
+				const metrics = targetMetrics(candidate);
+				const baselineObservations = selectEvaluationBaselineObservations({
+					candidate: { cluster_id: candidate.cluster_id, task_type: taskType },
+					observations,
+				});
+				const baselineProductionDays = new Set(
+					baselineObservations.map(
+						(observation) => observation.production_day_sequence,
+					),
+				).size;
+				const evaluationContract = buildEvaluationContract({
+					candidate: { cluster_id: candidate.cluster_id, task_type: taskType },
+					baselineObservations,
+					scorecard: scorecardFromObservations(
+						baselineObservations,
+						baselineProductionDays,
+					),
+					targetMetrics: metrics,
+				});
+				return {
+					id: proposalId(input.projectId, candidate),
+					rank: index + 1,
+					cluster_id: candidate.cluster_id,
+					task_type: taskType,
+					contract_version: EVALUATION_CONTRACT_VERSION,
+					comparator_version: EVALUATION_COMPARATOR_VERSION,
+					evaluation_contract: evaluationContract,
+					problem: candidate.problem,
+					recommendation: candidate.recommendation,
+					risk: candidate.risk,
+					validation: candidate.validation,
+					impact: candidate.impact,
+					score: candidate.score,
+					confidence: candidate.confidence,
+					occurrence_count: candidate.occurrence_count,
+					distinct_session_count: candidate.related_session_ids.length,
+					distinct_production_day_count:
+						candidate.distinct_production_day_count,
+					related_session_ids: [...candidate.related_session_ids]
+						.sort()
+						.slice(0, 4),
+					related_session_count: candidate.related_session_ids.length,
+					evidence_refs: publicSourceRefs(candidate.source_refs),
+					evidence_ref_count: candidate.source_refs.length,
+					evidence_digest: candidate.evidence_digest,
+					baseline,
+					targets: {
+						minimum_comparable_sessions: EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
+						production_day_window: EVALUATION_PRODUCTION_DAY_WINDOW,
+						state: "canary",
+						metrics,
+					},
+					target_metrics: metrics,
+				};
+			});
 	const status = blockedReason
 		? "blocked"
 		: proposals.length > 0

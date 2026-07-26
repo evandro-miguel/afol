@@ -22,6 +22,7 @@ import {
 	validateProductionDayProjection,
 } from "../services/evolution";
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
+import { validateEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import { withSessionLock } from "../services/io/session-lock";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
@@ -72,6 +73,89 @@ function waitForFile(path: string): void {
 }
 
 describe("Evolution canonical projection and concurrency", () => {
+	test("serializes concurrent projection checkpoint writers", async () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-checkpoint-lock-"));
+		const dbPath = evolutionDbPath(root);
+		const db = openEvolutionDb(dbPath);
+		const go = join(root, "checkpoint-go");
+		const ready = [
+			join(root, "checkpoint-ready-1"),
+			join(root, "checkpoint-ready-2"),
+		];
+		const modulePath = join(
+			import.meta.dir,
+			"../services/evolution/projection-checkpoint",
+		);
+		const children = ready.map((marker, index) =>
+			Bun.spawn(
+				[
+					"bun",
+					"-e",
+					`import { existsSync, writeFileSync } from "node:fs"; import { Database } from "bun:sqlite"; import { writeEvolutionProjectionCheckpoint } from ${JSON.stringify(modulePath)}; const db=new Database(${JSON.stringify(dbPath)}); writeFileSync(${JSON.stringify(marker)},"ready"); while(!existsSync(${JSON.stringify(go)})) Bun.sleepSync(5); writeEvolutionProjectionCheckpoint({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},now:new Date(${JSON.stringify(`2026-07-18T12:00:0${index}.000Z`)})}); db.close();`,
+				],
+				{ stdout: "pipe", stderr: "pipe" },
+			),
+		);
+		try {
+			for (const marker of ready) waitForFile(marker);
+			writeFileSync(go, "go");
+			expect(await Promise.all(children.map((child) => child.exited))).toEqual([
+				0, 0,
+			]);
+			validateEvolutionProjectionCheckpoint({
+				root,
+				db,
+				projectId: PROJECT_ID,
+			});
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkpoint validation waits for an in-flight checkpoint writer", async () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-checkpoint-reader-"));
+		const dbPath = evolutionDbPath(root);
+		const db = openEvolutionDb(dbPath);
+		const writerReady = join(root, "checkpoint-writer-ready");
+		const writerGo = join(root, "checkpoint-writer-go");
+		const readerReady = join(root, "checkpoint-reader-ready");
+		const readerDone = join(root, "checkpoint-reader-done");
+		const modulePath = join(
+			import.meta.dir,
+			"../services/evolution/projection-checkpoint",
+		);
+		try {
+			const writer = Bun.spawn(
+				[
+					"bun",
+					"-e",
+					`import { existsSync, writeFileSync, writeSync } from "node:fs"; import { Database } from "bun:sqlite"; import { writeEvolutionProjectionCheckpoint } from ${JSON.stringify(modulePath)}; const db=new Database(${JSON.stringify(dbPath)}); try { writeEvolutionProjectionCheckpoint({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},writeBytes:(fd,line)=>{writeFileSync(${JSON.stringify(writerReady)},"ready"); while(!existsSync(${JSON.stringify(writerGo)})) Bun.sleepSync(5); return writeSync(fd,line,null,"utf8");}}); } finally { db.close(); }`,
+				],
+				{ stdout: "pipe", stderr: "pipe" },
+			);
+			waitForFile(writerReady);
+			const reader = Bun.spawn(
+				[
+					"bun",
+					"-e",
+					`import { writeFileSync } from "node:fs"; import { Database } from "bun:sqlite"; import { validateEvolutionProjectionCheckpoint } from ${JSON.stringify(modulePath)}; const db=new Database(${JSON.stringify(dbPath)}); try { writeFileSync(${JSON.stringify(readerReady)},"ready"); validateEvolutionProjectionCheckpoint({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)}}); writeFileSync(${JSON.stringify(readerDone)},"done"); } finally { db.close(); }`,
+				],
+				{ stdout: "pipe", stderr: "pipe" },
+			);
+			waitForFile(readerReady);
+			Bun.sleepSync(100);
+			expect(existsSync(readerDone)).toBe(false);
+			writeFileSync(writerGo, "go");
+			expect(await writer.exited).toBe(0);
+			expect(await reader.exited).toBe(0);
+			expect(existsSync(readerDone)).toBe(true);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rebuild takes the same journal lock as append", async () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-rebuild-lock-"));
 		const dbPath = evolutionDbPath(root);

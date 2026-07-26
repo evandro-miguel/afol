@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 7;
+export const EVOLUTION_SCHEMA_VERSION = 8;
 
 const MIGRATIONS = [
 	{
@@ -358,6 +358,34 @@ CREATE INDEX IF NOT EXISTS session_links_project_state_idx
 	ON session_links(project_id, link_state, eligible_for_learning);
 CREATE INDEX IF NOT EXISTS import_checkpoints_project_status_idx
 	ON import_checkpoints(project_id, status, updated_at DESC);
+		`,
+	},
+	{
+		version: 8,
+		sql: `
+CREATE TABLE IF NOT EXISTS evaluations (
+	project_id TEXT NOT NULL,
+	mutation_id TEXT NOT NULL,
+	state TEXT NOT NULL CHECK (state IN ('canary', 'stable', 'regressed', 'needs_more_data', 'not_evaluable', 'rolled_back', 'superseded')),
+	apply_commit_digest TEXT,
+	event_id TEXT NOT NULL CHECK (length(trim(event_id)) > 0),
+	event_digest TEXT NOT NULL CHECK (length(trim(event_digest)) = 64),
+	event_type TEXT NOT NULL CHECK (event_type IN ('evaluation', 'supersession')),
+	successor_mutation_id TEXT,
+	comparable_sessions INTEGER CHECK (comparable_sessions IS NULL OR comparable_sessions >= 0),
+	production_day_start INTEGER,
+	production_day_end INTEGER,
+	scorecard_comparison TEXT,
+	payload_json TEXT NOT NULL CHECK (length(trim(payload_json)) > 0),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (project_id, mutation_id)
+);
+
+CREATE INDEX IF NOT EXISTS evaluations_project_state_idx
+	ON evaluations(project_id, state, updated_at DESC);
+CREATE INDEX IF NOT EXISTS evaluations_project_event_idx
+	ON evaluations(project_id, event_id);
 		`,
 	},
 ] as const;
