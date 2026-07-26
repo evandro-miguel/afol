@@ -253,6 +253,17 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 					"restore read access to the session directory",
 				),
 			);
+			continue;
+		}
+		if (warning.type === "invalid_event_ledger") {
+			findings.push(
+				makeFinding(
+					"wb",
+					"fail",
+					warning.message,
+					"repair the shared event ledger explicitly before rebuilding state",
+				),
+			);
 		}
 	}
 

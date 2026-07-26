@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260715_afol-1-0-linux-wsl-finalization_spec_01
 theme: afol-1-0-linux-wsl-finalization
-status: final
+status: active
 owners:
 - orchestrator
 workstream_intent: feature
@@ -20,6 +20,7 @@ links:
   - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
   - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
   - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
+  - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
 risk_level: high
 ---
 
@@ -45,6 +46,9 @@ AFOL-only downstream boundary.
   removal of legacy configuration from active factory authority, generic test
   fixtures, source guidance, and exported-template contracts while preserving
   explicit resolver fallback compatibility and a verified retention archive.
+- `260726_event-ledger-durability_spec-child_01` owns the shared global event
+  writer, ledger validation, and fail-closed local-state consumption needed
+  after the quota-induced partial-append incident.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -122,8 +126,14 @@ focused policy and compatibility checks, manifest/project validation, and
 redacted Gitleaks history/worktree scans. OSV parsed the unchanged `bun.lock`
 but could not match vulnerabilities because no offline database was available;
 dependency inputs remain unchanged from `532345f`, so the limitation is an
-explicit residual risk rather than a passing scan. All F-29 children and the
-parent are final without reinterpreting earlier evidence.
+explicit residual risk rather than a passing scan.
+
+F-29 is reopened only for the event-ledger durability child after a
+quota-induced partial append demonstrated that the shared JSONL writer and
+consumer trust boundary were not crash-safe. Earlier child evidence remains
+final and is not reinterpreted; the parent returns to final only after this
+child has focused RED/GREEN and independent quality evidence and the parent
+cross-child acceptance, release, and required security gates are current.
 
 ## Verification Plan
 

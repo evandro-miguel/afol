@@ -1,8 +1,7 @@
 import { existsSync } from "node:fs";
 import {
 	firstToken,
-	parseTelemetryEvents,
-	resolveTelemetryEventPath,
+	readBoundedTelemetryEvents,
 	type TelemetryEvent,
 } from "../events/telemetry";
 import { type FeedbackReport, feedbackMode, getFeedback } from "../feedback";
@@ -180,9 +179,8 @@ export function ingestObservationsForSession(
 		"session evidence ledger",
 		OBSERVE_EVIDENCE_LIMITS,
 	);
-	const telemetryText = readBoundedSourceFile(
-		resolveTelemetryEventPath(root),
-		"project telemetry ledger",
+	const telemetryEvents = readBoundedTelemetryEvents(
+		root,
 		OBSERVE_TELEMETRY_LIMITS,
 	);
 	readBoundedSourceFile(
@@ -238,9 +236,9 @@ export function ingestObservationsForSession(
 			entry.exit_code === 0,
 	);
 
-	const telemetryEvents = (
-		telemetryText === null ? [] : parseTelemetryEvents(telemetryText)
-	).filter((event) => event.session_id === session);
+	const sessionTelemetryEvents = telemetryEvents.filter(
+		(event) => event.session_id === session,
+	);
 	const existingEvents = readObservationJournal(root, projectId);
 	const existingOccurrenceIds = new Set<string>();
 	for (const event of existingEvents) {
@@ -277,7 +275,7 @@ export function ingestObservationsForSession(
 	}
 
 	const telemetryCandidates: ObservationInput[] = [];
-	for (const event of telemetryEvents) {
+	for (const event of sessionTelemetryEvents) {
 		if (event.event_type !== "error" && event.event_type !== "blocker")
 			continue;
 		if (telemetryMatchesEvidence(event, failedEvidenceEntries)) continue;

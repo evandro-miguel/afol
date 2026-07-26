@@ -898,7 +898,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: final
+- Status: active
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -912,6 +912,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
     - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
     - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
+    - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -924,6 +925,9 @@ Follow-on slices under this direction:
   - Remove `.agents/config.json` from active factory authority and generic
     fixtures while retaining explicit fallback compatibility and a verified
     AFOL-owned archive.
+  - Make the shared event ledger durable under partial-write and sync failure,
+    serialize cross-session writers, and block validation/rebuild on corrupt
+    input without automatic truncation.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,

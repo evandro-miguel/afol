@@ -2651,7 +2651,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("closeSession stays committed when diagnostic writes fail", () => {
+	test("closeSession fails before commit when the shared event ledger is unreadable", () => {
 		const root = mkRoot("close-diagnostic-failure");
 		try {
 			const created = newWorkstream(root, "close diagnostic failure");
@@ -2666,18 +2666,13 @@ describe("workbench lifecycle service", () => {
 			const eventPath = resolveWorkbenchEventLogPath(root);
 			rmSync(eventPath, { force: true });
 			mkdirSync(eventPath, { recursive: true });
+			const taskBefore = readFileSync(created.taskPath, "utf8");
 
-			const warnings = closeSession(root, created.session);
-			expect(warnings).toContain(
-				"workbench close event failed after the durable close commit; the durable task metadata remains authoritative.",
+			expect(() => closeSession(root, created.session)).toThrow(
+				"EVENT_LEDGER_UNREADABLE",
 			);
-			expect(warnings).toContain(
-				"session-end telemetry failed after the durable close commit; the durable task metadata remains authoritative.",
-			);
-			expect(existsSync(created.activeSessionPath)).toBe(false);
-			expect(readFileSync(created.taskPath, "utf8")).toContain(
-				'status: "closed"',
-			);
+			expect(existsSync(created.activeSessionPath)).toBe(true);
+			expect(readFileSync(created.taskPath, "utf8")).toBe(taskBefore);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
