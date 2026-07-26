@@ -67,6 +67,7 @@ export type CommandSpec = {
 	kind: CommandKind;
 	sideEffect: CommandSideEffect;
 	description: string;
+	capabilities?: readonly string[];
 	category?: CommandCategory;
 	guidance?: readonly string[];
 	subcommands?: readonly CommandSubcommandSpec[];
@@ -803,6 +804,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "evolve",
 		sideEffect: "read",
 		description: "Analyze project evolution state and proposals",
+		capabilities: ["evolution.suggest.first-session/v1"],
 		category: "inspect",
 		guidance: [
 			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",

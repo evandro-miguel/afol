@@ -430,6 +430,7 @@ describe("help formatter", () => {
 			sideEffect: string;
 			requires_approval: boolean;
 			description: string;
+			capabilities?: string[];
 			category?: string;
 		}>;
 
@@ -463,6 +464,26 @@ describe("help formatter", () => {
 		expect(
 			parsed.every((entry) => !entry.aliases.includes(entry.command)),
 		).toBe(true);
+		expect(
+			parsed.find((entry) => entry.command === "evolve")?.capabilities,
+		).toEqual(["evolution.suggest.first-session/v1"]);
+		expect(
+			parsed.find((entry) => entry.command === "status"),
+		).not.toHaveProperty("capabilities");
+	});
+
+	test("projects optional capabilities without sharing registry arrays", () => {
+		const catalog = buildCommandCatalog(kernelRegistry);
+		const evolve = catalog.find((entry) => entry.command === "evolve");
+
+		expect(evolve?.capabilities).toEqual([
+			"evolution.suggest.first-session/v1",
+		]);
+		evolve?.capabilities?.push("test-only");
+		expect(
+			kernelRegistry.commands.find((entry) => entry.command === "evolve")
+				?.capabilities,
+		).toEqual(["evolution.suggest.first-session/v1"]);
 	});
 
 	test("builds intent-filtered catalog json", () => {
@@ -515,6 +536,16 @@ describe("help formatter", () => {
 			],
 		});
 		expect(buildCommandHelpJson("nope", kernelRegistry)).toBeNull();
+	});
+
+	test("projects evolve capabilities in single-command json only", () => {
+		expect(buildCommandHelpJson("evolve", kernelRegistry)).toMatchObject({
+			command: "evolve",
+			capabilities: ["evolution.suggest.first-session/v1"],
+		});
+		expect(buildCommandHelpJson("status", kernelRegistry)).not.toHaveProperty(
+			"capabilities",
+		);
 	});
 
 	test("does not advertise unsupported init json output", () => {
