@@ -10,6 +10,7 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
+import { assertValidEventLedger } from "../services/events/ledger";
 import { withSessionLock } from "../services/io/session-lock";
 import {
 	rebuildProjectIndexes,
@@ -167,6 +168,7 @@ export async function runLocalStateCommand(
 				return 2;
 			}
 			return withSessionLock(projectRoot, "local-state.rebuild", () => {
+				assertValidEventLedger(projectRoot);
 				const workbench = rebuildWorkBenchIndex(projectRoot);
 				const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
 				const summary = summarizeRebuild(snapshot);

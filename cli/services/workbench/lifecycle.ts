@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
+import { readEventLedgerRecords } from "../events/ledger";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
 import { resolveEvolutionConfig } from "../evolution";
 import { ingestObservationsForSession } from "../evolution/observation-ingest";
@@ -802,31 +803,12 @@ function closeDiagnosticState(
 	root: string,
 	session: string,
 ): { workbench: boolean; telemetry: boolean } {
-	const eventPath = resolveProjectPaths(root).abs.eventsFile;
-	if (!existsSync(eventPath)) {
-		return { workbench: false, telemetry: false };
-	}
 	let workbench = false;
 	let telemetry = false;
-	let lines: string[];
-	try {
-		lines = readFileSync(eventPath, "utf8").split(/\r?\n/);
-	} catch {
-		return { workbench: false, telemetry: false };
-	}
-	for (const line of lines) {
-		if (!line.trim()) {
-			continue;
-		}
-		try {
-			const event = JSON.parse(line) as Record<string, unknown>;
-			workbench ||=
-				event.type === "workbench.close" && event.session === session;
-			telemetry ||=
-				event.event_type === "session_end" && event.session_id === session;
-		} catch {
-			// Malformed diagnostic lines are handled by validation, not close recovery.
-		}
+	for (const event of readEventLedgerRecords(root)) {
+		workbench ||= event.type === "workbench.close" && event.session === session;
+		telemetry ||=
+			event.event_type === "session_end" && event.session_id === session;
 	}
 	return { workbench, telemetry };
 }
@@ -2164,6 +2146,7 @@ export function closeSession(
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
+		const diagnostics = closeDiagnosticState(root, session);
 		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
 		const reportRelativePath = relative(root, reportPath).replaceAll("\\", "/");
 		let reportStatus: CloseSessionReport["status"] = existsSync(reportPath)
@@ -2278,7 +2261,6 @@ export function closeSession(
 				? evaluateCloseWarnings(session, paths.sessionDir)
 				: [];
 
-		const diagnostics = closeDiagnosticState(root, session);
 		for (const [alreadyRecorded, label, writeDiagnostic] of [
 			[
 				diagnostics.workbench,
