@@ -163,6 +163,7 @@ export type CommandCatalogEntry = {
 	sideEffect: CommandSpec["sideEffect"];
 	requires_approval: boolean;
 	description: string;
+	capabilities?: string[];
 	category: CommandCategory | "uncategorized";
 	guidance?: readonly string[];
 	subcommands?: (CommandSubcommandSpec & { requires_approval: boolean })[];
@@ -195,6 +196,9 @@ function withApprovalMetadata(spec: CommandSpec): CommandCatalogEntry & {
 		requires_approval:
 			spec.requires_approval ?? requiresApprovalForSideEffect(spec.sideEffect),
 		description: spec.description,
+		...(spec.capabilities !== undefined
+			? { capabilities: [...spec.capabilities] }
+			: {}),
 		category: spec.category ?? "uncategorized",
 		...(spec.guidance !== undefined ? { guidance: [...spec.guidance] } : {}),
 		...(spec.subcommands !== undefined
@@ -246,6 +250,9 @@ export function buildCommandHelpJson(
 			spec.requires_approval ?? requiresApprovalForSideEffect(spec.sideEffect),
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
+		...(spec.capabilities !== undefined
+			? { capabilities: [...spec.capabilities] }
+			: {}),
 	};
 	if (spec.guidance !== undefined) {
 		entry.guidance = [...spec.guidance];
