@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
-import { lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { readProjectConfig } from "../project/paths";
 import { resolveEvolutionIdentity } from "./config";
@@ -58,8 +58,11 @@ function commitResolves(
 	if (!commit || !/^[0-9a-f]{7,64}$/i.test(commit)) return false;
 	const canonicalRoot = realpathSync(root);
 	const result = spawnSync(
-		"git",
+		controlledGitExecutable(),
 		[
+			"--no-pager",
+			"--no-optional-locks",
+			"--no-lazy-fetch",
 			"--no-replace-objects",
 			"-C",
 			canonicalRoot,
@@ -69,9 +72,61 @@ function commitResolves(
 		],
 		{
 			stdio: "ignore",
+			env: gitReadOnlyEnv(),
+			shell: false,
+			timeout: 3_000,
+			windowsHide: true,
 		},
 	);
 	return result.status === 0;
+}
+
+function controlledGitExecutable(): string {
+	const candidates =
+		process.platform === "win32"
+			? ["C:\\Program Files\\Git\\cmd\\git.exe"]
+			: [
+					"/usr/bin/git",
+					"/bin/git",
+					"/usr/local/bin/git",
+					"/opt/homebrew/bin/git",
+				];
+	for (const candidate of candidates) {
+		if (!existsSync(candidate)) continue;
+		try {
+			return realpathSync(candidate);
+		} catch {
+			// Try the next fixed system location.
+		}
+	}
+	throw new Error(
+		"external import linking requires a controlled git executable",
+	);
+}
+
+function gitReadOnlyEnv(): NodeJS.ProcessEnv {
+	const env = Object.fromEntries(
+		[
+			"PATH",
+			"LANG",
+			"LC_ALL",
+			"LC_CTYPE",
+			"SystemRoot",
+			"SystemDrive",
+			"windir",
+		].flatMap((key) =>
+			process.env[key] === undefined ? [] : [[key, process.env[key]]],
+		),
+	) as NodeJS.ProcessEnv;
+	return {
+		...env,
+		GIT_NO_LAZY_FETCH: "1",
+		GIT_OPTIONAL_LOCKS: "0",
+		GIT_TERMINAL_PROMPT: "0",
+		GIT_CONFIG_NOSYSTEM: "1",
+		GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+		GIT_CONFIG_SYSTEM: process.platform === "win32" ? "NUL" : "/dev/null",
+	};
 }
 
 function evidence(...items: string[]): Array<Record<string, string>> {

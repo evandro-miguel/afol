@@ -8,6 +8,7 @@ import {
 	rmSync,
 	symlinkSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -234,6 +235,70 @@ describe("external import service", () => {
 		}
 	});
 
+	test("completes checked short writes for every artifact", async () => {
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			let writes = 0;
+			const accepted = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+				artifactWrite: (fd, buffer, offset, length, position) => {
+					writes += 1;
+					return writeSync(fd, buffer, offset, Math.min(7, length), position);
+				},
+			});
+			expect(writes).toBeGreaterThan(5);
+			for (const file of [
+				"manifest.json",
+				"sessions.jsonl",
+				"segments.jsonl",
+				"links.jsonl",
+				"summary.md",
+			])
+				expect(existsSync(join(accepted.artifactPath, file))).toBe(true);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+			const retry = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			expect(retry.duplicate).toBe(true);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed when an artifact writer makes no progress", async () => {
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			await expect(
+				confirmExternalImport({
+					root,
+					provider: "codex",
+					source: { provider: "codex", path: source, projectId: PROJECT_ID },
+					projectId: PROJECT_ID,
+					db,
+					artifactWrite: () => 0,
+				}),
+			).rejects.toThrow("file write made no progress");
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
+			expect(existsSync(join(root, ".afol", "external", "imports"))).toBe(
+				false,
+			);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("removes staged artifacts when store commit fails", async () => {
 		const { root, source } = fixture();
 		const db = openEvolutionDb(evolutionDbPath(root));
@@ -322,6 +387,52 @@ describe("external import service", () => {
 		} finally {
 			db.close();
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects an orphan artifact with missing, extra, or altered files", async () => {
+		for (const mutation of ["missing", "extra", "altered"] as const) {
+			const { root, source } = fixture();
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				const first = await confirmExternalImport({
+					root,
+					provider: "codex",
+					source: { provider: "codex", path: source, projectId: PROJECT_ID },
+					projectId: PROJECT_ID,
+					db,
+				});
+				db.exec(
+					"DELETE FROM import_checkpoints; DELETE FROM session_links; DELETE FROM external_sessions; DELETE FROM external_imports;",
+				);
+				rmSync(importJournalPath(root), { force: true });
+				if (mutation === "missing")
+					rmSync(join(first.artifactPath, "segments.jsonl"));
+				if (mutation === "extra")
+					writeFileSync(join(first.artifactPath, "raw.jsonl"), "forbidden\n");
+				if (mutation === "altered")
+					writeFileSync(
+						join(first.artifactPath, "segments.jsonl"),
+						"truncated\n",
+					);
+				await expect(
+					confirmExternalImport({
+						root,
+						provider: "codex",
+						source: {
+							provider: "codex",
+							path: source,
+							projectId: PROJECT_ID,
+						},
+						projectId: PROJECT_ID,
+						db,
+					}),
+				).rejects.toThrow(/artifact manifest is invalid/);
+				expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
+			} finally {
+				db.close();
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 });

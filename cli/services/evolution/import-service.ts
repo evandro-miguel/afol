@@ -10,14 +10,15 @@ import {
 	lstatSync,
 	mkdirSync,
 	openSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	renameSync,
 	rmdirSync,
 	rmSync,
-	writeSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { type WriteBufferSync, writeBufferFullySync } from "../io/full-write";
 import { readProjectConfig } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 import { isValidProjectUuid } from "./config";
@@ -119,6 +120,8 @@ export type ConfirmExternalImportInput = {
 	now?: Date;
 	/** Narrow test seam; never used by normal callers. */
 	beforeCommit?: () => void;
+	/** Narrow fault-injection seam for proving checked artifact writes. */
+	artifactWrite?: WriteBufferSync;
 };
 
 export type ConfirmedExternalImport = AcceptedExternalImport & {
@@ -406,10 +409,42 @@ function writeArtifact(
 	links: readonly ExternalSessionLink[],
 	root: string,
 	parent: DirectoryIdentity,
+	write?: WriteBufferSync,
 ): DirectoryIdentity {
 	secureDirectoryIdentity(dirname(path), root, parent);
 	mkdirSync(path, { recursive: true, mode: 0o700 });
 	const stage = secureDirectoryIdentity(path, root);
+	const files = artifactFiles(preview, links);
+	for (const [name, content] of Object.entries(files)) {
+		secureDirectoryIdentity(dirname(path), root, parent);
+		secureDirectoryIdentity(path, root, stage);
+		const target = join(path, name);
+		const fd = openSync(
+			target,
+			fsConstants.O_WRONLY |
+				fsConstants.O_CREAT |
+				fsConstants.O_EXCL |
+				(fsConstants.O_NOFOLLOW ?? 0),
+			0o600,
+		);
+		try {
+			assertOpenedArtifactFile(fd, stage);
+			if (process.platform !== "win32") fchmodSync(fd, 0o600);
+			writeBufferFullySync(fd, Buffer.from(content, "utf8"), write);
+			fsyncSync(fd);
+		} finally {
+			closeSync(fd);
+		}
+	}
+	secureDirectoryIdentity(path, root, stage);
+	fsyncDirectoryChain(path, root);
+	return stage;
+}
+
+function artifactFiles(
+	preview: ExternalImportPreview,
+	links: readonly ExternalSessionLink[],
+): Readonly<Record<string, string>> {
 	const records = preview.normalizedRecords.map((record) => ({
 		...record,
 		external_session_id: externalSessionId(
@@ -417,7 +452,7 @@ function writeArtifact(
 			record.sessionId ?? "unscoped",
 		),
 	}));
-	const files: Record<string, string> = {
+	return {
 		"manifest.json": `${JSON.stringify(preview.manifest)}\n`,
 		"sessions.jsonl": preview.sessionRecords
 			.map((session) => `${JSON.stringify(session)}\n`)
@@ -442,30 +477,6 @@ function writeArtifact(
 			"",
 		].join("\n"),
 	};
-	for (const [name, content] of Object.entries(files)) {
-		secureDirectoryIdentity(dirname(path), root, parent);
-		secureDirectoryIdentity(path, root, stage);
-		const target = join(path, name);
-		const fd = openSync(
-			target,
-			fsConstants.O_WRONLY |
-				fsConstants.O_CREAT |
-				fsConstants.O_EXCL |
-				(fsConstants.O_NOFOLLOW ?? 0),
-			0o600,
-		);
-		try {
-			assertOpenedArtifactFile(fd, stage);
-			if (process.platform !== "win32") fchmodSync(fd, 0o600);
-			writeSync(fd, content, null, "utf8");
-			fsyncSync(fd);
-		} finally {
-			closeSync(fd);
-		}
-	}
-	secureDirectoryIdentity(path, root, stage);
-	fsyncDirectoryChain(path, root);
-	return stage;
 }
 
 function fsyncDirectoryChain(start: string, root: string): void {
@@ -484,42 +495,56 @@ function fsyncDirectoryChain(start: string, root: string): void {
 	}
 }
 
-function sameArtifact(path: string, preview: ExternalImportPreview): boolean {
-	try {
-		const stat = lstatSync(path);
-		if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
-		const manifest = JSON.parse(
-			readFileSync(join(path, "manifest.json"), "utf8"),
-		) as Record<string, unknown>;
-		return (
-			manifest.import_id === preview.importId &&
-			manifest.content_digest === preview.contentDigest &&
-			manifest.redacted === true &&
-			manifest.raw_stored === false
-		);
-	} catch {
-		return false;
-	}
-}
-
 function readArtifactImportedAt(
 	path: string,
 	preview: ExternalImportPreview,
-): string | null {
-	if (!sameArtifact(path, preview)) return null;
+	links: readonly ExternalSessionLink[],
+): string {
 	try {
-		const value = JSON.parse(
+		const stat = lstatSync(path);
+		if (!stat.isDirectory() || stat.isSymbolicLink())
+			throw new Error("external import artifact directory is unsafe");
+		const manifest = JSON.parse(
 			readFileSync(join(path, "manifest.json"), "utf8"),
-		) as { imported_at?: unknown };
-		if (typeof value.imported_at !== "string")
+		) as Record<string, unknown>;
+		if (
+			manifest.import_id !== preview.importId ||
+			manifest.content_digest !== preview.contentDigest ||
+			manifest.redacted !== true ||
+			manifest.raw_stored !== false
+		)
+			throw new Error("external import artifact identity is invalid");
+		if (typeof manifest.imported_at !== "string")
 			throw new Error("external import artifact manifest timestamp is invalid");
-		const timestamp = new Date(value.imported_at);
+		const timestamp = new Date(manifest.imported_at);
 		if (
 			!Number.isFinite(timestamp.getTime()) ||
-			timestamp.toISOString() !== value.imported_at
+			timestamp.toISOString() !== manifest.imported_at
 		)
 			throw new Error("external import artifact manifest timestamp is invalid");
-		return value.imported_at;
+		const persistedPreview = {
+			...preview,
+			manifest: { ...preview.manifest, imported_at: manifest.imported_at },
+		};
+		const expected = artifactFiles(persistedPreview, links);
+		const expectedNames = Object.keys(expected).sort();
+		if (
+			JSON.stringify(readdirSync(path).sort()) !== JSON.stringify(expectedNames)
+		)
+			throw new Error("external import artifact file set is invalid");
+		for (const name of expectedNames) {
+			const target = join(path, name);
+			const file = lstatSync(target);
+			if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1)
+				throw new Error("external import artifact file is unsafe");
+			const expectedContent = expected[name];
+			if (
+				expectedContent === undefined ||
+				readFileSync(target, "utf8") !== expectedContent
+			)
+				throw new Error("external import artifact content is invalid");
+		}
+		return manifest.imported_at;
 	} catch {
 		throw new Error("external import artifact manifest is invalid");
 	}
@@ -611,17 +636,12 @@ export async function confirmExternalImport(
 			const provider = secureDirectoryIdentity(providerPath, input.root);
 			const existed = existsSync(finalPath);
 			if (existed) secureDirectoryIdentity(finalPath, input.root);
-			if (existed && !sameArtifact(finalPath, preview))
-				throw new Error(
-					"external import artifact already exists with different content",
-				);
 			if (existed) {
-				const importedAt = readArtifactImportedAt(finalPath, preview);
-				if (importedAt)
-					preview = {
-						...preview,
-						manifest: { ...preview.manifest, imported_at: importedAt },
-					};
+				const importedAt = readArtifactImportedAt(finalPath, preview, links);
+				preview = {
+					...preview,
+					manifest: { ...preview.manifest, imported_at: importedAt },
+				};
 			}
 			const existingEvent = readImportJournal(
 				input.root,
@@ -640,13 +660,14 @@ export async function confirmExternalImport(
 						links,
 						input.root,
 						provider,
+						input.artifactWrite,
 					);
 					secureDirectoryIdentity(providerPath, input.root, provider);
 					secureDirectoryIdentity(stagePath, input.root, stage);
 					renameSync(stagePath, finalPath);
+					installed = true;
 					secureDirectoryIdentity(finalPath, input.root, stage);
 					fsyncDirectoryChain(dirname(finalPath), input.root);
-					installed = true;
 				}
 				const payload: ImportAcceptancePayload = {
 					project_id: projectId,

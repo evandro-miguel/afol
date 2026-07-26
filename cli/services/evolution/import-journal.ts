@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
 	chmodSync,
 	closeSync,
+	fchmodSync,
 	constants as fsConstants,
 	fstatSync,
 	fsyncSync,
@@ -12,6 +13,7 @@ import {
 	writeSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { type WriteBufferSync, writeBufferFullySync } from "../io/full-write";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectWritePath } from "../project/root";
 import {
@@ -395,6 +397,12 @@ export function appendImportJournalEventUnlocked(
 		payload: ImportAcceptancePayload;
 		eventId?: string;
 		now?: Date;
+		/** Narrow fault-injection seam for durability tests. */
+		io?: {
+			write?: WriteBufferSync;
+			fsync?: typeof fsyncSync;
+			truncate?: typeof ftruncateSync;
+		};
 	},
 ): ImportJournalAppendResult {
 	if (
@@ -460,16 +468,31 @@ export function appendImportJournalEventUnlocked(
 		const opened = fstatSync(fd);
 		if (!opened.isFile() || opened.nlink !== 1)
 			throw new Error("import journal target must be a regular file");
-		const line = `${JSON.stringify(event)}\n`;
-		if (Buffer.byteLength(line, "utf8") > MAX_EVENT_BYTES)
+		if (opened.size !== previousSize)
+			throw new Error("import journal size changed before append");
+		const line = Buffer.from(`${JSON.stringify(event)}\n`, "utf8");
+		if (line.byteLength > MAX_EVENT_BYTES)
 			throw new Error("import journal event exceeds size limit");
-		writeSync(fd, line, null, "utf8");
-		fsyncSync(fd);
-		if (process.platform !== "win32") chmodSync(path, 0o600);
+		try {
+			writeBufferFullySync(fd, line, input.io?.write ?? writeSync);
+			if (process.platform !== "win32") fchmodSync(fd, 0o600);
+			(input.io?.fsync ?? fsyncSync)(fd);
+			fsyncDirectory(dirname(path));
+		} catch (writeError) {
+			try {
+				(input.io?.truncate ?? ftruncateSync)(fd, previousSize);
+				fsyncSync(fd);
+			} catch (rollbackError) {
+				throw new AggregateError(
+					[writeError, rollbackError],
+					"import journal append and rollback both failed",
+				);
+			}
+			throw writeError;
+		}
 	} finally {
 		closeSync(fd);
 	}
-	fsyncDirectory(dirname(path));
 	return { event, path, previous_size: previousSize };
 }
 

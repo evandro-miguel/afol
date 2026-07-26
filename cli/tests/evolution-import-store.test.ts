@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import { checkEvolutionDbHealth } from "../services/evolution/health";
 import {
+	appendImportJournalEventUnlocked,
 	importJournalPath,
 	readImportJournal,
 } from "../services/evolution/import-journal";
@@ -113,6 +114,81 @@ describe("external import acceptance store", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restores the journal after a partial write or fsync failure", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-import-io-rollback-"));
+		try {
+			appendImportJournalEventUnlocked({
+				root,
+				projectId: PROJECT_ID,
+				payload: payload("first"),
+			});
+			const path = importJournalPath(root);
+			const before = readFileSync(path);
+			let writes = 0;
+			expect(() =>
+				appendImportJournalEventUnlocked({
+					root,
+					projectId: PROJECT_ID,
+					payload: payload("partial"),
+					io: {
+						write: (fd, buffer, offset, length, position) => {
+							if (writes++ > 0) throw new Error("injected EDQUOT");
+							return writeSync(
+								fd,
+								buffer,
+								offset,
+								Math.min(17, length),
+								position,
+							);
+						},
+					},
+				}),
+			).toThrow("injected EDQUOT");
+			expect(readFileSync(path)).toEqual(before);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+
+			expect(() =>
+				appendImportJournalEventUnlocked({
+					root,
+					projectId: PROJECT_ID,
+					payload: payload("fsync"),
+					io: {
+						fsync: () => {
+							throw new Error("injected fsync failure");
+						},
+					},
+				}),
+			).toThrow("injected fsync failure");
+			expect(readFileSync(path)).toEqual(before);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports both append and rollback failures", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-import-io-aggregate-"));
+		try {
+			expect(() =>
+				appendImportJournalEventUnlocked({
+					root,
+					projectId: PROJECT_ID,
+					payload: payload("aggregate"),
+					io: {
+						write: () => {
+							throw new Error("injected write failure");
+						},
+						truncate: () => {
+							throw new Error("injected rollback failure");
+						},
+					},
+				}),
+			).toThrow("append and rollback both failed");
+		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

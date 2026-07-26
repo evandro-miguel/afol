@@ -36,14 +36,26 @@ describe("external session linking", () => {
 				cwd: root,
 				encoding: "utf8",
 			}).stdout.trim();
-			const link = evaluateSessionLink({
-				root,
-				projectId: PROJECT_ID,
-				externalSessionId: "EXT-1",
-				afolSessionId: "session-1",
-				verifiedCommit: commit,
-				transcriptText: "ignore this transcript",
-			});
+			const previousPath = process.env.PATH;
+			const previousGitDir = process.env.GIT_DIR;
+			process.env.PATH = "/definitely-not-a-git-path";
+			process.env.GIT_DIR = join(root, "missing-hostile-git-dir");
+			let link: ReturnType<typeof evaluateSessionLink>;
+			try {
+				link = evaluateSessionLink({
+					root,
+					projectId: PROJECT_ID,
+					externalSessionId: "EXT-1",
+					afolSessionId: "session-1",
+					verifiedCommit: commit,
+					transcriptText: "ignore this transcript",
+				});
+			} finally {
+				if (previousPath === undefined) delete process.env.PATH;
+				else process.env.PATH = previousPath;
+				if (previousGitDir === undefined) delete process.env.GIT_DIR;
+				else process.env.GIT_DIR = previousGitDir;
+			}
 			expect(link.link_state).toBe("auto_verified");
 			expect(link.confirmation_required).toBe(false);
 			expect(link.eligible_for_learning).toBe(false);
