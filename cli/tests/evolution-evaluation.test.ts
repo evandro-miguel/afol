@@ -8,6 +8,7 @@ import {
 	renameSync,
 	rmSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -792,6 +793,118 @@ describe("Evolution posterior evaluation contracts", () => {
 			renameSync(backup, path);
 			expect(readEvaluationJournal(root)).toHaveLength(1);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects an event larger than the reader limit before changing the journal", () => {
+		const { root, mutationId } = appliedFixture();
+		try {
+			const commit = readApplyJournal(root).find(
+				(event) =>
+					event.phase === "commit" && event.binding.mutation_id === mutationId,
+			);
+			if (!commit) throw new Error("missing apply commit fixture");
+			const path = evaluationJournalPath(root);
+			const before = existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
+			expect(() =>
+				appendEvaluationEventUnlocked(root, {
+					event_id: "E-eval-oversized",
+					event_type: "evaluation",
+					project_id: PROJECT_ID,
+					mutation_id: mutationId,
+					state: "canary",
+					created_at: NOW.toISOString(),
+					apply_commit_digest: commit.event_digest,
+					reason: "x".repeat(512 * 1024),
+				}),
+			).toThrow(/event exceeds size limit/i);
+			expect(existsSync(path) ? readFileSync(path) : Buffer.alloc(0)).toEqual(
+				before,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("completes byte-based short writes and aggregates rollback failure", () => {
+		const { root, mutationId } = appliedFixture();
+		try {
+			const commit = readApplyJournal(root).find(
+				(event) =>
+					event.phase === "commit" && event.binding.mutation_id === mutationId,
+			);
+			if (!commit) throw new Error("missing apply commit fixture");
+			const event = {
+				event_id: "E-eval-short-loop",
+				event_type: "evaluation",
+				project_id: PROJECT_ID,
+				mutation_id: mutationId,
+				state: "canary",
+				created_at: NOW.toISOString(),
+				apply_commit_digest: commit.event_digest,
+			} as const;
+			let shortCalls = 0;
+			appendEvaluationEventUnlocked({
+				root,
+				event,
+				writeBytes: (fd, value) => {
+					shortCalls += 1;
+					const bytes = Buffer.from(value);
+					return writeSync(fd, bytes, 0, Math.min(3, bytes.length), null);
+				},
+			});
+			expect(shortCalls).toBeGreaterThan(1);
+
+			let writeCalls = 0;
+			let caught: unknown;
+			try {
+				appendEvaluationEventUnlocked({
+					root,
+					event: { ...event, event_id: "E-eval-aggregate" },
+					writeBytes: (fd, value) => {
+						writeCalls += 1;
+						if (writeCalls > 1) throw new Error("primary write failure");
+						const bytes = Buffer.from(value);
+						return writeSync(fd, bytes, 0, Math.min(3, bytes.length), null);
+					},
+					truncateFile: () => {
+						throw new Error("rollback truncate failure");
+					},
+				});
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(AggregateError);
+			expect(
+				(caught as AggregateError).errors.map((error: Error) => error.message),
+			).toEqual(["primary write failure", "rollback truncate failure"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed when the journal pathname changes after safe fd open", () => {
+		if (process.platform === "win32") return;
+		const { root, mutationId } = appliedFixture();
+		const path = evaluationJournalPath(root);
+		const backup = `${path}.read-original`;
+		try {
+			recordEvaluation(root, mutationId);
+			const original = readFileSync(path);
+			expect(() =>
+				readEvaluationJournal(root, PROJECT_ID, undefined, {
+					afterOpen: () => {
+						renameSync(path, backup);
+						writeFileSync(path, original);
+					},
+				}),
+			).toThrow(/changed during read/i);
+		} finally {
+			if (existsSync(backup)) {
+				rmSync(path, { force: true });
+				renameSync(backup, path);
+			}
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

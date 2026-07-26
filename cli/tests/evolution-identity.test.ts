@@ -57,6 +57,8 @@ describe("Evolution identity boundaries", () => {
 			"/tmp/evolution.db",
 			"../evolution.db",
 			"state/../evolution.db",
+			".agents/runtime/evolution.db",
+			"docs/evolution.db",
 			"C:\\evolution.db",
 			"state\\evolution.db",
 			"state/",
@@ -65,7 +67,7 @@ describe("Evolution identity boundaries", () => {
 			const paths = config.paths as Record<string, unknown>;
 			paths.evolution_db = path;
 			expect(() => resolveEvolutionConfig(config)).toThrow(
-				"paths.evolution_db must be a safe project-relative path",
+				"paths.evolution_db must be an AFOL-owned project-relative path",
 			);
 		}
 	});

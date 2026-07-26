@@ -244,6 +244,55 @@ function requireTargetPath(result: { target_path?: string }): string {
 }
 
 describe("evolution apply service", () => {
+	test("keeps a durable terminal authoritative when checkpoint refresh fails", () => {
+		const { root, proposal, task } = fixture();
+		try {
+			let checkpointCalls = 0;
+			const result = applyEvolutionProposal({
+				...applyInput(root, proposal, task),
+				checkpointWriter: () => {
+					checkpointCalls += 1;
+					if (checkpointCalls > 1)
+						throw new Error("checkpoint unavailable after terminal");
+					return {} as never;
+				},
+			});
+			expect(result.status).toBe("applied");
+			expect(checkpointCalls).toBeGreaterThanOrEqual(2);
+			expect(existsSync(join(root, requireTargetPath(result)))).toBe(true);
+			expect(
+				readApplyJournal(root).some(
+					(event) =>
+						event.phase === "commit" &&
+						event.binding.mutation_id === result.mutation_id,
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails before artifact mutation when the prepare checkpoint cannot refresh", () => {
+		const { root, proposal, task } = fixture();
+		try {
+			expect(() =>
+				applyEvolutionProposal({
+					...applyInput(root, proposal, task),
+					checkpointWriter: () => {
+						throw new Error("prepare checkpoint unavailable");
+					},
+				}),
+			).toThrow("prepare checkpoint unavailable");
+			const events = readApplyJournal(root);
+			expect(events.map((event) => event.phase)).toEqual(["prepare", "abort"]);
+			expect(existsSync(join(root, events[0]?.binding.target_path ?? ""))).toBe(
+				false,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("applies a manual lesson, is idempotent, and rolls back explicitly", () => {
 		const { root, proposal, task } = fixture();
 		try {

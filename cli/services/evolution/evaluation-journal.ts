@@ -10,7 +10,7 @@ import {
 	ftruncateSync,
 	mkdirSync,
 	openSync,
-	readFileSync,
+	readSync,
 	writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
@@ -77,7 +77,14 @@ export type EvaluationJournalEvent = EvaluationEventInput & {
 
 export type EvaluationAppendOptions = {
 	beforeOpen?: () => void;
-	writeBytes?: (fd: number, value: string) => number;
+	writeBytes?: (fd: number, value: Buffer) => number;
+	syncFile?: (fd: number) => void;
+	truncateFile?: (fd: number, size: number) => void;
+	closeFile?: (fd: number) => void;
+};
+
+export type EvaluationReadOptions = {
+	afterOpen?: () => void;
 };
 
 type JournalContext = { root: string; eventsDir?: string; projectId?: string };
@@ -303,15 +310,13 @@ export function readEvaluationJournal(
 	root: string,
 	projectId?: string,
 	eventsDir?: string,
+	options: EvaluationReadOptions = {},
 ): EvaluationJournalEvent[] {
 	const expectedProject = resolveProjectId(root, projectId);
 	const resolvedEventsDir = resolveEventsDir(root, eventsDir);
 	const path = evaluationJournalPath(root, resolvedEventsDir);
-	const stat = assertSafeEvolutionTarget(path, "evolution evaluation journal");
-	if (!stat) return [];
-	if (stat.size > MAX_JOURNAL_BYTES)
-		throw new Error("evolution evaluation journal exceeds size limit");
-	const text = readFileSync(path, "utf8");
+	const text = readEvaluationJournalText(path, options);
+	if (text === null) return [];
 	if (text.length > 0 && !text.endsWith("\n"))
 		throw new Error(
 			"evolution evaluation journal has a partial trailing event",
@@ -343,6 +348,79 @@ export function readEvaluationJournal(
 	return events;
 }
 
+function sameFile(
+	left: {
+		dev: string | number | bigint;
+		ino: string | number | bigint;
+		size: string | number | bigint;
+		mtimeMs: string | number | bigint;
+		ctimeMs: string | number | bigint;
+	},
+	right: {
+		dev: string | number | bigint;
+		ino: string | number | bigint;
+		size: string | number | bigint;
+		mtimeMs: string | number | bigint;
+		ctimeMs: string | number | bigint;
+	},
+): boolean {
+	return (
+		String(left.dev) === String(right.dev) &&
+		String(left.ino) === String(right.ino) &&
+		Number(left.size) === Number(right.size) &&
+		Number(left.mtimeMs) === Number(right.mtimeMs) &&
+		Number(left.ctimeMs) === Number(right.ctimeMs)
+	);
+}
+
+function readEvaluationJournalText(
+	path: string,
+	options: EvaluationReadOptions,
+): string | null {
+	const before = assertSafeEvolutionTarget(
+		path,
+		"evolution evaluation journal",
+	);
+	if (!before) return null;
+	if (before.size > MAX_JOURNAL_BYTES)
+		throw new Error("evolution evaluation journal exceeds size limit");
+	const fd = openSync(
+		path,
+		fsConstants.O_RDONLY |
+			(process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW),
+	);
+	try {
+		options.afterOpen?.();
+		const opened = fstatSync(fd);
+		if (!opened.isFile() || opened.nlink !== 1 || !sameFile(before, opened))
+			throw new Error("evolution evaluation journal changed during read");
+		const size = Number(opened.size);
+		const buffer = Buffer.allocUnsafe(size);
+		let offset = 0;
+		while (offset < size) {
+			const bytesRead = readSync(fd, buffer, offset, size - offset, null);
+			if (bytesRead <= 0)
+				throw new Error("evolution evaluation journal changed during read");
+			offset += bytesRead;
+		}
+		const afterFd = fstatSync(fd);
+		const afterPath = assertSafeEvolutionTarget(
+			path,
+			"evolution evaluation journal",
+			false,
+		);
+		if (
+			!afterPath ||
+			!sameFile(opened, afterFd) ||
+			!sameFile(opened, afterPath)
+		)
+			throw new Error("evolution evaluation journal changed during read");
+		return buffer.toString("utf8");
+	} finally {
+		closeSync(fd);
+	}
+}
+
 function fsyncDirectory(path: string): void {
 	if (process.platform === "win32") return;
 	const fd = openSync(path, fsConstants.O_RDONLY);
@@ -355,7 +433,7 @@ function fsyncDirectory(path: string): void {
 
 function appendLine(
 	path: string,
-	line: string,
+	line: Buffer,
 	options: EvaluationAppendOptions = {},
 ): void {
 	const parent = dirname(path);
@@ -369,13 +447,23 @@ function appendLine(
 	options.beforeOpen?.();
 	const fd = openSync(
 		path,
-		fsConstants.O_WRONLY |
+		fsConstants.O_RDWR |
 			fsConstants.O_APPEND |
 			fsConstants.O_CREAT |
 			(process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW),
 		0o600,
 	);
+	const writeBytes =
+		options.writeBytes ??
+		((targetFd: number, value: Buffer) =>
+			writeSync(targetFd, value, 0, value.byteLength, null));
+	const syncFile = options.syncFile ?? fsyncSync;
+	const truncateFile = options.truncateFile ?? ftruncateSync;
+	const closeFile = options.closeFile ?? closeSync;
 	let writeAttempted = false;
+	let primaryError: unknown;
+	let rollbackError: unknown;
+	let closeError: unknown;
 	try {
 		const opened = fstatSync(fd);
 		const current = assertSafeEvolutionTarget(
@@ -393,26 +481,75 @@ function appendLine(
 			current.ino !== opened.ino
 		)
 			throw new Error("evolution evaluation journal changed during append");
+		if (previousSize + line.byteLength > MAX_JOURNAL_BYTES)
+			throw new Error("evolution evaluation journal exceeds size limit");
 		writeAttempted = true;
-		const written = options.writeBytes
-			? options.writeBytes(fd, line)
-			: writeSync(fd, line, undefined, "utf8");
-		if (written !== Buffer.byteLength(line, "utf8"))
-			throw new Error("evolution evaluation journal write was incomplete");
+		let offset = 0;
+		while (offset < line.byteLength) {
+			const remaining = line.subarray(offset);
+			const written = writeBytes(fd, remaining);
+			if (
+				!Number.isInteger(written) ||
+				written <= 0 ||
+				written > remaining.byteLength
+			)
+				throw new Error("evolution evaluation journal write was incomplete");
+			offset += written;
+		}
+		const afterWrite = fstatSync(fd);
+		if (Number(afterWrite.size) !== previousSize + line.byteLength)
+			throw new Error(
+				"evolution evaluation journal write was incomplete: size is inconsistent",
+			);
 		if (process.platform !== "win32") fchmodSync(fd, 0o600);
-		fsyncSync(fd);
+		syncFile(fd);
+		const finalOpened = fstatSync(fd);
+		const currentAfterWrite = assertSafeEvolutionTarget(
+			path,
+			"evolution evaluation journal",
+			false,
+		);
+		if (!currentAfterWrite || !sameFile(finalOpened, currentAfterWrite))
+			throw new Error("evolution evaluation journal changed during append");
 	} catch (error) {
-		if (writeAttempted)
+		primaryError = error;
+		if (writeAttempted) {
 			try {
-				ftruncateSync(fd, previousSize);
-				fsyncSync(fd);
-			} catch {
-				/* preserve the original append failure */
+				const opened = fstatSync(fd);
+				const current = assertSafeEvolutionTarget(
+					path,
+					"evolution evaluation journal",
+					false,
+				);
+				if (
+					!current ||
+					String(opened.dev) !== String(current.dev) ||
+					String(opened.ino) !== String(current.ino)
+				)
+					throw new Error(
+						"evolution evaluation journal changed before rollback",
+					);
+				truncateFile(fd, previousSize);
+				syncFile(fd);
+			} catch (errorDuringRollback) {
+				rollbackError = errorDuringRollback;
 			}
-		throw error;
-	} finally {
-		closeSync(fd);
+		}
 	}
+	try {
+		closeFile(fd);
+	} catch (error) {
+		closeError = error;
+	}
+	if (primaryError !== undefined) {
+		if (rollbackError !== undefined)
+			throw new AggregateError(
+				[primaryError, rollbackError],
+				"evolution evaluation journal append and rollback failed",
+			);
+		throw primaryError;
+	}
+	if (closeError !== undefined) throw closeError;
 	fsyncDirectory(parent);
 }
 
@@ -495,15 +632,15 @@ export function appendEvaluationEventUnlocked(
 		prior,
 		expectedProject,
 	);
-	const line = `${JSON.stringify(journalEvent)}\n`;
+	const serialized = JSON.stringify(journalEvent);
+	if (Buffer.byteLength(serialized, "utf8") > MAX_EVENT_BYTES)
+		throw new Error("evolution evaluation event exceeds size limit");
+	const line = Buffer.from(`${serialized}\n`, "utf8");
 	const current = assertSafeEvolutionTarget(
 		path,
 		"evolution evaluation journal",
 	);
-	if (
-		Number(current?.size ?? 0) + Buffer.byteLength(line, "utf8") >
-		MAX_JOURNAL_BYTES
-	)
+	if (Number(current?.size ?? 0) + line.byteLength > MAX_JOURNAL_BYTES)
 		throw new Error("evolution evaluation journal exceeds size limit");
 	appendLine(path, line, input);
 	return journalEvent;

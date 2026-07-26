@@ -50,6 +50,7 @@ export type ApplyInput = {
 	session: string;
 	taskId: string;
 	now?: Date;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 };
 
 export type RollbackInput = {
@@ -61,6 +62,7 @@ export type RollbackInput = {
 	session: string;
 	taskId: string;
 	now?: Date;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 };
 
 export type ApplyResult = {
@@ -352,6 +354,7 @@ function appendTerminal(input: {
 	session: string;
 	taskId: string;
 	now?: Date;
+	checkpointWriter?: typeof writeEvolutionProjectionCheckpoint;
 }) {
 	const event = appendApplyEventUnlocked({
 		root: input.root,
@@ -361,17 +364,32 @@ function appendTerminal(input: {
 		commandTaskId: input.taskId,
 		...(input.now ? { now: input.now } : {}),
 	});
-	refreshApplyCheckpoint(input.root);
+	refreshApplyCheckpointBestEffort(input.root, input.checkpointWriter);
 	return event;
 }
 
-function refreshApplyCheckpoint(root: string): void {
+function refreshApplyCheckpointBestEffort(
+	root: string,
+	checkpointWriter = writeEvolutionProjectionCheckpoint,
+): void {
+	try {
+		refreshApplyCheckpoint(root, checkpointWriter);
+	} catch {
+		// The apply journal is canonical. A stale/missing checkpoint is derived
+		// state and must not turn a durable terminal into a reported failure.
+	}
+}
+
+function refreshApplyCheckpoint(
+	root: string,
+	checkpointWriter = writeEvolutionProjectionCheckpoint,
+): void {
 	const resolved = resolveEvolutionConfig(readProjectConfig(root));
 	if (!resolved.projectId)
 		throw new Error("evolution project id is required for apply checkpoint");
 	const db = openEvolutionDb(evolutionDbPath(root, resolved.paths.evolutionDb));
 	try {
-		writeEvolutionProjectionCheckpoint({
+		checkpointWriter({
 			root,
 			db,
 			projectId: resolved.projectId,
@@ -535,7 +553,7 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 							commandTaskId: input.taskId,
 							...(input.now ? { now: input.now } : {}),
 						});
-						refreshApplyCheckpoint(input.root);
+						refreshApplyCheckpoint(input.root, input.checkpointWriter);
 					},
 				},
 			);
@@ -553,6 +571,9 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 				binding: prepared,
 				session: input.session,
 				taskId: input.taskId,
+				...(input.checkpointWriter
+					? { checkpointWriter: input.checkpointWriter }
+					: {}),
 				...(input.now ? { now: input.now } : {}),
 			});
 			return {
@@ -586,6 +607,9 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 					binding: prepared,
 					session: input.session,
 					taskId: input.taskId,
+					...(input.checkpointWriter
+						? { checkpointWriter: input.checkpointWriter }
+						: {}),
 					...(input.now ? { now: input.now } : {}),
 				});
 			}
@@ -640,6 +664,9 @@ export function rollbackEvolutionProposal(input: RollbackInput): ApplyResult {
 				binding: commit.binding,
 				session: input.session,
 				taskId: input.taskId,
+				...(input.checkpointWriter
+					? { checkpointWriter: input.checkpointWriter }
+					: {}),
 				...(input.now ? { now: input.now } : {}),
 			});
 			return {
@@ -664,6 +691,9 @@ export function rollbackEvolutionProposal(input: RollbackInput): ApplyResult {
 			binding: commit.binding,
 			session: input.session,
 			taskId: input.taskId,
+			...(input.checkpointWriter
+				? { checkpointWriter: input.checkpointWriter }
+				: {}),
 			...(input.now ? { now: input.now } : {}),
 		});
 		return {

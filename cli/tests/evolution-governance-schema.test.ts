@@ -162,6 +162,17 @@ describe("Evolution Slice 0 governance schema", () => {
 				},
 			}),
 		).toBe(false);
+		for (const path of [".agents/runtime/evolution.db", "docs/evolution.db"]) {
+			expect(
+				validate?.({
+					...custom,
+					paths: {
+						...(custom.paths as Record<string, unknown>),
+						evolution_db: path,
+					},
+				}),
+			).toBe(false);
+		}
 	});
 
 	test("rejects invalid project identity and timezone shape", () => {
