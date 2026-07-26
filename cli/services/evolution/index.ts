@@ -1,4 +1,15 @@
 export * from "./analysis";
+export {
+	APPLY_POLICY_VERSION,
+	APPLY_VALIDATOR_VERSION,
+	type ApplyBinding,
+	type ApplyJournalEvent,
+	type ApplyPhase,
+	applyDigest,
+	applyJournalPath,
+	readApplyJournal,
+} from "./apply-journal";
+export type { ApplyResult } from "./apply-service";
 export * from "./config";
 export * from "./db";
 export * from "./derived-state";

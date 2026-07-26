@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
-import { basename, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import {
 	envelopeErr,
 	envelopeOk,
@@ -42,6 +42,10 @@ import {
 	resolveDailySuggestion,
 	resolveEvolutionConfig,
 } from "../services/evolution";
+import {
+	applyEvolutionProposal,
+	rollbackEvolutionProposal,
+} from "../services/evolution/apply-service";
 import { localDateForTimezone } from "../services/evolution/config";
 import type { ImportProvider } from "../services/evolution/imports";
 import { ingestObservationsForSession } from "../services/evolution/observation-ingest";
@@ -57,7 +61,15 @@ import {
 	suggestionJournalPath,
 } from "../services/evolution/suggestion-journal";
 import { observeSessionLock } from "../services/io/session-lock";
-import { readProjectConfig } from "../services/project/paths";
+import {
+	readProjectConfig,
+	resolveProjectPaths,
+} from "../services/project/paths";
+import {
+	assertTaskInProgress,
+	readActiveSession,
+} from "../services/workbench/lifecycle";
+import { verifyWorkbenchTasks } from "../services/workbench/verify";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
@@ -528,6 +540,129 @@ function runLocalGit(root: string, args: readonly string[]) {
 		timeout: 3_000,
 		windowsHide: true,
 	});
+}
+
+function parseProposalMutationArgs(
+	action: "apply" | "rollback",
+	args: readonly string[],
+): { proposalId: string; json: boolean } {
+	let proposalId = "";
+	let json = false;
+	for (const arg of args) {
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
+		if (!proposalId && arg && !arg.startsWith("-")) {
+			proposalId = arg;
+			continue;
+		}
+		throw new Error(`Unsupported evolve ${action} argument`);
+	}
+	if (!proposalId) throw new Error(`evolve ${action} requires <proposal-id>`);
+	return { proposalId, json };
+}
+
+function resolveSingleInProgressTask(root: string): {
+	session: string;
+	taskId: string;
+} {
+	const session = readActiveSession(root);
+	if (!session)
+		throw new Error("evolve mutation requires an active workbench session");
+	const sessionPath = join(resolveProjectPaths(root).abs.wbDir, session);
+	const verification = verifyWorkbenchTasks(sessionPath);
+	const inProgress = verification.openTasks.filter(
+		(task) => task.state === "in_progress",
+	);
+	if (inProgress.length !== 1) {
+		throw new Error(
+			`evolve mutation requires exactly one in-progress task (found ${inProgress.length})`,
+		);
+	}
+	const taskId = inProgress[0]?.id;
+	if (!taskId)
+		throw new Error("evolve mutation could not resolve the in-progress task");
+	assertTaskInProgress(root, session, taskId);
+	return { session, taskId };
+}
+
+function evolutionPolicyMode(root: string): string {
+	const settings = resolveEvolutionConfig(readProjectConfig(root)).settings;
+	const autonomy = settings.autonomy;
+	if (autonomy && typeof autonomy === "object" && !Array.isArray(autonomy)) {
+		const mode = (autonomy as Record<string, unknown>).auto_apply_mode;
+		if (typeof mode === "string" && mode.length > 0) return mode;
+	}
+	return "none";
+}
+
+async function runProposalMutation(
+	action: "apply" | "rollback",
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): Promise<number> {
+	const parsed = parseProposalMutationArgs(action, args);
+	assertAdmittedOperationContext(operationContext);
+	if (
+		!isActionAllowed(operationContext, {
+			action: `evolve.${action}`,
+			sideEffect: "write",
+		})
+	) {
+		throw new Error(`evolve ${action} requires local interactive mode`);
+	}
+	const { session, taskId } = resolveSingleInProgressTask(root);
+	const projectId = resolveEvolutionConfig(readProjectConfig(root)).projectId;
+	if (!projectId) {
+		throw new Error("evolution project id is required");
+	}
+	const proposal =
+		action === "apply"
+			? analyzeEvolutionProject(root, { now }).proposals.find(
+					(entry) => entry.id === parsed.proposalId,
+				)
+			: undefined;
+	if (action === "apply" && !proposal)
+		throw new Error("evolution proposal preview is missing or stale");
+	const policyMode = evolutionPolicyMode(root) as
+		| "none"
+		| "canary"
+		| "lessons_memory_only";
+	const result =
+		action === "apply"
+			? applyEvolutionProposal({
+					root,
+					projectId,
+					proposal: proposal as NonNullable<typeof proposal> &
+						Record<string, unknown>,
+					invocationClass: "explicit_local",
+					policyMode,
+					session,
+					taskId,
+					now,
+				})
+			: rollbackEvolutionProposal({
+					root,
+					projectId,
+					proposalId: parsed.proposalId,
+					invocationClass: "explicit_local",
+					policyMode,
+					session,
+					taskId,
+					now,
+				});
+	writeEvolutionPayload(
+		io,
+		parsed.json,
+		`evolve.${action}`,
+		result,
+		operationContext,
+	);
+	return 0;
 }
 
 function resolveCommitRange(
@@ -1641,6 +1776,15 @@ export async function runEvolveCommand(
 			return await runImport(args, projectRoot, io, operationContext);
 		if (action === "external")
 			return runExternalList(args, projectRoot, io, operationContext);
+		if (action === "apply" || action === "rollback")
+			return await runProposalMutation(
+				action,
+				args,
+				projectRoot,
+				io,
+				operationContext,
+				now,
+			);
 		if (["skip", "accept", "reject"].includes(action))
 			return await runDecision(
 				action as "skip" | "accept" | "reject",

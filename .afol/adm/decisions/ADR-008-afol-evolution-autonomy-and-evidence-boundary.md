@@ -69,11 +69,16 @@ references sufficient to reconstruct the decision without trusting model prose.
 - External evidence is never an explicit user preference. It may support an
   observation or proposal, but only an explicit project-user decision can
   create, reinforce, reject, forget, or promote a preference.
-- Caller labels are not authentication. Journal authority is assigned only by
-  the trusted local dispatcher: an explicit user authority requires a locally
-  verified project-user origin, and approved policy authority requires the
-  system policy gate. Local/remote agents and external harnesses remain
+- Caller labels and transport markers are not authentication. TTY/PTY
+  signals are policy inputs only and cannot prove actor identity. Journal
+  authority is assigned only to a direct local-operator invocation
+  admitted by the cooperative deployment boundary; this is policy routing, not
+  authenticated identity. Local/remote agents and external harnesses remain
   observer authority and cannot impersonate either decision source.
+- Generic-shell/PTY-capable same-UID actors remain outside first-release
+  cooperative admission unless explicitly routed through local-operator
+  catalog entries; the catalog prerequisite forbids exposing unmarked routes
+  that carry unrestricted mutation behavior.
 - Canonical knowledge remains in existing AFOL surfaces. Evolution DB rows,
   indexes, clusters, receipts, caches, and projections are derived and must
   be rebuildable without deleting canonical knowledge.

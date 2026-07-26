@@ -72,6 +72,8 @@ Observer -> Analyst -> Proposal -> Critic -> User/Policy -> Apply -> Evaluate
 - Critic tests the proposal for safety, scope, evidence quality, and regression
   risk; a component may not approve its own change.
 - User or policy approves the proposal according to the autonomy matrix.
+- Execution context and caller signals are policy inputs only. TTY/PTY and transport
+  hints cannot authenticate a caller or override restrictive policy.
 - Apply uses the normal AFOL workbench and mutation lifecycle.
 - Evaluate compares later comparable sessions and enters canary, stable,
   needs-more-data, regressed, rolled-back, or superseded state.
@@ -325,6 +327,8 @@ config and persistence foundation without changing critical surfaces.
   preserve source refs, and require approval for promotion.
 - Prompt injection or secrets in imports: explicit command, redaction,
   non-execution boundary, size limits, hashes, and fail-closed parsing.
+- Same-UID PTY-capable terminal actor impersonation is out of scope for
+  authentication; explicit policy/governance channels remain required.
 - Noisy daily UX: one suggestion, shared receipt, TTL claim, and separate
   critical alerts.
 - Speed improvements hiding regressions: scorecard precedence and canary

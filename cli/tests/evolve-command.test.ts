@@ -16,6 +16,7 @@ import { runEvolveCommand, runObserveCommand } from "../commands/evolve";
 import {
 	agentOperationContext,
 	defaultOperationContext,
+	resolveOperationContext,
 } from "../core/operation-context";
 import { kernelRegistry } from "../registry";
 import { resolveCommand } from "../router";
@@ -174,6 +175,59 @@ describe("evolve status", () => {
 			action: "status",
 			args: ["--json"],
 		});
+		expect(resolveCommand(["evolve", "apply", "EVO-1", "--json"])).toEqual({
+			kind: "subcommand",
+			group: "evolve",
+			action: "apply",
+			args: ["EVO-1", "--json"],
+		});
+		expect(resolveCommand(["evolve", "rollback", "EVO-1", "--json"])).toEqual({
+			kind: "subcommand",
+			group: "evolve",
+			action: "rollback",
+			args: ["EVO-1", "--json"],
+		});
+	});
+
+	test("apply and rollback fail closed before mutation without valid CLI context", async () => {
+		const root = fixture();
+		try {
+			const missingId = captureIo();
+			expect(
+				await runEvolveCommand("apply", ["--json"], root, missingId.io),
+			).toBe(2);
+			expect(missingId.stdout.join("\n")).toContain("requires <proposal-id>");
+
+			const noSession = captureIo();
+			expect(
+				await runEvolveCommand(
+					"rollback",
+					["EVO-1", "--json"],
+					root,
+					noSession.io,
+					resolveOperationContext([], {}, true).ctx,
+				),
+			).toBe(2);
+			expect(noSession.stdout.join("\n")).toContain(
+				"requires an active workbench session",
+			);
+
+			const agent = captureIo();
+			expect(
+				await runEvolveCommand(
+					"apply",
+					["EVO-1", "--json"],
+					root,
+					agent.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(agent.stdout.join("\n")).toContain(
+				"local interactive diagnostics required",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("reports an uninitialized derived store without creating it", async () => {

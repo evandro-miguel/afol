@@ -9,6 +9,7 @@ export type OperationContext = {
 };
 
 const ADMITTED_OPERATION_CONTEXTS = new WeakSet<object>();
+const LOCAL_OPERATOR_CONTEXTS = new WeakSet<object>();
 
 function admitOperationContext(context: OperationContext): OperationContext {
 	const admitted = Object.freeze(context);
@@ -27,6 +28,20 @@ export function defaultOperationContext(): OperationContext {
 	return admitOperationContext({
 		callerType: "local",
 		interactive: true,
+		trustLevel: "trusted",
+	});
+}
+
+function localOperatorOperationContext(): OperationContext {
+	const context = defaultOperationContext();
+	LOCAL_OPERATOR_CONTEXTS.add(context);
+	return context;
+}
+
+export function localNonInteractiveOperationContext(): OperationContext {
+	return admitOperationContext({
+		callerType: "local",
+		interactive: false,
 		trustLevel: "trusted",
 	});
 }
@@ -146,9 +161,16 @@ export function resolveCanonicalAction(
 		}
 		if (
 			group === "evolve" &&
-			["suggest", "skip", "accept", "reject", "decision", "repair"].includes(
-				action,
-			)
+			[
+				"suggest",
+				"skip",
+				"accept",
+				"reject",
+				"decision",
+				"repair",
+				"apply",
+				"rollback",
+			].includes(action)
 		) {
 			return { action: `evolve.${action}`, sideEffect: "write" };
 		}
@@ -208,6 +230,16 @@ export function isActionAllowed(
 	ctx: OperationContext,
 	policy: ActionPolicy | undefined,
 ): boolean {
+	if (
+		policy &&
+		(policy.action === "evolve.apply" || policy.action === "evolve.rollback")
+	) {
+		return (
+			ctx.callerType === "local" &&
+			ctx.interactive &&
+			LOCAL_OPERATOR_CONTEXTS.has(ctx)
+		);
+	}
 	if (!policy || !requiresApproval(ctx)) return true;
 	// Daily suggestion claim/show is a fenced derived-state receipt. Agents may
 	// perform this narrow operation; user decisions remain local-only.
@@ -242,6 +274,7 @@ const FALSY_VALUES = new Set(["false", "0", "no", "off"]);
 export function resolveOperationContext(
 	args: string[],
 	env: Record<string, string | undefined> = process.env,
+	terminalInteractive = true,
 ): { ctx: OperationContext; remainingArgs: string[] } {
 	const consumed = new Set<number>();
 	let foundAgent = false;
@@ -293,5 +326,10 @@ export function resolveOperationContext(
 		return { ctx: remoteOperationContext(), remainingArgs: args };
 	}
 
-	return { ctx: defaultOperationContext(), remainingArgs: args };
+	return {
+		ctx: terminalInteractive
+			? localOperatorOperationContext()
+			: localNonInteractiveOperationContext(),
+		remainingArgs: args,
+	};
 }

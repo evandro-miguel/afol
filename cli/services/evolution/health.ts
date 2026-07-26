@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
+import { unmatchedApplyPrepares } from "./apply-journal";
 import { assertSafeEvolutionTarget } from "./db";
 import {
 	type EvolutionJournalContext,
@@ -495,6 +496,23 @@ export function checkEvolutionDbHealth(
 				}
 			}
 			if (canonicalContext && expectedProjectId && schemaOk) {
+				try {
+					const danglingApplies = unmatchedApplyPrepares(
+						canonicalContext.root,
+						canonicalContext.evolutionEventsDir,
+					);
+					if (danglingApplies.length > 0)
+						findings.push({
+							severity: "warn",
+							message: `evolution apply recovery required (${danglingApplies.length} pending)`,
+						});
+				} catch (error) {
+					schemaOk = false;
+					findings.push({
+						severity: "fail",
+						message: (error as Error).message,
+					});
+				}
 				try {
 					validateProductionDayProjection({
 						...canonicalContext,

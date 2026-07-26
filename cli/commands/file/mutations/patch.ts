@@ -178,6 +178,7 @@ export function runPatchMutation(
 	runtime: {
 		afterInitialRead?: () => void;
 		afterPrepared?: () => void;
+		beforePrepared?: (mutationId: string) => void;
 	} = {},
 ): CommandResult {
 	const resolved = resolveSafePath(projectRoot, args.path);
@@ -254,6 +255,11 @@ export function runPatchMutation(
 			const lockedBefore = lockedExisted ? readTextOrEmpty(resolved.path) : "";
 			const lockedBeforeHash = normalizeHash(lockedBefore);
 			if (
+				args.expectedBeforeExisted !== undefined &&
+				args.expectedBeforeExisted !== lockedExisted
+			)
+				throw new Error(`stale-before-existence:${resolved.relativePath}`);
+			if (
 				args.expectedBeforeHash &&
 				args.expectedBeforeHash !== lockedBeforeHash
 			) {
@@ -290,21 +296,37 @@ export function runPatchMutation(
 				beforeExisted: lockedExisted,
 				...(lockedDiffPreview ? { diffPreview: lockedDiffPreview } : {}),
 			};
+			runtime.beforePrepared?.(mutationId);
 			appendMutationRecord(projectRoot, record);
 			try {
 				runtime.afterPrepared?.();
 				atomicWriteText(resolved.path, lockedAfter);
 				appendMutationRecord(projectRoot, { ...record, status: "committed" });
 			} catch (error) {
-				if (lockedExisted) atomicWriteText(resolved.path, lockedBefore);
-				else rmSync(resolved.path, { force: true });
+				let rollbackError: Error | null = null;
+				try {
+					if (lockedExisted) atomicWriteText(resolved.path, lockedBefore);
+					else rmSync(resolved.path, { force: true });
+					if (!lockedExisted && existsSync(resolved.path))
+						throw new Error(
+							`mutation ${record.id} failed to restore target absence`,
+						);
+				} catch (rollbackFailure) {
+					rollbackError = rollbackFailure as Error;
+				}
+				if (rollbackError)
+					throw new AggregateError(
+						[error, rollbackError],
+						`INTEGRITY_ERROR: mutation ${record.id} rollback postcondition failed`,
+					);
 				try {
 					appendMutationRecord(projectRoot, {
 						...record,
 						status: "rolled_back",
 					});
 				} catch (journalError) {
-					throw new Error(
+					throw new AggregateError(
+						[error, journalError],
 						`INTEGRITY_ERROR: mutation ${record.id} rolled back on disk but rollback journal write failed: ${(journalError as Error).message}. Original error: ${(error as Error).message}`,
 					);
 				}

@@ -380,6 +380,19 @@ try {
 			.map((entry) => String(entry.path));
 		throw new Error(`analysis mutated evolution state: ${changed.join(",")}`);
 	}
+	for (const action of ["apply", "rollback"] as const) {
+		const denied = await invoke(healthy, [
+			"evolve",
+			action,
+			"EVO-benchmark",
+			"--json",
+		]);
+		if (
+			denied.exit !== 2 ||
+			!denied.stdout.includes("requires local interactive")
+		)
+			throw new Error(`non-interactive ${action} boundary failed`);
+	}
 	const importSource = join(healthy, "benchmark-codex.jsonl");
 	writeFileSync(
 		importSource,
