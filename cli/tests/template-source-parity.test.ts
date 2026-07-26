@@ -42,7 +42,9 @@ function inspectSourceParity(
 	if (source.includedFileCount !== generated.metadata.includedFileCount) {
 		issues.push("included-file-count-mismatch");
 	}
-	if (source.excludedForbiddenCount !== generated.metadata.excludedForbiddenCount) {
+	if (
+		source.excludedForbiddenCount !== generated.metadata.excludedForbiddenCount
+	) {
 		issues.push("excluded-forbidden-count-mismatch");
 	}
 	if (source.templateHash !== generated.metadata.templateHash) {
@@ -88,12 +90,7 @@ function inspectSourceParity(
 		if (!sourceEntry || !generatedEntry) {
 			continue;
 		}
-		for (const field of [
-			"path",
-			"contentBase64",
-			"sha256",
-			"bytes",
-		] as const) {
+		for (const field of ["path", "contentBase64", "sha256", "bytes"] as const) {
 			if (sourceEntry[field] !== generatedEntry[field]) {
 				issues.push(`entry-${field}-mismatch:${path}`);
 			}
