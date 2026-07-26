@@ -4,7 +4,11 @@ import {
 	readActiveSession,
 } from "../workbench/lifecycle";
 import { scorecardFromObservations } from "./analysis";
-import { type ApplyJournalEvent, readApplyJournal } from "./apply-journal";
+import {
+	type ApplyJournalEvent,
+	readApplyJournal,
+	withApplyLock,
+} from "./apply-journal";
 import { evolutionDbPath, openEvolutionDb } from "./db";
 import {
 	appendEvaluationEventUnlocked,
@@ -422,58 +426,61 @@ export function recordProposalEvaluation(
 	},
 ): EvaluationResult {
 	assertRecordingContext(input);
-	return withEvaluationLock(input.root, () => {
-		const projectId = projectIdFor(input.root, input.projectId);
-		const eventsDir = resolveEvolutionConfig(readProjectConfig(input.root))
-			.paths.evolutionEventsDir;
-		const applies = readApplyJournal(input.root, eventsDir);
-		if (!committedApply(applies, input.mutationId))
-			return previewProposalEvaluationUnlocked(
+	return withApplyLock(input.root, () =>
+		withEvaluationLock(input.root, () => {
+			const projectId = projectIdFor(input.root, input.projectId);
+			const eventsDir = resolveEvolutionConfig(readProjectConfig(input.root))
+				.paths.evolutionEventsDir;
+			const applies = readApplyJournal(input.root, eventsDir);
+			if (!committedApply(applies, input.mutationId))
+				return previewProposalEvaluationUnlocked(
+					input.root,
+					input.mutationId,
+					projectId,
+				);
+			const preview = previewProposalEvaluationUnlocked(
 				input.root,
 				input.mutationId,
 				projectId,
 			);
-		const preview = previewProposalEvaluationUnlocked(
-			input.root,
-			input.mutationId,
-			projectId,
-		);
-		if (preview.state === "superseded") return preview;
-		const idempotencyDigest = evaluationIdempotencyDigest(preview);
-		const existing = readEvaluationJournal(
-			input.root,
-			projectId,
-			eventsDir,
-		).find(
-			(event) =>
-				event.event_type === "evaluation" &&
-				event.mutation_id === input.mutationId &&
-				event.idempotency_digest === idempotencyDigest,
-		);
-		if (existing) {
-			projectEvaluationJournalUnlocked(input.root, projectId, eventsDir);
-			return eventResult(existing);
-		}
-		const event: EvaluationEventInput = {
-			event_id: `EV-${idempotencyDigest.slice(0, 32)}`,
-			event_type: "evaluation",
-			project_id: projectId,
-			mutation_id: input.mutationId,
-			state: preview.state,
-			reason: preview.reason,
-			created_at: (input.now ?? new Date()).toISOString(),
-			session: input.session,
-			task_id: input.taskId,
-			apply_commit_digest: preview.apply_commit_digest ?? undefined,
-			comparable_sessions: preview.comparable_sessions,
-			production_day_window: preview.production_day_window,
-			matching_observations: preview.matching_observations,
-			scorecard_comparison: preview.scorecard_comparison,
-			idempotency_digest: idempotencyDigest,
-		};
-		const appended = appendAndProjectUnlocked(input.root, event, eventsDir);
-		return { ...preview, journal_event_id: appended.event_id };
-	});
+			if (preview.state === "superseded") return preview;
+			const idempotencyDigest = evaluationIdempotencyDigest(preview);
+			const existing = readEvaluationJournal(
+				input.root,
+				projectId,
+				eventsDir,
+			).find(
+				(event) =>
+					event.event_type === "evaluation" &&
+					event.mutation_id === input.mutationId &&
+					event.idempotency_digest === idempotencyDigest,
+			);
+			if (existing) {
+				projectEvaluationJournalUnlocked(input.root, projectId, eventsDir);
+				return eventResult(existing);
+			}
+			const event: EvaluationEventInput = {
+				event_id: `EV-${idempotencyDigest.slice(0, 32)}`,
+				event_type: "evaluation",
+				project_id: projectId,
+				mutation_id: input.mutationId,
+				state: preview.state,
+				reason: preview.reason,
+				created_at: (input.now ?? new Date()).toISOString(),
+				session: input.session,
+				task_id: input.taskId,
+				apply_commit_digest: preview.apply_commit_digest ?? undefined,
+				apply_journal_sequence: applies.length,
+				comparable_sessions: preview.comparable_sessions,
+				production_day_window: preview.production_day_window,
+				matching_observations: preview.matching_observations,
+				scorecard_comparison: preview.scorecard_comparison,
+				idempotency_digest: idempotencyDigest,
+			};
+			const appended = appendAndProjectUnlocked(input.root, event, eventsDir);
+			return { ...preview, journal_event_id: appended.event_id };
+		}),
+	);
 }
 
 export function recordProposalSupersession(input: {
@@ -491,83 +498,85 @@ export function recordProposalSupersession(input: {
 	if (!input.reason.trim()) throw new Error("supersession reason is required");
 	if (input.subjectMutationId === input.successorMutationId)
 		throw new Error("supersession successor must differ from subject");
-	return withEvaluationLock(input.root, () => {
-		const projectId = projectIdFor(input.root, input.projectId);
-		const eventsDir = resolveEvolutionConfig(readProjectConfig(input.root))
-			.paths.evolutionEventsDir;
-		const applies = readApplyJournal(input.root, eventsDir);
-		const subject = committedApply(applies, input.subjectMutationId);
-		const successor = committedApply(applies, input.successorMutationId);
-		if (!subject || !successor)
-			throw new Error(
-				"supersession requires committed subject and successor mutations",
-			);
-		if (
-			subject.binding.project_id !== projectId ||
-			successor.binding.project_id !== projectId
-		)
-			throw new Error("supersession apply project identity mismatch");
-		if (rolledBack(applies, input.subjectMutationId))
-			throw new Error("supersession subject was rolled back");
-		if (rolledBack(applies, input.successorMutationId))
-			throw new Error("supersession successor was rolled back");
-		const journal = readEvaluationJournal(input.root, projectId, eventsDir);
-		const existing = journal.find(
-			(event) =>
-				event.event_type === "supersession" &&
-				event.mutation_id === input.subjectMutationId,
-		);
-		if (existing) {
+	return withApplyLock(input.root, () =>
+		withEvaluationLock(input.root, () => {
+			const projectId = projectIdFor(input.root, input.projectId);
+			const eventsDir = resolveEvolutionConfig(readProjectConfig(input.root))
+				.paths.evolutionEventsDir;
+			const applies = readApplyJournal(input.root, eventsDir);
+			const subject = committedApply(applies, input.subjectMutationId);
+			const successor = committedApply(applies, input.successorMutationId);
+			if (!subject || !successor)
+				throw new Error(
+					"supersession requires committed subject and successor mutations",
+				);
 			if (
-				existing.successor_mutation_id !== input.successorMutationId ||
-				existing.reason !== input.reason ||
-				existing.session !== input.session ||
-				existing.task_id !== input.taskId
+				subject.binding.project_id !== projectId ||
+				successor.binding.project_id !== projectId
 			)
-				throw new Error("conflicting supersession already recorded");
-			projectEvaluationJournalUnlocked(input.root, projectId, eventsDir);
-			return eventResult(existing);
-		}
-		if (successor.sequence <= subject.sequence)
-			throw new Error("supersession successor must be a later commit");
-		if (
-			subject.binding.validator_version !== "lesson-apply-v2" ||
-			successor.binding.validator_version !== "lesson-apply-v2"
-		)
-			throw new Error("supersession requires v2 evaluation contracts");
-		if (
-			subject.binding.cluster_id !== successor.binding.cluster_id ||
-			subject.binding.task_type !== successor.binding.task_type
-		)
-			throw new Error(
-				"supersession successor cluster or task type does not match",
+				throw new Error("supersession apply project identity mismatch");
+			if (rolledBack(applies, input.subjectMutationId))
+				throw new Error("supersession subject was rolled back");
+			if (rolledBack(applies, input.successorMutationId))
+				throw new Error("supersession successor was rolled back");
+			const journal = readEvaluationJournal(input.root, projectId, eventsDir);
+			const existing = journal.find(
+				(event) =>
+					event.event_type === "supersession" &&
+					event.mutation_id === input.subjectMutationId,
 			);
-		const idempotencyDigest = evaluationDigest({
-			subject_mutation_id: input.subjectMutationId,
-			successor_mutation_id: input.successorMutationId,
-			subject_apply_commit_digest: subject.event_digest,
-			successor_apply_commit_digest: successor.event_digest,
-			reason: input.reason,
-			session: input.session,
-			task_id: input.taskId,
-		});
-		const event: EvaluationEventInput = {
-			event_id: `EV-${idempotencyDigest.slice(0, 32)}`,
-			event_type: "supersession",
-			project_id: projectId,
-			mutation_id: input.subjectMutationId,
-			state: "superseded",
-			reason: input.reason,
-			created_at: (input.now ?? new Date()).toISOString(),
-			session: input.session,
-			task_id: input.taskId,
-			apply_commit_digest: subject.event_digest,
-			successor_mutation_id: input.successorMutationId,
-			successor_apply_commit_digest: successor.event_digest,
-			apply_journal_sequence: applies.at(-1)?.sequence ?? successor.sequence,
-			idempotency_digest: idempotencyDigest,
-		};
-		const appended = appendAndProjectUnlocked(input.root, event, eventsDir);
-		return eventResult(appended);
-	});
+			if (existing) {
+				if (
+					existing.successor_mutation_id !== input.successorMutationId ||
+					existing.reason !== input.reason ||
+					existing.session !== input.session ||
+					existing.task_id !== input.taskId
+				)
+					throw new Error("conflicting supersession already recorded");
+				projectEvaluationJournalUnlocked(input.root, projectId, eventsDir);
+				return eventResult(existing);
+			}
+			if (successor.sequence <= subject.sequence)
+				throw new Error("supersession successor must be a later commit");
+			if (
+				subject.binding.validator_version !== "lesson-apply-v2" ||
+				successor.binding.validator_version !== "lesson-apply-v2"
+			)
+				throw new Error("supersession requires v2 evaluation contracts");
+			if (
+				subject.binding.cluster_id !== successor.binding.cluster_id ||
+				subject.binding.task_type !== successor.binding.task_type
+			)
+				throw new Error(
+					"supersession successor cluster or task type does not match",
+				);
+			const idempotencyDigest = evaluationDigest({
+				subject_mutation_id: input.subjectMutationId,
+				successor_mutation_id: input.successorMutationId,
+				subject_apply_commit_digest: subject.event_digest,
+				successor_apply_commit_digest: successor.event_digest,
+				reason: input.reason,
+				session: input.session,
+				task_id: input.taskId,
+			});
+			const event: EvaluationEventInput = {
+				event_id: `EV-${idempotencyDigest.slice(0, 32)}`,
+				event_type: "supersession",
+				project_id: projectId,
+				mutation_id: input.subjectMutationId,
+				state: "superseded",
+				reason: input.reason,
+				created_at: (input.now ?? new Date()).toISOString(),
+				session: input.session,
+				task_id: input.taskId,
+				apply_commit_digest: subject.event_digest,
+				successor_mutation_id: input.successorMutationId,
+				successor_apply_commit_digest: successor.event_digest,
+				apply_journal_sequence: applies.at(-1)?.sequence ?? successor.sequence,
+				idempotency_digest: idempotencyDigest,
+			};
+			const appended = appendAndProjectUnlocked(input.root, event, eventsDir);
+			return eventResult(appended);
+		}),
+	);
 }

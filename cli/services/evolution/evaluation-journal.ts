@@ -17,7 +17,11 @@ import { dirname, join } from "node:path";
 import { withSessionLock } from "../io/session-lock";
 import { readProjectConfig } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
-import { type ApplyJournalEvent, readApplyJournal } from "./apply-journal";
+import {
+	type ApplyJournalEvent,
+	readApplyJournal,
+	withApplyLock,
+} from "./apply-journal";
 import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
@@ -54,7 +58,7 @@ export type EvaluationEventInput = {
 	project_id: string;
 	mutation_id: string;
 	state: EvaluationState;
-	reason?: string;
+	reason?: string | undefined;
 	created_at: string;
 	session?: string;
 	task_id?: string;
@@ -79,6 +83,7 @@ export type EvaluationAppendOptions = {
 	beforeOpen?: () => void;
 	writeBytes?: (fd: number, value: Buffer) => number;
 	syncFile?: (fd: number) => void;
+	syncDirectory?: (path: string) => void;
 	truncateFile?: (fd: number, size: number) => void;
 	closeFile?: (fd: number) => void;
 };
@@ -114,7 +119,14 @@ function stableJson(value: unknown): string {
 }
 
 export function evaluationDigest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
+	const serialized = JSON.stringify(value);
+	if (serialized === undefined)
+		throw new Error(
+			"evolution evaluation digest value is not JSON serializable",
+		);
+	return createHash("sha256")
+		.update(stableJson(JSON.parse(serialized)))
+		.digest("hex");
 }
 
 function projectIdFromConfig(root: string): string | undefined {
@@ -244,6 +256,29 @@ function validateBase(
 		throw new Error(
 			`evolution evaluation apply identity is unresolved at line ${index + 1}`,
 		);
+	if (
+		!Number.isInteger(event.apply_journal_sequence) ||
+		Number(event.apply_journal_sequence) < subjectCommit.sequence ||
+		Number(event.apply_journal_sequence) > applyEvents.length
+	)
+		throw new Error(
+			`invalid evolution evaluation apply anchor at line ${index + 1}`,
+		);
+	const anchor = Number(event.apply_journal_sequence);
+	const subjectRolledBackAtAnchor = applyEvents.some(
+		(candidate) =>
+			candidate.phase === "rollback" &&
+			candidate.sequence <= anchor &&
+			candidate.binding.mutation_id === event.mutation_id,
+	);
+	if (
+		event.event_type === "evaluation" &&
+		((event.state === "rolled_back") !== subjectRolledBackAtAnchor ||
+			event.state === "superseded")
+	)
+		throw new Error(
+			`invalid evolution evaluation rollback state at line ${index + 1}`,
+		);
 	if (event.event_type === "supersession") {
 		if (!event.successor_mutation_id || !event.successor_apply_commit_digest)
 			throw new Error(
@@ -272,15 +307,10 @@ function validateBase(
 			throw new Error(
 				`invalid evolution evaluation supersession contract at line ${index + 1}`,
 			);
-		if (
-			!Number.isInteger(event.apply_journal_sequence) ||
-			Number(event.apply_journal_sequence) < successorCommit.sequence ||
-			Number(event.apply_journal_sequence) > applyEvents.length
-		)
+		if (anchor < successorCommit.sequence)
 			throw new Error(
 				`invalid evolution evaluation apply anchor at line ${index + 1}`,
 			);
-		const anchor = Number(event.apply_journal_sequence);
 		if (
 			applyEvents.some(
 				(candidate) =>
@@ -458,9 +488,11 @@ function appendLine(
 		((targetFd: number, value: Buffer) =>
 			writeSync(targetFd, value, 0, value.byteLength, null));
 	const syncFile = options.syncFile ?? fsyncSync;
+	const syncDirectory = options.syncDirectory ?? fsyncDirectory;
 	const truncateFile = options.truncateFile ?? ftruncateSync;
 	const closeFile = options.closeFile ?? closeSync;
 	let writeAttempted = false;
+	let committed = false;
 	let primaryError: unknown;
 	let rollbackError: unknown;
 	let closeError: unknown;
@@ -481,6 +513,13 @@ function appendLine(
 			current.ino !== opened.ino
 		)
 			throw new Error("evolution evaluation journal changed during append");
+		if (previousSize > 0) {
+			const tail = Buffer.allocUnsafe(1);
+			if (readSync(fd, tail, 0, 1, previousSize - 1) !== 1 || tail[0] !== 0x0a)
+				throw new Error(
+					"evolution evaluation journal has a partial trailing event",
+				);
+		}
 		if (previousSize + line.byteLength > MAX_JOURNAL_BYTES)
 			throw new Error("evolution evaluation journal exceeds size limit");
 		writeAttempted = true;
@@ -511,6 +550,8 @@ function appendLine(
 		);
 		if (!currentAfterWrite || !sameFile(finalOpened, currentAfterWrite))
 			throw new Error("evolution evaluation journal changed during append");
+		syncDirectory(parent);
+		committed = true;
 	} catch (error) {
 		primaryError = error;
 		if (writeAttempted) {
@@ -531,6 +572,7 @@ function appendLine(
 					);
 				truncateFile(fd, previousSize);
 				syncFile(fd);
+				syncDirectory(parent);
 			} catch (errorDuringRollback) {
 				rollbackError = errorDuringRollback;
 			}
@@ -549,8 +591,7 @@ function appendLine(
 			);
 		throw primaryError;
 	}
-	if (closeError !== undefined) throw closeError;
-	fsyncDirectory(parent);
+	if (closeError !== undefined && !committed) throw closeError;
 }
 
 function normalizeAppendArgs(
@@ -615,8 +656,11 @@ export function appendEvaluationEventUnlocked(
 	);
 	if (prior.some((item) => item.event_id === input.event.event_id))
 		throw new Error("evolution evaluation event id already exists");
+	const applyEvents = readApplyJournal(input.root, resolvedEventsDir);
 	const base = {
 		...input.event,
+		apply_journal_sequence:
+			input.event.apply_journal_sequence ?? applyEvents.length,
 		sequence: prior.length + 1,
 		previous_event_digest: prior.at(-1)?.event_digest ?? GENESIS,
 	};
@@ -628,7 +672,7 @@ export function appendEvaluationEventUnlocked(
 		journalEvent,
 		prior.length,
 		base.previous_event_digest,
-		readApplyJournal(input.root, resolvedEventsDir),
+		applyEvents,
 		prior,
 		expectedProject,
 	);
@@ -651,8 +695,10 @@ export function appendEvaluationEvent(
 	event: EvaluationEventInput,
 	eventsDir?: string,
 ): EvaluationJournalEvent {
-	return withSessionLock(root, "__evolution-journal__", () =>
-		appendEvaluationEventUnlocked(root, event, eventsDir),
+	return withApplyLock(root, () =>
+		withSessionLock(root, "__evolution-journal__", () =>
+			appendEvaluationEventUnlocked(root, event, eventsDir),
+		),
 	);
 }
 

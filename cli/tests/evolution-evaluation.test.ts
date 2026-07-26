@@ -705,6 +705,57 @@ describe("Evolution posterior evaluation contracts", () => {
 		}
 	});
 
+	test("fences evaluation state to the apply journal rollback anchor", () => {
+		const { root, mutationId, session, taskId } = appliedFixture();
+		try {
+			const commit = readApplyJournal(root).find(
+				(event) =>
+					event.phase === "commit" && event.binding.mutation_id === mutationId,
+			);
+			if (!commit) throw new Error("missing apply commit fixture");
+			rollbackEvolutionProposal({
+				root,
+				projectId: PROJECT_ID,
+				proposalId: commit.binding.proposal_id,
+				invocationClass: "explicit_local",
+				policyMode: "canary",
+				session,
+				taskId,
+				now: NOW,
+			});
+
+			expect(() =>
+				appendEvaluationEventUnlocked(root, {
+					event_id: "EV-stable-after-rollback",
+					event_type: "evaluation",
+					project_id: PROJECT_ID,
+					mutation_id: mutationId,
+					state: "stable",
+					reason: "forged stale result",
+					created_at: NOW.toISOString(),
+					apply_commit_digest: commit.event_digest,
+				}),
+			).toThrow(/rollback state/i);
+
+			const recorded = recordProposalEvaluation({
+				root,
+				projectId: PROJECT_ID,
+				mutationId,
+				invocationClass: "explicit_local",
+				session,
+				taskId,
+				now: NOW,
+			});
+			expect(recorded.state).toBe("rolled_back");
+			expect(readEvaluationJournal(root)).toHaveLength(1);
+			expect(readEvaluationJournal(root)[0]?.apply_journal_sequence).toBe(
+				readApplyJournal(root).length,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("journal rejects tamper and partial append, and rebuild equals the original projection", () => {
 		const { root, mutationId } = appliedFixture();
 		try {
@@ -767,6 +818,13 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(result.event_id).toBe(event.event_id);
 			expect(readEvaluationJournal(root)).toHaveLength(1);
 			expect("rollback" in result).toBe(false);
+			const undefinedOptional = appendEvaluationEventUnlocked(root, {
+				...event,
+				event_id: "E-eval-undefined-optional",
+				reason: undefined,
+			});
+			expect(undefinedOptional.reason).toBeUndefined();
+			expect(readEvaluationJournal(root)).toHaveLength(2);
 			const path = evaluationJournalPath(root);
 			const original = readFileSync(path);
 			expect(() =>
@@ -791,7 +849,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(readFileSync(path, "utf8")).toBe("replacement sentinel\n");
 			rmSync(path);
 			renameSync(backup, path);
-			expect(readEvaluationJournal(root)).toHaveLength(1);
+			expect(readEvaluationJournal(root)).toHaveLength(2);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -879,6 +937,91 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(
 				(caught as AggregateError).errors.map((error: Error) => error.message),
 			).toEqual(["primary write failure", "rollback truncate failure"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rolls back a durable append when directory fsync fails", () => {
+		const { root, mutationId } = appliedFixture();
+		try {
+			const commit = readApplyJournal(root).find(
+				(event) =>
+					event.phase === "commit" && event.binding.mutation_id === mutationId,
+			);
+			if (!commit) throw new Error("missing apply commit fixture");
+			const path = evaluationJournalPath(root);
+			const before = existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
+			let directorySyncs = 0;
+			expect(() =>
+				appendEvaluationEventUnlocked({
+					root,
+					event: {
+						event_id: "E-eval-directory-sync",
+						event_type: "evaluation",
+						project_id: PROJECT_ID,
+						mutation_id: mutationId,
+						state: "canary",
+						created_at: NOW.toISOString(),
+						apply_commit_digest: commit.event_digest,
+					},
+					syncDirectory: () => {
+						directorySyncs += 1;
+						if (directorySyncs === 1)
+							throw new Error("directory fsync failure");
+					},
+				}),
+			).toThrow("directory fsync failure");
+			expect(directorySyncs).toBe(2);
+			expect(existsSync(path) ? readFileSync(path) : Buffer.alloc(0)).toEqual(
+				before,
+			);
+			expect(readEvaluationJournal(root)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a same-inode missing tail LF after the pre-open check", () => {
+		const { root, mutationId } = appliedFixture();
+		try {
+			const commit = readApplyJournal(root).find(
+				(event) =>
+					event.phase === "commit" && event.binding.mutation_id === mutationId,
+			);
+			if (!commit) throw new Error("missing apply commit fixture");
+			const seed = appendEvaluationEventUnlocked(root, {
+				event_id: "E-eval-tail-seed",
+				event_type: "evaluation",
+				project_id: PROJECT_ID,
+				mutation_id: mutationId,
+				state: "canary",
+				created_at: NOW.toISOString(),
+				apply_commit_digest: commit.event_digest,
+			});
+			expect(seed.event_id).toBe("E-eval-tail-seed");
+			const path = evaluationJournalPath(root);
+			const original = readFileSync(path);
+			const withoutTailLf = Buffer.from(original);
+			withoutTailLf[withoutTailLf.length - 1] = 0x20;
+			expect(() =>
+				appendEvaluationEventUnlocked({
+					root,
+					event: {
+						event_id: "E-eval-tail-race",
+						event_type: "evaluation",
+						project_id: PROJECT_ID,
+						mutation_id: mutationId,
+						state: "canary",
+						created_at: NOW.toISOString(),
+						apply_commit_digest: commit.event_digest,
+					},
+					beforeOpen: () => writeFileSync(path, withoutTailLf),
+				}),
+			).toThrow(/partial trailing event/i);
+			expect(readFileSync(path)).toEqual(withoutTailLf);
+			writeFileSync(path, original);
+			expect(readEvaluationJournal(root)).toHaveLength(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
