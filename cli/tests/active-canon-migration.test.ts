@@ -199,7 +199,7 @@ describe("AFOL-only active configuration canon", () => {
 		}
 	});
 
-	test("generic fixtures source the canonical template config", () => {
+	test("generic fixtures write a minimal canonical config", () => {
 		for (const relativePath of [
 			"cli/tests/file-command-unit.test.ts",
 			"cli/tests/mutation-safety.test.ts",
@@ -211,11 +211,8 @@ describe("AFOL-only active configuration canon", () => {
 					source,
 				),
 			).toBe(false);
-			expect(
-				/join\(\s*process\.cwd\(\),\s*"src",\s*"project-template",\s*"\.afol",\s*"config\.json"\s*,?\s*\)/.test(
-					source,
-				),
-			).toBe(true);
+			expect(source).toContain('"schema_version":1,"project":{"name":"afol"}');
+			expect(source).toContain('"config.json"');
 		}
 	});
 

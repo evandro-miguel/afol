@@ -54,6 +54,7 @@ const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const REF_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const DIGEST_RE = /^[a-f0-9]{64}$/;
 const LOCAL_SOURCE_KINDS = new Set([
+	"commit",
 	"decision",
 	"evidence",
 	"feedback",

@@ -173,11 +173,14 @@ export function resolveProjectPath(
 		}
 
 		const next = join(candidate, rawPart);
-		if (existsSync(next)) {
+		try {
 			const realNext = realpathSync(next);
 			if (!pathIsInsideRoot(root, realNext)) {
 				return err(`Path crosses symlink outside project root: ${targetPath}`);
 			}
+		} catch (error) {
+			if (!isMissingPathError(error))
+				return err(`Path cannot be inspected: ${targetPath}`);
 		}
 		candidate = next;
 	}

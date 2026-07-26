@@ -269,6 +269,21 @@ describe("project root loader", () => {
 		}
 	});
 
+	test("handles a path component that disappears before realpath inspection", () => {
+		const root = mkProjectRoot("path-jail-disappearing-component");
+		const disappearing = join(root, "transient");
+		mkdirSync(disappearing);
+		rmSync(disappearing, { recursive: true, force: true });
+		try {
+			const resolved = resolveProjectPath(root, "transient/target.txt");
+			expect(resolved.ok).toBe(true);
+			if (resolved.ok)
+				expect(resolved.value.path).toBe(join(root, "transient/target.txt"));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects path traversal outside root", () => {
 		const root = mkProjectRoot("path-jail-traversal");
 		try {

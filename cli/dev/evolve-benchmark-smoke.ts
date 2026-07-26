@@ -7,19 +7,27 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { runEvolveCommand } from "../commands/evolve";
 import {
+	analyzeEvolutionProject,
+	appendObservationJournalEvent,
 	appendProductionDayAllocation,
 	evolutionDbPath,
+	normalizeObservationRecord,
+	observationJournalPath,
 	openEvolutionDb,
+	preferenceJournalPath,
+	productionDayJournalPath,
+	suggestionJournalPath,
 } from "../services/evolution";
 
 const PROJECT_A = "db97afff-2026-4eb1-a799-5d34fd505267";
 const PROJECT_B = "f4c7c0ae-50c7-4ea7-81c4-bf20e7f3a1a9";
-const CLI = resolve(import.meta.dir, "..", "main.ts");
 const TEMPLATE_CONFIG = JSON.parse(
 	readFileSync(
 		resolve(import.meta.dir, "../..", "src/project-template/.afol/config.json"),
@@ -38,21 +46,32 @@ const TEMPLATE_MANIFEST = readFileSync(
 	),
 	"utf8",
 );
+const CONTRACT = JSON.parse(
+	readFileSync(
+		resolve(
+			import.meta.dir,
+			"../..",
+			".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+		),
+		"utf8",
+	),
+) as Record<string, unknown>;
 
 type StatusPayload = { data?: { state?: string } };
 
-function invoke(
+async function invoke(
 	root: string,
 	args: string[],
-): { exit: number; stdout: string } {
-	const result = Bun.spawnSync(["bun", CLI, ...args], {
-		cwd: root,
-		stdout: "pipe",
-		stderr: "pipe",
+): Promise<{ exit: number; stdout: string }> {
+	const [action = "", ...commandArgs] = args.slice(1);
+	const stdout: string[] = [];
+	const exit = await runEvolveCommand(action, commandArgs, root, {
+		stdout: (value) => stdout.push(value),
+		stderr: () => {},
 	});
 	return {
-		exit: result.exitCode,
-		stdout: new TextDecoder().decode(result.stdout).trim(),
+		exit,
+		stdout: stdout.join("\n").trim(),
 	};
 }
 
@@ -62,6 +81,9 @@ function projectConfig(projectId: string): Record<string, unknown> {
 	project.name = "evolution-benchmark";
 	project.id = projectId;
 	project.timezone = "America/Asuncion";
+	const evolution = config.evolution as Record<string, unknown>;
+	const recurrence = evolution.recurrence as Record<string, unknown>;
+	recurrence.minimum_distinct_production_days = 1;
 	return config;
 }
 
@@ -116,26 +138,191 @@ function openSeededProductionDb(
 	return db;
 }
 
-function status(root: string): { exit: number; payload: StatusPayload } {
-	const result = Bun.spawnSync(["bun", CLI, "evolve", "status", "--json"], {
-		cwd: root,
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	const stdout = new TextDecoder().decode(result.stdout).trim();
-	if (!stdout) {
-		const stderr = new TextDecoder().decode(result.stderr).trim();
-		throw new Error(`evolve status produced no output: ${stderr}`);
+function git(root: string, args: string[]): string {
+	const result = Bun.spawnSync([
+		"git",
+		"-c",
+		"user.name=AFOL Smoke",
+		"-c",
+		"user.email=afol-smoke@example.invalid",
+		"-C",
+		root,
+		...args,
+	]);
+	if (result.exitCode !== 0)
+		throw new Error(`git smoke command failed: ${args[0]}`);
+	return new TextDecoder().decode(result.stdout).trim();
+}
+
+function seedAnalysisHistory(
+	root: string,
+	projectId: string,
+): { base: string; head: string } {
+	git(root, ["init", "-q"]);
+	writeFileSync(join(root, "analysis.txt"), "one\n", "utf8");
+	git(root, ["add", "analysis.txt"]);
+	git(root, ["commit", "-qm", "first"]);
+	const base = git(root, ["rev-parse", "HEAD"]);
+	writeFileSync(join(root, "analysis.txt"), "two\n", "utf8");
+	git(root, ["commit", "-qam", "second"]);
+	const head = git(root, ["rev-parse", "HEAD"]);
+	const db = openEvolutionDb(evolutionDbPath(root));
+	try {
+		for (const [index, commit] of [base, base, head].entries()) {
+			const observation = normalizeObservationRecord({
+				project_id: projectId,
+				id: `O-analysis-${index}`,
+				kind: "workflow_friction",
+				session_id: `S-analysis-${index}`,
+				production_day_sequence: 1,
+				task_type: "smoke",
+				impact: "rework",
+				created_at: `2026-07-16T12:0${index}:00.000Z`,
+				journal_event_id: `J-analysis-${index}`,
+				source_refs: [{ id: commit, kind: "commit" }],
+			});
+			appendObservationJournalEvent({
+				root,
+				db,
+				projectId,
+				observation,
+				sourceRefs: observation.source_refs,
+				eventId: `OBS-analysis-${index}`,
+			});
+		}
+	} finally {
+		db.close();
 	}
-	return { exit: result.exitCode, payload: JSON.parse(stdout) };
+	return { base, head };
+}
+
+function analysisSnapshot(root: string): string {
+	const paths = [
+		evolutionDbPath(root),
+		`${evolutionDbPath(root)}-wal`,
+		`${evolutionDbPath(root)}-shm`,
+		observationJournalPath(root),
+		productionDayJournalPath(root),
+		preferenceJournalPath(root),
+		suggestionJournalPath(root),
+	];
+	return JSON.stringify(
+		paths.map((path) => {
+			if (!existsSync(path)) return { path, exists: false };
+			const stat = statSync(path);
+			const auxiliary = path.endsWith("-wal") || path.endsWith("-shm");
+			return {
+				path,
+				exists: true,
+				dev: stat.dev,
+				ino: stat.ino,
+				size: stat.size,
+				...(auxiliary
+					? {}
+					: { mtime: stat.mtimeMs, bytes: readFileSync(path) }),
+			};
+		}),
+	);
+}
+
+function assertContractMetadata(): void {
+	const coverage = CONTRACT.coverage as Record<string, unknown>;
+	const subcommands = coverage.subcommands as string[];
+	if (
+		CONTRACT.implementation_status !== "implemented" ||
+		CONTRACT.command !== "bun run cli/dev/evolve-benchmark-smoke.ts" ||
+		CONTRACT.expected_exit !== 0 ||
+		CONTRACT.result_schema !== "1.0.0" ||
+		![
+			"evolve analyze [--json]",
+			"evolve weekly [--json]",
+			"evolve after-merge <base>..<head> [--json]",
+			"evolve review <proposal-id> [--json]",
+		].every((entry) => subcommands.includes(entry))
+	)
+		throw new Error("evolution smoke metadata contract failed");
+}
+
+function assertPublicAnalysis(
+	result: { exit: number; stdout: string },
+	mode: string,
+): Record<string, unknown> {
+	if (result.exit !== 0 || Buffer.byteLength(result.stdout, "utf8") > 4_000)
+		throw new Error(`analysis ${mode} output contract failed`);
+	const payload = JSON.parse(result.stdout) as {
+		data?: Record<string, unknown>;
+	};
+	const data = payload.data;
+	if (!data || data.mode !== mode)
+		throw new Error(`analysis ${mode} mode contract failed`);
+	const sensitiveKey =
+		/(project|cluster|source|commit|path|digest|token|db|(?:^|_)session_id(?:s)?$|related_session_ids|origin_ref)/i;
+	const inspectKeys = (value: unknown): string | null => {
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				const match = inspectKeys(item);
+				if (match) return match;
+			}
+			return null;
+		}
+		if (value && typeof value === "object") {
+			for (const [key, item] of Object.entries(value)) {
+				if (sensitiveKey.test(key)) return key;
+				const match = inspectKeys(item);
+				if (match) return match;
+			}
+		}
+		return null;
+	};
+	const forbiddenKey = inspectKeys(data);
+	if (forbiddenKey)
+		throw new Error(
+			`analysis ${mode} public DTO contract failed: ${forbiddenKey}`,
+		);
+	const proposals = Array.isArray(data.proposals) ? data.proposals : [];
+	for (const value of proposals) {
+		const proposal = value as Record<string, unknown>;
+		const evidenceRefs = proposal.evidence_refs;
+		if (
+			typeof proposal.id !== "string" ||
+			!/^EVO-[a-f0-9]{32}$/.test(proposal.id) ||
+			typeof proposal.distinct_session_count !== "number" ||
+			typeof proposal.related_session_count !== "number" ||
+			!Array.isArray(evidenceRefs) ||
+			evidenceRefs.length > 4 ||
+			!evidenceRefs.every(
+				(ref) =>
+					ref &&
+					typeof ref === "object" &&
+					Object.keys(ref).every((key) =>
+						["id", "kind", "authority"].includes(key),
+					),
+			) ||
+			!proposal.baseline ||
+			!proposal.targets ||
+			proposal.approval_policy !== "explicit" ||
+			proposal.approval_surface !== "governed_workbench"
+		)
+			throw new Error(`analysis ${mode} decision context contract failed`);
+	}
+	return data;
+}
+
+async function status(
+	root: string,
+): Promise<{ exit: number; payload: StatusPayload }> {
+	const result = await invoke(root, ["evolve", "status", "--json"]);
+	if (!result.stdout) throw new Error("evolve status produced no output");
+	return { exit: result.exit, payload: JSON.parse(result.stdout) };
 }
 
 const roots: string[] = [];
 try {
+	assertContractMetadata();
 	const uninitialized = fixture(PROJECT_A);
 	roots.push(uninitialized);
 	const emptyPath = evolutionDbPath(uninitialized);
-	const empty = status(uninitialized);
+	const empty = await status(uninitialized);
 	if (empty.exit !== 0 || empty.payload.data?.state !== "ready_uninitialized")
 		throw new Error("uninitialized status contract failed");
 	if ([emptyPath, `${emptyPath}-wal`, `${emptyPath}-shm`].some(existsSync))
@@ -149,12 +336,50 @@ try {
 		"E-benchmark-01",
 	);
 	healthyDb.close();
-	const healthyStatus = status(healthy);
+	const range = seedAnalysisHistory(healthy, PROJECT_A);
+	const healthyStatus = await status(healthy);
 	if (
 		healthyStatus.exit !== 0 ||
 		healthyStatus.payload.data?.state !== "healthy"
 	)
 		throw new Error("healthy status contract failed");
+	const dbBeforeAnalysis = analysisSnapshot(healthy);
+	const internalAnalysis = analyzeEvolutionProject(healthy);
+	const reviewId = internalAnalysis.proposals[0]?.id;
+	if (!reviewId)
+		throw new Error("healthy analysis did not produce a review proposal");
+	const [analyzeResult, weeklyResult, afterMergeResult, reviewResult] =
+		await Promise.all([
+			invoke(healthy, ["evolve", "analyze", "--json"]),
+			invoke(healthy, ["evolve", "weekly", "--json"]),
+			invoke(healthy, [
+				"evolve",
+				"after-merge",
+				`${range.base}..${range.head}`,
+				"--json",
+			]),
+			invoke(healthy, ["evolve", "review", reviewId, "--json"]),
+		]);
+	assertPublicAnalysis(analyzeResult, "analyze");
+	assertPublicAnalysis(weeklyResult, "weekly");
+	assertPublicAnalysis(afterMergeResult, "after_merge");
+	assertPublicAnalysis(reviewResult, "review");
+	const dbAfterAnalysis = analysisSnapshot(healthy);
+	if (dbAfterAnalysis !== dbBeforeAnalysis) {
+		const beforeFiles = JSON.parse(dbBeforeAnalysis) as Array<
+			Record<string, unknown>
+		>;
+		const afterFiles = JSON.parse(dbAfterAnalysis) as Array<
+			Record<string, unknown>
+		>;
+		const changed = beforeFiles
+			.filter(
+				(before, index) =>
+					JSON.stringify(before) !== JSON.stringify(afterFiles[index]),
+			)
+			.map((entry) => String(entry.path));
+		throw new Error(`analysis mutated evolution state: ${changed.join(",")}`);
+	}
 
 	const source = fixture(PROJECT_B);
 	const copied = fixture(PROJECT_A);
@@ -164,7 +389,7 @@ try {
 	sourceDb.close();
 	mkdirSync(join(copied, ".afol", "state"), { recursive: true });
 	copyFileSync(evolutionDbPath(source), evolutionDbPath(copied));
-	const mismatch = status(copied);
+	const mismatch = await status(copied);
 	if (mismatch.exit !== 1 || mismatch.payload.data?.state !== "unhealthy")
 		throw new Error("cross-project status contract failed");
 
@@ -177,7 +402,7 @@ try {
 		`${JSON.stringify(disabledConfig, null, 2)}\n`,
 		"utf8",
 	);
-	const suggestion = invoke(disabled, [
+	const suggestion = await invoke(disabled, [
 		"evolve",
 		"suggest",
 		"--first-session",
@@ -185,15 +410,20 @@ try {
 	]);
 	if (suggestion.exit !== 0 || !suggestion.stdout.includes('"disabled"'))
 		throw new Error("disabled suggestion preview contract failed");
-	for (const args of [
+	const disabledDecisions = [
 		["evolve", "skip", "SUG-benchmark", "--json"],
 		["evolve", "accept", "SUG-benchmark", "--json"],
 		["evolve", "reject", "SUG-benchmark", "--reason", "benchmark", "--json"],
 		["evolve", "repair", "--json"],
-	]) {
-		const decision = invoke(disabled, args);
+	];
+	const decisionResults = await Promise.all(
+		disabledDecisions.map((args) => invoke(disabled, args)),
+	);
+	for (const [index, decision] of decisionResults.entries()) {
 		if (decision.exit !== 2 || !decision.stdout)
-			throw new Error(`disabled decision contract failed: ${args[1]}`);
+			throw new Error(
+				`disabled decision contract failed: ${disabledDecisions[index]?.[1]}`,
+			);
 	}
 	if (existsSync(evolutionDbPath(disabled)))
 		throw new Error("disabled suggestion commands created evolution state");
@@ -201,7 +431,13 @@ try {
 	console.log(
 		JSON.stringify({
 			ok: true,
-			states: ["ready_uninitialized", "healthy", "unhealthy", "disabled"],
+			states: [
+				"ready_uninitialized",
+				"healthy",
+				"analysis",
+				"unhealthy",
+				"disabled",
+			],
 		}),
 	);
 } finally {

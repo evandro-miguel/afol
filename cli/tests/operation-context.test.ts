@@ -112,6 +112,27 @@ describe("operation-context", () => {
 		expect(isActionAllowed(ctx, undefined)).toBe(true);
 	});
 
+	test.each([
+		"status",
+		"analyze",
+		"weekly",
+		"after-merge",
+		"review",
+	])("evolve %s is explicitly read-only", (action) => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action,
+			args: [],
+		});
+		expect(policy).toEqual({
+			action: `evolve.${action}`,
+			sideEffect: "read",
+		});
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(true);
+		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(true);
+	});
+
 	test("resolveOperationContext defaults to local", () => {
 		const { ctx, remainingArgs } = resolveOperationContext(["status"], {});
 		expect(ctx.callerType).toBe("local");

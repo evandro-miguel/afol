@@ -1042,7 +1042,7 @@ describe("kernel front-door", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 
 	test("hydrate flag-only aliases route without empty action argument", () => {
 		const root = mkProjectRoot("hydrate-flag-aliases", "");

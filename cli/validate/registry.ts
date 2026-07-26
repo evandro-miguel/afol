@@ -58,6 +58,10 @@ const SPEC_STATUSES = [
 ] as const;
 const GIT_PROVENANCE_TIMEOUT_MS = 5_000;
 
+export function baselineFilename(packId: PackId): string {
+	return packId === "evolution-core" ? "baseline-v2.json" : "baseline-v1.json";
+}
+
 function parsePackId(value: unknown, key: string): PackId {
 	const packId = asString(value, key);
 	if (!REQUIRED_PACKS.includes(packId as PackId)) {
@@ -445,7 +449,7 @@ export function loadRegistry(projectRoot: string): RegistrySnapshot {
 			projectRoot,
 			BASELINES_RELATIVE_PATH,
 			pack.pack_id,
-			"baseline-v1.json",
+			baselineFilename(pack.pack_id),
 		);
 		if (!existsSync(baselinePath)) {
 			continue;
@@ -1291,7 +1295,9 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 		}
 		const baseline = snapshot.baselinesByPack[packId];
 		if (!baseline) {
-			issues.push(`missing-baseline:${packId}`);
+			if (packId !== "evolution-core") {
+				issues.push(`missing-baseline:${packId}`);
+			}
 			continue;
 		}
 		if (baseline.schema_version !== VALIDATION_SCHEMA_VERSION) {

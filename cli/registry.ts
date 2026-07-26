@@ -802,13 +802,32 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: [],
 		kind: "evolve",
 		sideEffect: "read",
-		description: "Inspect project evolution state",
+		description: "Analyze project evolution state and proposals",
 		category: "inspect",
 		guidance: [
-			"Use evolve suggest --first-session for one evidence-backed daily suggestion.",
-			"Suggestion decisions require a shown receipt; reject requires --reason.",
+			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",
 		],
 		subcommands: [
+			{
+				usage: "analyze [--json]",
+				sideEffect: "read",
+				description: "Analyze recurrence, scorecard, and proposal previews",
+			},
+			{
+				usage: "weekly [--json]",
+				sideEffect: "read",
+				description: "Run the bounded weekly analysis mode",
+			},
+			{
+				usage: "after-merge <base>..<head> [--json]",
+				sideEffect: "read",
+				description: "Analyze with a validated local commit range",
+			},
+			{
+				usage: "review <proposal-id> [--json]",
+				sideEffect: "read",
+				description: "Re-derive one proposal preview by deterministic id",
+			},
 			{
 				usage: "status [--json]",
 				sideEffect: "read",

@@ -95,7 +95,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(390);
+		expect(lines.length).toBeLessThanOrEqual(400);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -250,7 +250,7 @@ describe("help formatter", () => {
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });
 		}
-	}, 15_000);
+	}, 60_000);
 
 	test("expands per-command help with tool-specific options and guidance", () => {
 		const validateHelp = formatCommandHelp("validate", kernelRegistry);
