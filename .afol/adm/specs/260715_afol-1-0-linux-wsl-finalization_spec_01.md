@@ -19,6 +19,7 @@ links:
   - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
   - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
   - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
+  - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
 risk_level: high
 ---
 
@@ -40,6 +41,10 @@ AFOL-only downstream boundary.
 - `260726_canonical-adm-context-index-migration_spec-child_01` owns the
   canonical administration section-index migration, fail-closed coverage and
   freshness checks, and selectable-section token-health model.
+- `260726_afol-only-active-canon-migration_spec-child_01` owns the bounded
+  removal of legacy configuration from active factory authority, generic test
+  fixtures, source guidance, and exported-template contracts while preserving
+  explicit resolver fallback compatibility and a verified retention archive.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -111,6 +116,14 @@ typecheck, formatting, project validation, and independent spec/quality
 reviews. This does not invalidate the accepted release evidence or reopen the
 two previously final children. The local Gitleaks and OSV binaries were absent,
 so this bounded remediation makes no new security-scan or full-suite claim.
+
+The active-canon migration child is finalized after source-only payload parity,
+focused policy and compatibility checks, manifest/project validation, and
+redacted Gitleaks history/worktree scans. OSV parsed the unchanged `bun.lock`
+but could not match vulnerabilities because no offline database was available;
+dependency inputs remain unchanged from `532345f`, so the limitation is an
+explicit residual risk rather than a passing scan. All F-29 children and the
+parent are final without reinterpreting earlier evidence.
 
 ## Verification Plan
 

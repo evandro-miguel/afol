@@ -64,8 +64,8 @@ function createFixtureRoot(): string {
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
 	cpSync(
-		join(process.cwd(), ".agents", "config.json"),
-		join(root, ".agents", "config.json"),
+		join(process.cwd(), "src", "project-template", ".afol", "config.json"),
+		join(root, ".afol", "config.json"),
 	);
 	cpSync(
 		join(process.cwd(), ".agents", "lock.json"),

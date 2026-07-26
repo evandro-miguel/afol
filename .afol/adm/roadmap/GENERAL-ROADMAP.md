@@ -911,6 +911,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
     - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
     - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
+    - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -920,6 +921,9 @@ Follow-on slices under this direction:
   - Index canonical `.afol/adm/specs/**` and `.afol/adm/decisions/**` context
     recursively, reject false-green empty/stale coverage, and measure the
     worst selectable three-section token envelope.
+  - Remove `.agents/config.json` from active factory authority and generic
+    fixtures while retaining explicit fallback compatibility and a verified
+    AFOL-owned archive.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,
@@ -957,6 +961,15 @@ Follow-on slices under this direction:
   exist but the section index is missing, stale, corrupt, foreign, or
   incomplete. No new full-suite or security-scan claim is made for this
   degraded-host follow-up.
+- Active-canon migration: the bounded child
+  `260726_afol-only-active-canon-migration_spec-child_01` is final. It removes
+  legacy configuration from active factory and fixture authority, preserves
+  explicit resolver fallback compatibility, and records the retired root
+  config byte-for-byte in an AFOL-owned retention archive. Redacted Gitleaks
+  history and worktree scans found no leaks. OSV could parse the unchanged
+  `bun.lock` but could not perform vulnerability matching because no offline
+  database was available; dependency inputs remain unchanged from `532345f`,
+  and that residual risk is explicit rather than reported as a pass.
 
 ### F-30 AFOL Evolution System
 

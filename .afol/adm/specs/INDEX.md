@@ -16,10 +16,10 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 79 |
+| Total | 80 |
 | Draft | 0 |
 | Active | 6 |
-| Final | 55 |
+| Final | 56 |
 | Superseded | 18 |
 
 ## Index
@@ -101,6 +101,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260726_canonical-adm-context-index-migration_spec-child_01 | canonical-adm-context-index-migration | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260726_afol-only-active-canon-migration_spec-child_01 | afol-only-active-canon-migration | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260716_1234_agent-cli-sequential-verification-runs_spec-child_01 | agent-cli-sequential-verification-runs | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
 | 260717_agent-submission-and-batch-review_spec_01 | agent-submission-and-batch-review | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md, adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md, evolution_adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
 | 260716_2155_afol-evolution-system_spec_01 | afol-evolution-system | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
