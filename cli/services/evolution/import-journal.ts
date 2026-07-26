@@ -10,6 +10,7 @@ import {
 	mkdirSync,
 	openSync,
 	readFileSync,
+	readSync,
 	writeSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -373,6 +374,8 @@ export function readImportJournal(
 	const text = readFileSync(path, "utf8");
 	if (text.length > 100 * 1024 * 1024)
 		throw new Error("import journal exceeds size limit");
+	if (text.length > 0 && !text.endsWith("\n"))
+		throw new Error("import journal must end with a newline");
 	const lines = text.split("\n").filter((line) => line.length > 0);
 	const events: ImportAcceptanceEvent[] = [];
 	let previous = GENESIS_DIGEST;
@@ -408,6 +411,7 @@ export function appendImportJournalEventUnlocked(
 			write?: WriteBufferSync;
 			fsync?: typeof fsyncSync;
 			truncate?: typeof ftruncateSync;
+			beforeOpen?: () => void;
 		};
 	},
 ): ImportJournalAppendResult {
@@ -462,12 +466,11 @@ export function appendImportJournalEventUnlocked(
 	parseEvent(event, events.length, base.previous_event_digest, input.projectId);
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 	if (process.platform !== "win32") chmodSync(dirname(path), 0o700);
+	input.io?.beforeOpen?.();
 	assertSafeEvolutionTarget(path, "import journal target");
 	const fd = openSync(
 		path,
-		openFlags(
-			fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT,
-		),
+		openFlags(fsConstants.O_RDWR | fsConstants.O_APPEND | fsConstants.O_CREAT),
 		0o600,
 	);
 	try {
@@ -476,6 +479,11 @@ export function appendImportJournalEventUnlocked(
 			throw new Error("import journal target must be a regular file");
 		if (opened.size !== previousSize)
 			throw new Error("import journal size changed before append");
+		if (opened.size > 0) {
+			const tail = Buffer.allocUnsafe(1);
+			if (readSync(fd, tail, 0, 1, opened.size - 1) !== 1 || tail[0] !== 0x0a)
+				throw new Error("import journal must end with a newline");
+		}
 		const line = Buffer.from(`${JSON.stringify(event)}\n`, "utf8");
 		if (line.byteLength > MAX_EVENT_BYTES)
 			throw new Error("import journal event exceeds size limit");

@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeSync } from "node:fs";
+import {
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+	writeSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
@@ -165,6 +171,37 @@ describe("external import acceptance store", () => {
 			).toThrow("injected fsync failure");
 			expect(readFileSync(path)).toEqual(before);
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a same-size journal change that removes the final newline", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-import-tail-frame-"));
+		try {
+			appendImportJournalEventUnlocked({
+				root,
+				projectId: PROJECT_ID,
+				payload: payload("tail-frame-first"),
+			});
+			const path = importJournalPath(root);
+			const malformed = readFileSync(path);
+			malformed[malformed.length - 1] = 0x20;
+
+			expect(() =>
+				appendImportJournalEventUnlocked({
+					root,
+					projectId: PROJECT_ID,
+					payload: payload("tail-frame-second"),
+					io: {
+						beforeOpen: () => writeFileSync(path, malformed),
+					},
+				}),
+			).toThrow("import journal must end with a newline");
+			expect(readFileSync(path)).toEqual(malformed);
+			expect(() => readImportJournal(root, PROJECT_ID)).toThrow(
+				"import journal must end with a newline",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
