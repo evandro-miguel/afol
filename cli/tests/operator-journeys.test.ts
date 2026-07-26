@@ -38,7 +38,7 @@ function createProjectRoot(name: string): string {
 	mkdirSync(join(root, "docs", "lessons", "entries"), { recursive: true });
 	mkdirSync(join(root, "cli", "services"), { recursive: true });
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		`${JSON.stringify({ schema_version: 1, project: { name } }, null, 2)}\n`,
 		"utf8",
 	);
@@ -210,8 +210,17 @@ describe("operator UX journeys", () => {
 					.recurrence_detected,
 			).toBe(true);
 
+			const contextBuild = runKernel(root, ["ctx", "build", "--json"]);
+			expect(
+				contextBuild.status,
+				`${contextBuild.stderr ?? ""}\n${contextBuild.stdout ?? ""}`,
+			).toBe(0);
+
 			const contextTools = runKernel(root, ["ctx", "tools", "--json"]);
-			expect(contextTools.status).toBe(0);
+			expect(
+				contextTools.status,
+				`${contextTools.stderr ?? ""}\n${contextTools.stdout ?? ""}`,
+			).toBe(0);
 			const toolsPayload = parseEnvelope(contextTools.stdout as string);
 			expect(toolsPayload).toMatchObject({
 				ok: true,
