@@ -216,6 +216,10 @@ function successfulCompletionOutcomes(input: {
 }): ObservationRecord[] {
 	const daySequences = new Map<string, number>();
 	const sessions = new Map<string, ObservationRecord>();
+	const completionBySession = new Map<
+		string,
+		ReturnType<typeof loadEvidenceEntries>[number] | null
+	>();
 	for (const event of input.productionDays) {
 		let daySequence = daySequences.get(event.payload.local_date);
 		if (daySequence === undefined) {
@@ -229,25 +233,29 @@ function successfulCompletionOutcomes(input: {
 		)
 			continue;
 		const sessionId = event.payload.evidence.session_id;
-		const evidenceId = event.payload.evidence.id;
-		const evidence = loadEvidenceEntries(
-			sessionPaths(input.root, sessionId).evidencePath,
-			EVALUATION_EVIDENCE_LIMITS,
-		).find((entry) => entry.id === evidenceId);
-		if (
-			!evidence ||
-			evidence.project_id !== input.projectId ||
-			evidence.session_id !== sessionId ||
-			evidence.task_id !== input.taskType ||
-			evidence.result !== "passed" ||
-			evidence.exit_code !== 0 ||
-			evidence.provenance !== "observed" ||
-			evidence.purpose !== "completion" ||
-			!new Set(["execution", "artifact", "waiver"]).has(
-				evidence.authorization_type ?? "",
-			)
-		)
-			continue;
+		let evidence = completionBySession.get(sessionId);
+		if (evidence === undefined) {
+			evidence =
+				loadEvidenceEntries(
+					sessionPaths(input.root, sessionId).evidencePath,
+					EVALUATION_EVIDENCE_LIMITS,
+				).find(
+					(entry) =>
+						entry.project_id === input.projectId &&
+						entry.session_id === sessionId &&
+						entry.task_id === input.taskType &&
+						entry.result === "passed" &&
+						entry.exit_code === 0 &&
+						entry.provenance === "observed" &&
+						entry.purpose === "completion" &&
+						new Set(["execution", "artifact", "waiver"]).has(
+							entry.authorization_type ?? "",
+						),
+				) ?? null;
+			completionBySession.set(sessionId, evidence);
+		}
+		if (!evidence) continue;
+		const evidenceId = evidence.id;
 		sessions.set(sessionId, {
 			project_id: input.projectId,
 			id: `OUT-${event.event_id}`,

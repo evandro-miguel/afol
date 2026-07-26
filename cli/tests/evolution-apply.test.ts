@@ -34,6 +34,7 @@ import {
 	rollbackEvolutionProposal,
 } from "../services/evolution/apply-service";
 import { appendObservationJournalEvent } from "../services/evolution/observation-journal";
+import { validateEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import {
 	appendMutationRecord,
 	createMutationId,
@@ -243,6 +244,19 @@ function requireTargetPath(result: { target_path?: string }): string {
 	return result.target_path;
 }
 
+function assertCheckpoint(root: string): void {
+	const db = openEvolutionDb(evolutionDbPath(root));
+	try {
+		validateEvolutionProjectionCheckpoint({
+			root,
+			db,
+			projectId: PROJECT_ID,
+		});
+	} finally {
+		db.close();
+	}
+}
+
 describe("evolution apply service", () => {
 	test("keeps a durable terminal authoritative when checkpoint refresh fails", () => {
 		const { root, proposal, task } = fixture();
@@ -267,6 +281,91 @@ describe("evolution apply service", () => {
 						event.binding.mutation_id === result.mutation_id,
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("duplicate apply repairs a checkpoint left stale by a transient terminal failure", () => {
+		const { root, proposal, task } = fixture();
+		try {
+			let checkpointCalls = 0;
+			const first = applyEvolutionProposal({
+				...applyInput(root, proposal, task),
+				checkpointWriter: () => {
+					checkpointCalls += 1;
+					if (checkpointCalls > 1)
+						throw new Error("transient terminal checkpoint failure");
+					return {} as never;
+				},
+			});
+			expect(first).toMatchObject({ status: "applied", duplicate: false });
+			expect(() => assertCheckpoint(root)).toThrow(/checkpoint is stale/i);
+
+			const retry = applyEvolutionProposal(applyInput(root, proposal, task));
+			expect(retry).toMatchObject({
+				status: "applied",
+				duplicate: true,
+				mutation_id: first.mutation_id,
+			});
+			assertCheckpoint(root);
+			expect(
+				readApplyJournal(root).filter(
+					(event) =>
+						event.phase === "commit" &&
+						event.binding.mutation_id === first.mutation_id,
+				),
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("duplicate rollback repairs a checkpoint left stale by a transient terminal failure", () => {
+		const { root, proposal, task } = fixture();
+		try {
+			const applied = applyEvolutionProposal(applyInput(root, proposal, task));
+			const first = rollbackEvolutionProposal({
+				root,
+				projectId: PROJECT_ID,
+				proposalId: proposal.id,
+				invocationClass: "explicit_local",
+				session: task.session,
+				taskId: task.taskId,
+				now: NOW,
+				checkpointWriter: () => {
+					throw new Error("transient rollback checkpoint failure");
+				},
+			});
+			expect(first).toMatchObject({
+				status: "rolled_back",
+				mutation_id: applied.mutation_id,
+			});
+			expect(first.duplicate).toBeUndefined();
+			expect(() => assertCheckpoint(root)).toThrow(/checkpoint is stale/i);
+
+			const retry = rollbackEvolutionProposal({
+				root,
+				projectId: PROJECT_ID,
+				proposalId: proposal.id,
+				invocationClass: "explicit_local",
+				session: task.session,
+				taskId: task.taskId,
+				now: NOW,
+			});
+			expect(retry).toMatchObject({
+				status: "rolled_back",
+				duplicate: true,
+				mutation_id: applied.mutation_id,
+			});
+			assertCheckpoint(root);
+			expect(
+				readApplyJournal(root).filter(
+					(event) =>
+						event.phase === "rollback" &&
+						event.binding.mutation_id === applied.mutation_id,
+				),
+			).toHaveLength(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -317,7 +416,7 @@ describe("evolution apply service", () => {
 			});
 			expect(rolled.status).toBe("rolled_back");
 			expect(existsSync(join(root, requireTargetPath(first)))).toBe(false);
-			expect(() =>
+			expect(
 				rollbackEvolutionProposal({
 					root,
 					projectId: PROJECT_ID,
@@ -327,7 +426,7 @@ describe("evolution apply service", () => {
 					taskId: task.taskId,
 					now: NOW,
 				}),
-			).toThrow("already rolled back");
+			).toMatchObject({ status: "rolled_back", duplicate: true });
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

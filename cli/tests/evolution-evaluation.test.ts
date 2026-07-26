@@ -131,6 +131,7 @@ function addComparableSession(
 	observationKind = "workflow_friction",
 	includeObservation = true,
 	taskType = "documentation",
+	productionEvidenceIsCompletion = true,
 ): void {
 	const evidenceId = `E-eval-${day}-${sessionId}`;
 	const sessionDir = join(root, ".afol", "wb", sessionId);
@@ -147,8 +148,12 @@ function addComparableSession(
 			result: "passed",
 			provenance: "observed",
 			exit_code: 0,
-			purpose: "completion",
-			authorization_type: "execution",
+			...(productionEvidenceIsCompletion
+				? {
+						purpose: "completion",
+						authorization_type: "execution",
+					}
+				: {}),
 		})}\n`,
 	);
 	const db = openEvolutionDb(evolutionDbPath(root));
@@ -190,6 +195,30 @@ function addComparableSession(
 	} finally {
 		db.close();
 	}
+}
+
+function appendCompletionEvidence(
+	root: string,
+	day: number,
+	sessionId: string,
+	taskType = "documentation",
+): void {
+	appendFileSync(
+		join(root, ".afol", "wb", sessionId, ".evidence.jsonl"),
+		`${JSON.stringify({
+			id: `E-completion-${day}-${sessionId}`,
+			project_id: PROJECT_ID,
+			session_id: sessionId,
+			task_id: taskType,
+			created_at: `2026-07-${String(day + 1).padStart(2, "0")}T00:01:00.000Z`,
+			command: "bun test",
+			result: "passed",
+			provenance: "observed",
+			exit_code: 0,
+			purpose: "completion",
+			authorization_type: "execution",
+		})}\n`,
+	);
 }
 
 function appliedFixture(): {
@@ -566,6 +595,39 @@ describe("Evolution posterior evaluation contracts", () => {
 					}
 				).outcome.observed_results,
 			).toBeGreaterThan(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("finds task-scoped completion evidence beyond the production-day evidence id", () => {
+		const { root, mutationId } = appliedFixture();
+		try {
+			for (const [day, session] of [
+				[4, "S-ledger-1"],
+				[5, "S-ledger-2"],
+				[6, "S-ledger-3"],
+				[7, "S-ledger-4"],
+				[8, "S-ledger-5"],
+			] as const) {
+				addComparableSession(
+					root,
+					day,
+					session,
+					"clean",
+					"workflow_friction",
+					false,
+					"documentation",
+					false,
+				);
+				appendCompletionEvidence(root, day, session);
+			}
+			const result = previewProposalEvaluation(root, mutationId);
+			expect(result).toMatchObject({
+				state: "stable",
+				comparable_sessions: 5,
+				matching_observations: 0,
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

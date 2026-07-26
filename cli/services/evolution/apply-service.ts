@@ -512,12 +512,21 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 	return withApplyLock(input.root, () => {
 		assertGovernedTask(input.root, input.session, input.taskId);
 		recoverEvolutionAppliesUnlocked(input.root);
-		const proposal = canonicalProposal(input);
-		const planned = plannedArtifact(input, proposal);
-		const duplicate = exactCommittedApply(input.root, proposal);
+		const duplicate = exactCommittedApply(input.root, input.proposal);
 		if (duplicate) {
+			if (
+				currentProjectId(input.root) !== input.projectId ||
+				duplicate.project_id !== input.projectId
+			)
+				throw new Error("evolution apply project identity mismatch");
+			if (
+				duplicate.invocation_class !== input.invocationClass ||
+				duplicate.policy_mode !== input.policyMode
+			)
+				throw new Error("evolution apply invocation or policy denied");
 			assertDuplicateMutation(input.root, duplicate);
 			validateArtifact(input.root, duplicate);
+			refreshApplyCheckpointBestEffort(input.root, input.checkpointWriter);
 			return {
 				status: "applied",
 				mutation_id: duplicate.mutation_id,
@@ -527,6 +536,8 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 				duplicate: true,
 			};
 		}
+		const proposal = canonicalProposal(input);
+		const planned = plannedArtifact(input, proposal);
 		assertNewTarget(input.root, planned.path);
 		let prepared: ApplyBinding | undefined;
 		try {
@@ -658,14 +669,31 @@ export function rollbackEvolutionProposal(input: RollbackInput): ApplyResult {
 		if (!commit) throw new Error("evolution proposal rollback unavailable");
 		if (commit.binding.project_id !== input.projectId)
 			throw new Error("evolution rollback committed project identity mismatch");
-		if (
-			events.some(
-				(event) =>
-					event.phase === "rollback" &&
-					event.binding.mutation_id === commit.binding.mutation_id,
+		const priorRollback = events.findLast(
+			(event) =>
+				event.phase === "rollback" &&
+				event.binding.mutation_id === commit.binding.mutation_id,
+		);
+		if (priorRollback) {
+			const journal = loadMutationJournalStrict(input.root);
+			const artifact = artifactState(input.root, commit.binding.target_path);
+			if (
+				journal.issues.length > 0 ||
+				!mutationWasUndone(journal.records, commit.binding.mutation_id) ||
+				artifact.exists
 			)
-		)
-			throw new Error("evolution proposal already rolled back");
+				throw new Error(
+					"INTEGRITY_ERROR: evolution rollback terminal state is inconsistent",
+				);
+			refreshApplyCheckpointBestEffort(input.root, input.checkpointWriter);
+			return {
+				status: "rolled_back",
+				mutation_id: commit.binding.mutation_id,
+				target_path: commit.binding.target_path,
+				after_hash: EMPTY_HASH,
+				duplicate: true,
+			};
+		}
 		const mutationJournal = loadMutationJournalStrict(input.root);
 		if (mutationJournal.issues.length > 0)
 			throw new Error("evolution rollback mutation journal is corrupt");
