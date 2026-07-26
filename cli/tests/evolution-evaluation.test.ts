@@ -130,6 +130,7 @@ function addComparableSession(
 	fingerprintSeed = "same",
 	observationKind = "workflow_friction",
 	includeObservation = true,
+	taskType = "documentation",
 ): void {
 	const evidenceId = `E-eval-${day}-${sessionId}`;
 	const sessionDir = join(root, ".afol", "wb", sessionId);
@@ -140,7 +141,7 @@ function addComparableSession(
 			id: evidenceId,
 			project_id: PROJECT_ID,
 			session_id: sessionId,
-			task_id: "documentation",
+			task_id: taskType,
 			created_at: `2026-07-${String(day + 1).padStart(2, "0")}T00:00:00.000Z`,
 			command: "bun test",
 			result: "passed",
@@ -171,7 +172,7 @@ function addComparableSession(
 				kind: observationKind,
 				session_id: sessionId,
 				production_day_sequence: day,
-				task_type: "documentation",
+				task_type: taskType,
 				impact: "rework",
 				error_code: `E-${fingerprintSeed}`,
 				test: "suite/eval",
@@ -438,6 +439,99 @@ describe("Evolution posterior evaluation contracts", () => {
 				size: 5,
 			});
 			expect(result.comparable_sessions).toBeGreaterThanOrEqual(3);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("anchors the posterior window at the apply-day ordinal without rewriting an older baseline", () => {
+		const root = fixtureRoot();
+		try {
+			for (const [day, session] of [
+				[1, "S-anchor-base-1"],
+				[2, "S-anchor-base-2"],
+				[3, "S-anchor-base-3"],
+			] as const)
+				addComparableSession(root, day, session);
+			addComparableSession(
+				root,
+				4,
+				"S-anchor-gap-1",
+				"gap",
+				"other",
+				false,
+				"maintenance",
+			);
+			addComparableSession(
+				root,
+				5,
+				"S-anchor-gap-2",
+				"gap",
+				"other",
+				false,
+				"maintenance",
+			);
+			const proposal = analyzeEvolutionProject(root, { now: NOW }).proposals[0];
+			if (!proposal) throw new Error("fixture produced no evolution proposal");
+			expect(
+				proposal.evaluation_contract.baseline.production_day_range,
+			).toEqual({ start: 1, end: 3 });
+
+			// The maintenance ordinals exist when the proposal is applied, but do
+			// not belong to its immutable documentation baseline.
+			const stream = newWorkstream(root, "apply ordinal anchor", {
+				noSpecRequiredReason: "test fixture",
+			});
+			startTask(root, { session: stream.session, taskId: "T-01" });
+			const applied = applyEvolutionProposal({
+				root,
+				projectId: PROJECT_ID,
+				proposal,
+				invocationClass: "policy_canary",
+				policyMode: "canary",
+				session: stream.session,
+				taskId: "T-01",
+				now: NOW,
+			});
+			if (!applied.mutation_id) throw new Error("fixture apply failed");
+
+			const commit = readApplyJournal(root).findLast(
+				(event) =>
+					event.phase === "commit" &&
+					event.binding.mutation_id === applied.mutation_id,
+			);
+			expect(commit?.binding.evaluation_anchor_production_day_sequence).toBe(5);
+			expect(
+				commit?.binding.evaluation_contract?.baseline.production_day_range,
+			).toEqual({ start: 1, end: 3 });
+			expect(
+				previewProposalEvaluation(root, applied.mutation_id),
+			).toMatchObject({
+				production_day_window: { start: 6, end: 10, size: 5 },
+				comparable_sessions: 0,
+			});
+
+			for (const [day, session] of [
+				[6, "S-anchor-post-1"],
+				[7, "S-anchor-post-2"],
+				[8, "S-anchor-post-3"],
+				[9, "S-anchor-post-4"],
+				[10, "S-anchor-post-5"],
+			] as const)
+				addComparableSession(
+					root,
+					day,
+					session,
+					"clean",
+					"workflow_friction",
+					false,
+				);
+			expect(
+				previewProposalEvaluation(root, applied.mutation_id),
+			).toMatchObject({
+				production_day_window: { start: 6, end: 10, size: 5 },
+				comparable_sessions: 5,
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

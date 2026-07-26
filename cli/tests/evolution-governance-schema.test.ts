@@ -175,6 +175,27 @@ describe("Evolution Slice 0 governance schema", () => {
 		}
 	});
 
+	test("rejects dot traversal in every AFOL path segment", () => {
+		const validate = validator("projectRelativePath");
+		for (const path of [
+			".afol/./evolution.db",
+			".afol/../evolution.db",
+			".afol/data/./evolution.db",
+			".afol/data/../evolution.db",
+			".afol/.",
+			".afol/..",
+		]) {
+			expect(validate(path)).toBe(false);
+		}
+		for (const path of [
+			".afol/.cache/evolution.db",
+			".afol/data/v1.2/evolution.db",
+			".afol/data/..cache/evolution.db",
+		]) {
+			expect(validate(path)).toBe(true);
+		}
+	});
+
 	test("rejects invalid project identity and timezone shape", () => {
 		const validate = ajv.getSchema(schema.$id);
 		const invalidId = projectConfig({

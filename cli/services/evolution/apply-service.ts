@@ -311,6 +311,21 @@ function bind(input: {
 	content: string;
 	mutationId: string;
 }): ApplyBinding {
+	const resolved = resolveEvolutionConfig(readProjectConfig(input.apply.root));
+	const db = openEvolutionDb(
+		evolutionDbPath(input.apply.root, resolved.paths.evolutionDb),
+	);
+	let evaluationAnchorProductionDaySequence = 0;
+	try {
+		const row = db
+			.prepare(
+				"SELECT MAX(ordinal_sequence) AS sequence FROM production_days WHERE project_id = ?",
+			)
+			.get(input.apply.projectId) as { sequence: number | null } | null;
+		evaluationAnchorProductionDaySequence = Number(row?.sequence ?? 0);
+	} finally {
+		db.close();
+	}
 	return {
 		project_id: input.apply.projectId,
 		proposal_id: input.proposal.id,
@@ -333,6 +348,8 @@ function bind(input: {
 		evaluation_contract_digest: evaluationContractDigest(
 			input.proposal.evaluation_contract,
 		),
+		evaluation_anchor_production_day_sequence:
+			evaluationAnchorProductionDaySequence,
 		target_kind: input.targetKind,
 		target_path: input.targetPath,
 		before_state: "absent",

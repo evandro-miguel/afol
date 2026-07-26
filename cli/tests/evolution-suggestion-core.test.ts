@@ -489,6 +489,61 @@ describe("evolution suggestion model", () => {
 		expect(result.critical_alerts).toHaveLength(0);
 	});
 
+	test("splits a mixed-task fingerprint into deterministic task-scoped cohorts", () => {
+		const rows = observations();
+		const first = rows[0];
+		if (!first) throw new Error("missing fixture observation");
+		const mixed = rows.map((row, index) => ({
+			...row,
+			task_type: index === rows.length - 1 ? "documentation" : "bug-fix",
+			source_refs: [{ id: `E-task-${index}`, kind: "evidence" }],
+		}));
+		const cluster = {
+			fingerprint: first.fingerprint,
+			state: "recurring" as const,
+			occurrence_count: mixed.length,
+			distinct_session_count: 2,
+			distinct_production_day_count: 3,
+			priority: 2,
+			source_refs: [{ id: "E-mixed-cluster", kind: "evidence" }],
+		};
+		const result = deriveSuggestionCandidates({
+			projectId: PROJECT_ID,
+			localDate: "2026-07-17",
+			clusters: [cluster],
+			observationsByFingerprint: new Map([[cluster.fingerprint, mixed]]),
+		});
+		expect(result.suggestions).toHaveLength(2);
+		expect(result.suggestions.map((candidate) => candidate.task_type)).toEqual([
+			"bug-fix",
+			"documentation",
+		]);
+		expect(
+			new Set(result.suggestions.map((candidate) => candidate.id)).size,
+		).toBe(2);
+		expect(
+			new Set(result.suggestions.map((candidate) => candidate.evidence_digest))
+				.size,
+		).toBe(2);
+		for (const candidate of result.suggestions) {
+			const cohort = mixed.filter(
+				(observation) => observation.task_type === candidate.task_type,
+			);
+			expect(candidate.occurrence_count).toBe(cohort.length);
+			expect(candidate.related_session_ids).toEqual(
+				[
+					...new Set(cohort.map((observation) => observation.session_id)),
+				].sort(),
+			);
+			expect(candidate.validation).toContain(candidate.task_type);
+			expect(candidate.recommendation).toContain(candidate.task_type);
+			expect(candidate.source_refs).not.toContainEqual({
+				id: "E-mixed-cluster",
+				kind: "evidence",
+			});
+		}
+	});
+
 	test("surfaces observed and candidate critical clusters without recurrence gating", () => {
 		const criticalRows = observations("integrity_error");
 		const first = criticalRows[0];

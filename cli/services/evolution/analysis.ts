@@ -257,7 +257,7 @@ export function scorecardFromObservations(
 }
 
 function proposalId(projectId: string, candidate: SuggestionCandidate): string {
-	return `EVO-${digest({ projectId, cluster: candidate.cluster_id, evidence: candidate.evidence_digest }).slice(0, 32)}`;
+	return `EVO-${digest({ projectId, cluster: candidate.cluster_id, taskType: candidate.task_type, evidence: candidate.evidence_digest }).slice(0, 32)}`;
 }
 
 function targetMetrics(

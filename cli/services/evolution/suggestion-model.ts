@@ -224,8 +224,16 @@ export function suggestionEvidenceDigest(input: {
 	});
 }
 
-export function suggestionId(projectId: string, clusterId: string): string {
-	return `SUG-${digest({ projectId, clusterId }).slice(0, 32)}`;
+export function suggestionId(
+	projectId: string,
+	clusterId: string,
+	taskType?: string,
+): string {
+	const identity =
+		taskType === undefined
+			? { projectId, clusterId }
+			: { projectId, clusterId, taskType };
+	return `SUG-${digest(identity).slice(0, 32)}`;
 }
 
 export function isCriticalSuggestion(
@@ -323,7 +331,7 @@ export function buildSuggestionCandidate(input: {
 			(input.cluster.user_confirmed_recurrence ? 0.15 : 0),
 	);
 	return {
-		id: suggestionId(input.projectId, input.cluster.fingerprint),
+		id: suggestionId(input.projectId, input.cluster.fingerprint, taskType),
 		project_id: input.projectId,
 		local_date: input.localDate,
 		cluster_id: input.cluster.fingerprint,
@@ -331,10 +339,8 @@ export function buildSuggestionCandidate(input: {
 		fingerprint_version: 1,
 		problem: `${observationKind(input.observations[0] as ObservationRecord) || "workflow friction"} recurred across ${input.cluster.distinct_session_count} sessions`,
 		risk: critical ? "critical alert; no automatic suggestion" : "low",
-		validation:
-			"Compare recurrence and user-intervention metrics over the next 3 comparable sessions",
-		recommendation:
-			"Add a bounded check at the workflow step where this recurrence is observed",
+		validation: `Compare recurrence and user-intervention metrics for ${taskType} over the next 3 comparable sessions`,
+		recommendation: `Add a bounded check to the ${taskType} workflow step where this recurrence is observed`,
 		related_session_ids: [
 			...new Set(
 				input.observations.map((observation) => observation.session_id),
@@ -460,31 +466,57 @@ export function deriveSuggestionCandidates(input: {
 	pendingCount?: number;
 }): SuggestionDerivation {
 	const candidates = input.clusters
-		.map((cluster) => {
+		.flatMap((cluster) => {
 			const observations =
 				input.observationsByFingerprint.get(cluster.fingerprint) ?? [];
-			if (observations.length === 0) return null;
-			const critical = isCriticalSuggestion(observations);
-			const alertEligible = [
-				"observed",
-				"candidate",
-				"recurring",
-				"reopened",
-			].includes(cluster.state);
-			const normalEligible = ["recurring", "reopened"].includes(cluster.state);
-			if ((!critical || !alertEligible) && (!normalEligible || critical))
-				return null;
-			return buildSuggestionCandidate({
-				projectId: input.projectId,
-				localDate: input.localDate,
-				cluster,
-				observations,
-				...(input.pendingCount === undefined
-					? {}
-					: { pendingCount: input.pendingCount }),
-			});
+			if (observations.length === 0) return [];
+			const cohorts = new Map<string, ObservationRecord[]>();
+			for (const observation of observations) {
+				const cohort = cohorts.get(observation.task_type) ?? [];
+				cohort.push(observation);
+				cohorts.set(observation.task_type, cohort);
+			}
+			const mixed = cohorts.size > 1;
+			return [...cohorts.entries()]
+				.sort(([left], [right]) => left.localeCompare(right))
+				.flatMap(([taskType, cohort]) => {
+					if (!taskType || cohort.length === 0) return [];
+					const critical = isCriticalSuggestion(cohort);
+					const alertEligible = [
+						"observed",
+						"candidate",
+						"recurring",
+						"reopened",
+					].includes(cluster.state);
+					const normalEligible = ["recurring", "reopened"].includes(
+						cluster.state,
+					);
+					if ((!critical || !alertEligible) && (!normalEligible || critical))
+						return [];
+					const scopedCluster: SuggestionCluster = {
+						...cluster,
+						occurrence_count: cohort.length,
+						distinct_session_count: new Set(
+							cohort.map((observation) => observation.session_id),
+						).size,
+						distinct_production_day_count: new Set(
+							cohort.map((observation) => observation.production_day_sequence),
+						).size,
+						...(mixed ? { source_refs: [] } : {}),
+					};
+					return [
+						buildSuggestionCandidate({
+							projectId: input.projectId,
+							localDate: input.localDate,
+							cluster: scopedCluster,
+							observations: cohort,
+							...(input.pendingCount === undefined
+								? {}
+								: { pendingCount: input.pendingCount }),
+						}),
+					];
+				});
 		})
-		.filter((candidate): candidate is SuggestionCandidate => candidate !== null)
 		.sort(
 			(left, right) =>
 				right.score - left.score || left.id.localeCompare(right.id),

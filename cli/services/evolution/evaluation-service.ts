@@ -166,12 +166,19 @@ function contractFor(
 	return contract;
 }
 
-function emptyWindow(contract: EvaluationContractV1 | null): {
+function evaluationWindow(
+	contract: EvaluationContractV1 | null,
+	commit: ApplyJournalEvent | null = null,
+): {
 	start: number;
 	end: number;
 	size: number;
 } {
-	const end = contract?.baseline.production_day_range.end ?? 0;
+	const baselineEnd = contract?.baseline.production_day_range.end ?? 0;
+	const end = Math.max(
+		baselineEnd,
+		commit?.binding.evaluation_anchor_production_day_sequence ?? 0,
+	);
 	return {
 		start: end + 1,
 		end: end + EVALUATION_PRODUCTION_DAY_WINDOW,
@@ -287,7 +294,7 @@ function baseResult(
 		state,
 		reason,
 		apply_commit_digest: commit?.event_digest ?? null,
-		production_day_window: emptyWindow(contract),
+		production_day_window: evaluationWindow(contract, commit),
 		comparable_sessions: 0,
 		matching_observations: 0,
 		scorecard_comparison: { comparable: false, accepted: false, reason },
@@ -348,12 +355,7 @@ function previewProposalEvaluationUnlocked(
 	const all = journalEvents
 		.map(observationFromEvent)
 		.filter((item): item is ObservationRecord => item !== null);
-	const baselineEnd = contract.baseline.production_day_range.end;
-	const window = {
-		start: baselineEnd + 1,
-		end: baselineEnd + EVALUATION_PRODUCTION_DAY_WINDOW,
-		size: EVALUATION_PRODUCTION_DAY_WINDOW,
-	};
+	const window = evaluationWindow(contract, commit);
 	const post = all.filter(
 		(observation) =>
 			observation.journal_sequence >

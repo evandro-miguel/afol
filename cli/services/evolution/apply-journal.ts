@@ -56,6 +56,7 @@ export type ApplyBinding = {
 	contract_version?: 1;
 	evaluation_contract?: EvaluationContractV1;
 	evaluation_contract_digest?: string;
+	evaluation_anchor_production_day_sequence?: number;
 	target_kind: ApplyTargetKind;
 	target_path: string;
 	before_state: "absent";
@@ -151,6 +152,14 @@ function assertBinding(binding: ApplyBinding): void {
 				evaluationContractDigest(binding.evaluation_contract)
 		)
 			throw new Error("evolution apply evaluation contract digest mismatch");
+		if (
+			binding.evaluation_anchor_production_day_sequence !== undefined &&
+			(!Number.isSafeInteger(
+				binding.evaluation_anchor_production_day_sequence,
+			) ||
+				binding.evaluation_anchor_production_day_sequence < 0)
+		)
+			throw new Error("invalid evolution apply evaluation anchor");
 	}
 	if (
 		!new Set(["none", "canary", "lessons_memory_only"]).has(binding.policy_mode)
