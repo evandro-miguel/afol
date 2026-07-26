@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	appendProductionDayAllocation,
+	checkEvolutionDbHealth,
 	normalizeObservationRecord,
 } from "../services/evolution";
 import { analyzeEvolutionProject } from "../services/evolution/analysis";
@@ -139,10 +140,14 @@ function addComparableSession(
 			id: evidenceId,
 			project_id: PROJECT_ID,
 			session_id: sessionId,
+			task_id: "documentation",
 			created_at: `2026-07-${String(day + 1).padStart(2, "0")}T00:00:00.000Z`,
+			command: "bun test",
 			result: "passed",
 			provenance: "observed",
 			exit_code: 0,
+			purpose: "completion",
+			authorization_type: "execution",
 		})}\n`,
 	);
 	const db = openEvolutionDb(evolutionDbPath(root));
@@ -438,6 +443,40 @@ describe("Evolution posterior evaluation contracts", () => {
 		}
 	});
 
+	test("counts successful completion evidence as comparable outcomes", () => {
+		const { root, mutationId } = appliedFixture();
+		try {
+			for (const [day, session] of [
+				[4, "S-clean-1"],
+				[5, "S-clean-2"],
+				[6, "S-clean-3"],
+				[7, "S-clean-4"],
+				[8, "S-clean-5"],
+			] as const)
+				addComparableSession(
+					root,
+					day,
+					session,
+					"clean",
+					"workflow_friction",
+					false,
+				);
+			const result = previewProposalEvaluation(root, mutationId);
+			expect(result.comparable_sessions).toBe(5);
+			expect(result.matching_observations).toBe(0);
+			expect(result.state).toBe("stable");
+			expect(
+				(
+					result.scorecard_comparison.deltas as {
+						outcome: { observed_results: number | null };
+					}
+				).outcome.observed_results,
+			).toBeGreaterThan(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("reopens immediately when a matching post-apply recurrence appears", () => {
 		const { root, mutationId } = appliedFixture();
 		try {
@@ -700,6 +739,62 @@ describe("Evolution posterior evaluation contracts", () => {
 					(event) => event.mutation_id === mutationId,
 				),
 			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps the canonical append successful when projection refresh fails and repairs it on retry", () => {
+		const { root, mutationId, session, taskId } = appliedFixture();
+		try {
+			const first = recordProposalEvaluation({
+				root,
+				projectId: PROJECT_ID,
+				mutationId,
+				invocationClass: "explicit_local",
+				session,
+				taskId,
+				now: NOW,
+				projectionRefresher: () => {
+					throw new Error("injected projection refresh failure");
+				},
+			});
+			expect(first.journal_event_id).toBeTruthy();
+			expect(readEvaluationJournal(root)).toHaveLength(1);
+			const context = {
+				root,
+				projectId: PROJECT_ID,
+				timezone: "UTC",
+				evolutionEventsDir: ".afol/data/events/evolution",
+			};
+			const unhealthy = checkEvolutionDbHealth(
+				evolutionDbPath(root),
+				PROJECT_ID,
+				context,
+			);
+			expect(unhealthy.ok).toBe(false);
+			expect(unhealthy.findings).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						message: expect.stringContaining("evaluation projection differs"),
+					}),
+				]),
+			);
+
+			const recovered = recordProposalEvaluation({
+				root,
+				projectId: PROJECT_ID,
+				mutationId,
+				invocationClass: "explicit_local",
+				session,
+				taskId,
+				now: NOW,
+			});
+			expect(recovered).toEqual(first);
+			expect(readEvaluationJournal(root)).toHaveLength(1);
+			expect(
+				checkEvolutionDbHealth(evolutionDbPath(root), PROJECT_ID, context).ok,
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

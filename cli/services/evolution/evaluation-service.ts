@@ -3,6 +3,7 @@ import {
 	assertTaskInProgress,
 	readActiveSession,
 } from "../workbench/lifecycle";
+import { loadEvidenceEntries, sessionPaths } from "../workbench/session-reader";
 import { scorecardFromObservations } from "./analysis";
 import {
 	type ApplyJournalEvent,
@@ -57,11 +58,23 @@ export type EvaluationResult = {
 	journal_event_id?: string;
 };
 
+const EVALUATION_EVIDENCE_LIMITS = {
+	maxBytes: 1_048_576,
+	maxLines: 4_096,
+	maxCandidates: 1_024,
+} as const;
+
 type EvaluationInput = {
 	root: string;
 	projectId?: string;
 	mutationId: string;
 };
+
+type EvaluationProjectionRefresher = (
+	root: string,
+	projectId: string,
+	eventsDir: string,
+) => void;
 
 function assertRecordingContext(input: {
 	root: string;
@@ -187,6 +200,80 @@ function comparisonSummary(
 	};
 }
 
+function successfulCompletionOutcomes(input: {
+	root: string;
+	projectId: string;
+	taskType: string;
+	productionDays: ReturnType<typeof readProductionDayJournal>;
+	window: { start: number; end: number };
+}): ObservationRecord[] {
+	const daySequences = new Map<string, number>();
+	const sessions = new Map<string, ObservationRecord>();
+	for (const event of input.productionDays) {
+		let daySequence = daySequences.get(event.payload.local_date);
+		if (daySequence === undefined) {
+			daySequence = daySequences.size + 1;
+			daySequences.set(event.payload.local_date, daySequence);
+		}
+		if (
+			daySequence < input.window.start ||
+			daySequence > input.window.end ||
+			event.payload.project_id !== input.projectId
+		)
+			continue;
+		const sessionId = event.payload.evidence.session_id;
+		const evidenceId = event.payload.evidence.id;
+		const evidence = loadEvidenceEntries(
+			sessionPaths(input.root, sessionId).evidencePath,
+			EVALUATION_EVIDENCE_LIMITS,
+		).find((entry) => entry.id === evidenceId);
+		if (
+			!evidence ||
+			evidence.project_id !== input.projectId ||
+			evidence.session_id !== sessionId ||
+			evidence.task_id !== input.taskType ||
+			evidence.result !== "passed" ||
+			evidence.exit_code !== 0 ||
+			evidence.provenance !== "observed" ||
+			evidence.purpose !== "completion" ||
+			!new Set(["execution", "artifact", "waiver"]).has(
+				evidence.authorization_type ?? "",
+			)
+		)
+			continue;
+		sessions.set(sessionId, {
+			project_id: input.projectId,
+			id: `OUT-${event.event_id}`,
+			kind: "successful_completion",
+			fingerprint: `completion:${input.taskType}`,
+			fingerprint_version: 1,
+			occurrence_identity: `completion:${evidenceId}`,
+			session_id: sessionId,
+			production_day_sequence: daySequence,
+			task_type: input.taskType,
+			impact: "successful_outcome",
+			normalized_fields: {
+				kind: "successful_completion",
+				error_code: "",
+				test: "",
+				command: "completion",
+				path_module: "",
+				operation: "complete",
+				workflow_step: "completion",
+				stack_digest: "",
+				provider: "afol",
+			},
+			source_refs: [{ id: evidenceId, kind: "evidence" }],
+			created_at: evidence.created_at,
+			journal_sequence: 0,
+			journal_event_id: event.event_id,
+		});
+	}
+	return [...sessions.values()].sort((left, right) =>
+		left.session_id.localeCompare(right.session_id),
+	);
+}
+
 function baseResult(
 	input: EvaluationInput,
 	state: EvaluationState,
@@ -278,33 +365,44 @@ function previewProposalEvaluationUnlocked(
 	const matching = post.filter(
 		(observation) => observation.fingerprint === contract.cluster_id,
 	);
-	const sessions = new Set(post.map((observation) => observation.session_id));
-	const comparableSessions = sessions.size;
 	const productionDays = readProductionDayJournal(
 		root,
 		resolvedProjectId,
 		resolvedConfig.timezone,
 		resolvedConfig.paths.evolutionEventsDir,
 	);
+	const successfulOutcomes = successfulCompletionOutcomes({
+		root,
+		projectId: resolvedProjectId,
+		taskType: contract.task_type,
+		productionDays,
+		window,
+	});
 	const productionDayCount = new Set(
 		productionDays
 			.filter((event) => event.payload.project_id === resolvedProjectId)
 			.map((event) => event.payload.local_date),
 	).size;
 	const fullWindow = productionDayCount >= window.end;
+	const outcomeObservations = [...post, ...successfulOutcomes];
+	const comparableSessions = new Set(
+		outcomeObservations.map((observation) => observation.session_id),
+	).size;
 	const cohort: ComparableCohort = {
 		task_type: contract.task_type,
-		observations: post,
+		observations: outcomeObservations,
 		minimum_data: EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
 		distinct_production_days: new Set(
-			post.map((observation) => observation.production_day_sequence),
+			outcomeObservations.map(
+				(observation) => observation.production_day_sequence,
+			),
 		).size,
 		comparable:
 			comparableSessions >= EVALUATION_MINIMUM_COMPARABLE_SESSIONS &&
 			fullWindow,
 	};
 	const currentScorecard = scorecardFromObservations(
-		post,
+		outcomeObservations,
 		cohort.distinct_production_days,
 	);
 	const comparison = compareScorecards(
@@ -391,10 +489,30 @@ function appendAndProjectUnlocked(
 	root: string,
 	event: EvaluationEventInput,
 	eventsDir: string,
+	projectionRefresher: EvaluationProjectionRefresher,
 ): EvaluationJournalEvent {
 	const appended = appendEvaluationEventUnlocked(root, event, eventsDir);
-	projectEvaluationJournalUnlocked(root, event.project_id, eventsDir);
+	refreshEvaluationProjectionBestEffort(
+		root,
+		event.project_id,
+		eventsDir,
+		projectionRefresher,
+	);
 	return appended;
+}
+
+function refreshEvaluationProjectionBestEffort(
+	root: string,
+	projectId: string,
+	eventsDir: string,
+	projectionRefresher: EvaluationProjectionRefresher,
+): void {
+	try {
+		projectionRefresher(root, projectId, eventsDir);
+	} catch {
+		// The journal is canonical. Projection/checkpoint refresh is recoverable
+		// on the next idempotent record or through derived-state repair.
+	}
 }
 
 function projectEvaluationJournalUnlocked(
@@ -423,6 +541,7 @@ export function recordProposalEvaluation(
 		session: string;
 		taskId: string;
 		now?: Date;
+		projectionRefresher?: EvaluationProjectionRefresher;
 	},
 ): EvaluationResult {
 	assertRecordingContext(input);
@@ -456,7 +575,12 @@ export function recordProposalEvaluation(
 					event.idempotency_digest === idempotencyDigest,
 			);
 			if (existing) {
-				projectEvaluationJournalUnlocked(input.root, projectId, eventsDir);
+				refreshEvaluationProjectionBestEffort(
+					input.root,
+					projectId,
+					eventsDir,
+					input.projectionRefresher ?? projectEvaluationJournalUnlocked,
+				);
 				return eventResult(existing);
 			}
 			const event: EvaluationEventInput = {
@@ -477,7 +601,12 @@ export function recordProposalEvaluation(
 				scorecard_comparison: preview.scorecard_comparison,
 				idempotency_digest: idempotencyDigest,
 			};
-			const appended = appendAndProjectUnlocked(input.root, event, eventsDir);
+			const appended = appendAndProjectUnlocked(
+				input.root,
+				event,
+				eventsDir,
+				input.projectionRefresher ?? projectEvaluationJournalUnlocked,
+			);
 			return { ...preview, journal_event_id: appended.event_id };
 		}),
 	);
@@ -493,6 +622,7 @@ export function recordProposalSupersession(input: {
 	session: string;
 	taskId: string;
 	now?: Date;
+	projectionRefresher?: EvaluationProjectionRefresher;
 }): EvaluationResult {
 	assertRecordingContext(input);
 	if (!input.reason.trim()) throw new Error("supersession reason is required");
@@ -533,7 +663,12 @@ export function recordProposalSupersession(input: {
 					existing.task_id !== input.taskId
 				)
 					throw new Error("conflicting supersession already recorded");
-				projectEvaluationJournalUnlocked(input.root, projectId, eventsDir);
+				refreshEvaluationProjectionBestEffort(
+					input.root,
+					projectId,
+					eventsDir,
+					input.projectionRefresher ?? projectEvaluationJournalUnlocked,
+				);
 				return eventResult(existing);
 			}
 			if (successor.sequence <= subject.sequence)
@@ -575,7 +710,12 @@ export function recordProposalSupersession(input: {
 				apply_journal_sequence: applies.at(-1)?.sequence ?? successor.sequence,
 				idempotency_digest: idempotencyDigest,
 			};
-			const appended = appendAndProjectUnlocked(input.root, event, eventsDir);
+			const appended = appendAndProjectUnlocked(
+				input.root,
+				event,
+				eventsDir,
+				input.projectionRefresher ?? projectEvaluationJournalUnlocked,
+			);
 			return eventResult(appended);
 		}),
 	);

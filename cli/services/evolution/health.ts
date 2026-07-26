@@ -3,6 +3,10 @@ import { existsSync } from "node:fs";
 import { unmatchedApplyPrepares } from "./apply-journal";
 import { assertSafeEvolutionTarget } from "./db";
 import {
+	evaluationJournalPath,
+	validateEvaluationProjection,
+} from "./evaluation-journal";
+import {
 	type EvolutionJournalContext,
 	validateProductionDayProjection,
 } from "./journal";
@@ -201,7 +205,34 @@ export function getEvolutionStatus(
 						.get(projectId, projectId) as Record<string, unknown>,
 				)
 			: 0;
-		if (suggestionState > 0)
+		const evaluationState = tables.has("evaluations")
+			? scalarNumber(
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM evaluations WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
+				)
+			: 0;
+		const evaluationJournalExists = existsSync(
+			evaluationJournalPath(
+				canonicalContext.root,
+				canonicalContext.evolutionEventsDir,
+			),
+		);
+		if (
+			tables.has("evaluations") &&
+			(evaluationState > 0 || evaluationJournalExists)
+		)
+			validateEvaluationProjection({
+				root: canonicalContext.root,
+				projectId,
+				db,
+				...(canonicalContext.evolutionEventsDir
+					? { eventsDir: canonicalContext.evolutionEventsDir }
+					: {}),
+			});
+		if (suggestionState > 0 || evaluationState > 0 || evaluationJournalExists)
 			validateEvolutionProjectionCheckpoint({
 				root: canonicalContext.root,
 				db,
@@ -304,6 +335,7 @@ export function checkEvolutionDbHealth(
 	let observationCount = 0;
 	let recurringClusterCount = 0;
 	let dailySuggestionReceiptCount = 0;
+	let evaluationCount = 0;
 	let projectId: string | null = null;
 	try {
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
@@ -377,6 +409,13 @@ export function checkEvolutionDbHealth(
 			findings.push({
 				severity: "fail",
 				message: "suggestion receipt schema is stale or incomplete",
+			});
+		}
+		if (migrationVersion >= 8 && !tables.has("evaluations")) {
+			schemaOk = false;
+			findings.push({
+				severity: "fail",
+				message: "evaluation schema is stale or incomplete",
 			});
 		}
 		if (
@@ -473,6 +512,15 @@ export function checkEvolutionDbHealth(
 					db
 						.query(
 							"SELECT COUNT(*) AS count FROM daily_suggestion_receipts WHERE project_id = ?",
+						)
+						.get(projectId) as Record<string, unknown>,
+				);
+			}
+			if (tables.has("evaluations")) {
+				evaluationCount = scalarNumber(
+					db
+						.query(
+							"SELECT COUNT(*) AS count FROM evaluations WHERE project_id = ?",
 						)
 						.get(projectId) as Record<string, unknown>,
 				);
@@ -574,9 +622,40 @@ export function checkEvolutionDbHealth(
 						});
 					}
 				}
+				const evaluationJournalExists = existsSync(
+					evaluationJournalPath(
+						canonicalContext.root,
+						canonicalContext.evolutionEventsDir,
+					),
+				);
 				if (
 					schemaOk &&
-					(observationCount > 0 || dailySuggestionReceiptCount > 0)
+					tables.has("evaluations") &&
+					(evaluationCount > 0 || evaluationJournalExists)
+				) {
+					try {
+						validateEvaluationProjection({
+							root: canonicalContext.root,
+							projectId: expectedProjectId,
+							db,
+							...(canonicalContext.evolutionEventsDir
+								? { eventsDir: canonicalContext.evolutionEventsDir }
+								: {}),
+						});
+					} catch (error) {
+						schemaOk = false;
+						findings.push({
+							severity: "fail",
+							message: (error as Error).message,
+						});
+					}
+				}
+				if (
+					schemaOk &&
+					(observationCount > 0 ||
+						dailySuggestionReceiptCount > 0 ||
+						evaluationCount > 0 ||
+						evaluationJournalExists)
 				) {
 					try {
 						validateEvolutionProjectionCheckpoint({
