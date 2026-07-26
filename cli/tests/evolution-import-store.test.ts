@@ -127,6 +127,43 @@ describe("external import acceptance store", () => {
 		}
 	});
 
+	test("does not append when a duplicate projection references another event", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-import-event-drift-"));
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const driftPayload = payload("projection-event-drift");
+			acceptExternalImport({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				payload: driftPayload,
+			});
+			const path = importJournalPath(root);
+			const before = readFileSync(path);
+			db.prepare(
+				"UPDATE external_imports SET journal_event_id = ? WHERE project_id = ? AND import_id = ?",
+			).run(
+				"IMP-11111111-1111-4111-8111-111111111111",
+				PROJECT_ID,
+				driftPayload.manifest.import_id,
+			);
+
+			expect(() =>
+				acceptExternalImport({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					payload: driftPayload,
+				}),
+			).toThrow("import projection and journal disagree");
+			expect(readFileSync(path)).toEqual(before);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rolls back projection and journal together on a failed transaction", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-import-rollback-"));
 		const db = openEvolutionDb(evolutionDbPath(root));
