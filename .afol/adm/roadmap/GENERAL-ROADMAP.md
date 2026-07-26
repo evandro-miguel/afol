@@ -913,6 +913,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
     - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
     - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
+    - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -928,6 +929,9 @@ Follow-on slices under this direction:
   - Make the shared event ledger durable under partial-write and sync failure,
     serialize cross-session writers, and block validation/rebuild on corrupt
     input without automatic truncation.
+  - Reconcile accepted F-01, F-11, F-13, and F-15 governance contracts with
+    the AFOL-only TypeScript runtime while retaining their pre-reconciliation
+    bytes in a verified AFOL migration archive.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,
@@ -974,6 +978,18 @@ Follow-on slices under this direction:
   `bun.lock` but could not perform vulnerability matching because no offline
   database was available; dependency inputs remain unchanged from `532345f`,
   and that residual risk is explicit rather than reported as a pass.
+- Event-ledger durability: the bounded child
+  `260726_event-ledger-durability_spec-child_01` is final with crash-safe
+  append, serialized writers, fail-closed readers, and its original governed
+  evidence preserved.
+- Governance contract reconciliation: the bounded child
+  `260726_governance-contract-reconciliation_spec-child_01` is final. F-01,
+  F-11, F-13, and F-15 now describe the current AFOL-only TypeScript runtime;
+  their exact prior bytes remain in the verified AFOL migration archive.
+  Focused regressions, project drift validation, typecheck, formatting,
+  manifest, Gitleaks history/worktree, and OSV dependency scans passed. This
+  bounded remediation makes no new full-suite, build, release, deployment, or
+  global-install claim.
 
 ### F-30 AFOL Evolution System
 
