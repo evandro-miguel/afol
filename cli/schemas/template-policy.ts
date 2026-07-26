@@ -52,6 +52,7 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
 	".afol/adm/source/universal-skills/**",
 	".afol/adm/**",
 	".afol/data/**",
+	".afol/external/README.md",
 	".afol/pstr/**",
 	".afol/library/**",
 	".afol/memory/**",

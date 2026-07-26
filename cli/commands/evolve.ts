@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
+import { basename, relative } from "node:path";
 import {
 	envelopeErr,
 	envelopeOk,
@@ -17,16 +18,20 @@ import {
 import {
 	analyzeEvolutionProject,
 	assertSafeEvolutionProjectRoot,
+	assertSafeEvolutionTarget,
 	checkEvolutionDbHealth,
+	confirmExternalImport,
 	type DailySuggestionPreview,
 	type EvolutionDbHealth,
 	type EvolutionStatus,
 	evolutionDbPath,
 	getEvolutionStatus,
+	listExternalImports,
 	observationJournalPath,
 	openEvolutionDb,
 	preferenceJournalPath,
 	previewDailySuggestion,
+	previewExternalImport,
 	productionDayJournalPath,
 	type RecurrenceThresholds,
 	readObservationJournal,
@@ -38,6 +43,7 @@ import {
 	resolveEvolutionConfig,
 } from "../services/evolution";
 import { localDateForTimezone } from "../services/evolution/config";
+import type { ImportProvider } from "../services/evolution/imports";
 import { ingestObservationsForSession } from "../services/evolution/observation-ingest";
 import {
 	dispatchSuggestionDecision,
@@ -226,6 +232,161 @@ export function runObserveCommand(
 		}
 		return 2;
 	}
+}
+
+function parseImportArgs(args: readonly string[]): {
+	provider: ImportProvider;
+	source: string;
+	confirm: boolean;
+	json: boolean;
+} {
+	const provider = args[0];
+	if (provider !== "codex" && provider !== "pi")
+		throw new Error("evolve import requires codex or pi");
+	let source = "";
+	let confirm = false;
+	let json = false;
+	for (let index = 1; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "--confirm") confirm = true;
+		else if (arg === "--source") {
+			source = args[++index] ?? "";
+			if (!source || source.startsWith("-"))
+				throw new Error("evolve import --source requires a value");
+		} else throw new Error(`Unknown evolve import argument: ${arg}`);
+	}
+	if (!source) throw new Error("evolve import requires --source <path>");
+	return { provider, source, confirm, json };
+}
+
+function parseExternalArgs(args: readonly string[]): { json: boolean } {
+	if (args[0] !== "list") throw new Error("evolve external requires list");
+	let json = false;
+	for (const arg of args.slice(1)) {
+		if (arg === "--json" || arg === "-j") json = true;
+		else throw new Error(`Unknown evolve external argument: ${arg}`);
+	}
+	return { json };
+}
+
+function importPreviewPayload(
+	preview: Awaited<ReturnType<typeof previewExternalImport>>,
+	mode: "preview" | "confirmed",
+): Record<string, unknown> {
+	return {
+		mode,
+		provider: preview.provider,
+		import_id: preview.importId,
+		adapter_version: preview.adapterVersion,
+		source_path: preview.manifest.source_path
+			? basename(preview.manifest.source_path)
+			: null,
+		bytes: preview.bytes,
+		lines: preview.lines,
+		records: preview.records,
+		sessions: preview.sessions,
+		warnings: preview.warnings,
+		redacted: true,
+		raw_stored: false,
+	};
+}
+
+async function runImport(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): Promise<number> {
+	const parsed = parseImportArgs(args);
+	assertAdmittedOperationContext(operationContext);
+	const policy = {
+		action: parsed.confirm ? "evolve.import.confirm" : "evolve.import.preview",
+		sideEffect: parsed.confirm ? ("write" as const) : ("preview" as const),
+	};
+	if (!isActionAllowed(operationContext, policy))
+		throw new Error(
+			"evolve import confirmation is not allowed for this caller",
+		);
+	if (!parsed.confirm) {
+		const preview = await previewExternalImport(
+			root,
+			parsed.provider,
+			parsed.source,
+		);
+		writeEvolutionPayload(
+			io,
+			parsed.json,
+			"evolve.import",
+			importPreviewPayload(preview, "preview"),
+			operationContext,
+		);
+		return 0;
+	}
+	const accepted = await confirmExternalImport({
+		root,
+		provider: parsed.provider,
+		source: parsed.source,
+	});
+	writeEvolutionPayload(
+		io,
+		parsed.json,
+		"evolve.import",
+		{
+			...importPreviewPayload(accepted.preview, "confirmed"),
+			artifact_path: relative(root, accepted.artifactPath),
+			duplicate: accepted.duplicate,
+			checkpoint_status: accepted.checkpoint?.status ?? null,
+		},
+		operationContext,
+	);
+	return 0;
+}
+
+function runExternalList(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	const parsed = parseExternalArgs(args);
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId) throw new Error("evolution project id is required");
+	const dbPath = evolutionDbPath(root, resolved.paths.evolutionDb);
+	const rows = existsSync(dbPath)
+		? (() => {
+				assertSafeEvolutionTarget(dbPath, "evolution db", false);
+				const db = new Database(dbPath, { readonly: true });
+				try {
+					return listExternalImports(db, resolved.projectId as string);
+				} finally {
+					db.close();
+				}
+			})()
+		: [];
+	const imports = rows.map((row) => ({
+		import_id: row.import_id,
+		provider: row.provider,
+		adapter_version: row.adapter_version,
+		source_format: row.source_format,
+		source_path: row.source_path ? basename(row.source_path) : null,
+		imported_at: row.imported_at,
+		session_count: row.session_count,
+		message_count: row.message_count,
+		link_status: row.link_status,
+		trust: row.trust,
+		redacted: row.redacted,
+		raw_stored: row.raw_stored,
+		warnings: row.warnings,
+	}));
+	writeEvolutionPayload(
+		io,
+		parsed.json,
+		"evolve.external.list",
+		{ imports },
+		operationContext,
+	);
+	return 0;
 }
 
 function parseSuggestArgs(args: readonly string[]): {
@@ -1476,6 +1637,10 @@ export async function runEvolveCommand(
 			);
 		if (action === "suggest")
 			return await runSuggest(args, projectRoot, io, now, operationContext);
+		if (action === "import")
+			return await runImport(args, projectRoot, io, operationContext);
+		if (action === "external")
+			return runExternalList(args, projectRoot, io, operationContext);
 		if (["skip", "accept", "reject"].includes(action))
 			return await runDecision(
 				action as "skip" | "accept" | "reject",

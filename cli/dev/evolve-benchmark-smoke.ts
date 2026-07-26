@@ -380,6 +380,57 @@ try {
 			.map((entry) => String(entry.path));
 		throw new Error(`analysis mutated evolution state: ${changed.join(",")}`);
 	}
+	const importSource = join(healthy, "benchmark-codex.jsonl");
+	writeFileSync(
+		importSource,
+		`${JSON.stringify({ session_id: "S-external", role: "user", content: "token=benchmark-secret" })}\n`,
+		"utf8",
+	);
+	const importPreview = await invoke(healthy, [
+		"evolve",
+		"import",
+		"codex",
+		"--source",
+		importSource,
+		"--json",
+	]);
+	if (
+		importPreview.exit !== 0 ||
+		!importPreview.stdout.includes('"mode":"preview"') ||
+		importPreview.stdout.includes("benchmark-secret")
+	)
+		throw new Error("external import preview contract failed");
+	if (existsSync(join(healthy, ".afol", "external")))
+		throw new Error("external import preview persisted state");
+	if (analysisSnapshot(healthy) !== dbAfterAnalysis)
+		throw new Error("external import preview mutated the evolution database");
+	const importConfirm = await invoke(healthy, [
+		"evolve",
+		"import",
+		"codex",
+		"--source",
+		importSource,
+		"--confirm",
+		"--json",
+	]);
+	if (
+		importConfirm.exit !== 0 ||
+		!importConfirm.stdout.includes('"mode":"confirmed"') ||
+		importConfirm.stdout.includes("benchmark-secret")
+	)
+		throw new Error("external import confirmation contract failed");
+	const externalList = await invoke(healthy, [
+		"evolve",
+		"external",
+		"list",
+		"--json",
+	]);
+	if (
+		externalList.exit !== 0 ||
+		!externalList.stdout.includes('"provider":"codex"') ||
+		externalList.stdout.includes("benchmark-secret")
+	)
+		throw new Error("external import list contract failed");
 
 	const source = fixture(PROJECT_B);
 	const copied = fixture(PROJECT_A);
@@ -435,6 +486,7 @@ try {
 				"ready_uninitialized",
 				"healthy",
 				"analysis",
+				"external-import",
 				"unhealthy",
 				"disabled",
 			],

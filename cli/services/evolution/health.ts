@@ -378,6 +378,19 @@ export function checkEvolutionDbHealth(
 				message: "suggestion receipt schema is stale or incomplete",
 			});
 		}
+		if (
+			migrationVersion >= 7 &&
+			(!tables.has("external_imports") ||
+				!tables.has("external_sessions") ||
+				!tables.has("session_links") ||
+				!tables.has("import_checkpoints"))
+		) {
+			schemaOk = false;
+			findings.push({
+				severity: "fail",
+				message: "external import schema is stale or incomplete",
+			});
+		}
 		if (migrationVersion > EVOLUTION_SCHEMA_VERSION) {
 			schemaOk = false;
 			findings.push({

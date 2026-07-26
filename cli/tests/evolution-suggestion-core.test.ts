@@ -324,7 +324,7 @@ describe("evolution suggestion model", () => {
 							user_version: number;
 						}
 					).user_version,
-				).toBe(6);
+				).toBe(7);
 			} finally {
 				upgraded.close();
 			}

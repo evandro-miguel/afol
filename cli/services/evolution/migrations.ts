@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 6;
+export const EVOLUTION_SCHEMA_VERSION = 7;
 
 const MIGRATIONS = [
 	{
@@ -272,6 +272,92 @@ CREATE INDEX IF NOT EXISTS observations_suggestion_tail_idx
 
 CREATE INDEX IF NOT EXISTS daily_suggestion_receipts_feedback_tail_idx
 	ON daily_suggestion_receipts(project_id, suggestion_id, receipt_status, local_date DESC, journal_sequence DESC);
+		`,
+	},
+	{
+		version: 7,
+		sql: `
+CREATE TABLE IF NOT EXISTS external_imports (
+	project_id TEXT NOT NULL,
+	import_id TEXT NOT NULL,
+	provider TEXT NOT NULL CHECK (length(trim(provider)) > 0),
+	adapter_version TEXT NOT NULL CHECK (length(trim(adapter_version)) > 0),
+	source_format TEXT NOT NULL CHECK (length(trim(source_format)) > 0),
+	source_path TEXT,
+	imported_at TEXT NOT NULL,
+	content_digest TEXT NOT NULL CHECK (length(trim(content_digest)) = 64),
+	session_count INTEGER NOT NULL CHECK (session_count >= 0),
+	message_count INTEGER NOT NULL CHECK (message_count >= 0),
+	redaction_policy_version TEXT NOT NULL CHECK (length(trim(redaction_policy_version)) > 0),
+	project_detected TEXT,
+	link_status TEXT NOT NULL CHECK (link_status IN ('unlinked', 'pending', 'linked')),
+	warnings TEXT NOT NULL,
+	files_ignored TEXT NOT NULL,
+	trust TEXT NOT NULL CHECK (trust = 'untrusted'),
+	raw_stored INTEGER NOT NULL CHECK (raw_stored = 0),
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (project_id, import_id),
+	UNIQUE (project_id, content_digest, adapter_version)
+);
+
+CREATE TABLE IF NOT EXISTS external_sessions (
+	project_id TEXT NOT NULL,
+	external_session_id TEXT NOT NULL,
+	import_id TEXT NOT NULL,
+	provider_session_id TEXT NOT NULL CHECK (length(trim(provider_session_id)) > 0),
+	content_digest TEXT NOT NULL CHECK (length(trim(content_digest)) = 64),
+	started_at TEXT,
+	ended_at TEXT,
+	record_count INTEGER NOT NULL CHECK (record_count >= 0),
+	normalized_digest TEXT NOT NULL CHECK (length(trim(normalized_digest)) = 64),
+	trust TEXT NOT NULL CHECK (trust = 'untrusted'),
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (project_id, external_session_id),
+	UNIQUE (project_id, import_id, provider_session_id),
+	FOREIGN KEY (project_id, import_id) REFERENCES external_imports(project_id, import_id)
+);
+
+CREATE TABLE IF NOT EXISTS session_links (
+	project_id TEXT NOT NULL,
+	external_session_id TEXT NOT NULL,
+	afol_session_id TEXT,
+	link_state TEXT NOT NULL CHECK (link_state IN ('auto_verified', 'manual_confirmed', 'pending')),
+	confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+	evidence TEXT NOT NULL,
+	verified_commit TEXT,
+	canonical_decision_ref TEXT,
+	confirmation_required INTEGER NOT NULL CHECK (confirmation_required IN (0, 1)),
+	eligible_for_learning INTEGER NOT NULL CHECK (eligible_for_learning IN (0, 1)),
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (project_id, external_session_id),
+	FOREIGN KEY (project_id, external_session_id) REFERENCES external_sessions(project_id, external_session_id)
+);
+
+CREATE TABLE IF NOT EXISTS import_checkpoints (
+	project_id TEXT NOT NULL,
+	import_id TEXT NOT NULL,
+	cursor TEXT NOT NULL,
+	status TEXT NOT NULL CHECK (status IN ('staged', 'accepted', 'complete', 'failed')),
+	content_digest TEXT NOT NULL CHECK (length(trim(content_digest)) = 64),
+	updated_at TEXT NOT NULL,
+	journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+	PRIMARY KEY (project_id, import_id),
+	FOREIGN KEY (project_id, import_id) REFERENCES external_imports(project_id, import_id)
+);
+
+CREATE INDEX IF NOT EXISTS external_imports_project_provider_idx
+	ON external_imports(project_id, provider, imported_at DESC);
+CREATE INDEX IF NOT EXISTS external_sessions_project_import_idx
+	ON external_sessions(project_id, import_id, external_session_id);
+CREATE INDEX IF NOT EXISTS session_links_project_state_idx
+	ON session_links(project_id, link_state, eligible_for_learning);
+CREATE INDEX IF NOT EXISTS import_checkpoints_project_status_idx
+	ON import_checkpoints(project_id, status, updated_at DESC);
 		`,
 	},
 ] as const;
