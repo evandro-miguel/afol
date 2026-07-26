@@ -11,6 +11,10 @@ import {
 	readClaudeAdapterEnabled,
 } from "../adapter/claude";
 import { resolveAdmPaths } from "../adm";
+import {
+	formatEventLedgerValidation,
+	validateEventLedger,
+} from "../events/ledger";
 import { validateEvolutionConfigExtension } from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
@@ -41,6 +45,7 @@ export type ProjectValidationCheck = {
 		| "agents_payload_clean"
 		| "adapter_consistency"
 		| "template_forbidden"
+		| "event_ledger"
 		| "rules_local_state_index"
 		| "skills_local_state_index"
 		| "specs_local_state_index"
@@ -219,6 +224,17 @@ function validateAgentsPayloadClean(
 		id: "agents_payload_clean",
 		ok: true,
 		message: "ok .agents contains provider-safe static payload only",
+	};
+}
+
+function validateSharedEventLedger(
+	projectRoot: string,
+): ProjectValidationCheck {
+	const validation = validateEventLedger(projectRoot);
+	return {
+		id: "event_ledger",
+		ok: validation.ok,
+		message: formatEventLedgerValidation(validation),
 	};
 }
 
@@ -492,6 +508,7 @@ export async function validateProjectStructure(
 		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
 		validateAgentsPayloadClean(projectRoot),
 		validateAdapterConsistency(projectRoot),
+		validateSharedEventLedger(projectRoot),
 		(() => {
 			const result = validateWorkBenchIndex(projectRoot);
 			return {
@@ -598,7 +615,9 @@ export async function validateProjectStructure(
 				};
 			}
 			const hasUnavailableSession = warnings.some(
-				(w) => w.type === "unreadable_session_directory",
+				(w) =>
+					w.type === "unreadable_session_directory" ||
+					w.type === "invalid_event_ledger",
 			);
 			return {
 				id: "session_health" as const,

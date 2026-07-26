@@ -281,14 +281,14 @@ describe("validate command", () => {
 			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
 			writeFileSync(
 				join(root, ".afol", "data", "events", "events.jsonl"),
-				[
+				`${[
 					{ type: "workbench.new", session: sessionA },
 					{ type: "workbench.close", session: sessionA },
 					{ type: "workbench.new", session: sessionB },
 					{ type: "workbench.close", session: sessionB },
 				]
 					.map((event, index) => JSON.stringify({ ...event, id: `E-${index}` }))
-					.join("\n") + "\n",
+					.join("\n")}\n`,
 				"utf8",
 			);
 			rebuildValidationFixtureIndexes(root);

@@ -87,11 +87,14 @@ function expectRestrictedFileError(proc: ReturnType<typeof runKernel>): void {
 
 function mkProjectRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "mutation-safety-"));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
-	cpSync(
-		join(process.cwd(), ".agents", "config.json"),
-		join(agentsDir, "config.json"),
+	writeFileSync(
+		join(afolDir, "config.json"),
+		'{"schema_version":1,"project":{"name":"afol"}}\n',
+		"utf8",
 	);
 	cpSync(
 		join(process.cwd(), ".agents", "lock.json"),

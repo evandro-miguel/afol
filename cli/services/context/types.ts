@@ -88,9 +88,24 @@ export type SectionEntry = {
 	source_path: string;
 };
 
+export type SectionSourceManifestEntry = {
+	source_path: string;
+	content_sha256: string;
+	section_count: number;
+};
+
+export type SectionIndexManifest = {
+	algorithm: "sha256";
+	source_count: number;
+	section_count: number;
+	sections_sha256: string;
+	sources: SectionSourceManifestEntry[];
+};
+
 export type SectionIndex = {
-	kind: "sections_index_v1";
-	version: 1;
+	kind: "sections_index_v2";
+	version: 2;
 	generated_at: string;
+	manifest: SectionIndexManifest;
 	sections: SectionEntry[];
 };

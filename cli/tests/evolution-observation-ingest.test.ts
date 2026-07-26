@@ -489,7 +489,7 @@ describe("observation-ingest", () => {
 		);
 		expect(() =>
 			ingestObservationsForSession({ root, projectId: PROJECT_ID, session }),
-		).toThrow("project telemetry ledger exceeds the candidate limit");
+		).toThrow("EVENT_LEDGER_LIMIT_EXCEEDED");
 		expect(existsSync(evolutionDbPath(root))).toBe(false);
 		expect(existsSync(observationJournalPath(root))).toBe(false);
 	});
