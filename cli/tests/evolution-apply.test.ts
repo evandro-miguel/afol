@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runPatchMutation } from "../commands/file/mutations/patch";
 import {
 	appendProductionDayAllocation,
 	evolutionDbPath,
@@ -25,6 +26,7 @@ import {
 	applyDigest,
 	readApplyJournal,
 	unmatchedApplyPrepares,
+	writeApplyJournalLine,
 } from "../services/evolution/apply-journal";
 import {
 	applyEvolutionProposal,
@@ -217,6 +219,25 @@ function rewriteApplyJournal(root: string, events: unknown[]): void {
 	);
 }
 
+function rewriteMutationJournal(
+	root: string,
+	transform: (
+		rows: Array<Record<string, unknown>>,
+	) => Array<Record<string, unknown>>,
+): void {
+	const path = mutationJournalPath(root);
+	const rows = readFileSync(path, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line) as Record<string, unknown>);
+	writeFileSync(
+		path,
+		`${transform(rows)
+			.map((row) => JSON.stringify(row))
+			.join("\n")}\n`,
+	);
+}
+
 function requireTargetPath(result: { target_path?: string }): string {
 	if (!result.target_path) throw new Error("missing target path fixture");
 	return result.target_path;
@@ -260,6 +281,177 @@ describe("evolution apply service", () => {
 			).toThrow("already rolled back");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply journal completes short writes and durably truncates a failed append", () => {
+		let bytesWritten = 0;
+		let fsyncs = 0;
+		const completeIo = {
+			write: (
+				_fd: number,
+				_buffer: Buffer,
+				_offset: number,
+				length: number,
+			) => {
+				const written = Math.min(3, length);
+				bytesWritten += written;
+				return written;
+			},
+			fsync: () => {
+				fsyncs += 1;
+			},
+			truncate: () => {
+				throw new Error("unexpected truncate");
+			},
+		};
+		writeApplyJournalLine(1, Buffer.from("abcdefgh"), 4, completeIo);
+		expect(bytesWritten).toBe(8);
+		expect(fsyncs).toBe(1);
+
+		const truncations: number[] = [];
+		let writes = 0;
+		const failingIo = {
+			write: () => {
+				writes += 1;
+				if (writes === 2) throw new Error("simulated write failure");
+				return 2;
+			},
+			fsync: () => {
+				fsyncs += 1;
+			},
+			truncate: (_fd: number, length: number) => {
+				truncations.push(length);
+			},
+		};
+		expect(() =>
+			writeApplyJournalLine(1, Buffer.from("abcdef"), 17, failingIo),
+		).toThrow("simulated write failure");
+		expect(truncations).toEqual([17]);
+		expect(fsyncs).toBe(2);
+	});
+
+	test("apply journal rejects an incomplete final record before append", () => {
+		const { root, proposal, task } = fixture();
+		try {
+			applyEvolutionProposal(applyInput(root, proposal, task));
+			const journal = join(
+				root,
+				".afol",
+				"data",
+				"events",
+				"evolution",
+				"applies.jsonl",
+			);
+			const content = readFileSync(journal);
+			writeFileSync(journal, content.subarray(0, content.length - 1));
+			expect(() => readApplyJournal(root)).toThrow("incomplete final record");
+			expect(() =>
+				applyEvolutionProposal(applyInput(root, proposal, task)),
+			).toThrow("incomplete final record");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("new-file expectation is rechecked under the resource lock", () => {
+		const { root, task } = fixture();
+		const path = "docs/lessons/entries/race.md";
+		try {
+			expect(() =>
+				runPatchMutation(
+					{
+						command: "pt",
+						path,
+						appendText: "owned by apply\n",
+						dryRun: false,
+						json: false,
+						session: task.session,
+						taskId: task.taskId,
+						reason: "race fixture",
+						expectedBeforeExisted: false,
+					},
+					root,
+					{
+						afterInitialRead: () => {
+							mkdirSync(join(root, "docs", "lessons", "entries"), {
+								recursive: true,
+							});
+							writeFileSync(join(root, path), "concurrent writer\n");
+						},
+					},
+				),
+			).toThrow("stale-before-existence");
+			expect(readFileSync(join(root, path), "utf8")).toBe(
+				"concurrent writer\n",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("duplicate apply fails closed when its mutation record is absent", () => {
+		const { root, proposal, task } = fixture();
+		try {
+			const applied = applyEvolutionProposal(applyInput(root, proposal, task));
+			rewriteMutationJournal(root, (rows) =>
+				rows.filter((row) => row.id !== applied.mutation_id),
+			);
+			expect(() =>
+				applyEvolutionProposal(applyInput(root, proposal, task)),
+			).toThrow("mutation binding mismatch");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("duplicate apply fails closed on mutation binding drift or undo", () => {
+		const drift = fixture();
+		try {
+			const applied = applyEvolutionProposal(
+				applyInput(drift.root, drift.proposal, drift.task),
+			);
+			rewriteMutationJournal(drift.root, (rows) =>
+				rows.map((row) =>
+					row.id === applied.mutation_id
+						? { ...row, sourcePath: "docs/lessons/entries/other.md" }
+						: row,
+				),
+			);
+			expect(() =>
+				applyEvolutionProposal(
+					applyInput(drift.root, drift.proposal, drift.task),
+				),
+			).toThrow("mutation binding mismatch");
+		} finally {
+			rmSync(drift.root, { recursive: true, force: true });
+		}
+
+		const undone = fixture();
+		try {
+			const applied = applyEvolutionProposal(
+				applyInput(undone.root, undone.proposal, undone.task),
+			);
+			appendMutationRecord(undone.root, {
+				id: createMutationId(),
+				ts: NOW.toISOString(),
+				kind: "undo",
+				status: "committed",
+				dryRun: false,
+				session: undone.task.session,
+				taskId: undone.task.taskId,
+				reason: `undo ${applied.mutation_id}`,
+				targetMutationId: applied.mutation_id ?? "",
+				sourcePath: requireTargetPath(applied),
+				destinationPath: requireTargetPath(applied),
+			});
+			expect(() =>
+				applyEvolutionProposal(
+					applyInput(undone.root, undone.proposal, undone.task),
+				),
+			).toThrow("mutation was undone");
+		} finally {
+			rmSync(undone.root, { recursive: true, force: true });
 		}
 	});
 

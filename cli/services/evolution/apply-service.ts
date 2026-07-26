@@ -424,6 +424,25 @@ function exactCommittedApply(
 	return commit.binding;
 }
 
+function assertDuplicateMutation(root: string, binding: ApplyBinding): void {
+	const journal = loadMutationJournalStrict(root);
+	if (journal.issues.length > 0)
+		throw new Error("evolution duplicate mutation journal is corrupt");
+	const mutation = committedMutation(journal.records, binding.mutation_id);
+	if (
+		mutation?.kind !== "patch" ||
+		mutation.session !== binding.session ||
+		mutation.taskId !== binding.task_id ||
+		mutation.sourcePath !== binding.target_path ||
+		mutation.beforeExisted !== false ||
+		mutation.beforeHash !== binding.before_hash ||
+		mutation.afterHash !== binding.after_hash
+	)
+		throw new Error("evolution duplicate mutation binding mismatch");
+	if (mutationWasUndone(journal.records, binding.mutation_id))
+		throw new Error("evolution duplicate mutation was undone");
+}
+
 export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 	return withApplyLock(input.root, () => {
 		assertGovernedTask(input.root, input.session, input.taskId);
@@ -432,6 +451,7 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 		const planned = plannedArtifact(input, proposal);
 		const duplicate = exactCommittedApply(input.root, proposal);
 		if (duplicate) {
+			assertDuplicateMutation(input.root, duplicate);
 			validateArtifact(input.root, duplicate);
 			return {
 				status: "applied",
@@ -456,6 +476,7 @@ export function applyEvolutionProposal(input: ApplyInput): ApplyResult {
 					taskId: input.taskId,
 					reason: `evolution proposal ${proposal.id}`,
 					expectedBeforeHash: EMPTY_HASH,
+					expectedBeforeExisted: false,
 				},
 				input.root,
 				{

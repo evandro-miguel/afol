@@ -53,6 +53,7 @@ export type CommandArgs = {
 	taskId: string;
 	reason: string;
 	expectedBeforeHash?: string | undefined;
+	expectedBeforeExisted?: boolean | undefined;
 	expectedDestinationHash?: string | undefined;
 	expectedDestinationExists?: boolean | undefined;
 };

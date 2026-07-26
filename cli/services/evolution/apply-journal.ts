@@ -5,9 +5,11 @@ import {
 	constants as fsConstants,
 	fstatSync,
 	fsyncSync,
+	ftruncateSync,
 	mkdirSync,
 	openSync,
 	readFileSync,
+	readSync,
 	statSync,
 	writeSync,
 } from "node:fs";
@@ -249,7 +251,10 @@ export function readApplyJournal(
 	if (!stat) return [];
 	if (stat.size > MAX_JOURNAL_BYTES)
 		throw new Error("evolution apply journal exceeds size limit");
-	const rows = readFileSync(path, "utf8").split("\n").filter(Boolean);
+	const content = readFileSync(path, "utf8");
+	if (content.length > 0 && !content.endsWith("\n"))
+		throw new Error("evolution apply journal has an incomplete final record");
+	const rows = content.split("\n").filter(Boolean);
 	const events: ApplyJournalEvent[] = [];
 	let previous = GENESIS_DIGEST;
 	for (const [index, row] of rows.entries()) {
@@ -303,6 +308,47 @@ function fsyncDirectory(path: string): void {
 	}
 }
 
+export type ApplyJournalIo = {
+	write: (fd: number, buffer: Buffer, offset: number, length: number) => number;
+	fsync: (fd: number) => void;
+	truncate: (fd: number, length: number) => void;
+};
+
+const APPLY_JOURNAL_IO: ApplyJournalIo = {
+	write: writeSync,
+	fsync: fsyncSync,
+	truncate: ftruncateSync,
+};
+
+export function writeApplyJournalLine(
+	fd: number,
+	line: Buffer,
+	previousSize: number,
+	io: ApplyJournalIo = APPLY_JOURNAL_IO,
+): void {
+	let offset = 0;
+	try {
+		while (offset < line.length) {
+			const written = io.write(fd, line, offset, line.length - offset);
+			if (written <= 0)
+				throw new Error("evolution apply journal write made no progress");
+			offset += written;
+		}
+		io.fsync(fd);
+	} catch (error) {
+		try {
+			io.truncate(fd, previousSize);
+			io.fsync(fd);
+		} catch (rollbackError) {
+			throw new AggregateError(
+				[error, rollbackError],
+				"evolution apply journal write and durable rollback failed",
+			);
+		}
+		throw error;
+	}
+}
+
 export function appendApplyEventUnlocked(input: {
 	root: string;
 	phase: ApplyPhase;
@@ -337,17 +383,14 @@ export function appendApplyEventUnlocked(input: {
 		...base,
 		event_digest: applyDigest(base),
 	};
-	const line = `${JSON.stringify(event)}\n`;
-	if (Buffer.byteLength(line, "utf8") > MAX_EVENT_BYTES)
+	const line = Buffer.from(`${JSON.stringify(event)}\n`, "utf8");
+	if (line.length > MAX_EVENT_BYTES)
 		throw new Error("evolution apply event exceeds size limit");
 	const existing = assertSafeEvolutionTarget(path, "evolution apply journal");
-	if (
-		Number(existing?.size ?? 0) + Buffer.byteLength(line, "utf8") >
-		MAX_JOURNAL_BYTES
-	)
+	if (Number(existing?.size ?? 0) + line.length > MAX_JOURNAL_BYTES)
 		throw new Error("evolution apply journal exceeds size limit");
 	const flags =
-		fsConstants.O_WRONLY |
+		fsConstants.O_RDWR |
 		fsConstants.O_APPEND |
 		fsConstants.O_CREAT |
 		(process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0));
@@ -356,8 +399,21 @@ export function appendApplyEventUnlocked(input: {
 		const opened = fstatSync(fd);
 		if (!opened.isFile() || opened.nlink !== 1)
 			throw new Error("evolution apply journal must be a single regular file");
-		writeSync(fd, line, undefined, "utf8");
-		fsyncSync(fd);
+		if (
+			opened.size !== Number(existing?.size ?? 0) ||
+			(existing && (opened.dev !== existing.dev || opened.ino !== existing.ino))
+		)
+			throw new Error("evolution apply journal changed during append");
+		if (opened.size + line.length > MAX_JOURNAL_BYTES)
+			throw new Error("evolution apply journal exceeds size limit");
+		if (opened.size > 0) {
+			const tail = Buffer.allocUnsafe(1);
+			if (readSync(fd, tail, 0, 1, opened.size - 1) !== 1 || tail[0] !== 0x0a)
+				throw new Error(
+					"evolution apply journal has an incomplete final record",
+				);
+		}
+		writeApplyJournalLine(fd, line, opened.size);
 	} finally {
 		closeSync(fd);
 	}
