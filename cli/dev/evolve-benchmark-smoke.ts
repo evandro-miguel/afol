@@ -256,7 +256,7 @@ function assertPublicAnalysis(
 	if (!data || data.mode !== mode)
 		throw new Error(`analysis ${mode} mode contract failed`);
 	const sensitiveKey =
-		/(project|cluster|session|evidence|source|commit|ref|path|digest|token|db)/i;
+		/(project|cluster|source|commit|path|digest|token|db|(?:^|_)session_id(?:s)?$|related_session_ids|origin_ref)/i;
 	const inspectKeys = (value: unknown): string | null => {
 		if (Array.isArray(value)) {
 			for (const item of value) {
@@ -279,6 +279,32 @@ function assertPublicAnalysis(
 		throw new Error(
 			`analysis ${mode} public DTO contract failed: ${forbiddenKey}`,
 		);
+	const proposals = Array.isArray(data.proposals) ? data.proposals : [];
+	for (const value of proposals) {
+		const proposal = value as Record<string, unknown>;
+		const evidenceRefs = proposal.evidence_refs;
+		if (
+			typeof proposal.id !== "string" ||
+			!/^EVO-[a-f0-9]{32}$/.test(proposal.id) ||
+			typeof proposal.distinct_session_count !== "number" ||
+			typeof proposal.related_session_count !== "number" ||
+			!Array.isArray(evidenceRefs) ||
+			evidenceRefs.length > 4 ||
+			!evidenceRefs.every(
+				(ref) =>
+					ref &&
+					typeof ref === "object" &&
+					Object.keys(ref).every((key) =>
+						["id", "kind", "authority"].includes(key),
+					),
+			) ||
+			!proposal.baseline ||
+			!proposal.targets ||
+			proposal.approval_policy !== "explicit" ||
+			proposal.approval_surface !== "governed_workbench"
+		)
+			throw new Error(`analysis ${mode} decision context contract failed`);
+	}
 	return data;
 }
 

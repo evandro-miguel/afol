@@ -1,18 +1,26 @@
 #!/usr/bin/env bun
 
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { atomicWriteText } from "../services/io/atomic";
+import { runValidationCommand } from "../validate/command";
 
 const PACK_ID = "evolution-core";
 const SCENARIO_ID = "evolution-status-contract";
 const SCENARIO_VERSION = "1.1.0";
 const BASELINE_ID = "evolution-core-v2";
+const VALIDATION_SCHEMA_VERSION = "1.0.0";
+const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
+const RUN_ID = "bench-evolution-core-evolution-status-contract-1.1.0";
+const RUNNER_EVIDENCE = "expected-exit-honored:0";
 const BASELINE_REFERENCE =
 	".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v2.json";
 const PROVENANCE = "fresh-local-runnable-smoke";
+const FIXTURE_PROVENANCE = "untrusted-test-fixture";
+const TOKENIZER_ID = "output-bytes-divided-by-4";
+const TOKENIZER_VERSION = "1";
 const SAMPLE_COUNT = 3;
 const WARMUP_COUNT = 1;
 const MAX_DURATION_MS = 4000;
@@ -28,12 +36,29 @@ const RELATIVE_PATHS = [
 	"src/project-template/.afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
 ] as const;
 
+const BENCHMARK_INPUT_PATHS = [
+	"cli",
+	"package.json",
+	"bun.lock",
+	".afol/config.json",
+	".afol/data/benchmarks/catalog",
+	"src/project-template/.afol/config.json",
+	"src/project-template/.afol/data/benchmarks/catalog",
+	"src/project-template/.agents/lock.json",
+	"src/project-template/.agents/manifest.json",
+] as const;
+
 type JsonObject = Record<string, unknown>;
 
 export type EvolutionBaselineWriterOptions = {
 	now?: Date;
 	currentCommit?: string;
 	write?: (path: string, content: string) => void;
+};
+
+type ControlledBenchmark = {
+	exitCode: number;
+	payload: JsonObject;
 };
 
 function withBaselineRollback(
@@ -47,6 +72,7 @@ function withBaselineRollback(
 	try {
 		for (const [path, content] of targets) write(path, content);
 	} catch (error) {
+		const rollbackFailures: Array<{ path: string; error: unknown }> = [];
 		for (let index = snapshots.length - 1; index >= 0; index -= 1) {
 			const snapshot = snapshots[index];
 			if (!snapshot) continue;
@@ -56,9 +82,23 @@ function withBaselineRollback(
 					continue;
 				}
 				atomicWriteText(snapshot.path, snapshot.before.toString("utf8"));
-			} catch {
-				// Preserve the original write failure while attempting every rollback.
+			} catch (rollbackError) {
+				rollbackFailures.push({
+					path: snapshot.path,
+					error: rollbackError,
+				});
 			}
+		}
+		if (rollbackFailures.length > 0) {
+			const writeMessage =
+				error instanceof Error ? error.message : String(error);
+			const rollbackSummary = rollbackFailures
+				.map(({ path }) => path)
+				.join(", ");
+			throw new AggregateError(
+				[error, ...rollbackFailures.map((failure) => failure.error)],
+				`Baseline write failed (${writeMessage}); rollback also failed for: ${rollbackSummary}`,
+			);
 		}
 		throw error;
 	}
@@ -72,6 +112,47 @@ function readObject(path: string): JsonObject {
 	const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
 	if (!isObject(parsed)) throw new Error(`${path} must contain a JSON object`);
 	return parsed;
+}
+
+function runControlledBenchmark(repoRoot: string): ControlledBenchmark {
+	const stdout: string[] = [];
+	const originalWrite = process.stdout.write;
+	process.stdout.write = ((chunk: string | Uint8Array) => {
+		stdout.push(
+			typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"),
+		);
+		return true;
+	}) as typeof process.stdout.write;
+	let exitCode: number;
+	try {
+		exitCode = runValidationCommand(repoRoot, [
+			"bench",
+			"--pack",
+			PACK_ID,
+			"--json",
+		]);
+	} finally {
+		process.stdout.write = originalWrite;
+	}
+	if (exitCode !== 0 && exitCode !== 2) {
+		throw new Error(`Controlled evolution benchmark exited ${exitCode}`);
+	}
+	const output = stdout.join("").trim();
+	if (output.length === 0) {
+		throw new Error("Controlled evolution benchmark produced no JSON output");
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(output);
+	} catch {
+		throw new Error("Controlled evolution benchmark produced invalid JSON");
+	}
+	if (!isObject(parsed)) {
+		throw new Error(
+			"Controlled evolution benchmark output must be a JSON object",
+		);
+	}
+	return { exitCode, payload: parsed };
 }
 
 function requiredString(value: unknown, label: string): string {
@@ -88,16 +169,107 @@ function requiredNumber(value: unknown, label: string): number {
 	return value;
 }
 
+function controlledGitExecutable(): string {
+	const candidates =
+		process.platform === "win32"
+			? ["C:\\Program Files\\Git\\cmd\\git.exe"]
+			: [
+					"/usr/bin/git",
+					"/bin/git",
+					"/usr/local/bin/git",
+					"/opt/homebrew/bin/git",
+				];
+	for (const candidate of candidates) {
+		if (!existsSync(candidate)) continue;
+		try {
+			return realpathSync(candidate);
+		} catch {
+			// Try the next fixed system location.
+		}
+	}
+	throw new Error(
+		"Evolution baseline writer requires a controlled local git executable",
+	);
+}
+
+function gitReadOnlyEnv(): NodeJS.ProcessEnv {
+	const env = Object.fromEntries(
+		[
+			"PATH",
+			"LANG",
+			"LC_ALL",
+			"LC_CTYPE",
+			"SystemRoot",
+			"SystemDrive",
+			"windir",
+		].flatMap((key) =>
+			process.env[key] === undefined ? [] : [[key, process.env[key]]],
+		),
+	) as NodeJS.ProcessEnv;
+	return {
+		...env,
+		GIT_NO_LAZY_FETCH: "1",
+		GIT_OPTIONAL_LOCKS: "0",
+		GIT_TERMINAL_PROMPT: "0",
+		GIT_CONFIG_NOSYSTEM: "1",
+		GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
+		GIT_CONFIG_SYSTEM: process.platform === "win32" ? "NUL" : "/dev/null",
+	};
+}
+
+function runLocalGit(repoRoot: string, args: readonly string[]) {
+	return spawnSync(controlledGitExecutable(), [...args], {
+		cwd: realpathSync(repoRoot),
+		env: gitReadOnlyEnv(),
+		encoding: "utf8",
+		maxBuffer: 1_048_576,
+		shell: false,
+		timeout: 3_000,
+		windowsHide: true,
+	});
+}
+
+function assertCleanBenchmarkInputs(repoRoot: string): void {
+	const result = runLocalGit(repoRoot, [
+		"--no-pager",
+		"--no-optional-locks",
+		"--no-lazy-fetch",
+		"status",
+		"--porcelain=v1",
+		"--untracked-files=all",
+		"--",
+		...BENCHMARK_INPUT_PATHS,
+	]);
+	if (result.error || result.status !== 0) {
+		throw new Error(
+			"Evolution baseline writer cannot verify clean benchmark inputs",
+		);
+	}
+	const dirtyPaths = `${result.stdout ?? ""}`
+		.split(/\r?\n/u)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	if (dirtyPaths.length > 0) {
+		throw new Error(
+			`Evolution baseline writer requires clean benchmark inputs at HEAD; dirty paths: ${dirtyPaths.slice(0, 5).join(", ")}`,
+		);
+	}
+}
+
 function currentCommit(repoRoot: string): string {
-	try {
-		return execFileSync("git", ["rev-parse", "--short=12", "HEAD"], {
-			cwd: repoRoot,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-		}).trim();
-	} catch {
+	const result = runLocalGit(repoRoot, [
+		"--no-pager",
+		"--no-optional-locks",
+		"--no-lazy-fetch",
+		"rev-parse",
+		"--short=12",
+		"HEAD",
+	]);
+	const head = `${result.stdout ?? ""}`.trim();
+	if (result.error || result.status !== 0 || !/^[a-f0-9]{12}$/u.test(head)) {
 		throw new Error("Unable to resolve current git HEAD");
 	}
+	return head;
 }
 
 function validateBootstrapMetrics(result: JsonObject): void {
@@ -164,8 +336,23 @@ function validateInput(
 	head: string,
 	baselinePresent: boolean,
 ): JsonObject {
+	if (payload.schema_version !== VALIDATION_SCHEMA_VERSION) {
+		throw new Error(
+			`Benchmark input schema_version must be ${VALIDATION_SCHEMA_VERSION}`,
+		);
+	}
+	if (payload.command_family !== "validation") {
+		throw new Error("Benchmark input must have command_family=validation");
+	}
 	if (payload.mode !== "benchmark") {
 		throw new Error("Benchmark input must have mode=benchmark");
+	}
+	if (
+		payload.benchmark_result_schema_version !== BENCHMARK_RESULT_SCHEMA_VERSION
+	) {
+		throw new Error(
+			`Benchmark input result schema must be ${BENCHMARK_RESULT_SCHEMA_VERSION}`,
+		);
 	}
 	const packs = payload.selected_pack_ids;
 	if (!Array.isArray(packs) || packs.length !== 1 || packs[0] !== PACK_ID) {
@@ -179,6 +366,14 @@ function validateInput(
 		throw new Error("Benchmark input must contain exactly one result");
 	}
 	const result = results[0];
+	if (result.schema_version !== BENCHMARK_RESULT_SCHEMA_VERSION) {
+		throw new Error(
+			`Benchmark result schema_version must be ${BENCHMARK_RESULT_SCHEMA_VERSION}`,
+		);
+	}
+	if (result.run_id !== RUN_ID) {
+		throw new Error(`Benchmark result run_id must be ${RUN_ID}`);
+	}
 	if (
 		result.scenario_id !== SCENARIO_ID ||
 		result.scenario_version !== SCENARIO_VERSION ||
@@ -218,14 +413,16 @@ function validateInput(
 		requiredNumber(result[key], `results[0].${key}`);
 	}
 	const notes = result.notes;
-	if (
-		Array.isArray(notes) &&
-		notes.some(
-			(note) =>
-				typeof note === "string" && note.startsWith("baseline-regression:"),
-		)
-	) {
+	if (!Array.isArray(notes) || notes.some((note) => typeof note !== "string")) {
+		throw new Error("Benchmark result notes must be a string array");
+	}
+	if (notes.some((note) => note.startsWith("baseline-regression:"))) {
 		throw new Error("Benchmark input must not contain baseline-regression");
+	}
+	if (!notes.includes(RUNNER_EVIDENCE)) {
+		throw new Error(
+			`Benchmark result lacks runner evidence ${RUNNER_EVIDENCE}`,
+		);
 	}
 	if (result.status === "baseline-missing" && result.pass === false) {
 		if (baselinePresent) {
@@ -256,7 +453,11 @@ function validateInput(
 	return result;
 }
 
-function baselineFromResult(result: JsonObject, timestamp: string): JsonObject {
+function baselineFromResult(
+	result: JsonObject,
+	timestamp: string,
+	provenance: string,
+): JsonObject {
 	return {
 		schema_version: "1.0.0",
 		baseline_id: BASELINE_ID,
@@ -272,13 +473,13 @@ function baselineFromResult(result: JsonObject, timestamp: string): JsonObject {
 			result.timing_p95_ms,
 			"results[0].timing_p95_ms",
 		),
-		tokenizer_id: "tiktoken-o200k-base",
-		tokenizer_version: "recorded",
+		tokenizer_id: TOKENIZER_ID,
+		tokenizer_version: TOKENIZER_VERSION,
 		git_commit: requiredString(result.git_commit, "results[0].git_commit"),
 		run_id: requiredString(result.run_id, "results[0].run_id"),
 		timestamp,
 		results_count: 1,
-		provenance: PROVENANCE,
+		provenance,
 	};
 }
 
@@ -286,6 +487,7 @@ function scenarioFromResult(
 	path: string,
 	result: JsonObject,
 	timestamp: string,
+	provenance: string,
 ): JsonObject {
 	const scenario = readObject(path);
 	const metrics = isObject(scenario.deterministic_metrics)
@@ -312,7 +514,7 @@ function scenarioFromResult(
 	scenario.deterministic_metrics = metrics;
 	scenario.measurement = {
 		status: "observed",
-		source: PROVENANCE,
+		source: provenance,
 		sample_count: SAMPLE_COUNT,
 		warmup_count: WARMUP_COUNT,
 		git_commit: requiredString(result.git_commit, "results[0].git_commit"),
@@ -321,12 +523,12 @@ function scenarioFromResult(
 	return scenario;
 }
 
-export function updateEvolutionBenchmarkBaseline(
+function writeEvolutionBenchmarkBaseline(
 	repoRoot: string,
-	inputPath: string,
+	payload: JsonObject,
+	provenance: string,
 	options: EvolutionBaselineWriterOptions = {},
 ): string[] {
-	const payload = readObject(inputPath);
 	const head = options.currentCommit ?? currentCommit(repoRoot);
 	const rootBaselinePath = join(repoRoot, RELATIVE_PATHS[0]);
 	const templateBaselinePath = join(repoRoot, RELATIVE_PATHS[2]);
@@ -341,12 +543,18 @@ export function updateEvolutionBenchmarkBaseline(
 	const timestamp = now.toISOString();
 	const rootScenarioPath = join(repoRoot, RELATIVE_PATHS[1]);
 	const templateScenarioPath = join(repoRoot, RELATIVE_PATHS[3]);
-	const baseline = baselineFromResult(result, timestamp);
-	const rootScenario = scenarioFromResult(rootScenarioPath, result, timestamp);
+	const baseline = baselineFromResult(result, timestamp, provenance);
+	const rootScenario = scenarioFromResult(
+		rootScenarioPath,
+		result,
+		timestamp,
+		provenance,
+	);
 	const templateScenario = scenarioFromResult(
 		templateScenarioPath,
 		result,
 		timestamp,
+		provenance,
 	);
 	const baselineText = `${JSON.stringify(baseline, null, 2)}\n`;
 	const rootScenarioText = `${JSON.stringify(rootScenario, null, 2)}\n`;
@@ -361,19 +569,73 @@ export function updateEvolutionBenchmarkBaseline(
 	return [...RELATIVE_PATHS];
 }
 
-function parseInputPath(args: string[]): string {
-	if (args.length === 1 && args[0] && !args[0].startsWith("-")) return args[0];
-	if (args.length === 2 && args[0] === "--input" && args[1]) return args[1];
-	throw new Error(
-		"Usage: bun run cli/dev/update-evolution-benchmark-baseline.ts <benchmark-output.json>",
+export function updateEvolutionBenchmarkBaseline(
+	repoRoot: string,
+	options: EvolutionBaselineWriterOptions = {},
+): string[] {
+	assertCleanBenchmarkInputs(repoRoot);
+	const benchmark = runControlledBenchmark(repoRoot);
+	const results = benchmark.payload.results;
+	const status =
+		Array.isArray(results) && isObject(results[0])
+			? results[0].status
+			: undefined;
+	const expectedExit = status === "baseline-missing" ? 2 : 0;
+	if (benchmark.exitCode !== expectedExit) {
+		throw new Error(
+			`Controlled evolution benchmark exit ${benchmark.exitCode} does not match result status`,
+		);
+	}
+	return writeEvolutionBenchmarkBaseline(
+		repoRoot,
+		benchmark.payload,
+		PROVENANCE,
+		options,
 	);
 }
+
+function assertNoExternalInput(args: string[]): void {
+	if (args.length === 0) return;
+	throw new Error(
+		"Usage: bun run cli/dev/update-evolution-benchmark-baseline.ts (external benchmark JSON is not accepted)",
+	);
+}
+
+export const evolutionBaselineWriterTestApi = {
+	writeFixture(
+		repoRoot: string,
+		inputPath: string,
+		options: EvolutionBaselineWriterOptions = {},
+	): string[] {
+		return writeEvolutionBenchmarkBaseline(
+			repoRoot,
+			readObject(inputPath),
+			FIXTURE_PROVENANCE,
+			options,
+		);
+	},
+	writeFixtureAfterCleanInputCheck(
+		repoRoot: string,
+		inputPath: string,
+		options: EvolutionBaselineWriterOptions = {},
+	): string[] {
+		assertCleanBenchmarkInputs(repoRoot);
+		return writeEvolutionBenchmarkBaseline(
+			repoRoot,
+			readObject(inputPath),
+			FIXTURE_PROVENANCE,
+			options,
+		);
+	},
+	assertCleanInputs: assertCleanBenchmarkInputs,
+	assertNoExternalInput,
+};
 
 function main(): void {
 	try {
 		const repoRoot = resolve(import.meta.dir, "..", "..");
-		const inputPath = resolve(repoRoot, parseInputPath(process.argv.slice(2)));
-		const paths = updateEvolutionBenchmarkBaseline(repoRoot, inputPath);
+		assertNoExternalInput(process.argv.slice(2));
+		const paths = updateEvolutionBenchmarkBaseline(repoRoot);
 		console.log(`evolution benchmark baseline: updated ${paths.length} files`);
 	} catch (error) {
 		console.error((error as Error).message);

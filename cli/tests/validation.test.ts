@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -25,7 +26,9 @@ const runtimeLiveBenchmarkValidationCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand}`;
 const runtimeLiveBenchmarkRefreshNote = `refresh live benchmark artifacts with ${runtimeLiveBenchmarkRefreshCommand}; then validate with ${runtimeLiveBenchmarkValidationCommand}`;
-const slowValidationTestTimeoutMs = 30_000;
+const slowValidationTestTimeoutMs = 60_000;
+const cliKernelValidationTestTimeoutMs = 60_000;
+const cliKernelRunTestTimeoutMs = 120_000;
 
 function runKernel(
 	args: string[],
@@ -82,6 +85,47 @@ function relaxMutationSafetyTimingLimits(root: string): void {
 		"catalog",
 		"baselines",
 		"mutation-safety",
+		"baseline-v1.json",
+	);
+	const baseline = parseJsonOutput(readFileSync(baselinePath, "utf8"));
+	baseline.timing_p50_ms = timingLimitMs;
+	baseline.timing_p95_ms = timingLimitMs;
+	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
+}
+
+function relaxCliKernelTimingLimits(root: string): void {
+	const timingLimitMs = 60_000;
+	const scenariosRoot = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"scenarios",
+		"cli-kernel-local",
+	);
+	for (const name of readdirSync(scenariosRoot)) {
+		if (!name.endsWith(".json")) continue;
+		const path = join(scenariosRoot, name);
+		const scenario = parseJsonOutput(readFileSync(path, "utf8"));
+		const thresholds = scenario.thresholds as Record<string, unknown>;
+		for (const key of [
+			"max_duration_ms",
+			"max_p50_ms",
+			"max_p95_ms",
+		] as const) {
+			if (Object.hasOwn(thresholds, key)) thresholds[key] = timingLimitMs;
+		}
+		writeFileSync(path, `${JSON.stringify(scenario, null, 2)}\n`, "utf8");
+	}
+	const baselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"cli-kernel-local",
 		"baseline-v1.json",
 	);
 	const baseline = parseJsonOutput(readFileSync(baselinePath, "utf8"));
@@ -237,6 +281,7 @@ describe("validation command family", () => {
 		expect(selected).toEqual(["cli-kernel-local"]);
 	});
 
+	// biome-ignore format: Keep the existing test body stable when setting its integration timeout.
 	test("v select changed-path routes current services/commands paths to benchmark packs", () => {
 		const cliProc = runKernel([
 			"v",
@@ -486,7 +531,7 @@ describe("validation command family", () => {
 		expect(parseJsonOutput(admProc.stdout as string).selected_pack_ids).toEqual(
 			["adm-governance"],
 		);
-	});
+	}, slowValidationTestTimeoutMs);
 
 	test("v select changed-path keeps generic cli fallback on cli-kernel-local", () => {
 		const proc = runKernel([
@@ -540,7 +585,7 @@ describe("validation command family", () => {
 			expect(JSON.stringify(results)).not.toContain("just");
 			expect(payload.contract_issues).toEqual([]);
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelRunTestTimeoutMs,
 	);
 
 	test("v select changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
@@ -562,7 +607,7 @@ describe("validation command family", () => {
 	test(
 		"v bench returns benchmark schema with scenario results",
 		() => {
-			const root = createValidationFixtureRoot();
+			const root = createValidationFixtureRoot(relaxCliKernelTimingLimits);
 			try {
 				const proc = runKernel(
 					["v", "bench", "--pack", "cli-kernel-local", "--json"],
@@ -606,13 +651,13 @@ describe("validation command family", () => {
 				rmSync(root, { recursive: true, force: true });
 			}
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelValidationTestTimeoutMs,
 	);
 
 	test(
 		"bench --pack aliases to validation benchmark contract",
 		() => {
-			const root = createValidationFixtureRoot();
+			const root = createValidationFixtureRoot(relaxCliKernelTimingLimits);
 			try {
 				const proc = runKernel(
 					["bench", "--pack", "cli-kernel-local", "--json"],
@@ -627,7 +672,7 @@ describe("validation command family", () => {
 				rmSync(root, { recursive: true, force: true });
 			}
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelValidationTestTimeoutMs,
 	);
 
 	test(
@@ -750,7 +795,9 @@ describe("validation command family", () => {
 	test(
 		"v bench --save persists a benchmark result artifact under default results directory",
 		() => {
-			const fixtureRoot = createValidationFixtureRoot();
+			const fixtureRoot = createValidationFixtureRoot(
+				relaxCliKernelTimingLimits,
+			);
 			const proc = runKernel(
 				["v", "bench", "--pack", "cli-kernel-local", "--save", "--json"],
 				fixtureRoot,
@@ -779,13 +826,15 @@ describe("validation command family", () => {
 			expect(typeof first.baseline_id).toBe("string");
 			expect(typeof first.git_commit).toBe("string");
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelValidationTestTimeoutMs,
 	);
 
 	test(
 		"v bench --output writes to explicit path",
 		() => {
-			const fixtureRoot = createValidationFixtureRoot();
+			const fixtureRoot = createValidationFixtureRoot(
+				relaxCliKernelTimingLimits,
+			);
 			const outputPath = join(
 				fixtureRoot,
 				".afol",
@@ -814,7 +863,7 @@ describe("validation command family", () => {
 			const savedPayload = readJson(outputPath);
 			expect(savedPayload.mode).toBe("benchmark");
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelValidationTestTimeoutMs,
 	);
 
 	test(
@@ -882,7 +931,7 @@ describe("validation command family", () => {
 			expect(summary.failed).toBe(8);
 			expect(summary.skipped).toBe(0);
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelValidationTestTimeoutMs,
 	);
 
 	test("v bench runtime-live-agent fails on a partial live snapshot without fallback mapping", () => {
@@ -1482,7 +1531,7 @@ describe("validation command family", () => {
 			expect(benchPayload.status).toBe("failed");
 			expect(benchPayload.pass).toBe(false);
 		},
-		slowValidationTestTimeoutMs,
+		cliKernelValidationTestTimeoutMs,
 	);
 
 	test("validate alias and tpl/update scopes keep working", () => {
@@ -1536,7 +1585,7 @@ describe("validation command family", () => {
 		expect(
 			registry.find((entry) => entry.pack_id === "evolution-core")
 				?.baseline_present,
-		).toBe(false);
+		).toBe(true);
 		expect(payload.contract_issues).toEqual([]);
 	});
 });

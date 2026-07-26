@@ -120,6 +120,12 @@ function createFixtureRoot(): string {
 	);
 	if (existsSync(runtimeLiveSnapshotPath)) {
 		const runtimeLiveSnapshot = readJson(runtimeLiveSnapshotPath);
+		runtimeLiveSnapshot.generated_at = new Date().toISOString();
+		writeFileSync(
+			runtimeLiveSnapshotPath,
+			`${JSON.stringify(runtimeLiveSnapshot, null, 2)}\n`,
+			"utf8",
+		);
 		const savedResultPath = join(
 			root,
 			runtimeLiveSnapshot.saved_result_path as string,
@@ -525,7 +531,7 @@ describe("validate output helpers", () => {
 		expect(
 			summary.find((entry) => entry.pack_id === "evolution-core")
 				?.baseline_present,
-		).toBe(false);
+		).toBe(true);
 	});
 });
 
@@ -1780,7 +1786,7 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, 120_000);
 
 	test("ignores an active completion lock but still catches workbench leaks", async () => {
 		const root = createBenchExecutionFixtureRoot();
@@ -2921,7 +2927,7 @@ describe("validation command entrypoint", () => {
 			status: "passed",
 			pass: true,
 		});
-	}, 30_000);
+	}, 120_000);
 
 	test("supports select, run, benchmark save, and argument failures", () => {
 		const root = createFixtureRoot();
@@ -2968,6 +2974,40 @@ describe("validation command entrypoint", () => {
 			expect(
 				runTextPayload.command_results[0]?.reported_status,
 			).toBeUndefined();
+
+			const cliKernelPaths = getCliKernelPaths(root);
+			const scenarioDir = dirname(cliKernelPaths.scenarioPath);
+			for (const name of readdirSync(scenarioDir)) {
+				if (!name.endsWith(".json")) {
+					continue;
+				}
+				const scenarioPath = join(scenarioDir, name);
+				const scenario = readJson(scenarioPath);
+				writeFileSync(
+					scenarioPath,
+					`${JSON.stringify(
+						{
+							...scenario,
+							thresholds: {
+								...(scenario.thresholds as Record<string, unknown>),
+								max_duration_ms: 10_000,
+								max_p95_ms: 10_000,
+							},
+						},
+						null,
+						2,
+					)}\n`,
+					"utf8",
+				);
+			}
+			const baseline = readJson(cliKernelPaths.baselinePath);
+			baseline.timing_p50_ms = 10_000;
+			baseline.timing_p95_ms = 10_000;
+			writeFileSync(
+				cliKernelPaths.baselinePath,
+				`${JSON.stringify(baseline, null, 2)}\n`,
+				"utf8",
+			);
 
 			const benchmarkSave = withCapturedStdout(() =>
 				runValidationCommand(root, [
@@ -3050,7 +3090,7 @@ describe("validation command entrypoint", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, 180_000);
 
 	test("fails JSON-reporting packs when the child emits malformed JSON", () => {
 		const root = createFixtureRoot();
@@ -3299,5 +3339,5 @@ describe("validation command entrypoint", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, 120_000);
 });

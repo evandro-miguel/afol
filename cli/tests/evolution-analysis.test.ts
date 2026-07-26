@@ -15,7 +15,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runEvolveCommand } from "../commands/evolve";
+import {
+	publicAnalysisDto,
+	runEvolveCommand,
+	writeAnalysisPayload,
+} from "../commands/evolve";
+import { envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	agentOperationContext,
 	defaultOperationContext,
@@ -317,7 +322,7 @@ describe("evolution analysis previews", () => {
 		).toThrow("normalized fields exceed the limit");
 	});
 
-	test("router analysis DTO is identical for omitted, falsy, and restricted callers", async () => {
+	test("router blocked analysis DTO is safe for every admitted caller", async () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-analysis-router-"));
 		configure(root);
 		try {
@@ -394,6 +399,202 @@ describe("evolution analysis previews", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("trusted proposal previews expose bounded decision context while restricted callers stay redacted", async () => {
+		const { root } = populatedFixture();
+		try {
+			const invoke = async (
+				operationContext:
+					| ReturnType<typeof defaultOperationContext>
+					| ReturnType<typeof agentOperationContext>,
+			) => {
+				const output: string[] = [];
+				expect(
+					await runEvolveCommand(
+						"analyze",
+						["--json"],
+						root,
+						{ stdout: (value) => output.push(value), stderr: () => {} },
+						operationContext,
+					),
+				).toBe(0);
+				expect(Buffer.byteLength(output[0] ?? "", "utf8")).toBeLessThanOrEqual(
+					4_000,
+				);
+				return JSON.parse(output[0] ?? "{}").data;
+			};
+
+			const trusted = await invoke(defaultOperationContext());
+			const proposal = trusted.proposals[0];
+			expect(proposal.id).toMatch(/^EVO-[a-f0-9]{32}$/);
+			expect(proposal.distinct_session_count).toBe(3);
+			expect(proposal.related_session_count).toBe(3);
+			expect(proposal.evidence_ref_count).toBe(2);
+			expect(proposal.evidence_refs).toEqual([
+				expect.objectContaining({ id: expect.any(String), kind: "commit" }),
+			]);
+			expect(proposal.evidence_refs).toHaveLength(1);
+			expect(proposal.evidence_refs[0]).not.toHaveProperty("digest");
+			expect(proposal.baseline).toEqual(
+				expect.objectContaining({
+					window: "recorded",
+					observation_count: 3,
+					minimum_comparable_sessions: 3,
+					production_day_window: 5,
+				}),
+			);
+			expect(proposal.targets).toEqual(
+				expect.objectContaining({
+					minimum_comparable_sessions: 3,
+					production_day_window: 5,
+					state: "canary",
+					metrics: expect.any(Object),
+				}),
+			);
+			expect(proposal.approval_policy).toBe("explicit");
+			expect(proposal.approval_surface).toBe("governed_workbench");
+
+			const restricted = await invoke(agentOperationContext());
+			const restrictedProposal = restricted.proposals[0];
+			for (const key of [
+				"id",
+				"distinct_session_count",
+				"related_session_count",
+				"evidence_refs",
+				"evidence_ref_count",
+				"baseline",
+				"targets",
+				"approval_policy",
+				"approval_surface",
+			]) {
+				expect(restrictedProposal).not.toHaveProperty(key);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("trusted evidence references reject secret-like identifiers", () => {
+		const unsafeCandidate = {
+			...candidate(0),
+			source_refs: [
+				{ id: "E-safe", kind: "evidence", authority: "token-secretvalue" },
+				{ id: "sk-abcdefghijklmnop", kind: "evidence" },
+				{ id: "token-supersecretvalue", kind: "evidence" },
+				{ id: "E-secret-kind", kind: "access-token" },
+			],
+		};
+		const analysis = analyzeEvolution({
+			projectId: PROJECT_ID,
+			state: { ok: true },
+			candidates: [unsafeCandidate],
+		});
+		const dto = publicAnalysisDto(
+			analysis as unknown as Record<string, unknown>,
+			false,
+		);
+		expect(dto.proposals[0]?.evidence_refs).toEqual([
+			{ id: "E-safe", kind: "evidence" },
+		]);
+		expect(JSON.stringify(dto)).not.toMatch(
+			/sk-abcdefghijklmnop|token-(?:supersecretvalue|secretvalue)|access-token/i,
+		);
+	});
+
+	test("maximum trusted proposal and alert envelope stays within the public output budget", () => {
+		const maximalText = "🧪界é".repeat(128);
+		const maximalIdentifier = (prefix: string) =>
+			`${prefix}${"a".repeat(128 - prefix.length)}`;
+		const maximalCandidates = Array.from({ length: 3 }, (_, index) => ({
+			...candidate(index),
+			cluster_id: `cluster-max-${index}`,
+			problem: maximalText,
+			recommendation: maximalText,
+			risk: maximalText,
+			validation: maximalText,
+			source_refs: Array.from({ length: 4 }, (_, refIndex) => ({
+				id: maximalIdentifier(`E${index}${refIndex}-`),
+				kind: maximalIdentifier("kind-"),
+				authority: maximalIdentifier("auth-"),
+			})),
+		}));
+		const maximalCriticalAlerts = Array.from({ length: 3 }, (_, index) => ({
+			...candidate(index, true),
+			problem: maximalText,
+			risk: maximalText,
+			validation: maximalText,
+		}));
+		const analysis = analyzeEvolution({
+			projectId: PROJECT_ID,
+			state: { ok: true },
+			candidates: maximalCandidates,
+			criticalAlerts: maximalCriticalAlerts,
+		});
+		const dto = publicAnalysisDto(
+			analysis as unknown as Record<string, unknown>,
+			false,
+		);
+		const output = stringifyEnvelope(
+			envelopeOk(dto, { action: "evolve.analyze" }),
+		);
+		expect(dto.proposals).toHaveLength(3);
+		expect(
+			dto.proposals.every(
+				(proposal) =>
+					proposal.evidence_ref_count === 4 &&
+					proposal.evidence_refs?.length === 1 &&
+					proposal.baseline?.window === "recorded" &&
+					proposal.targets?.state === "canary" &&
+					proposal.approval_policy === "explicit" &&
+					proposal.approval_surface === "governed_workbench" &&
+					Buffer.byteLength(proposal.evidence_refs[0]?.id ?? "", "utf8") <=
+						64 &&
+					Buffer.byteLength(proposal.evidence_refs[0]?.kind ?? "", "utf8") <=
+						32 &&
+					Buffer.byteLength(
+						proposal.evidence_refs[0]?.authority ?? "",
+						"utf8",
+					) <= 32 &&
+					Object.values(proposal.evidence_refs[0] ?? {}).every((value) =>
+						value.endsWith("..."),
+					),
+			),
+		).toBe(true);
+		expect(dto.critical_alerts).toHaveLength(3);
+		expect(dto.critical_alert_count).toBe(3);
+		expect(dto.critical_alert_pending_count).toBe(0);
+		for (const proposal of dto.proposals) {
+			for (const field of [
+				proposal.problem,
+				proposal.recommendation,
+				proposal.risk,
+				proposal.validation,
+			]) {
+				expect(Buffer.byteLength(field, "utf8")).toBeLessThanOrEqual(32);
+				expect(field).not.toContain("\uFFFD");
+			}
+		}
+		for (const alert of dto.critical_alerts) {
+			for (const field of [alert.problem, alert.risk, alert.validation]) {
+				expect(Buffer.byteLength(field, "utf8")).toBeLessThanOrEqual(128);
+				expect(field).not.toContain("\uFFFD");
+			}
+		}
+		expect(Buffer.byteLength(output, "utf8")).toBeLessThanOrEqual(4_000);
+		const written: string[] = [];
+		expect(() =>
+			writeAnalysisPayload(
+				{ stdout: (value) => written.push(value), stderr: () => {} },
+				true,
+				"evolve.analyze",
+				analysis as unknown as Record<string, unknown>,
+				defaultOperationContext(),
+			),
+		).not.toThrow();
+		expect(Buffer.byteLength(written[0] ?? "", "utf8")).toBeLessThanOrEqual(
+			4_000,
+		);
 	});
 
 	test("missing WAL and SHM stay absent during read-only analysis", () => {
@@ -517,6 +718,78 @@ describe("evolution analysis previews", () => {
 				expect(data).not.toHaveProperty("project_id");
 			}
 			expect(snapshotReadOnlyState(root)).toBe(before);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("after-merge facade excludes mixed commit refs from every baseline metric", () => {
+		const { root, base, head } = populatedFixture();
+		const sessionDir = join(root, ".afol", "wb", "S-mixed-range");
+		mkdirSync(sessionDir, { recursive: true });
+		writeFileSync(
+			join(sessionDir, ".evidence.jsonl"),
+			`${JSON.stringify({
+				id: "E-mixed-range",
+				project_id: PROJECT_ID,
+				session_id: "S-mixed-range",
+				created_at: "2026-07-22T12:00:00.000Z",
+				result: "passed",
+				provenance: "observed",
+				exit_code: 0,
+			})}\n`,
+			"utf8",
+		);
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			appendProductionDayAllocation({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				timezone: "UTC",
+				sessionId: "S-mixed-range",
+				evidenceId: "E-mixed-range",
+			});
+			const observation = normalizeObservationRecord({
+				project_id: PROJECT_ID,
+				id: "O-mixed-range",
+				kind: "test_failure",
+				session_id: "S-mixed-range",
+				production_day_sequence: 2,
+				task_type: "analysis",
+				impact: "rework",
+				created_at: "2026-07-22T12:00:00.000Z",
+				journal_event_id: "J-mixed-range",
+				source_refs: [
+					{ id: head, kind: "commit" },
+					{ id: base, kind: "commit" },
+				],
+			});
+			appendObservationJournalEvent({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				observation,
+				sourceRefs: observation.source_refs,
+				eventId: "OBS-mixed-range",
+			});
+		} finally {
+			db.close();
+		}
+		try {
+			const analysis = analyzeEvolutionProject(root, {
+				mode: "after_merge",
+				base,
+				head,
+				commitIds: [head],
+				now: new Date("2026-07-22T12:00:00.000Z"),
+			});
+			expect(analysis.baseline.observation_count).toBe(1);
+			expect(analysis.baseline.production_day_count).toBe(1);
+			expect(analysis.scorecard.outcome.observed_results?.value).toBe(1);
+			expect(analysis.scorecard.outcome.production_days?.value).toBe(1);
+			expect(analysis.scorecard.regressions.failed_again?.value).toBe(0);
+			expect(analysis.baseline.scorecard).toEqual(analysis.scorecard);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -696,9 +969,13 @@ describe("evolution analysis previews", () => {
 				findings: [{ severity: "fail", message: "projection is stale" }],
 			},
 			candidates: [candidate(1)],
+			criticalAlerts: [candidate(2, true), candidate(3, true)],
 		});
 		expect(blocked.status).toBe("blocked");
 		expect(blocked.proposals).toEqual([]);
+		expect(blocked.critical_alerts).toEqual([]);
+		expect(blocked.critical_alert_count).toBe(0);
+		expect(blocked.critical_alert_pending_count).toBe(0);
 	});
 
 	test("weekly and after-merge commands stay bounded and read-only", async () => {
@@ -753,6 +1030,9 @@ describe("evolution analysis previews", () => {
 			expect(exitCode).toBe(0);
 			const payload = JSON.parse(output[0] ?? "{}");
 			expect(payload.data.status).toBe("blocked");
+			expect(payload.data.recovery_action).toBe(
+				"afol health --area state --json",
+			);
 			expect(payload.data).not.toHaveProperty("project_id");
 			expect(JSON.stringify(payload)).not.toContain(PROJECT_ID);
 			expect(existsSync(join(root, ".afol", "state", "evolution.db"))).toBe(

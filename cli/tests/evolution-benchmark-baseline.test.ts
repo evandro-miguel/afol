@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
@@ -11,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { updateEvolutionBenchmarkBaseline } from "../dev/update-evolution-benchmark-baseline";
+import { evolutionBaselineWriterTestApi } from "../dev/update-evolution-benchmark-baseline";
 import { atomicWriteText } from "../services/io/atomic";
 
 const repoRoot = process.cwd();
@@ -36,6 +37,38 @@ function fixtureRoot(): string {
 		const target = join(root, path);
 		mkdirSync(join(target, ".."), { recursive: true });
 		cpSync(join(repoRoot, path), target);
+	}
+	return root;
+}
+
+function gitFixtureRoot(): string {
+	const root = fixtureRoot();
+	const sourcePath = join(root, "cli/dev/evolve-benchmark-smoke.ts");
+	mkdirSync(join(sourcePath, ".."), { recursive: true });
+	writeFileSync(sourcePath, "export const fixture = true;\n", "utf8");
+	for (const args of [
+		["init"],
+		["add", "."],
+		[
+			"-c",
+			"user.name=AFOL Test",
+			"-c",
+			"user.email=afol-test@example.invalid",
+			"commit",
+			"-m",
+			"fixture",
+		],
+	]) {
+		const result = spawnSync("git", args, {
+			cwd: root,
+			encoding: "utf8",
+			shell: false,
+		});
+		if (result.error || result.status !== 0) {
+			throw new Error(
+				`Unable to create Git fixture with: git ${args.join(" ")}`,
+			);
+		}
 	}
 	return root;
 }
@@ -87,11 +120,14 @@ function input(
 		tool_call_count: 1,
 		tool_success_rate: 1,
 		git_commit: currentCommit,
-		notes: [],
+		notes: ["expected-exit-honored:0"],
 		...resultOverrides,
 	};
 	writeJson(path, {
+		schema_version: "1.0.0",
+		command_family: "validation",
 		mode: "benchmark",
+		benchmark_result_schema_version: "1.0.0",
 		status: result.status === "passed" ? "passed" : "failed",
 		pass: result.pass,
 		selected_pack_ids: ["evolution-core"],
@@ -120,7 +156,7 @@ describe("evolution benchmark baseline writer", () => {
 		try {
 			const beforeV1 = snapshot(v1Paths, root);
 			const output = input(root, { status: "baseline-missing", pass: false });
-			const paths = updateEvolutionBenchmarkBaseline(root, output, {
+			const paths = evolutionBaselineWriterTestApi.writeFixture(root, output, {
 				currentCommit,
 				now: new Date("2026-07-20T12:00:00.000Z"),
 			});
@@ -132,6 +168,10 @@ describe("evolution benchmark baseline writer", () => {
 			) as Record<string, unknown>;
 			expect(baseline.baseline_id).toBe("evolution-core-v2");
 			expect(baseline.timestamp).toBe("2026-07-20T12:00:00.000Z");
+			expect(baseline.tokenizer_id).toBe("output-bytes-divided-by-4");
+			expect(baseline.tokenizer_version).toBe("1");
+			expect(baseline.provenance).toBe("untrusted-test-fixture");
+			expect(baseline.provenance).not.toBe("fresh-local-runnable-smoke");
 			const scenario = JSON.parse(
 				readFileSync(join(root, v2Paths[1]), "utf8"),
 			) as Record<string, unknown>;
@@ -145,12 +185,44 @@ describe("evolution benchmark baseline writer", () => {
 		}
 	});
 
+	test("rejects a fully conformant fabricated payload as external input", () => {
+		const root = fixtureRoot();
+		try {
+			const fabricated = input(root, {
+				status: "baseline-missing",
+				pass: false,
+			});
+			expect(() =>
+				evolutionBaselineWriterTestApi.assertNoExternalInput([fabricated]),
+			).toThrow("external benchmark JSON is not accepted");
+			const cli = Bun.spawnSync(
+				[
+					process.execPath,
+					join(repoRoot, "cli/dev/update-evolution-benchmark-baseline.ts"),
+					fabricated,
+				],
+				{
+					cwd: root,
+					env: { ...process.env, TMPDIR: "/dev/shm" },
+				},
+			);
+			expect(cli.exitCode).not.toBe(0);
+			expect(new TextDecoder().decode(cli.stderr)).toContain(
+				"external benchmark JSON is not accepted",
+			);
+			expect(existsSync(join(root, v2Paths[0]))).toBe(false);
+			expect(existsSync(join(root, v2Paths[2]))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("refreshes an existing v2 baseline from a normal passing result", () => {
 		const root = fixtureRoot();
 		try {
 			seedV2Baseline(root);
 			const output = input(root);
-			updateEvolutionBenchmarkBaseline(root, output, {
+			evolutionBaselineWriterTestApi.writeFixture(root, output, {
 				currentCommit,
 				now: new Date("2026-07-20T12:00:00.000Z"),
 			});
@@ -165,11 +237,81 @@ describe("evolution benchmark baseline writer", () => {
 		}
 	});
 
+	for (const dirtyInput of [
+		{
+			name: "source",
+			path: "cli/dev/untracked-benchmark-input.ts",
+			content: "export const fixture = false;\n",
+		},
+		{
+			name: "scenario",
+			path: v2Paths[1],
+			content: '{"dirty":true}\n',
+		},
+	]) {
+		test(`rejects a fully conformant payload when ${dirtyInput.name} input is dirty`, () => {
+			const root = gitFixtureRoot();
+			try {
+				const output = input(root, {
+					status: "baseline-missing",
+					pass: false,
+				});
+				writeFileSync(join(root, dirtyInput.path), dirtyInput.content, "utf8");
+				expect(() =>
+					evolutionBaselineWriterTestApi.writeFixtureAfterCleanInputCheck(
+						root,
+						output,
+						{
+							currentCommit,
+							now: new Date("2026-07-20T12:00:00.000Z"),
+						},
+					),
+				).toThrow(
+					/Evolution baseline writer requires clean benchmark inputs at HEAD.*dirty paths/u,
+				);
+				expect(existsSync(join(root, v2Paths[0]))).toBe(false);
+				expect(existsSync(join(root, v2Paths[2]))).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+	}
+
 	for (const rejection of [
 		{
 			name: "wrong commit",
 			result: { git_commit: "deadbeefdead" },
 			error: "does not match current HEAD",
+		},
+		{
+			name: "wrong payload schema",
+			payload: { schema_version: "2.0.0" },
+			error: "input schema_version",
+		},
+		{
+			name: "wrong command family",
+			payload: { command_family: "handcrafted" },
+			error: "command_family=validation",
+		},
+		{
+			name: "wrong declared result schema",
+			payload: { benchmark_result_schema_version: "2.0.0" },
+			error: "input result schema",
+		},
+		{
+			name: "wrong result schema",
+			result: { schema_version: "2.0.0" },
+			error: "result schema_version",
+		},
+		{
+			name: "wrong run id",
+			result: { run_id: "handcrafted-run" },
+			error: "result run_id",
+		},
+		{
+			name: "missing runner evidence",
+			result: { notes: [] },
+			error: "lacks runner evidence",
 		},
 		{
 			name: "wrong baseline id",
@@ -188,7 +330,12 @@ describe("evolution benchmark baseline writer", () => {
 		},
 		{
 			name: "baseline regression",
-			result: { notes: ["baseline-regression:timing_p95_ms:321>200"] },
+			result: {
+				notes: [
+					"expected-exit-honored:0",
+					"baseline-regression:timing_p95_ms:321>200",
+				],
+			},
 			error: "baseline-regression",
 		},
 		{
@@ -265,7 +412,9 @@ describe("evolution benchmark baseline writer", () => {
 				);
 				const output = input(root, rejection.result, rejection.payload);
 				expect(() =>
-					updateEvolutionBenchmarkBaseline(root, output, { currentCommit }),
+					evolutionBaselineWriterTestApi.writeFixture(root, output, {
+						currentCommit,
+					}),
 				).toThrow(rejection.error);
 				expect(
 					snapshot(
@@ -290,7 +439,7 @@ describe("evolution benchmark baseline writer", () => {
 			const output = input(root, { status: "baseline-missing", pass: false });
 			let writes = 0;
 			expect(() =>
-				updateEvolutionBenchmarkBaseline(root, output, {
+				evolutionBaselineWriterTestApi.writeFixture(root, output, {
 					currentCommit,
 					now: new Date("2026-07-20T12:00:00.000Z"),
 					write(path, content) {
@@ -310,6 +459,37 @@ describe("evolution benchmark baseline writer", () => {
 					root,
 				),
 			).toEqual(beforeScenarios);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports both the write failure and any rollback failure", () => {
+		const root = fixtureRoot();
+		try {
+			const output = input(root, {
+				status: "baseline-missing",
+				pass: false,
+			});
+			let writes = 0;
+			expect(() =>
+				evolutionBaselineWriterTestApi.writeFixture(root, output, {
+					currentCommit,
+					write(path, content) {
+						writes += 1;
+						if (writes === 3) {
+							rmSync(join(root, v2Paths[0]), { force: true });
+							mkdirSync(join(root, v2Paths[0]), { recursive: true });
+							writeFileSync(
+								join(root, v2Paths[0], "rollback-blocker"),
+								"blocked",
+							);
+							throw new Error("injected writer failure");
+						}
+						atomicWriteText(path, content);
+					},
+				}),
+			).toThrow(/Baseline write failed.*rollback also failed/);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -51,8 +51,19 @@ if (parsedArgs.verbose) {
 
 if (result.status !== 0) {
 	if (!parsedArgs.verbose) {
-		process.stdout.write(result.stdout ?? "");
-		process.stderr.write(result.stderr ?? "");
+		const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+		const lines = output.split(/\r?\n/);
+		const failureLines = lines.filter(
+			(line) =>
+				line.includes("(fail)") ||
+				/\btests? failed\b/i.test(line) ||
+				/^error: script /.test(line),
+		);
+		const summary =
+			failureLines.length > 0
+				? failureLines.slice(0, 100)
+				: lines.filter(Boolean).slice(-40);
+		process.stderr.write(`${summary.join("\n")}\n`);
 	}
 	if (result.signal) {
 		console.error(`coverage: bun test terminated by signal ${result.signal}`);

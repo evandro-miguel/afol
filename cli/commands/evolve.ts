@@ -58,6 +58,10 @@ const CONTROL_CHARACTER = /\p{Cc}/u;
 const MAX_OBSERVE_IDENTIFIER_LENGTH = 256;
 const MAX_ANALYSIS_OUTPUT_BYTES = 4_000;
 const MAX_ANALYSIS_PUBLIC_TEXT_BYTES = 128;
+const MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES = 32;
+const MAX_ANALYSIS_PUBLIC_REF_ID_BYTES = 64;
+const MAX_ANALYSIS_PUBLIC_REF_LABEL_BYTES = 32;
+const MAX_ANALYSIS_DTO_BYTES = 3_800;
 
 function assertObserveIdentifier(value: string, label: string): void {
 	if (
@@ -454,6 +458,7 @@ type PublicAnalysisScorecard = Record<
 	Record<string, PublicAnalysisMetric>
 >;
 type PublicAnalysisProposal = {
+	id?: string;
 	rank: number;
 	problem: string;
 	recommendation: string;
@@ -464,7 +469,31 @@ type PublicAnalysisProposal = {
 	confidence: number;
 	occurrence_count: number;
 	distinct_production_day_count: number;
-	target_metrics: Readonly<Record<string, number | null>>;
+	target_metrics?: Readonly<Record<string, number | null>>;
+	distinct_session_count?: number;
+	related_session_count?: number;
+	evidence_refs?: readonly PublicAnalysisEvidenceRef[];
+	evidence_ref_count?: number;
+	baseline?: {
+		window: "recorded";
+		observation_count: number;
+		production_day_count: number;
+		minimum_comparable_sessions: number;
+		production_day_window: number;
+	};
+	targets?: {
+		minimum_comparable_sessions: number;
+		production_day_window: number;
+		state: "canary";
+		metrics: Readonly<Record<string, number | null>>;
+	};
+	approval_policy?: "explicit";
+	approval_surface?: "governed_workbench";
+};
+type PublicAnalysisEvidenceRef = {
+	id: string;
+	kind: string;
+	authority?: string;
 };
 type PublicAnalysisAlert = {
 	problem: string;
@@ -490,6 +519,7 @@ type PublicEvolutionAnalysisDto = {
 	mode: string;
 	status: string;
 	blocked_reason: string | null;
+	recovery_action: string | null;
 	generated_at: string;
 	scorecard: PublicAnalysisScorecard;
 	baseline: {
@@ -505,14 +535,58 @@ type PublicEvolutionAnalysisDto = {
 	critical_alert_pending_count: number;
 };
 
-function boundedPublicText(value: unknown): string {
+function truncateUtf8(value: string, maxBytes: number): string {
+	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	const suffix = "...";
+	const contentBudget = Math.max(
+		0,
+		maxBytes - Buffer.byteLength(suffix, "utf8"),
+	);
+	let result = "";
+	let bytes = 0;
+	for (const codePoint of value) {
+		const codePointBytes = Buffer.byteLength(codePoint, "utf8");
+		if (bytes + codePointBytes > contentBudget) break;
+		result += codePoint;
+		bytes += codePointBytes;
+	}
+	return `${result}${suffix}`;
+}
+
+function boundedPublicTextTo(value: unknown, maxBytes: number): string {
 	const redacted = redactSensitiveText(value, { redactPaths: true }).replace(
 		/\p{Cc}/gu,
 		" ",
 	);
-	const bytes = Buffer.from(redacted, "utf8");
-	if (bytes.byteLength <= MAX_ANALYSIS_PUBLIC_TEXT_BYTES) return redacted;
-	return `${bytes.subarray(0, MAX_ANALYSIS_PUBLIC_TEXT_BYTES - 3).toString("utf8")}...`;
+	return truncateUtf8(redacted, maxBytes);
+}
+
+function boundedPublicText(value: unknown): string {
+	return boundedPublicTextTo(value, MAX_ANALYSIS_PUBLIC_TEXT_BYTES);
+}
+
+function boundedPublicProposalText(value: unknown): string {
+	return boundedPublicTextTo(value, MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES);
+}
+
+function boundedPublicIdentifier(value: unknown, maxBytes = 128): string {
+	if (
+		typeof value !== "string" ||
+		!/[A-Za-z0-9]/.test(value) ||
+		!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ||
+		/(?:token|secret|password|api[_-]?key|access[_-]?token|authorization|bearer)/i.test(
+			value,
+		) ||
+		/^(?:gh[pousr]_|github_pat_|AKIA|ASIA|xox[baprs]-|eyJ[A-Za-z0-9_-]*\.)/.test(
+			value,
+		)
+	)
+		return "";
+	const redacted = redactSensitiveText(value, { redactPaths: true });
+	if (redacted !== value.toLowerCase() || redacted.includes("<redacted"))
+		return "";
+	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	return `${value.slice(0, maxBytes - 3)}...`;
 }
 
 function publicImpact(value: unknown): PublicImpactCategory {
@@ -560,36 +634,113 @@ function publicScorecard(value: unknown): PublicAnalysisScorecard {
 	);
 }
 
-function publicAnalysisDto(
+export function publicAnalysisDto(
 	analysis: Record<string, unknown>,
+	restricted: boolean,
 ): PublicEvolutionAnalysisDto {
 	const baseline = (analysis.baseline ?? {}) as Record<string, unknown>;
+	const publicTargetMetrics = (
+		value: unknown,
+	): Readonly<Record<string, number | null>> =>
+		value && typeof value === "object" && !Array.isArray(value)
+			? Object.fromEntries(
+					Object.entries(value as Record<string, unknown>).map(
+						([key, metric]) => [
+							key,
+							typeof metric === "number" && Number.isFinite(metric)
+								? metric
+								: null,
+						],
+					),
+				)
+			: {};
+	const publicEvidenceRefs = (
+		value: unknown,
+	): readonly PublicAnalysisEvidenceRef[] =>
+		Array.isArray(value)
+			? value
+					.slice(0, 4)
+					.map((item) => {
+						const ref = item as Record<string, unknown>;
+						const id = boundedPublicIdentifier(
+							ref.id,
+							MAX_ANALYSIS_PUBLIC_REF_ID_BYTES,
+						);
+						const kind = boundedPublicIdentifier(
+							ref.kind,
+							MAX_ANALYSIS_PUBLIC_REF_LABEL_BYTES,
+						);
+						const authority = boundedPublicIdentifier(
+							ref.authority,
+							MAX_ANALYSIS_PUBLIC_REF_LABEL_BYTES,
+						);
+						return {
+							id,
+							kind,
+							...(authority ? { authority } : {}),
+						};
+					})
+					.filter((ref) => ref.id && ref.kind)
+			: [];
 	const safeProposal = (
 		proposal: Record<string, unknown>,
-	): PublicAnalysisProposal => ({
-		rank: Number(proposal.rank) || 0,
-		problem: boundedPublicText(proposal.problem),
-		recommendation: boundedPublicText(proposal.recommendation),
-		risk: boundedPublicText(proposal.risk),
-		validation: boundedPublicText(proposal.validation),
-		impact: publicImpact(proposal.impact),
-		score: Number(proposal.score) || 0,
-		confidence: Number(proposal.confidence) || 0,
-		occurrence_count: Number(proposal.occurrence_count) || 0,
-		distinct_production_day_count:
-			Number(proposal.distinct_production_day_count) || 0,
-		target_metrics:
-			proposal.target_metrics && typeof proposal.target_metrics === "object"
-				? Object.fromEntries(
-						Object.entries(
-							proposal.target_metrics as Record<string, unknown>,
-						).map(([key, value]) => [
-							key,
-							typeof value === "number" ? value : null,
-						]),
-					)
-				: {},
-	});
+	): PublicAnalysisProposal => {
+		const proposalBaseline = (proposal.baseline ?? {}) as Record<
+			string,
+			unknown
+		>;
+		const proposalTargets = (proposal.targets ?? {}) as Record<string, unknown>;
+		return {
+			rank: Number(proposal.rank) || 0,
+			problem: boundedPublicProposalText(proposal.problem),
+			recommendation: boundedPublicProposalText(proposal.recommendation),
+			risk: boundedPublicProposalText(proposal.risk),
+			validation: boundedPublicProposalText(proposal.validation),
+			impact: publicImpact(proposal.impact),
+			score: Number(proposal.score) || 0,
+			confidence: Number(proposal.confidence) || 0,
+			occurrence_count: Number(proposal.occurrence_count) || 0,
+			distinct_production_day_count:
+				Number(proposal.distinct_production_day_count) || 0,
+			...(restricted
+				? { target_metrics: publicTargetMetrics(proposal.target_metrics) }
+				: {}),
+			...(!restricted
+				? {
+						id: boundedPublicIdentifier(proposal.id),
+						distinct_session_count:
+							Number(proposal.distinct_session_count) || 0,
+						related_session_count: Number(proposal.related_session_count) || 0,
+						evidence_refs: publicEvidenceRefs(proposal.evidence_refs).slice(
+							0,
+							1,
+						),
+						evidence_ref_count: Number(proposal.evidence_ref_count) || 0,
+						baseline: {
+							window: "recorded" as const,
+							observation_count:
+								Number(proposalBaseline.observation_count) || 0,
+							production_day_count:
+								Number(proposalBaseline.production_day_count) || 0,
+							minimum_comparable_sessions:
+								Number(proposalBaseline.minimum_comparable_sessions) || 0,
+							production_day_window:
+								Number(proposalBaseline.production_day_window) || 0,
+						},
+						targets: {
+							minimum_comparable_sessions:
+								Number(proposalTargets.minimum_comparable_sessions) || 0,
+							production_day_window:
+								Number(proposalTargets.production_day_window) || 0,
+							state: "canary" as const,
+							metrics: publicTargetMetrics(proposalTargets.metrics),
+						},
+						approval_policy: "explicit" as const,
+						approval_surface: "governed_workbench" as const,
+					}
+				: {}),
+		};
+	};
 	const safeAlert = (alert: Record<string, unknown>): PublicAnalysisAlert => ({
 		problem: boundedPublicText(alert.problem),
 		risk: boundedPublicText(alert.risk),
@@ -600,11 +751,12 @@ function publicAnalysisDto(
 			Number(alert.distinct_production_day_count) || 0,
 	});
 	const blocked = analysis.status === "blocked";
-	return {
+	const dto: PublicEvolutionAnalysisDto = {
 		version: Number(analysis.version) || 1,
 		mode: boundedPublicText(analysis.mode),
 		status: boundedPublicText(analysis.status),
 		blocked_reason: blocked ? "analysis unavailable" : null,
+		recovery_action: blocked ? "afol health --area state --json" : null,
 		generated_at: boundedPublicText(analysis.generated_at),
 		scorecard: publicScorecard(analysis.scorecard),
 		baseline: {
@@ -628,17 +780,48 @@ function publicAnalysisDto(
 		critical_alert_pending_count:
 			Number(analysis.critical_alert_pending_count) || 0,
 	};
+	const dtoBytes = (value: PublicEvolutionAnalysisDto): number =>
+		Buffer.byteLength(JSON.stringify(value), "utf8");
+	let compact = dto;
+	// Preserve counts and proposal decision context while removing redundant
+	// scorecards and progressively bounding prose in the largest valid envelope.
+	if (dtoBytes(compact) > MAX_ANALYSIS_DTO_BYTES)
+		compact = { ...compact, scorecard: {} };
+	if (dtoBytes(compact) > MAX_ANALYSIS_DTO_BYTES)
+		compact = {
+			...compact,
+			critical_alerts: compact.critical_alerts.map((alert) => ({
+				...alert,
+				problem: truncateUtf8(
+					alert.problem,
+					MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES,
+				),
+				risk: truncateUtf8(alert.risk, MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES),
+				validation: truncateUtf8(
+					alert.validation,
+					MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES,
+				),
+			})),
+		};
+	if (dtoBytes(compact) > MAX_ANALYSIS_DTO_BYTES)
+		compact = {
+			...compact,
+			baseline: { ...compact.baseline, scorecard: {} },
+		};
+	return compact;
 }
 
-function writeAnalysisPayload(
+export function writeAnalysisPayload(
 	io: CommandIo,
 	json: boolean,
 	action: string,
 	payload: Record<string, unknown>,
 	operationContext: OperationContext,
 ): void {
-	void operationContext;
-	const dto = publicAnalysisDto(payload);
+	const dto = publicAnalysisDto(
+		payload,
+		!isTrustedLocalInteractive(operationContext),
+	);
 	const output = json
 		? stringifyEnvelope(envelopeOk(dto, { action }))
 		: JSON.stringify(dto);

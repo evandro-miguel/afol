@@ -332,13 +332,19 @@ export function analyzeEvolution(
 				).size
 			: input.productionDayCount;
 	const scorecard =
-		input.scorecard ??
-		scorecardFromObservations(observations, productionDayCount);
+		mode === "after_merge"
+			? scorecardFromObservations(observations, productionDayCount)
+			: (input.scorecard ??
+				scorecardFromObservations(observations, productionDayCount));
 	const baseline: EvolutionAnalysisBaseline = {
 		window: "recorded",
 		observation_count: Math.max(
 			0,
-			Math.floor(number(input.observationCount, observations.length)),
+			Math.floor(
+				mode === "after_merge"
+					? observations.length
+					: number(input.observationCount, observations.length),
+			),
 		),
 		production_day_count: Math.max(0, Math.floor(number(productionDayCount))),
 		scorecard,
@@ -417,9 +423,11 @@ export function analyzeEvolution(
 		: proposals.length > 0
 			? "available"
 			: "empty";
-	const scopedCriticalAlerts = (input.criticalAlerts ?? []).filter(
-		(candidate) => candidateInCommitScope(candidate.source_refs),
-	);
+	const scopedCriticalAlerts = blockedReason
+		? []
+		: (input.criticalAlerts ?? []).filter((candidate) =>
+				candidateInCommitScope(candidate.source_refs),
+			);
 	const content: Omit<EvolutionAnalysis, "generated_at" | "digest"> = {
 		version: EVOLUTION_ANALYSIS_VERSION,
 		project_id: input.projectId,
