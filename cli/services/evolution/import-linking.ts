@@ -159,7 +159,7 @@ export function evaluateSessionLink(
 			: evidence("automatic_link_not_verified"),
 		verified_commit: verified ? (input.verifiedCommit ?? null) : null,
 		confirmation_required: !verified,
-		eligible_for_learning: false,
+		eligible_for_learning: verified,
 	};
 }
 
@@ -188,7 +188,7 @@ export function confirmManualSessionLink(
 		evidence: evidence("explicit_local_confirmation"),
 		canonical_decision_ref: input.canonicalDecisionRef,
 		confirmation_required: false,
-		eligible_for_learning: false,
+		eligible_for_learning: true,
 	};
 }
 

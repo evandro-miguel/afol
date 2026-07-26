@@ -256,7 +256,7 @@ function autoLinks(
 						confirmation_required: true,
 						eligible_for_learning: false,
 					};
-		return { ...link, eligible_for_learning: false };
+		return link;
 	});
 }
 
@@ -362,6 +362,7 @@ function buildPreview(
 	const normalizedPreview = {
 		...read.first,
 		contentDigest: read.normalizedDigest,
+		sessions: sessions.length,
 	};
 	const manifest = manifestFor(
 		projectId,

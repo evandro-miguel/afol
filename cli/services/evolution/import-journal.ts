@@ -295,10 +295,16 @@ function validatePayload(
 			)
 		)
 			throw new Error("external session link evidence is invalid");
-		if (link.eligible_for_learning)
-			throw new Error("external import links cannot enter learning");
-		if (link.link_state === "pending" && !link.confirmation_required)
-			throw new Error("pending links require confirmation");
+		if (
+			link.link_state === "pending" &&
+			(!link.confirmation_required || link.eligible_for_learning)
+		)
+			throw new Error("pending links require confirmation and stay ineligible");
+		if (
+			link.link_state !== "pending" &&
+			(link.confirmation_required || !link.eligible_for_learning)
+		)
+			throw new Error("verified links must be eligible without confirmation");
 		if (link.confidence < 0 || link.confidence > 1)
 			throw new Error("link confidence must be between 0 and 1");
 	}

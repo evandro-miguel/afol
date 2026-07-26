@@ -264,7 +264,7 @@ describe("external import acceptance store", () => {
 		}
 	});
 
-	test("canonical import acceptance rejects learning-eligible links", () => {
+	test("canonical import acceptance rejects verified links made ineligible", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-import-learning-"));
 		const db = openEvolutionDb(evolutionDbPath(root));
 		try {
@@ -279,16 +279,18 @@ describe("external import acceptance store", () => {
 						links: [
 							{
 								external_session_id: EXTERNAL_SESSION_ID,
+								afol_session_id: "session-1",
 								link_state: "auto_verified",
 								confidence: 1,
 								evidence: [{ kind: "project_uuid_exact_match" }],
+								verified_commit: "deadbeef",
 								confirmation_required: false,
-								eligible_for_learning: true,
+								eligible_for_learning: false,
 							},
 						],
 					},
 				}),
-			).toThrow("external import links cannot enter learning");
+			).toThrow("verified links must be eligible without confirmation");
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
