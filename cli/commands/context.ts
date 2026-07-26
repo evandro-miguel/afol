@@ -14,6 +14,7 @@ import {
 	getSectionIndex,
 	rebuildSectionIndex,
 	resolveSection,
+	SectionIndexTrustError,
 } from "../services/context/section-index";
 import type { ContextRetrievalMode } from "../services/context/types";
 import { checkHealth } from "../services/health/checker";
@@ -601,6 +602,14 @@ export async function runContextCommand(
 		}
 		return 2;
 	} catch (error) {
+		if (error instanceof SectionIndexTrustError) {
+			if (wantsJson) {
+				jsonOutput.err(io, action, error.code, error.message, 1);
+			} else {
+				io.stderr(error.message);
+			}
+			return 1;
+		}
 		if (wantsJson && error instanceof Error && error.message) {
 			jsonOutput.err(io, action, "CTX_USAGE_ERROR", error.message, 2);
 			return 2;

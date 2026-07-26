@@ -910,12 +910,16 @@ Follow-on slices under this direction:
   - Child specs:
     - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
     - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
+    - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
     `afol.result/v1` and existing error output contracts.
   - Prove Linux x64 and observed WSL2 release behavior with bounded,
     redacted, file-backed evidence.
+  - Index canonical `.afol/adm/specs/**` and `.afol/adm/decisions/**` context
+    recursively, reject false-green empty/stale coverage, and measure the
+    worst selectable three-section token envelope.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,
@@ -946,6 +950,13 @@ Follow-on slices under this direction:
   `260715_2109_pr-40-template-spec-index-remediation` closed with two tasks
   complete, full-suite evidence `E-20260715211444533-1df252`, and independent
   downstream scaffold review.
+- Canonical context remediation: the bounded child
+  `260726_canonical-adm-context-index-migration_spec-child_01` is final after
+  focused regression evidence and independent spec/quality approval. It fails
+  closed before hydrate or heavy gates when canonical administration documents
+  exist but the section index is missing, stale, corrupt, foreign, or
+  incomplete. No new full-suite or security-scan claim is made for this
+  degraded-host follow-up.
 
 ### F-30 AFOL Evolution System
 

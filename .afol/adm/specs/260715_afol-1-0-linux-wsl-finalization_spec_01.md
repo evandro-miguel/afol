@@ -18,6 +18,7 @@ links:
   child_specs:
   - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
   - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
+  - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
 risk_level: high
 ---
 
@@ -36,6 +37,9 @@ AFOL-only downstream boundary.
   persistence, redaction, contention limits, and integrity/error evidence.
 - `260715_afol-1-0-linux-wsl-release-hardening_spec-child_01` owns the Linux
   x64 build/provenance contract and observed WSL2 smoke/release gates.
+- `260726_canonical-adm-context-index-migration_spec-child_01` owns the
+  canonical administration section-index migration, fail-closed coverage and
+  freshness checks, and selectable-section token-health model.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -80,7 +84,7 @@ Out of scope:
 
 ## Acceptance
 
-- F-29 parent and both children exist with valid frontmatter, explicit links,
+- F-29 parent and all children exist with valid frontmatter, explicit links,
   and an index row for every current spec.
 - `afol validate project --check-drift --json` reports no index/frontmatter
   drift after local-state rebuild.
@@ -93,12 +97,20 @@ Out of scope:
 
 ## Closure
 
-The parent is final in `260715_1811_afol-1-0-final-status` with diagnostics
+The original Linux/WSL release slice was finalized in
+`260715_1811_afol-1-0-final-status` with diagnostics
 evidence `E-20260715172724325-99e5fa`, release evidence
 `E-20260715180931454-766e6a` and observed artifact authorization
 `E-20260715181030468-8dd8d9`. Full tests were `1203/0` and
 `validate:release` exited 0 at HEAD `6210ac8`. The closure makes no global
 installation, deployment, remote CI, or unsupported-platform claim.
+
+The canonical administration context child is finalized in session
+`260726_1302_canonical-context-index-repair` after focused regression,
+typecheck, formatting, project validation, and independent spec/quality
+reviews. This does not invalidate the accepted release evidence or reopen the
+two previously final children. The local Gitleaks and OSV binaries were absent,
+so this bounded remediation makes no new security-scan or full-suite claim.
 
 ## Verification Plan
 

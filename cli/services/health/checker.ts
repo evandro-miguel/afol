@@ -1,6 +1,9 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { getSectionIndex } from "../context";
+import {
+	inspectSectionIndexCache,
+	type SectionIndexCacheInspection,
+} from "../context";
 import { runDriftCheck } from "../drift";
 import {
 	checkEvolutionDbHealth,
@@ -99,50 +102,53 @@ function walkMarkdownFiles(root: string): string[] {
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
-function latestSourceMtime(root: string): number {
-	const docsRoot = join(root, "docs", "arc");
-	let latest = 0;
-	for (const file of walkMarkdownFiles(join(docsRoot, "SPECS"))) {
-		latest = Math.max(latest, statSync(file).mtimeMs);
-	}
-	for (const file of walkMarkdownFiles(join(docsRoot, "DECISIONS"))) {
-		latest = Math.max(latest, statSync(file).mtimeMs);
-	}
-	return latest;
-}
-
 function sectionIndexPath(root: string): string {
 	return join(resolveProjectPaths(root).abs.dataIndexDir, "sections.json");
 }
 
-function estimateSectionTokens(
-	sections: readonly { ref: string; title: string; source_path: string }[],
+function estimateSelectableSectionTokens(
+	sections: readonly {
+		ref: string;
+		title: string;
+		level: number;
+		line_start: number;
+		line_end: number;
+		source_path: string;
+	}[],
 ): number {
-	return sections.reduce(
-		(total, section) =>
-			total +
-			Math.max(
+	return sections
+		.map((section) => {
+			const domain = section.ref.startsWith("adr:") ? "adr" : "spec";
+			const selectableMetadata = [
+				domain,
+				section.source_path,
+				section.ref,
+				section.title,
+				section.level,
+				section.line_start,
+				section.line_end,
+			].join(":");
+			return Math.max(
 				1,
-				Math.ceil(
-					(section.ref.length +
-						section.title.length +
-						section.source_path.length) /
-						4,
-				),
-			),
-		0,
-	);
+				Math.ceil(new TextEncoder().encode(selectableMetadata).byteLength / 4),
+			);
+		})
+		.sort((left, right) => right - left)
+		.slice(0, 3)
+		.reduce((total, tokens) => total + tokens, 0);
 }
 
 function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 	const findings: HealthFinding[] = [];
-	const admRoot = join(root, ".afol", "adm");
+	const projectPaths = resolveProjectPaths(root);
+	const admRoot = projectPaths.abs.admDir;
+	const admLabel = projectPaths.admDir;
 	if (!existsSync(admRoot)) {
 		return [
 			makeFinding(
 				"adm",
 				"fail",
-				"missing .afol/adm directory",
+				`missing ${admLabel} directory`,
 				"restore AFOL administration files or run the project bootstrap/update flow",
 			),
 		];
@@ -156,8 +162,8 @@ function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 				makeFinding(
 					"adm",
 					"warn",
-					`missing .afol/adm/${dir} directory`,
-					`create .afol/adm/${dir} or update project administration layout`,
+					`missing ${admLabel}/${dir} directory`,
+					`create ${admLabel}/${dir} or update project administration layout`,
 				),
 			);
 		}
@@ -247,7 +253,6 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 					"restore read access to the session directory",
 				),
 			);
-			continue;
 		}
 	}
 
@@ -405,41 +410,23 @@ function checkStateHealth(root: string, deep: boolean): HealthFinding[] {
 	return findings;
 }
 
-function checkCtxHealth(root: string, deep: boolean): HealthFinding[] {
-	const index = getSectionIndex(root);
-	if (!index) {
+function checkCtxHealth(
+	root: string,
+	deep: boolean,
+	inspection?: SectionIndexCacheInspection,
+): HealthFinding[] {
+	const inspected = inspection ?? inspectSectionIndexCache(root);
+	if (inspected.status !== "current" || !inspected.index) {
 		return [
 			makeFinding(
 				"ctx",
 				"fail",
-				`missing section index: ${sectionIndexPath(root)}`,
+				`${inspected.status} section index: ${sectionIndexPath(root)} (${inspected.detail})`,
 				"rebuild the section index",
 			),
 		];
 	}
-
-	const latestSource = latestSourceMtime(root);
-	const generatedAt = parseIsoDate(index.generated_at);
-	if (generatedAt === null) {
-		return [
-			makeFinding(
-				"ctx",
-				"fail",
-				`invalid section index generated_at: ${index.generated_at}`,
-				"rebuild the section index",
-			),
-		];
-	}
-	if (latestSource > 0 && generatedAt < latestSource) {
-		return [
-			makeFinding(
-				"ctx",
-				"fail",
-				`stale section index: ${sectionIndexPath(root)}`,
-				"rebuild the section index",
-			),
-		];
-	}
+	const index = inspected.index;
 	return deep
 		? [
 				makeFinding(
@@ -451,20 +438,25 @@ function checkCtxHealth(root: string, deep: boolean): HealthFinding[] {
 		: [];
 }
 
-function checkTokenHealth(root: string, deep: boolean): HealthFinding[] {
-	const index = getSectionIndex(root);
-	if (!index) {
+function checkTokenHealth(
+	root: string,
+	deep: boolean,
+	inspection?: SectionIndexCacheInspection,
+): HealthFinding[] {
+	const inspected = inspection ?? inspectSectionIndexCache(root);
+	if (inspected.status !== "current" || !inspected.index) {
 		return [
 			makeFinding(
 				"token_budget",
 				"fail",
-				`missing section index: ${sectionIndexPath(root)}`,
+				`${inspected.status} section index: ${sectionIndexPath(root)} (${inspected.detail})`,
 				"rebuild the section index",
 			),
 		];
 	}
+	const index = inspected.index;
 
-	const usedTokens = estimateSectionTokens(index.sections);
+	const usedTokens = estimateSelectableSectionTokens(index.sections);
 	if (usedTokens >= TOKEN_FAIL_AT) {
 		return [
 			makeFinding(
@@ -627,9 +619,21 @@ export function checkHealth(
 		: opts?.deep || opts?.includeAuxiliary
 			? [...HEALTH_AREAS]
 			: [...CORE_HEALTH_AREAS];
-	const findings = areas.flatMap((area) =>
-		checkAreaHealth(root, area, opts?.deep ?? false),
-	);
+	const deep = opts?.deep ?? false;
+	const sectionInspection = areas.some(
+		(area) => area === "ctx" || area === "token_budget",
+	)
+		? inspectSectionIndexCache(root)
+		: undefined;
+	const findings = areas.flatMap((area) => {
+		if (area === "ctx") {
+			return checkCtxHealth(root, deep, sectionInspection);
+		}
+		if (area === "token_budget") {
+			return checkTokenHealth(root, deep, sectionInspection);
+		}
+		return checkAreaHealth(root, area, deep);
+	});
 	if (areas.includes("wb")) {
 		const openPendingSpecs = listOpenPendingSpecs(root);
 		if (openPendingSpecs.length > 0) {
