@@ -44,9 +44,9 @@
   },
   "baseline_id": "evolution-core-v2",
   "deterministic_metrics": {
-    "duration_ms": 2008,
-    "timing_p50_ms": 2008,
-    "timing_p95_ms": 2080,
+    "duration_ms": 1279,
+    "timing_p50_ms": 1279,
+    "timing_p95_ms": 1766,
     "error_count": 0,
     "retry_count": 0,
     "context_tokens": 0,
@@ -62,8 +62,8 @@
     "source": "fresh-local-runnable-smoke",
     "sample_count": 3,
     "warmup_count": 1,
-    "git_commit": "335a5a7363c1",
-    "timestamp": "2026-07-25T23:05:17.756Z"
+    "git_commit": "ffbf031e6e68",
+    "timestamp": "2026-07-26T02:54:28.057Z"
   },
   "implementation_status": "implemented"
 }

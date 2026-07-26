@@ -5,13 +5,13 @@
   "host_profile_id": "ci-linux-x64",
   "sample_count": 3,
   "warmup_count": 1,
-  "timing_p50_ms": 2008,
-  "timing_p95_ms": 2080,
+  "timing_p50_ms": 1279,
+  "timing_p95_ms": 1766,
   "tokenizer_id": "output-bytes-divided-by-4",
   "tokenizer_version": "1",
-  "git_commit": "335a5a7363c1",
+  "git_commit": "ffbf031e6e68",
   "run_id": "bench-evolution-core-evolution-status-contract-1.1.0",
-  "timestamp": "2026-07-25T23:05:17.756Z",
+  "timestamp": "2026-07-26T02:54:28.057Z",
   "results_count": 1,
   "provenance": "fresh-local-runnable-smoke"
 }
