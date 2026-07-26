@@ -13,7 +13,7 @@ import {
 	writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { withSessionLock } from "../io/session-lock";
+import { observeSessionLock, withSessionLock } from "../io/session-lock";
 import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
@@ -27,6 +27,16 @@ import {
 const GENESIS = "GENESIS";
 const DEFAULT_EVENTS_DIR = ".afol/data/events/evolution";
 const CHECKPOINT_LOCK = "__evolution-projection-checkpoint__";
+const CHECKPOINT_READER_WAIT_MS = 10_000;
+
+function waitForCheckpointWriter(root: string): void {
+	const deadline = Date.now() + CHECKPOINT_READER_WAIT_MS;
+	while (observeSessionLock(root, CHECKPOINT_LOCK).active) {
+		if (Date.now() >= deadline)
+			throw new Error("evolution projection checkpoint writer is busy");
+		Bun.sleepSync(10);
+	}
+}
 
 type ProjectionCheckpoint = {
 	checkpoint_schema_version?: 2;
@@ -379,9 +389,8 @@ export function assertEvolutionProjectionCheckpoint(input: {
 	projectId: string;
 	eventsDir?: string;
 }): void {
-	withSessionLock(input.root, CHECKPOINT_LOCK, () =>
-		assertEvolutionProjectionCheckpointUnlocked(input),
-	);
+	waitForCheckpointWriter(input.root);
+	assertEvolutionProjectionCheckpointUnlocked(input);
 }
 
 export function validateEvolutionProjectionCheckpoint(input: {
@@ -390,8 +399,7 @@ export function validateEvolutionProjectionCheckpoint(input: {
 	projectId: string;
 	eventsDir?: string;
 }): void {
-	withSessionLock(input.root, CHECKPOINT_LOCK, () => {
-		readCheckpoints(projectionCheckpointPath(input.root, input.eventsDir));
-		assertEvolutionProjectionCheckpointUnlocked(input);
-	});
+	waitForCheckpointWriter(input.root);
+	readCheckpoints(projectionCheckpointPath(input.root, input.eventsDir));
+	assertEvolutionProjectionCheckpointUnlocked(input);
 }

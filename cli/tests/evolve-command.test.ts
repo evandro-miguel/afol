@@ -209,7 +209,9 @@ describe("evolve status", () => {
 					agentOperationContext(),
 				),
 			).toBe(2);
-			expect(captured.stdout.join("\n")).toContain("local interactive mode");
+			expect(captured.stdout.join("\n")).toContain(
+				"local interactive diagnostics required",
+			);
 			const nonInteractive = captureIo();
 			expect(
 				await runEvolveCommand(
@@ -221,7 +223,7 @@ describe("evolve status", () => {
 				),
 			).toBe(2);
 			expect(nonInteractive.stdout.join("\n")).toContain(
-				"local interactive mode",
+				"local interactive diagnostics required",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

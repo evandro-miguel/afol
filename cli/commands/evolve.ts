@@ -38,9 +38,9 @@ import {
 	readObservationJournal,
 	readPreferenceJournal,
 	readProductionDayJournal,
-	redactSensitiveText,
 	recordProposalEvaluation,
 	recordProposalSupersession,
+	redactSensitiveText,
 	repairEvolutionDerivedState,
 	resolveDailySuggestion,
 	resolveEvolutionConfig,
@@ -604,6 +604,7 @@ async function runEvaluate(
 			parsed.json,
 			"evolve.evaluate",
 			previewProposalEvaluation(root, parsed.mutationId, projectId),
+			operationContext,
 		);
 		return 0;
 	}
@@ -637,7 +638,13 @@ async function runEvaluate(
 				taskId,
 				now,
 			});
-	writeEvolutionPayload(io, parsed.json, "evolve.evaluate", result);
+	writeEvolutionPayload(
+		io,
+		parsed.json,
+		"evolve.evaluate",
+		result,
+		operationContext,
+	);
 	return 0;
 }
 

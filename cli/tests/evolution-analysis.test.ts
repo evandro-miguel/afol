@@ -29,7 +29,7 @@ import {
 } from "../core/operation-context";
 import { resolveCommand } from "../router";
 import {
-	analyzeEvolution,
+	analyzeEvolution as analyzeEvolutionCore,
 	analyzeEvolutionProject,
 	appendObservationJournalEvent,
 	appendProductionDayAllocation,
@@ -52,6 +52,27 @@ import {
 import type { SuggestionCandidate } from "../services/evolution/suggestion-model";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
+
+function analyzeEvolution(
+	input: Parameters<typeof analyzeEvolutionCore>[0],
+): ReturnType<typeof analyzeEvolutionCore> {
+	if (input.observations) return analyzeEvolutionCore(input);
+	const observations = (input.candidates ?? []).map((item, index) =>
+		normalizeObservationRecord({
+			project_id: input.projectId,
+			id: `O-fixture-${item.id}`,
+			kind: "workflow_friction",
+			session_id: item.related_session_ids[0] ?? `S-fixture-${index}`,
+			production_day_sequence: 1,
+			task_type: item.task_type ?? "documentation",
+			impact: item.impact,
+			created_at: `2026-07-21T12:${String(index).padStart(2, "0")}:00.000Z`,
+			journal_event_id: `J-fixture-${index}`,
+			source_refs: item.source_refs,
+		}),
+	);
+	return analyzeEvolutionCore({ ...input, observations });
+}
 
 function candidate(index: number, critical = false): SuggestionCandidate {
 	return {
@@ -717,8 +738,8 @@ describe("evolution analysis previews", () => {
 					4_000,
 				);
 				expect(data).not.toHaveProperty("project_id");
+				expect(snapshotReadOnlyState(root), action).toBe(before);
 			}
-			expect(snapshotReadOnlyState(root)).toBe(before);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
