@@ -65,9 +65,10 @@ function mkProjectRoot(): string {
 	const agentsDir = join(root, ".agents");
 	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
-	cpSync(
-		join(process.cwd(), "src", "project-template", ".afol", "config.json"),
+	writeFileSync(
 		join(afolDir, "config.json"),
+		'{"schema_version":1,"project":{"name":"afol"}}\n',
+		"utf8",
 	);
 	cpSync(
 		join(process.cwd(), ".agents", "lock.json"),

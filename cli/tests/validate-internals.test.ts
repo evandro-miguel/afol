@@ -63,9 +63,10 @@ function createFixtureRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-internals-"));
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
-	cpSync(
-		join(process.cwd(), "src", "project-template", ".afol", "config.json"),
+	writeFileSync(
 		join(root, ".afol", "config.json"),
+		'{"schema_version":1,"project":{"name":"afol"}}\n',
+		"utf8",
 	);
 	cpSync(
 		join(process.cwd(), ".agents", "lock.json"),
