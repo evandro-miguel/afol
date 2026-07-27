@@ -21,6 +21,7 @@ links:
   - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
   - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
   - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
+  - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
 risk_level: high
 ---
 
@@ -49,6 +50,10 @@ AFOL-only downstream boundary.
 - `260726_event-ledger-durability_spec-child_01` owns the shared global event
   writer, ledger validation, and fail-closed local-state consumption needed
   after the quota-induced partial-append incident.
+- `260726_governance-contract-reconciliation_spec-child_01` owns the bounded
+  reconciliation of final F-01, F-11, F-13, and F-15 contracts with the
+  AFOL-only TypeScript runtime while preserving their exact prior text in a
+  verified retention archive.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -134,6 +139,15 @@ consumer trust boundary were not crash-safe. Earlier child evidence remains
 final and is not reinterpreted; the parent returns to final only after this
 child has focused RED/GREEN and independent quality evidence and the parent
 cross-child acceptance, release, and required security gates are current.
+
+The event-ledger durability child is final with its original governed evidence
+preserved. The governance-contract reconciliation child is also final in
+session `260726_1553_governance-contract-reconciliation` after exact archive
+verification, focused regressions, local-state/context rebuild, project drift
+validation, typecheck, formatting, manifest, redacted Gitleaks history/worktree,
+and OSV dependency scans. These bounded results do not create a new full-suite,
+build, release, deployment, or global-install claim; F-29 remains active until
+its broader cross-child release gates are refreshed.
 
 ## Verification Plan
 
