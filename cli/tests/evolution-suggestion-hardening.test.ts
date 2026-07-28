@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
+	closeSync,
 	existsSync,
 	linkSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
 	readFileSync,
+	readSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -19,6 +22,7 @@ import {
 	normalizeObservationRecord,
 	projectObservation,
 } from "../services/evolution/observation-model";
+import { readExactTailBytes } from "../services/evolution/projection-watermark";
 import { dispatchSuggestionDecision } from "../services/evolution/suggestion-authority";
 import {
 	acknowledgeDailySuggestion,
@@ -106,6 +110,53 @@ function configure(root: string, timezone = "UTC"): void {
 }
 
 describe("evolution suggestion hardening", () => {
+	test("fills bounded tail buffers across short reads", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-tail-short-read-"));
+		const path = join(root, "tail.jsonl");
+		const expected = Buffer.from('{"event_digest":"abc"}\n');
+		writeFileSync(path, expected);
+		const fd = openSync(path, "r");
+		try {
+			const actual = Buffer.alloc(expected.length);
+			readExactTailBytes(
+				fd,
+				actual,
+				0,
+				"bounded tail read was incomplete",
+				(readFd, buffer, offset, length, position) =>
+					readSync(readFd, buffer, offset, Math.min(length, 2), position),
+			);
+			expect(actual).toEqual(expected);
+		} finally {
+			closeSync(fd);
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails bounded tail reads on premature EOF with stable reader errors", () => {
+		for (const message of [
+			"evolution projection checkpoint read was incomplete",
+			"evolution journal watermark read was incomplete",
+			"suggestion journal tail read was incomplete",
+		]) {
+			let calls = 0;
+			expect(() =>
+				readExactTailBytes(
+					-1,
+					Buffer.alloc(4),
+					0,
+					message,
+					(_fd, buffer, offset) => {
+						calls += 1;
+						if (calls > 1) return 0;
+						buffer[offset] = 0x7b;
+						return 1;
+					},
+				),
+			).toThrow(message);
+		}
+	});
+
 	test("rejects a rehashed event with forged action and authority semantics", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-suggestion-semantic-"));
 		configure(root);

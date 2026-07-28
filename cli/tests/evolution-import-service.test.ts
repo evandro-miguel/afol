@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -14,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
+	appendImportJournalEventUnlocked,
 	importJournalPath,
 	readImportJournal,
 } from "../services/evolution/import-journal";
@@ -21,6 +24,7 @@ import {
 	confirmExternalImport,
 	previewExternalImport,
 } from "../services/evolution/import-service";
+import { rebuildExternalImportProjection } from "../services/evolution/import-store";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 
@@ -32,6 +36,26 @@ function fixture(): { root: string; source: string } {
 		`${JSON.stringify({ session_id: "provider-session-1", role: "user", content: "token=redaction_canary" })}\n`,
 	);
 	return { root, source };
+}
+
+function rewriteArtifactSessionId(
+	path: string,
+	externalSessionId: string,
+): void {
+	for (const name of ["sessions.jsonl", "segments.jsonl", "links.jsonl"]) {
+		const file = join(path, name);
+		const rows = readFileSync(file, "utf8")
+			.split(/\r?\n/)
+			.filter(Boolean)
+			.map((line) => ({
+				...(JSON.parse(line) as Record<string, unknown>),
+				external_session_id: externalSessionId,
+			}));
+		writeFileSync(
+			file,
+			`${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
+		);
+	}
 }
 
 describe("external import service", () => {
@@ -114,6 +138,178 @@ describe("external import service", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(2);
 		} finally {
 			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("versions a named provider session across distinct imports", async () => {
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			writeFileSync(
+				source,
+				`${JSON.stringify({ session_id: "provider-session-1", role: "user", content: "first import" })}\n`,
+			);
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			writeFileSync(
+				source,
+				`${JSON.stringify({ session_id: "provider-session-1", role: "user", content: "second import" })}\n${JSON.stringify({ session_id: "provider-session-1", role: "assistant", content: "new response" })}\n`,
+			);
+			const second = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+
+			expect(first.preview.importId).not.toBe(second.preview.importId);
+			expect(first.preview.sessionRecords[0]?.provider_session_id).toBe(
+				second.preview.sessionRecords[0]?.provider_session_id,
+			);
+			expect(first.preview.sessionRecords[0]?.external_session_id).not.toBe(
+				second.preview.sessionRecords[0]?.external_session_id,
+			);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(2);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps an unchanged session identity when another session changes", async () => {
+		const { root, source } = fixture();
+		try {
+			writeFileSync(
+				source,
+				`${[
+					{ session_id: "session-a", role: "user", content: "stable" },
+					{ session_id: "session-b", role: "user", content: "before" },
+				]
+					.map((row) => JSON.stringify(row))
+					.join("\n")}\n`,
+			);
+			const first = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			writeFileSync(
+				source,
+				`${[
+					{ session_id: "session-a", role: "user", content: "stable" },
+					{ session_id: "session-b", role: "user", content: "after" },
+				]
+					.map((row) => JSON.stringify(row))
+					.join("\n")}\n`,
+			);
+			const second = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			const secondIds = new Map(
+				second.sessionRecords.map((session) => [
+					session.provider_session_id,
+					session.external_session_id,
+				]),
+			);
+			const comparisons = first.sessionRecords.map(
+				(session) =>
+					secondIds.get(session.provider_session_id) ===
+					session.external_session_id,
+			);
+			expect(comparisons.filter(Boolean)).toHaveLength(1);
+			expect(comparisons.filter((same) => !same)).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps an unchanged session identity when another session shifts line position", async () => {
+		const { root, source } = fixture();
+		try {
+			writeFileSync(
+				source,
+				[
+					{ session_id: "session-a", role: "user", content: "a1" },
+					{ session_id: "session-b", role: "user", content: "stable" },
+				]
+					.map((record) => JSON.stringify(record))
+					.join("\n")
+					.concat("\n"),
+			);
+			const first = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			writeFileSync(
+				source,
+				[
+					{ session_id: "session-a", role: "user", content: "a1" },
+					{ session_id: "session-a", role: "user", content: "a2" },
+					{ session_id: "session-b", role: "user", content: "stable" },
+				]
+					.map((record) => JSON.stringify(record))
+					.join("\n")
+					.concat("\n"),
+			);
+			const second = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			const firstStable = first.sessionRecords.find(
+				(session) =>
+					session.provider_session_id ===
+					`SID-${createHash("sha256").update("session-b").digest("hex").slice(0, 32)}`,
+			);
+			const secondStable = second.sessionRecords.find(
+				(session) =>
+					session.provider_session_id ===
+					`SID-${createHash("sha256").update("session-b").digest("hex").slice(0, 32)}`,
+			);
+			expect(firstStable?.external_session_id).toBe(
+				secondStable?.external_session_id,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps session identity consistent when redaction makes imports identical", async () => {
+		const { root, source } = fixture();
+		try {
+			writeFileSync(
+				source,
+				`${JSON.stringify({ id: "fixed-record", session_id: "session-a", role: "user", content: "first secret" })}\n`,
+			);
+			const first = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			writeFileSync(
+				source,
+				`${JSON.stringify({ id: "fixed-record", session_id: "session-a", role: "user", content: "second secret" })}\n`,
+			);
+			const second = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			expect(first.importId).toBe(second.importId);
+			expect(first.sessionRecords[0]?.external_session_id).toBe(
+				second.sessionRecords[0]?.external_session_id,
+			);
+		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
@@ -299,6 +495,222 @@ describe("external import service", () => {
 		}
 	});
 
+	test("retries a canonical import that uses the legacy named-session id", async () => {
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			const providerSessionId =
+				first.event.payload.sessions[0]?.provider_session_id;
+			if (!providerSessionId) throw new Error("missing provider session");
+			const legacyId = `EXT-${createHash("sha256")
+				.update(`codex:${providerSessionId}`)
+				.digest("hex")
+				.slice(0, 32)}`;
+			const firstLinks = first.event.payload.links;
+			if (!firstLinks) throw new Error("missing canonical links");
+			const legacyPayload = {
+				...first.event.payload,
+				sessions: first.event.payload.sessions.map((session) => ({
+					...session,
+					external_session_id: legacyId,
+				})),
+				links: firstLinks.map((link) => ({
+					...link,
+					external_session_id: legacyId,
+				})),
+			};
+			rmSync(importJournalPath(root), { force: true });
+			appendImportJournalEventUnlocked({
+				root,
+				projectId: PROJECT_ID,
+				payload: legacyPayload,
+				eventId: first.event.event_id,
+				now: new Date(first.event.timestamp),
+			});
+			rewriteArtifactSessionId(first.artifactPath, legacyId);
+			rebuildExternalImportProjection({
+				root,
+				projectId: PROJECT_ID,
+				db,
+			});
+
+			const retry = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			expect(retry.duplicate).toBe(true);
+			expect(retry.preview.sessionRecords[0]?.external_session_id).toBe(
+				legacyId,
+			);
+			expect(retry.preview.links[0]?.external_session_id).toBe(legacyId);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recreates a missing artifact from the canonical import event", async () => {
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			rmSync(first.artifactPath, { recursive: true, force: true });
+			const retry = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			expect(retry.duplicate).toBe(true);
+			expect(retry.preview.sessionRecords).toEqual(
+				first.preview.sessionRecords,
+			);
+			expect(existsSync(join(first.artifactPath, "manifest.json"))).toBe(true);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reuses persisted canonical links when local link evidence drifts", async () => {
+		const { root, source } = fixture();
+		mkdirSync(join(root, ".afol"), { recursive: true });
+		writeFileSync(
+			join(root, ".afol", "config.json"),
+			JSON.stringify({
+				schema_version: 1,
+				project: { id: PROJECT_ID, timezone: "UTC", name: "test" },
+				paths: {
+					external_dir: ".afol/external",
+					evolution_db: ".afol/state/evolution.db",
+					evolution_data_dir: ".afol/data/evolution",
+					evolution_events_dir: ".afol/data/events/evolution",
+				},
+				evolution: {
+					enabled: true,
+					suggestions: {
+						first_session_of_day: true,
+						dedupe_scope: "project",
+						max_visible_per_day: 1,
+						remind_skipped_next_day: true,
+						deep_review_after_production_days: 5,
+					},
+					preferences: {
+						soft_decay_after_production_days: 7,
+						stop_guiding_after_production_days: 20,
+						minimum_effective_confidence: 0.65,
+						decay_curve: "linear",
+					},
+					recurrence: {
+						minimum_occurrences: 3,
+						minimum_distinct_sessions: 2,
+						minimum_distinct_production_days: 2,
+					},
+					large_change: {
+						changed_files: 20,
+						changed_lines: 1000,
+						critical_paths_trigger: true,
+					},
+					external: {
+						mode: "explicit_import_only",
+						storage: "normalized_sections",
+						store_raw: false,
+						redact_before_persist: true,
+					},
+					autonomy: {
+						auto_observe: true,
+						auto_refresh_preference_projections: true,
+						auto_clean_derived_state: true,
+						auto_apply_mode: "none",
+					},
+				},
+			}),
+		);
+		writeFileSync(join(root, "tracked.txt"), "fixture\n");
+		spawnSync("git", ["init", "-q"], { cwd: root });
+		spawnSync("git", ["config", "user.email", "test@example.invalid"], {
+			cwd: root,
+		});
+		spawnSync("git", ["config", "user.name", "AFOL Test"], { cwd: root });
+		spawnSync("git", ["add", "tracked.txt"], { cwd: root });
+		spawnSync("git", ["commit", "-qm", "fixture"], { cwd: root });
+		const commit = spawnSync("git", ["rev-parse", "HEAD"], {
+			cwd: root,
+			encoding: "utf8",
+		}).stdout.trim();
+		writeFileSync(
+			source,
+			`${JSON.stringify({
+				session_id: "provider-session-1",
+				role: "user",
+				content: "linked import",
+				project_id: PROJECT_ID,
+				afol_session_id: "session-1",
+				commit_sha: commit,
+			})}\n`,
+		);
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			expect(first.preview.links[0]?.link_state).toBe("pending");
+			const persistedLinks = readFileSync(
+				join(first.artifactPath, "links.jsonl"),
+				"utf8",
+			);
+
+			mkdirSync(join(root, ".afol", "wb", "session-1"), {
+				recursive: true,
+			});
+			const reevaluated = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+			expect(reevaluated.links[0]?.link_state).toBe("auto_verified");
+
+			const retry = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			expect(retry.duplicate).toBe(true);
+			expect(retry.preview.links).toEqual(first.preview.links);
+			expect(
+				readFileSync(join(first.artifactPath, "links.jsonl"), "utf8"),
+			).toBe(persistedLinks);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("completes checked short writes for every artifact", async () => {
 		const { root, source } = fixture();
 		const db = openEvolutionDb(evolutionDbPath(root));
@@ -404,6 +816,14 @@ describe("external import service", () => {
 				"DELETE FROM import_checkpoints; DELETE FROM session_links; DELETE FROM external_sessions; DELETE FROM external_imports;",
 			);
 			rmSync(importJournalPath(root), { force: true });
+			const providerSessionId =
+				first.preview.sessionRecords[0]?.provider_session_id;
+			if (!providerSessionId) throw new Error("missing provider session");
+			const legacyId = `EXT-${createHash("sha256")
+				.update(`codex:${providerSessionId}`)
+				.digest("hex")
+				.slice(0, 32)}`;
+			rewriteArtifactSessionId(first.artifactPath, legacyId);
 			const retry = await confirmExternalImport({
 				root,
 				provider: "codex",
@@ -414,7 +834,55 @@ describe("external import service", () => {
 			expect(retry.preview.manifest.imported_at).toBe(
 				first.preview.manifest.imported_at,
 			);
+			expect(retry.preview.sessionRecords[0]?.external_session_id).toBe(
+				legacyId,
+			);
 			expect(retry.duplicate).toBe(false);
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reuses a legacy unscoped orphan artifact after a crash before journal append", async () => {
+		const { root, source } = fixture();
+		writeFileSync(
+			source,
+			`${JSON.stringify({ role: "user", content: "unscoped legacy import" })}\n`,
+		);
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			db.exec(
+				"DELETE FROM import_checkpoints; DELETE FROM session_links; DELETE FROM external_sessions; DELETE FROM external_imports;",
+			);
+			rmSync(importJournalPath(root), { force: true });
+			expect(first.preview.sessionRecords[0]?.provider_session_id).toBe(
+				"unscoped",
+			);
+			const legacyId = `EXT-${createHash("sha256")
+				.update(`codex:unscoped:${first.preview.contentDigest}`)
+				.digest("hex")
+				.slice(0, 32)}`;
+			rewriteArtifactSessionId(first.artifactPath, legacyId);
+
+			const retry = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			expect(retry.duplicate).toBe(false);
+			expect(retry.preview.sessionRecords[0]?.external_session_id).toBe(
+				legacyId,
+			);
 		} finally {
 			db.close();
 			rmSync(root, { recursive: true, force: true });
@@ -455,7 +923,7 @@ describe("external import service", () => {
 	});
 
 	test("rejects an orphan artifact with missing, extra, or altered files", async () => {
-		for (const mutation of ["missing", "extra", "altered"] as const) {
+		for (const mutation of ["missing", "extra", "altered", "links"] as const) {
 			const { root, source } = fixture();
 			const db = openEvolutionDb(evolutionDbPath(root));
 			try {
@@ -478,6 +946,17 @@ describe("external import service", () => {
 					writeFileSync(
 						join(first.artifactPath, "segments.jsonl"),
 						"truncated\n",
+					);
+				if (mutation === "links")
+					writeFileSync(
+						join(first.artifactPath, "links.jsonl"),
+						`${JSON.stringify({
+							...first.preview.links[0],
+							link_state: "auto_verified",
+							confidence: 1,
+							confirmation_required: false,
+							eligible_for_learning: true,
+						})}\n`,
 					);
 				await expect(
 					confirmExternalImport({

@@ -164,6 +164,38 @@ describe("external import acceptance store", () => {
 		}
 	});
 
+	test("rebuilds a missing projection from the canonical import journal", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-import-reconcile-"));
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const canonicalPayload = payload("journal-ahead");
+			appendImportJournalEventUnlocked({
+				root,
+				projectId: PROJECT_ID,
+				payload: canonicalPayload,
+			});
+			const accepted = acceptExternalImport({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				payload: canonicalPayload,
+			});
+			expect(accepted.duplicate).toBe(true);
+			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
+			expect(listExternalImports(db, PROJECT_ID)).toHaveLength(1);
+			expect(() =>
+				validateExternalImportProjection({
+					root,
+					projectId: PROJECT_ID,
+					db,
+				}),
+			).not.toThrow();
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rolls back projection and journal together on a failed transaction", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-import-rollback-"));
 		const db = openEvolutionDb(evolutionDbPath(root));

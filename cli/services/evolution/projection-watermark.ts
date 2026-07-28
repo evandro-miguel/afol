@@ -9,6 +9,39 @@ import { assertSafeEvolutionTarget } from "./db";
 
 const MAX_TAIL_BYTES = 65_536;
 const KINDS = new Set(["observation", "receipt", "apply", "evaluation"]);
+type TailReader = (
+	fd: number,
+	buffer: Buffer,
+	offset: number,
+	length: number,
+	position: number,
+) => number;
+
+export function readExactTailBytes(
+	fd: number,
+	buffer: Buffer,
+	position: number,
+	incompleteMessage: string,
+	readBytes: TailReader = readSync,
+): void {
+	let offset = 0;
+	while (offset < buffer.length) {
+		const bytesRead = readBytes(
+			fd,
+			buffer,
+			offset,
+			buffer.length - offset,
+			position + offset,
+		);
+		if (
+			!Number.isInteger(bytesRead) ||
+			bytesRead <= 0 ||
+			bytesRead > buffer.length - offset
+		)
+			throw new Error(incompleteMessage);
+		offset += bytesRead;
+	}
+}
 
 function metadataKey(kind: string): string {
 	if (!KINDS.has(kind))
@@ -30,7 +63,12 @@ export function journalTailFingerprint(
 			(process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW),
 	);
 	try {
-		readSync(fd, buffer, 0, length, Number(stat.size) - length);
+		readExactTailBytes(
+			fd,
+			buffer,
+			Number(stat.size) - length,
+			"evolution journal watermark read was incomplete",
+		);
 	} finally {
 		closeSync(fd);
 	}

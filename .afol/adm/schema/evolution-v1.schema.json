@@ -535,7 +535,7 @@
         "sequence": { "type": "integer", "minimum": 1 },
         "event_id": { "$ref": "#/$defs/id" },
         "event_type": {
-          "enum": ["import_acceptance", "session_link", "observation", "recurrence_decision", "proposal", "decision", "receipt_claim", "receipt_shown", "receipt_decision", "production_day_allocation", "mutation", "evaluation", "rollback", "tombstone"]
+          "enum": ["import_acceptance", "session_link", "observation", "recurrence_decision", "proposal", "decision", "preference", "receipt_claim", "receipt_shown", "receipt_decision", "production_day_allocation", "mutation", "evaluation", "rollback", "tombstone"]
         },
         "action": { "type": "string", "minLength": 1 },
         "authority_kind": { "enum": ["explicit_project_user", "approved_policy", "system_observer"] },
@@ -551,6 +551,36 @@
         "payload_digest": { "type": "string", "minLength": 1 },
         "event_digest": { "type": "string", "minLength": 1 },
         "proposal_digest": { "type": "string", "minLength": 1 },
+        "decision": {
+          "type": "object",
+          "required": ["id", "projectId", "preferenceId", "action", "provenance", "actor", "timestamp"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "projectId": { "$ref": "#/$defs/projectId" },
+            "preferenceId": { "$ref": "#/$defs/id" },
+            "action": { "enum": ["create", "reinforce", "contradict", "reject", "reopen"] },
+            "provenance": { "enum": ["explicit", "inferred", "structural"] },
+            "actor": { "enum": ["project_user", "policy"] },
+            "timestamp": { "$ref": "#/$defs/dateTime" }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "provenance": { "const": "structural" } }, "required": ["provenance"] },
+              "then": {
+                "properties": {
+                  "actor": { "const": "policy" },
+                  "action": { "not": { "const": "reopen" } }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "provenance": { "enum": ["explicit", "inferred"] } }, "required": ["provenance"] },
+              "then": { "properties": { "actor": { "const": "project_user" } } }
+            }
+          ],
+          "additionalProperties": false
+        },
+        "decision_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "source_refs": { "$ref": "#/$defs/sourceRefs" }
       },
       "allOf": [
@@ -597,6 +627,110 @@
               "trust_level": { "const": "local_trusted" }
             }
           }
+        },
+        {
+          "if": { "properties": { "event_type": { "const": "preference" } }, "required": ["event_type"] },
+          "then": {
+            "required": ["decision", "decision_digest"],
+            "properties": {
+              "action": { "enum": ["create", "reinforce", "contradict", "reject", "reopen"] },
+              "trust_level": { "const": "local_trusted" }
+            }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["decision"] },
+                { "required": ["decision_digest"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "decision": {
+                "properties": { "provenance": { "const": "structural" } },
+                "required": ["provenance"]
+              }
+            },
+            "required": ["event_type", "decision"]
+          },
+          "then": {
+            "properties": {
+              "authority_kind": { "const": "approved_policy" },
+              "caller_type": { "const": "system" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "decision": {
+                "properties": { "provenance": { "enum": ["explicit", "inferred"] } },
+                "required": ["provenance"]
+              }
+            },
+            "required": ["event_type", "decision"]
+          },
+          "then": {
+            "properties": {
+              "authority_kind": { "const": "explicit_project_user" },
+              "caller_type": { "const": "project_user" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "action": { "const": "create" }
+            },
+            "required": ["event_type", "action"]
+          },
+          "then": { "properties": { "decision": { "properties": { "action": { "const": "create" } } } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "action": { "const": "reinforce" }
+            },
+            "required": ["event_type", "action"]
+          },
+          "then": { "properties": { "decision": { "properties": { "action": { "const": "reinforce" } } } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "action": { "const": "contradict" }
+            },
+            "required": ["event_type", "action"]
+          },
+          "then": { "properties": { "decision": { "properties": { "action": { "const": "contradict" } } } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "action": { "const": "reject" }
+            },
+            "required": ["event_type", "action"]
+          },
+          "then": { "properties": { "decision": { "properties": { "action": { "const": "reject" } } } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_type": { "const": "preference" },
+              "action": { "const": "reopen" }
+            },
+            "required": ["event_type", "action"]
+          },
+          "then": { "properties": { "decision": { "properties": { "action": { "const": "reopen" } } } } }
         },
         {
           "if": {

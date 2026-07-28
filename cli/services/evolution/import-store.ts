@@ -148,6 +148,14 @@ export function acceptExternalImportUnderLock(
 	input: AcceptExternalImportInput,
 ): AcceptedExternalImport {
 	applyMigrations(input.db);
+	const journalEvent = readImportJournal(
+		input.root,
+		input.projectId,
+		input.eventsDir,
+	).find(
+		(event) =>
+			event.payload.manifest.import_id === input.payload.manifest.import_id,
+	);
 	const existing = input.db
 		.query(
 			"SELECT journal_event_id FROM external_imports WHERE project_id = ? AND import_id = ?",
@@ -156,20 +164,32 @@ export function acceptExternalImportUnderLock(
 		journal_event_id?: string;
 	} | null;
 	if (existing) {
-		const journalEvent = readImportJournal(
-			input.root,
-			input.projectId,
-			input.eventsDir,
-		).find(
-			(event) =>
-				event.payload.manifest.import_id === input.payload.manifest.import_id,
-		);
 		if (
 			!journalEvent ||
 			existing.journal_event_id !== journalEvent.event_id ||
 			importDigest(journalEvent.payload) !== importDigest(input.payload)
 		)
 			throw new Error("import projection and journal disagree");
+		return {
+			event: journalEvent,
+			checkpoint: readImportCheckpoint(
+				input.db,
+				input.projectId,
+				input.payload.manifest.import_id,
+			),
+			duplicate: true,
+		};
+	}
+	if (journalEvent) {
+		if (importDigest(journalEvent.payload) !== importDigest(input.payload))
+			throw new Error("import projection and journal disagree");
+		rebuildExternalImportProjection({
+			root: input.root,
+			projectId: input.projectId,
+			db: input.db,
+			...(input.eventsDir ? { eventsDir: input.eventsDir } : {}),
+		});
+		input.commitCursor?.();
 		return {
 			event: journalEvent,
 			checkpoint: readImportCheckpoint(

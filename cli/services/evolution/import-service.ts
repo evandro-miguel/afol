@@ -163,6 +163,14 @@ function projectIdFor(
 function externalSessionId(
 	provider: ImportProvider,
 	providerSessionId: string,
+	sessionNormalizedDigest: string,
+): string {
+	return `EXT-${sha256(`${provider}:${providerSessionId}:${sessionNormalizedDigest}`).slice(0, 32)}`;
+}
+
+function legacyExternalSessionId(
+	provider: ImportProvider,
+	providerSessionId: string,
 	importContentDigest: string,
 ): string {
 	const namespace =
@@ -173,7 +181,7 @@ function externalSessionId(
 function collectSessions(
 	provider: ImportProvider,
 	records: readonly NormalizedRecord[],
-	importContentDigest: string,
+	identityDigests: ReadonlyMap<string, string>,
 ): ExternalSessionRecord[] {
 	const grouped = new Map<string, NormalizedRecord[]>();
 	for (const record of records) {
@@ -189,11 +197,14 @@ function collectSessions(
 		.map(([providerSessionId, sessionRecords]) => {
 			const ordered = sessionRecords.map((record) => record.recordDigest);
 			const normalizedDigest = digestJson(sessionRecords);
+			const identityDigest = identityDigests.get(providerSessionId);
+			if (!identityDigest)
+				throw new Error("external import session identity is missing");
 			return {
 				external_session_id: externalSessionId(
 					provider,
 					providerSessionId,
-					importContentDigest,
+					identityDigest,
 				),
 				provider_session_id: String(redactImported(providerSessionId)),
 				content_digest: digestJson(ordered),
@@ -278,6 +289,45 @@ function normalizedRecordsFor(
 	});
 }
 
+function sessionIdentityDigests(
+	records: readonly NormalizedRecord[],
+	redactedRecords: readonly NormalizedRecord[],
+): ReadonlyMap<string, string> {
+	const grouped = new Map<string, unknown[]>();
+	for (const [index, record] of records.entries()) {
+		const redacted = redactedRecords[index];
+		if (!redacted)
+			throw new Error("external import redacted record is missing");
+		const providerSessionId = redacted.sessionId ?? "unscoped";
+		const synthesizedPrefix = `${record.provider}:${record.line}:`;
+		const synthesizedDigest = record.recordId.startsWith(synthesizedPrefix)
+			? record.recordId.slice(synthesizedPrefix.length)
+			: "";
+		const stableRecordId = /^[a-f0-9]{24}$/.test(synthesizedDigest)
+			? `synthesized:${synthesizedDigest}`
+			: `explicit:${redacted.recordId}`;
+		const list = grouped.get(providerSessionId) ?? [];
+		list.push({
+			provider: redacted.provider,
+			format: redacted.format,
+			recordId: stableRecordId,
+			...(redacted.role ? { role: redacted.role } : {}),
+			kind: redacted.kind,
+			...(redacted.createdAt ? { createdAt: redacted.createdAt } : {}),
+			text: redacted.text,
+			metadata: redacted.metadata,
+			contentDigest: redacted.contentDigest,
+		});
+		grouped.set(providerSessionId, list);
+	}
+	return new Map(
+		[...grouped.entries()].map(([providerSessionId, sessionRecords]) => [
+			providerSessionId,
+			digestJson(sessionRecords),
+		]),
+	);
+}
+
 async function readNormalized(
 	provider: ImportProvider,
 	source: ImportSource,
@@ -286,6 +336,7 @@ async function readNormalized(
 	last: ImportPreview;
 	records: NormalizedRecord[];
 	normalizedDigest: string;
+	sessionIdentityDigests: ReadonlyMap<string, string>;
 }> {
 	const adapter = evolutionImportAdapters[provider];
 	const detection = await adapter.detect(source);
@@ -312,6 +363,7 @@ async function readNormalized(
 		last,
 		records: redactedRecords,
 		normalizedDigest: digestJson(redactedRecords),
+		sessionIdentityDigests: sessionIdentityDigests(records, redactedRecords),
 	};
 }
 
@@ -369,7 +421,7 @@ function buildPreview(
 	const sessions = collectSessions(
 		provider,
 		read.records,
-		read.normalizedDigest,
+		read.sessionIdentityDigests,
 	);
 	const normalizedPreview = {
 		...read.first,
@@ -458,14 +510,18 @@ function artifactFiles(
 	preview: ExternalImportPreview,
 	links: readonly ExternalSessionLink[],
 ): Readonly<Record<string, string>> {
+	const externalIds = new Map(
+		preview.sessionRecords.map((session) => [
+			session.provider_session_id,
+			session.external_session_id,
+		]),
+	);
 	const records = preview.normalizedRecords.map((record) => ({
 		...record,
-		external_session_id: externalSessionId(
-			preview.provider,
-			record.sessionId ?? "unscoped",
-			preview.contentDigest,
-		),
+		external_session_id: externalIds.get(record.sessionId ?? "unscoped"),
 	}));
+	if (records.some((record) => !record.external_session_id))
+		throw new Error("external import session mapping is incomplete");
 	return {
 		"manifest.json": `${JSON.stringify(preview.manifest)}\n`,
 		"sessions.jsonl": preview.sessionRecords
@@ -509,11 +565,104 @@ function fsyncDirectoryChain(start: string, root: string): void {
 	}
 }
 
-function readArtifactImportedAt(
+function readArtifactJsonl(path: string, name: string): unknown[] {
+	const content = readFileSync(join(path, name), "utf8");
+	if (!content.endsWith("\n"))
+		throw new Error(`external import artifact ${name} is incomplete`);
+	return content
+		.slice(0, -1)
+		.split("\n")
+		.map((line) => JSON.parse(line) as unknown);
+}
+
+function readPersistedSessions(
 	path: string,
 	preview: ExternalImportPreview,
-	links: readonly ExternalSessionLink[],
-): string {
+	allowLegacyIds: boolean,
+): ExternalSessionRecord[] {
+	const values = readArtifactJsonl(path, "sessions.jsonl");
+	if (values.length !== preview.sessionRecords.length)
+		throw new Error("external import artifact session count is invalid");
+	return values.map((value, index) => {
+		if (!value || typeof value !== "object" || Array.isArray(value))
+			throw new Error("external import artifact session is invalid");
+		const persisted = value as ExternalSessionRecord;
+		const expected = preview.sessionRecords[index];
+		if (!expected)
+			throw new Error("external import artifact session is invalid");
+		const { external_session_id: persistedId, ...persistedFields } = persisted;
+		const { external_session_id: expectedId, ...expectedFields } = expected;
+		const legacyId = legacyExternalSessionId(
+			preview.provider,
+			expected.provider_session_id,
+			preview.contentDigest,
+		);
+		if (
+			JSON.stringify(persistedFields) !== JSON.stringify(expectedFields) ||
+			(persistedId !== expectedId &&
+				(!allowLegacyIds || persistedId !== legacyId))
+		)
+			throw new Error("external import artifact session is invalid");
+		return persisted;
+	});
+}
+
+function readPersistedLinks(
+	path: string,
+	sessions: readonly ExternalSessionRecord[],
+): ExternalSessionLink[] {
+	const links = readArtifactJsonl(path, "links.jsonl");
+	if (links.length !== sessions.length)
+		throw new Error("external import artifact link count is invalid");
+	return links.map((value, index) => {
+		if (!value || typeof value !== "object" || Array.isArray(value))
+			throw new Error("external import artifact link is invalid");
+		const link = value as Record<string, unknown>;
+		const session = sessions[index];
+		if (
+			!session ||
+			link.external_session_id !== session.external_session_id ||
+			!["auto_verified", "manual_confirmed", "pending"].includes(
+				String(link.link_state),
+			) ||
+			typeof link.confidence !== "number" ||
+			!Number.isFinite(link.confidence) ||
+			link.confidence < 0 ||
+			link.confidence > 1 ||
+			!Array.isArray(link.evidence) ||
+			!link.evidence.every(
+				(item) =>
+					item !== null &&
+					typeof item === "object" &&
+					!Array.isArray(item) &&
+					Object.values(item).every((field) => typeof field === "string"),
+			) ||
+			typeof link.confirmation_required !== "boolean" ||
+			typeof link.eligible_for_learning !== "boolean"
+		)
+			throw new Error("external import artifact link is invalid");
+		for (const key of [
+			"afol_session_id",
+			"verified_commit",
+			"canonical_decision_ref",
+		] as const) {
+			const field = link[key];
+			if (field !== undefined && field !== null && typeof field !== "string")
+				throw new Error("external import artifact link is invalid");
+		}
+		return link as ExternalSessionLink;
+	});
+}
+
+function readArtifact(
+	path: string,
+	preview: ExternalImportPreview,
+	allowLegacySessionIds: boolean,
+): {
+	importedAt: string;
+	sessions: readonly ExternalSessionRecord[];
+	links: readonly ExternalSessionLink[];
+} {
 	try {
 		const stat = lstatSync(path);
 		if (!stat.isDirectory() || stat.isSymbolicLink())
@@ -536,11 +685,27 @@ function readArtifactImportedAt(
 			timestamp.toISOString() !== manifest.imported_at
 		)
 			throw new Error("external import artifact manifest timestamp is invalid");
+		const sessions = readPersistedSessions(
+			path,
+			preview,
+			allowLegacySessionIds,
+		);
+		const expectedLinks = preview.links.map((link, index) => {
+			const session = sessions[index];
+			if (!session)
+				throw new Error("external import artifact link count is invalid");
+			return {
+				...link,
+				external_session_id: session.external_session_id,
+			};
+		});
+		const links = readPersistedLinks(path, sessions);
 		const persistedPreview = {
 			...preview,
+			sessionRecords: sessions,
 			manifest: { ...preview.manifest, imported_at: manifest.imported_at },
 		};
-		const expected = artifactFiles(persistedPreview, links);
+		const expected = artifactFiles(persistedPreview, expectedLinks);
 		const expectedNames = Object.keys(expected).sort();
 		if (
 			JSON.stringify(readdirSync(path).sort()) !== JSON.stringify(expectedNames)
@@ -558,7 +723,7 @@ function readArtifactImportedAt(
 			)
 				throw new Error("external import artifact content is invalid");
 		}
-		return manifest.imported_at;
+		return { importedAt: manifest.imported_at, sessions, links };
 	} catch {
 		throw new Error("external import artifact manifest is invalid");
 	}
@@ -640,6 +805,22 @@ export async function confirmExternalImport(
 		const activeDb = db;
 		if (!activeDb) throw new Error("evolution import database is unavailable");
 		return withImportMutationLock(input.root, () => {
+			const existingEvent = readImportJournal(
+				input.root,
+				projectId,
+				input.eventsDir,
+			).find((event) => event.payload.manifest.import_id === preview.importId);
+			if (existingEvent) {
+				const eventLinks = existingEvent.payload.links;
+				if (!eventLinks)
+					throw new Error("canonical external import links are missing");
+				preview = {
+					...preview,
+					sessionRecords: existingEvent.payload.sessions,
+					links: eventLinks,
+					manifest: existingEvent.payload.manifest,
+				};
+			}
 			const finalPath = artifactPath(
 				input.root,
 				input.provider,
@@ -650,20 +831,20 @@ export async function confirmExternalImport(
 			const provider = secureDirectoryIdentity(providerPath, input.root);
 			const existed = existsSync(finalPath);
 			if (existed) secureDirectoryIdentity(finalPath, input.root);
+			let canonicalLinks: readonly ExternalSessionLink[] = preview.links;
 			if (existed) {
-				const importedAt = readArtifactImportedAt(finalPath, preview, links);
+				const artifact = readArtifact(finalPath, preview, !existingEvent);
+				canonicalLinks = artifact.links;
 				preview = {
 					...preview,
-					manifest: { ...preview.manifest, imported_at: importedAt },
+					sessionRecords: artifact.sessions,
+					links: canonicalLinks,
+					manifest: {
+						...preview.manifest,
+						imported_at: artifact.importedAt,
+					},
 				};
 			}
-			const existingEvent = readImportJournal(
-				input.root,
-				projectId,
-				input.eventsDir,
-			).find((event) => event.payload.manifest.import_id === preview.importId);
-			if (existingEvent)
-				preview = { ...preview, manifest: existingEvent.payload.manifest };
 			const stagePath = existed ? null : `${finalPath}.stage-${randomUUID()}`;
 			let installed = false;
 			try {
@@ -671,7 +852,7 @@ export async function confirmExternalImport(
 					const stage = writeArtifact(
 						stagePath,
 						preview,
-						links,
+						canonicalLinks,
 						input.root,
 						provider,
 						input.artifactWrite,
@@ -687,7 +868,7 @@ export async function confirmExternalImport(
 					project_id: projectId,
 					manifest: preview.manifest,
 					sessions: preview.sessionRecords,
-					links,
+					links: canonicalLinks,
 					checkpoint: {
 						cursor: String(preview.lines),
 						status: "complete",

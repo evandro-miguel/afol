@@ -376,6 +376,111 @@ describe("Evolution Slice 0 governance schema", () => {
 		).toBe(true);
 	});
 
+	test("validates real preference journal shape and authority constraints", () => {
+		const validate = validator("journalEntry");
+		const projectId = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
+		const decisionDigest = "a".repeat(64);
+		const decision = {
+			id: "DEC-PREF-01",
+			projectId,
+			preferenceId: "PREF-01",
+			action: "create",
+			provenance: "explicit",
+			actor: "project_user",
+			timestamp: "2026-07-16T20:00:00Z",
+		};
+		const decisionRef = {
+			id: decision.id,
+			kind: "decision",
+			path: ".afol/data/events/evolution/preferences.jsonl",
+			digest: decisionDigest,
+			authority: "canonical",
+		};
+		const preferenceEvent = journalEntry({
+			event_id: "PREF-EV-01",
+			event_type: "preference",
+			action: "create",
+			authority_kind: "explicit_project_user",
+			caller_type: "project_user",
+			origin_ref: ".afol/data/events/evolution/preferences.jsonl",
+			subject_id: "PREF-01",
+			command: "afol evolution preference create",
+			payload: {
+				project_id: projectId,
+				preference: {
+					project_id: projectId,
+					id: "PREF-01",
+					statement: "Prefer focused validation",
+					scope: "project",
+					status: "active",
+					provenance: "explicit",
+					confidence: 1,
+					effective_confidence: 1,
+					positive_evidence: 1,
+					negative_evidence: 0,
+					last_reinforced_production_day: 1,
+					current_production_day: 1,
+					created_at: "2026-07-16T20:00:00Z",
+					updated_at: "2026-07-16T20:00:00Z",
+					journal_event_id: "PREF-EV-01",
+					source_refs: [decisionRef],
+				},
+			},
+			source_refs: [decisionRef],
+			decision,
+			decision_digest: decisionDigest,
+		});
+		expect(validate(preferenceEvent)).toBe(true);
+
+		expect(validate({ ...preferenceEvent, action: "reject" })).toBe(false);
+		expect(
+			validate({
+				...preferenceEvent,
+				authority_kind: "approved_policy",
+				caller_type: "system",
+			}),
+		).toBe(false);
+		expect(
+			validate({
+				...preferenceEvent,
+				decision: { ...decision, unexpected: true },
+			}),
+		).toBe(false);
+		expect(validate({ ...preferenceEvent, unexpected: true })).toBe(false);
+		const withoutDecision = { ...preferenceEvent };
+		delete (withoutDecision as { decision?: unknown }).decision;
+		expect(validate(withoutDecision)).toBe(false);
+
+		const policyEvent = {
+			...preferenceEvent,
+			authority_kind: "approved_policy",
+			caller_type: "system",
+			decision: {
+				...decision,
+				provenance: "structural",
+				actor: "policy",
+			},
+		};
+		expect(validate(policyEvent)).toBe(true);
+		expect(
+			validate({
+				...policyEvent,
+				action: "reopen",
+				decision: { ...policyEvent.decision, action: "reopen" },
+			}),
+		).toBe(false);
+		expect(
+			validate(
+				journalEntry({
+					event_type: "observation",
+					action: "record",
+					decision,
+					decision_digest: decisionDigest,
+				}),
+			),
+		).toBe(false);
+	});
+
 	test("keeps imported preference evidence untrusted and non-explicit", () => {
 		const validate = validator("preferenceEvidence");
 		const external = {

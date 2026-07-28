@@ -9,7 +9,6 @@ import {
 	mkdirSync,
 	openSync,
 	readFileSync,
-	readSync,
 	writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
@@ -18,7 +17,10 @@ import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
 } from "./db";
-import { journalTailFingerprint } from "./projection-watermark";
+import {
+	journalTailFingerprint,
+	readExactTailBytes,
+} from "./projection-watermark";
 import {
 	activeReceiptIntegrityDigest,
 	readActiveSuggestionProjection,
@@ -131,7 +133,12 @@ function readLatestCheckpoint(path: string): ProjectionCheckpoint | null {
 			current.ino !== target.ino
 		)
 			throw new Error("evolution checkpoint journal changed during read");
-		readSync(fd, buffer, 0, length, Number(current.size) - length);
+		readExactTailBytes(
+			fd,
+			buffer,
+			Number(current.size) - length,
+			"evolution projection checkpoint read was incomplete",
+		);
 	} finally {
 		closeSync(fd);
 	}

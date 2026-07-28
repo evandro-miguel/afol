@@ -839,6 +839,57 @@ describe("observation-ingest", () => {
 		expect(existsSync(productionDayJournalPath(root))).toBe(false);
 	});
 
+	test("unqualified failures remain observable without qualifying recurrence", () => {
+		const root = fixtureRoot();
+		try {
+			for (const session of ["S-failed-1", "S-failed-2", "S-failed-3"]) {
+				seedCompletedSession(root, session);
+				seedFailedEvidence(root, session, [{ id: `E-${session}` }]);
+				expect(
+					ingestObservationsForSession({
+						root,
+						projectId: PROJECT_ID,
+						session,
+					}),
+				).toMatchObject({ appended: 1 });
+			}
+
+			const observations = readObservationJournal(root, PROJECT_ID).map(
+				(event) =>
+					event.payload.observation as {
+						production_day_sequence: number;
+					},
+			);
+			expect(observations).toHaveLength(3);
+			expect(
+				observations.every(
+					(observation) => observation.production_day_sequence === 0,
+				),
+			).toBe(true);
+			expect(existsSync(productionDayJournalPath(root))).toBe(false);
+
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				expect(
+					db
+						.query(
+							"SELECT state, occurrence_count, distinct_session_count, distinct_production_day_count FROM issue_clusters WHERE project_id = ?",
+						)
+						.get(PROJECT_ID),
+				).toMatchObject({
+					state: "candidate",
+					occurrence_count: 3,
+					distinct_session_count: 3,
+					distinct_production_day_count: 0,
+				});
+			} finally {
+				db.close();
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("mixed-project qualifying_events do not inflate health counts", () => {
 		const root = fixtureRoot();
 		// Set up DB with correct project (has metadata)

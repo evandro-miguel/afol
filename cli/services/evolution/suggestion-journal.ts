@@ -32,6 +32,7 @@ import { writeEvolutionProjectionCheckpoint } from "./projection-checkpoint";
 import {
 	assertProjectionWatermark,
 	clearProjectionWatermark,
+	readExactTailBytes,
 	writeProjectionWatermark,
 } from "./projection-watermark";
 import { resolveEvolutionConfig } from "./runtime-config";
@@ -296,7 +297,12 @@ function readJournalTail(path: string): ReceiptJournalTail | null {
 			opened.ino !== target.ino
 		)
 			throw new Error("suggestion journal target changed during read");
-		readSync(fd, buffer, 0, length, Number(opened.size) - length);
+		readExactTailBytes(
+			fd,
+			buffer,
+			Number(opened.size) - length,
+			"suggestion journal tail read was incomplete",
+		);
 		const after = fstatSync(fd);
 		if (after.size !== opened.size)
 			throw new Error("suggestion journal target changed during read");
