@@ -15,10 +15,12 @@ import {
 	rmSync,
 	symlinkSync,
 	unlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { cpus, arch as osArch, platform } from "node:os";
 import { join, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
+import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { outputTail } from "./output";
 import type { BenchmarkExecutionProfile, Scenario } from "./types";
 
@@ -317,6 +319,38 @@ export function compiledReleaseBuildArgs(targetBinary: string): string[] {
 	];
 }
 
+export function writeBenchmarkArtifactProvenance(
+	targetBinary: string,
+	artifactSha256: string,
+	commitSha: string,
+	generatedAt: string,
+): string {
+	const provenancePath = `${targetBinary}.provenance.json`;
+	writeFileSync(
+		provenancePath,
+		`${JSON.stringify(
+			{
+				artifact: targetBinary,
+				package_name: CLI_PACKAGE_NAME,
+				version: CLI_VERSION,
+				sha256: artifactSha256,
+				generated_at: generatedAt,
+				commit_sha: commitSha,
+				build_command: `bun ${compiledReleaseBuildArgs(targetBinary).join(" ")}`,
+				platform: process.platform,
+				arch: process.arch,
+				build_target: `bun-${process.platform}-${process.arch}`,
+				compile_autoload_dotenv: false,
+				compile_autoload_bunfig: false,
+			},
+			null,
+			2,
+		)}\n`,
+		"utf8",
+	);
+	return provenancePath;
+}
+
 function createSandboxRoot(projectRoot: string): string {
 	const sandboxRoot = mkdtempSync(
 		join(ensureBenchmarkTempRoot(projectRoot), "afol-bench-sandbox-"),
@@ -412,6 +446,14 @@ export function prepareCompiledReleaseArtifact(
 		}
 		chmodSync(targetBinary, 0o755);
 		const artifactSha256 = hashFile(targetBinary);
+		const timestamp = new Date().toISOString();
+		const commit = gitCommit(projectRoot);
+		writeBenchmarkArtifactProvenance(
+			targetBinary,
+			artifactSha256,
+			commit,
+			timestamp,
+		);
 		return {
 			binaryPath: targetBinary,
 			profile: executionProfile(
@@ -419,8 +461,8 @@ export function prepareCompiledReleaseArtifact(
 				"bun-compile",
 				artifactSha256,
 			),
-			timestamp: new Date().toISOString(),
-			git_commit: gitCommit(projectRoot),
+			timestamp,
+			git_commit: commit,
 			cleanup: () => rmSync(artifactRoot, { recursive: true, force: true }),
 		};
 	} catch (error) {

@@ -56,6 +56,7 @@ import {
 	ensureBenchmarkTempRoot,
 	executeScenarioPackWithArtifact,
 	type PreparedCompiledReleaseArtifact,
+	prepareCompiledReleaseArtifact,
 	resolveScenarioSampleCount,
 	runScenarioCommand,
 	type ScenarioExecutionResult,
@@ -1719,6 +1720,75 @@ describe("scenario benchmark execution", () => {
 			],
 		);
 	});
+
+	test("prepares a registered sidecar and executes a compiled mutation", () => {
+		const fixtureRoot = createBenchExecutionFixtureRoot();
+		cpSync(
+			join(process.cwd(), ".afol", "config.json"),
+			join(fixtureRoot, ".afol", "config.json"),
+		);
+		mkdirSync(join(fixtureRoot, ".agents"), { recursive: true });
+		for (const metadataFile of ["lock.json", "manifest.json"]) {
+			cpSync(
+				join(process.cwd(), ".agents", metadataFile),
+				join(fixtureRoot, ".agents", metadataFile),
+			);
+		}
+		const artifact = prepareCompiledReleaseArtifact(process.cwd());
+		try {
+			const provenancePath = `${artifact.binaryPath}.provenance.json`;
+			expect(existsSync(provenancePath)).toBe(true);
+			const provenance = readJson(provenancePath);
+			expect(provenance).toMatchObject({
+				artifact: expect.any(String),
+				package_name: "afol",
+				version: expect.any(String),
+				sha256: artifact.profile.artifact_sha256,
+				compile_autoload_dotenv: false,
+				compile_autoload_bunfig: false,
+			});
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "compiled-mutation-sidecar",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					"afol f pt --session sb-pt --task-id T-01 --reason seed --path tmp/patch-src.txt --append x --json",
+				sandbox: true,
+				compiled_binary: true,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-pt'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'), session+'\\n','utf8'); writeFileSync(join(dir,session+'_task_01.md'), ['---','feature_id: F-sb','---','','# Tasks','','| Task | State | Owner | Notes |','|------|-------|-------|-------|','| T-01 | in_progress | worker | seed |',''].join('\\n'),'utf8');",
+					],
+				],
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 1_000,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "fixture",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(fixtureRoot, scenario, {
+				artifact,
+				sampleCount: 3,
+				warmupCount: 1,
+			});
+			expect(result.notes).toEqual([]);
+			expect(result.passed).toBe(true);
+			expect(result.metrics.error_count).toBe(0);
+		} finally {
+			const artifactRoot = dirname(artifact.binaryPath);
+			artifact.cleanup();
+			expect(existsSync(artifactRoot)).toBe(false);
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	}, 30_000);
 
 	test("prepares one compiled artifact per pack and reuses its identity", () => {
 		let prepareCount = 0;
