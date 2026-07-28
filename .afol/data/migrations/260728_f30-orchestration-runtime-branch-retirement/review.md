@@ -72,6 +72,11 @@ does not claim a security scan passed.
 ## Current status
 
 - Metadata recorded: yes
-- Published to `dev`: pending
-- Remote branch deleted: pending
-- Post-deletion verification: pending
+- Published to `dev`: yes, commit
+  `dd43ced678095131b3897ea39bdad7e58c9b7a81`
+- Remote branch deleted: yes, at `2026-07-28T03:21:10Z`
+- Post-deletion verification: passed
+  - `refs/heads/feat/f30-orchestration-runtime` is absent.
+  - PR #58 remains draft, closed, and not merged.
+  - `refs/pull/58/head` remains at
+    `dc9d1657d09a5ee3e254c0df441dbd8cb982f216`.

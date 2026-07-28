@@ -19,9 +19,9 @@
       "ahead_of_dev": 2
     },
     "retirement_authorized": true,
-    "retirement_status": "pending",
+    "retirement_status": "completed",
     "remote_tip_guard": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216",
-    "deleted_at": null
+    "deleted_at": "2026-07-28T03:21:10Z"
   },
   "pull_request": {
     "number": 58,
@@ -129,6 +129,14 @@
     "gitleaks": "not-run",
     "osv_scanner": "not-run",
     "reason": "os-gov-preflight-blocked-missing-source-state-authority"
+  },
+  "post_retirement_verification": {
+    "verified_at": "2026-07-28T03:21:10Z",
+    "remote_branch_absent": true,
+    "pull_request_state": "closed",
+    "pull_request_merged": false,
+    "pull_head_ref": "refs/pull/58/head",
+    "pull_head_sha": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216"
   },
   "recovery_limitation": "This metadata does not contain source content. After branch deletion, recovery depends on GitHub retaining the closed pull-request ref or another external object database retaining the recorded commits."
 }
