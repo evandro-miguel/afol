@@ -2,12 +2,16 @@
   "schema_version": "1.0.0",
   "baseline_id": "mutation-safety-v1",
   "pack_id": "mutation-safety",
-  "host_profile_id": "ci-linux-x64",
-  "sample_count": 3,
+  "host_profile_id": "linux-x64-amd-epyc-9354p-32-core-processor",
+  "os": "linux",
+  "arch": "x64",
+  "cpu_class": "amd-epyc-9354p-32-core-processor",
+  "bun_version": "1.3.14",
+  "runtime_version": "1.3.14",
+  "execution_mode": "compiled-release",
+  "artifact_mode": "bun-compile",
+  "sample_count": 20,
   "warmup_count": 1,
-  "timing_p50_ms": 200,
-  "timing_p95_ms": 300,
-  "tokenizer_id": "tiktoken-o200k-base",
-  "tokenizer_version": "recorded",
-  "git_commit": "baseline-fixture"
+  "provenance": "calibration-pending:benchmark-sandbox-aborted-with-disk-quota",
+  "scenarios": {}
 }

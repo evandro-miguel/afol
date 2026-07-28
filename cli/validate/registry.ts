@@ -20,6 +20,7 @@ import {
 	REQUIRED_PACKS,
 	type RegistrySnapshot,
 	type Scenario,
+	type ScenarioBaseline,
 	type ScenarioCoverage,
 	type ScenarioMeasurement,
 	type ToolCoverageExemption,
@@ -267,6 +268,13 @@ function parseScenario(
 	return scenario;
 }
 
+function asRequiredFiniteNumber(value: unknown, key: string): number {
+	if (typeof value !== "number" || !Number.isFinite(value)) {
+		throw new Error(`Invalid or missing finite numeric field: ${key}`);
+	}
+	return value;
+}
+
 function parseBaseline(
 	data: Record<string, unknown>,
 	sourcePath: string,
@@ -315,6 +323,82 @@ function parseBaseline(
 	if (gitCommit !== undefined) baseline.git_commit = gitCommit;
 	if (timestamp !== undefined) baseline.timestamp = timestamp;
 	if (provenance !== undefined) baseline.provenance = provenance;
+	for (const field of [
+		"host_profile_id",
+		"os",
+		"arch",
+		"cpu_class",
+		"bun_version",
+		"runtime_version",
+		"artifact_sha256",
+	] as const) {
+		const value = asOptionalString(data[field], `${sourcePath}.${field}`);
+		if (value !== undefined) baseline[field] = value;
+	}
+	const executionMode = asOptionalString(
+		data.execution_mode,
+		`${sourcePath}.execution_mode`,
+	);
+	if (
+		executionMode !== undefined &&
+		executionMode !== "source" &&
+		executionMode !== "compiled-release"
+	) {
+		throw new Error(`Invalid execution mode: ${sourcePath}.execution_mode`);
+	}
+	if (executionMode !== undefined) baseline.execution_mode = executionMode;
+	const artifactMode = asOptionalString(
+		data.artifact_mode,
+		`${sourcePath}.artifact_mode`,
+	);
+	if (
+		artifactMode !== undefined &&
+		artifactMode !== "source" &&
+		artifactMode !== "bun-compile"
+	) {
+		throw new Error(`Invalid artifact mode: ${sourcePath}.artifact_mode`);
+	}
+	if (artifactMode !== undefined) baseline.artifact_mode = artifactMode;
+	if (data.scenarios !== undefined) {
+		if (!isObject(data.scenarios)) {
+			throw new Error(`Invalid scenario baseline map: ${sourcePath}.scenarios`);
+		}
+		const scenarios: Record<string, ScenarioBaseline> = {};
+		for (const [scenarioId, value] of Object.entries(data.scenarios)) {
+			if (!isObject(value)) {
+				throw new Error(
+					`Invalid scenario baseline: ${sourcePath}.scenarios.${scenarioId}`,
+				);
+			}
+			scenarios[scenarioId] = {
+				scenario_id: asString(
+					value.scenario_id,
+					`${sourcePath}.scenarios.${scenarioId}.scenario_id`,
+				),
+				scenario_version: asString(
+					value.scenario_version,
+					`${sourcePath}.scenarios.${scenarioId}.scenario_version`,
+				),
+				timing_p50_ms: asRequiredFiniteNumber(
+					value.timing_p50_ms,
+					`${sourcePath}.scenarios.${scenarioId}.timing_p50_ms`,
+				),
+				timing_p95_ms: asRequiredFiniteNumber(
+					value.timing_p95_ms,
+					`${sourcePath}.scenarios.${scenarioId}.timing_p95_ms`,
+				),
+				sample_count: asRequiredFiniteNumber(
+					value.sample_count,
+					`${sourcePath}.scenarios.${scenarioId}.sample_count`,
+				),
+				warmup_count: asRequiredFiniteNumber(
+					value.warmup_count,
+					`${sourcePath}.scenarios.${scenarioId}.warmup_count`,
+				),
+			};
+		}
+		baseline.scenarios = scenarios;
+	}
 	return baseline;
 }
 
@@ -1250,6 +1334,141 @@ export function validateBenchmarkProvenance(
 	return issues;
 }
 
+function isSyntheticProfileValue(value: string): boolean {
+	return /(?:^|[-_])(fixture|placeholder|synthetic|unknown|pending)(?:$|[-_])/i.test(
+		value,
+	);
+}
+
+export function validateMutationBaselineContract(
+	projectRoot: string | undefined,
+	scenarios: readonly Scenario[],
+	baseline: Baseline,
+	now: Date = new Date(),
+): string[] {
+	const issues: string[] = [];
+	const requiredProfileFields = [
+		"host_profile_id",
+		"os",
+		"arch",
+		"cpu_class",
+		"bun_version",
+		"runtime_version",
+		"execution_mode",
+		"artifact_mode",
+	] as const;
+	for (const field of requiredProfileFields) {
+		const value = baseline[field];
+		if (typeof value !== "string" || value.trim() === "") {
+			issues.push(`mutation-baseline-provenance-missing:${field}`);
+		} else if (isSyntheticProfileValue(value)) {
+			issues.push(`mutation-baseline-profile-placeholder:${field}`);
+		}
+	}
+	if (baseline.execution_mode !== "compiled-release") {
+		issues.push("mutation-baseline-execution-mode-required");
+	}
+	if (baseline.artifact_mode !== "bun-compile") {
+		issues.push("mutation-baseline-artifact-mode-required");
+	}
+	if (
+		typeof baseline.artifact_sha256 !== "string" ||
+		!/^[a-f0-9]{64}$/.test(baseline.artifact_sha256)
+	) {
+		issues.push("mutation-baseline-artifact-sha256-invalid");
+	}
+	if (
+		typeof baseline.git_commit !== "string" ||
+		!/^[a-f0-9]{40}$/i.test(baseline.git_commit)
+	) {
+		issues.push("mutation-baseline-git-commit-invalid");
+	} else if (projectRoot === undefined) {
+		issues.push("mutation-baseline-project-root-missing");
+	} else {
+		const git = readGitProvenance(projectRoot, baseline.git_commit);
+		if (!git.exists) {
+			issues.push("mutation-baseline-git-commit-not-found");
+		} else if (!git.ancestor) {
+			issues.push("mutation-baseline-git-commit-not-ancestor");
+		}
+	}
+	const timestampMs =
+		typeof baseline.timestamp === "string"
+			? Date.parse(baseline.timestamp)
+			: Number.NaN;
+	if (!Number.isFinite(timestampMs)) {
+		issues.push("mutation-baseline-timestamp-invalid");
+	} else if (timestampMs > now.getTime()) {
+		issues.push("mutation-baseline-timestamp-future");
+	}
+	if (
+		typeof baseline.provenance !== "string" ||
+		baseline.provenance.trim() === ""
+	) {
+		issues.push("mutation-baseline-provenance-missing:provenance");
+	} else if (/calibration-pending/i.test(baseline.provenance)) {
+		issues.push("mutation-baseline-calibration-pending");
+	}
+	if (
+		!Number.isInteger(baseline.sample_count) ||
+		(baseline.sample_count ?? 0) < 20
+	) {
+		issues.push("mutation-baseline-sample-count-required:20");
+	}
+	if (
+		!Number.isInteger(baseline.warmup_count) ||
+		(baseline.warmup_count ?? 0) < 1
+	) {
+		issues.push("mutation-baseline-warmup-count-required:1");
+	}
+	for (const scenario of scenarios) {
+		if (scenario.compiled_binary !== true) {
+			issues.push(
+				`mutation-scenario-compiled-release-required:${scenario.scenario_id}`,
+			);
+		}
+		const scenarioBaseline = baseline.scenarios?.[scenario.scenario_id];
+		if (!scenarioBaseline) {
+			issues.push(`mutation-scenario-baseline-missing:${scenario.scenario_id}`);
+			continue;
+		}
+		if (
+			scenarioBaseline.scenario_id !== scenario.scenario_id ||
+			scenarioBaseline.scenario_version !== scenario.scenario_version
+		) {
+			issues.push(
+				`mutation-scenario-baseline-identity-mismatch:${scenario.scenario_id}`,
+			);
+		}
+		if (
+			!Number.isInteger(scenarioBaseline.sample_count) ||
+			scenarioBaseline.sample_count < 20
+		) {
+			issues.push(
+				`mutation-scenario-baseline-sample-count-required:${scenario.scenario_id}:20`,
+			);
+		}
+		if (
+			!Number.isInteger(scenarioBaseline.warmup_count) ||
+			scenarioBaseline.warmup_count < 1
+		) {
+			issues.push(
+				`mutation-scenario-baseline-warmup-count-required:${scenario.scenario_id}:1`,
+			);
+		}
+		const hardP95 = scenario.thresholds.max_p95_ms;
+		if (
+			typeof hardP95 === "number" &&
+			scenarioBaseline.timing_p95_ms > hardP95
+		) {
+			issues.push(
+				`mutation-scenario-baseline-violates-slo:${scenario.scenario_id}:timing_p95_ms`,
+			);
+		}
+	}
+	return issues;
+}
+
 export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 	const issues: string[] = [];
 	for (const packId of REQUIRED_PACKS) {
@@ -1303,6 +1522,15 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 		if (baseline.schema_version !== VALIDATION_SCHEMA_VERSION) {
 			issues.push(
 				`baseline-schema-version-mismatch:${packId}:${baseline.schema_version}`,
+			);
+		}
+		if (packId === "mutation-safety") {
+			issues.push(
+				...validateMutationBaselineContract(
+					snapshot.projectRoot,
+					scenarios,
+					baseline,
+				),
 			);
 		}
 		for (const scenario of scenarios) {

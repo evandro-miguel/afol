@@ -27,7 +27,10 @@ import {
 } from "../services/workbench/completion-lock";
 import { parseValidationArgs } from "../validate/args";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
-import { buildResult } from "../validate/command";
+import {
+	buildResult,
+	collectProfileCompatibilityNotes,
+} from "../validate/command";
 import {
 	loadRegistry,
 	runValidationCommand,
@@ -41,12 +44,24 @@ import {
 } from "../validate/output";
 import {
 	validateBenchmarkProvenance,
+	validateMutationBaselineContract,
 	validateRegistryContract,
 } from "../validate/registry";
 import {
 	buildRuntimeLiveAgentResults,
 	collectThresholdNotes,
 } from "../validate/runtime-live";
+import {
+	compiledReleaseBuildArgs,
+	ensureBenchmarkTempRoot,
+	executeScenarioPackWithArtifact,
+	type PreparedCompiledReleaseArtifact,
+	resolveScenarioSampleCount,
+	runScenarioCommand,
+	type ScenarioExecutionResult,
+	type ScenarioSamplePhase,
+	type ScenarioSampleRun,
+} from "../validate/scenario-execution";
 import {
 	asBoolean,
 	asNumberRecord,
@@ -807,6 +822,62 @@ describe("validate registry", () => {
 				expect(scenario.thresholds.max_argv_chars).toBeDefined();
 				expect(scenario.compiled_binary).toBe(true);
 			}
+			const mutationScenarios =
+				snapshot.scenariosByPack["mutation-safety"] ?? [];
+			const mutationScenarioIds = [
+				"mut-dry-run",
+				"mut-move",
+				"mut-patch",
+				"mut-protected",
+				"mut-undo",
+			];
+			expect(mutationScenarios).toHaveLength(5);
+			for (const scenario of mutationScenarios) {
+				expect(scenario.compiled_binary).toBe(true);
+				expect(scenario.thresholds.max_duration_ms).toBeLessThanOrEqual(300);
+				expect(scenario.thresholds.max_p95_ms).toBeLessThanOrEqual(350);
+			}
+			const mutationBaseline = snapshot.baselinesByPack["mutation-safety"] as
+				| (Baseline & {
+						host_profile_id?: string;
+						os?: string;
+						arch?: string;
+						cpu_class?: string;
+						bun_version?: string;
+						runtime_version?: string;
+						execution_mode?: string;
+						artifact_mode?: string;
+						scenarios?: Record<
+							string,
+							{
+								scenario_id?: string;
+								scenario_version?: string;
+								timing_p50_ms?: number;
+								timing_p95_ms?: number;
+								sample_count?: number;
+								warmup_count?: number;
+							}
+						>;
+				  })
+				| undefined;
+			expect(mutationBaseline).toMatchObject({
+				host_profile_id: expect.any(String),
+				os: "linux",
+				arch: "x64",
+				cpu_class: expect.any(String),
+				bun_version: expect.any(String),
+				runtime_version: expect.any(String),
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				sample_count: 20,
+				warmup_count: 1,
+				provenance:
+					"calibration-pending:benchmark-sandbox-aborted-with-disk-quota",
+			});
+			expect(mutationBaseline?.artifact_sha256).toBeUndefined();
+			expect(mutationBaseline?.git_commit).toBeUndefined();
+			expect(mutationBaseline?.timestamp).toBeUndefined();
+			expect(mutationBaseline?.scenarios).toEqual({});
 			const sequentialDone = snapshot.scenariosByPack["workbench-parity"]?.find(
 				(scenario) => scenario.scenario_id === "wb-sequential-done",
 			);
@@ -867,8 +938,22 @@ describe("validate registry", () => {
 			expect(snapshot.baselinesByPack["cli-kernel-local"]?.timing_p50_ms).toBe(
 				200,
 			);
-			expect(validateRegistryContract(snapshot)).toEqual([]);
-			expect(validateRegistryContract(snapshot)).not.toContain(
+			const contractIssues = validateRegistryContract(snapshot);
+			const mutationIssues = contractIssues.filter((issue) =>
+				issue.startsWith("mutation-"),
+			);
+			expect(mutationIssues).toEqual(
+				expect.arrayContaining([
+					"mutation-baseline-artifact-sha256-invalid",
+					"mutation-baseline-git-commit-invalid",
+					"mutation-baseline-timestamp-invalid",
+					"mutation-baseline-calibration-pending",
+					...mutationScenarioIds.map(
+						(scenarioId) => `mutation-scenario-baseline-missing:${scenarioId}`,
+					),
+				]),
+			);
+			expect(contractIssues).not.toContain(
 				"scenario-feature-coverage-missing:F-30",
 			);
 
@@ -1478,9 +1563,464 @@ describe("validate registry", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("rejects missing and non-finite scenario baseline numbers", () => {
+		const root = createFixtureRoot();
+		try {
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"mutation-safety",
+				"baseline-v1.json",
+			);
+			const baseline = readJson(baselinePath);
+			const validScenarioBaseline = {
+				scenario_id: "mut-dry-run",
+				scenario_version: "1.0.0",
+				timing_p50_ms: 100,
+				timing_p95_ms: 150,
+				sample_count: 20,
+				warmup_count: 1,
+			};
+			for (const [field, value] of [
+				["timing_p50_ms", undefined],
+				["timing_p95_ms", null],
+				["sample_count", "20"],
+			] as const) {
+				const invalid = { ...validScenarioBaseline } as Record<string, unknown>;
+				if (value === undefined) delete invalid[field];
+				else invalid[field] = value;
+				writeFileSync(
+					baselinePath,
+					`${JSON.stringify(
+						{
+							...baseline,
+							scenarios: { "mut-dry-run": invalid },
+						},
+						null,
+						2,
+					)}\n`,
+				);
+				expect(() => loadRegistry(root)).toThrow(
+					`Invalid or missing finite numeric field: ${baselinePath}.scenarios.mut-dry-run.${field}`,
+				);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validates mutation baseline provenance and calibration identity", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const commit = spawnSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-provenance",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 300 },
+				baseline_id: "mutation-safety-v1",
+				deterministic_metrics: {},
+				compiled_binary: true,
+			};
+			const baseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				host_profile_id: "linux-x64-amd-epyc",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "amd-epyc",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "a".repeat(64),
+				git_commit: commit,
+				timestamp: new Date().toISOString(),
+				provenance: "observed-clean-commit",
+				sample_count: 20,
+				warmup_count: 1,
+				scenarios: {
+					[scenario.scenario_id]: {
+						scenario_id: scenario.scenario_id,
+						scenario_version: scenario.scenario_version,
+						timing_p50_ms: 100,
+						timing_p95_ms: 150,
+						sample_count: 20,
+						warmup_count: 1,
+					},
+				},
+			};
+			expect(
+				validateMutationBaselineContract(root, [scenario], baseline),
+			).toEqual([]);
+			for (const [patch, expected] of [
+				[
+					{ git_commit: "baseline-fixture" },
+					"mutation-baseline-git-commit-invalid",
+				],
+				[{ timestamp: "not-a-date" }, "mutation-baseline-timestamp-invalid"],
+				[
+					{ artifact_sha256: "abc" },
+					"mutation-baseline-artifact-sha256-invalid",
+				],
+				[
+					{ host_profile_id: "profile-placeholder" },
+					"mutation-baseline-profile-placeholder:host_profile_id",
+				],
+				[{ sample_count: 19 }, "mutation-baseline-sample-count-required:20"],
+			] as const) {
+				expect(
+					validateMutationBaselineContract(root, [scenario], {
+						...baseline,
+						...patch,
+					}),
+				).toContain(expected);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("scenario benchmark execution", () => {
+	test("resolves benchmark-owned temp state under .afol/tmp", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-bench-temp-root-"));
+		try {
+			const resolved = ensureBenchmarkTempRoot(root);
+			expect(resolved).toBe(join(root, ".afol", "tmp"));
+			expect(existsSync(resolved)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("uses the canonical release compiler flags", () => {
+		expect(compiledReleaseBuildArgs("/fixture/.afol/tmp/release/afol")).toEqual(
+			[
+				"build",
+				"--compile",
+				"--no-compile-autoload-dotenv",
+				"--no-compile-autoload-bunfig",
+				join(process.cwd(), "cli", "main.ts"),
+				"--outfile",
+				"/fixture/.afol/tmp/release/afol",
+			],
+		);
+	});
+
+	test("prepares one compiled artifact per pack and reuses its identity", () => {
+		let prepareCount = 0;
+		let cleanupCount = 0;
+		const artifact: PreparedCompiledReleaseArtifact = {
+			binaryPath: "/fixture/.afol/tmp/afol-bench-release-1/afol",
+			profile: {
+				host_profile_id: "linux-x64-test",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "test-cpu",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "a".repeat(64),
+			},
+			timestamp: "2026-07-28T00:00:00.000Z",
+			git_commit: "b".repeat(40),
+			cleanup: () => {
+				cleanupCount += 1;
+			},
+		};
+		const baseScenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "one",
+			scenario_version: "1.0.0",
+			pack_id: "mutation-safety",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_p95_ms: 300 },
+			baseline_id: "mutation-safety-v1",
+			deterministic_metrics: {},
+			compiled_binary: true,
+		};
+		const seenArtifacts = executeScenarioPackWithArtifact(
+			"/fixture",
+			[
+				baseScenario,
+				{ ...baseScenario, scenario_id: "two" },
+				{ ...baseScenario, scenario_id: "three" },
+				{
+					...baseScenario,
+					scenario_id: "source-only",
+					compiled_binary: false,
+				},
+			],
+			(_scenario, prepared) => prepared,
+			() => {
+				prepareCount += 1;
+				return artifact;
+			},
+		);
+		expect(prepareCount).toBe(1);
+		expect(cleanupCount).toBe(1);
+		expect(seenArtifacts).toHaveLength(4);
+		expect(seenArtifacts.slice(0, 3).every((entry) => entry === artifact)).toBe(
+			true,
+		);
+		expect(seenArtifacts[3]).toBeUndefined();
+	});
+
+	test("orchestrates cold samples with setup outside measured duration", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-bench-seams-"));
+		try {
+			const artifactDir = join(
+				root,
+				".afol",
+				"tmp",
+				"afol-bench-release-fixture",
+			);
+			mkdirSync(artifactDir, { recursive: true });
+			const artifactPath = join(artifactDir, "afol");
+			writeFileSync(artifactPath, "fixture\n");
+			const artifact: PreparedCompiledReleaseArtifact = {
+				binaryPath: artifactPath,
+				profile: {
+					host_profile_id: "linux-x64-test",
+					os: "linux",
+					arch: "x64",
+					cpu_class: "test-cpu",
+					bun_version: Bun.version,
+					runtime_version: Bun.version,
+					execution_mode: "compiled-release",
+					artifact_mode: "bun-compile",
+					artifact_sha256: "a".repeat(64),
+				},
+				timestamp: "2026-07-28T00:00:00.000Z",
+				git_commit: "b".repeat(40),
+				cleanup: () => {},
+			};
+			const phases: ScenarioSamplePhase[] = [];
+			const invocationRoots: string[] = [];
+			const invocationCommands: string[] = [];
+			const createdSandboxes: string[] = [];
+			const cleanedSandboxes: string[] = [];
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "instrumented-release",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				command: "afol --version",
+				sandbox: true,
+				compiled_binary: true,
+				setup: [["afol", "--version"]],
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 300 },
+				baseline_id: "mutation-safety-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario, {
+				artifact,
+				sampleCount: 20,
+				warmupCount: 1,
+				seams: {
+					createSandboxRoot: () => {
+						const sandbox = join(
+							root,
+							".afol",
+							"tmp",
+							`afol-bench-sandbox-fixture-${createdSandboxes.length}`,
+						);
+						mkdirSync(sandbox, { recursive: true });
+						createdSandboxes.push(sandbox);
+						return sandbox;
+					},
+					cleanupSandboxRoot: (sandbox) => {
+						cleanedSandboxes.push(sandbox);
+						rmSync(sandbox, { recursive: true, force: true });
+					},
+					runSample: (sampleRoot, invocation, phase): ScenarioSampleRun => {
+						phases.push(phase);
+						invocationRoots.push(sampleRoot);
+						invocationCommands.push(invocation.command);
+						return {
+							duration_ms:
+								phase === "setup" ? 9_000 : phase === "warmup" ? 8_000 : 10,
+							exit_code: 0,
+							signal: null,
+							spawn_error: null,
+							stdout: "ok",
+							stderr: "",
+						};
+					},
+				},
+			});
+			expect(result.passed).toBe(true);
+			expect(result.metrics.sample_count).toBe(20);
+			expect(result.metrics.warmup_count).toBe(1);
+			expect(result.metrics.timing_p50_ms).toBe(10);
+			expect(result.metrics.timing_p95_ms).toBe(10);
+			expect(phases.filter((phase) => phase === "setup")).toHaveLength(21);
+			expect(phases.filter((phase) => phase === "warmup")).toHaveLength(1);
+			expect(phases.filter((phase) => phase === "sample")).toHaveLength(20);
+			expect(createdSandboxes).toHaveLength(21);
+			expect(
+				new Set(
+					invocationRoots.filter((_root, index) => phases[index] === "sample"),
+				).size,
+			).toBe(20);
+			expect(cleanedSandboxes).toEqual(createdSandboxes);
+			expect(
+				createdSandboxes.every((path) => path.includes("/.afol/tmp/")),
+			).toBe(true);
+			expect(
+				invocationCommands.every((command) => command === artifactPath),
+			).toBe(true);
+			expect(createdSandboxes.every((path) => !existsSync(path))).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps AFOL benchmark temp state out of sandbox copies and cleans sandboxes", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const sentinel = join(
+				root,
+				".afol",
+				"tmp",
+				"afol-bench-release-sentinel",
+				"afol",
+			);
+			mkdirSync(dirname(sentinel), { recursive: true });
+			writeFileSync(sentinel, "must-not-copy\n");
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-temp-exclusion",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					'node -e \'process.exit(require("node:fs").existsSync(".afol/tmp/afol-bench-release-sentinel/afol") ? 9 : 0)\'',
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario);
+			expect(result.passed).toBe(true);
+			expect(readFileSync(sentinel, "utf8")).toBe("must-not-copy\n");
+			expect(
+				readdirSync(join(root, ".afol", "tmp")).filter((entry) =>
+					entry.startsWith("afol-bench-sandbox-"),
+				),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects fewer than twenty mutation samples at the release gate", () => {
+		expect(() =>
+			resolveScenarioSampleCount({ pack_id: "mutation-safety" }, 19),
+		).toThrow("release-benchmark-sample-count-required:20");
+		expect(resolveScenarioSampleCount({ pack_id: "mutation-safety" }, 20)).toBe(
+			20,
+		);
+	});
+
+	test("does not require artifact hash equality for profile compatibility", () => {
+		const scenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "artifact-identity",
+			scenario_version: "1.0.0",
+			pack_id: "mutation-safety",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_p95_ms: 300 },
+			baseline_id: "mutation-safety-v1",
+			deterministic_metrics: {},
+			compiled_binary: true,
+		};
+		const baseline: Baseline = {
+			baseline_id: "mutation-safety-v1",
+			pack_id: "mutation-safety",
+			schema_version: "1.0.0",
+			host_profile_id: "linux-x64-test",
+			os: "linux",
+			arch: "x64",
+			cpu_class: "test-cpu",
+			bun_version: Bun.version,
+			runtime_version: Bun.version,
+			execution_mode: "compiled-release",
+			artifact_mode: "bun-compile",
+			artifact_sha256: "a".repeat(64),
+			scenarios: {
+				[scenario.scenario_id]: {
+					scenario_id: scenario.scenario_id,
+					scenario_version: scenario.scenario_version,
+					timing_p50_ms: 100,
+					timing_p95_ms: 150,
+					sample_count: 20,
+					warmup_count: 1,
+				},
+			},
+		};
+		const execution: ScenarioExecutionResult = {
+			metrics: {
+				duration_ms: 100,
+				timing_p50_ms: 100,
+				timing_p95_ms: 150,
+				error_count: 0,
+				retry_count: 0,
+				context_tokens: 0,
+				prompt_tokens: 0,
+				output_tokens: 0,
+				context_bytes: 0,
+				output_bytes: 0,
+				tool_call_count: 1,
+				tool_success_rate: 1,
+				sample_count: 20,
+				warmup_count: 1,
+			},
+			notes: [],
+			passed: true,
+			profile: {
+				host_profile_id: "linux-x64-test",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "test-cpu",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "b".repeat(64),
+			},
+			timestamp: "2026-07-28T00:00:00.000Z",
+			git_commit: "c".repeat(40),
+		};
+		expect(
+			collectProfileCompatibilityNotes(
+				scenario,
+				baseline,
+				baseline.scenarios?.[scenario.scenario_id],
+				execution,
+			),
+		).toEqual([]);
+	});
+
 	test("keeps completion-lock ignore policy in source/example parity", () => {
 		for (const file of [".gitignore", ".gitignore.example"]) {
 			const lines = readFileSync(join(process.cwd(), file), "utf8").split(
@@ -2365,6 +2905,97 @@ describe("scenario benchmark execution", () => {
 		expect(() =>
 			parseValidationArgs(["run", "--timing-mode", "enforce"]),
 		).toThrow("--timing-mode requires bench mode");
+	});
+
+	test("fails mutation timing closed when the execution profile is incompatible", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-profile-contract",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				command: "node -e 'process.stdout.write(\"ok\")'",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "mutation-safety-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {},
+				compiled_binary: true,
+			};
+			const artifact: PreparedCompiledReleaseArtifact = {
+				binaryPath: join(root, ".afol", "tmp", "release", "afol"),
+				profile: {
+					host_profile_id: "actual-host",
+					os: process.platform,
+					arch: process.arch,
+					cpu_class: "actual-cpu",
+					bun_version: Bun.version,
+					runtime_version: Bun.version,
+					execution_mode: "compiled-release",
+					artifact_mode: "bun-compile",
+					artifact_sha256: "d".repeat(64),
+				},
+				timestamp: "2026-07-28T00:00:00.000Z",
+				git_commit: "e".repeat(40),
+				cleanup: () => {},
+			};
+			const baseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				host_profile_id: "different-host",
+				os: process.platform,
+				arch: process.arch,
+				cpu_class: "different-cpu",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "source",
+				artifact_mode: "source",
+				artifact_sha256: "source",
+				scenarios: {
+					[scenario.scenario_id]: {
+						scenario_id: scenario.scenario_id,
+						scenario_version: scenario.scenario_version,
+						timing_p50_ms: 100,
+						timing_p95_ms: 100,
+						sample_count: 20,
+						warmup_count: 1,
+					},
+				},
+			};
+			const result = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					scenario,
+					join(root, "baseline.json"),
+					baseline,
+					"enforce",
+					artifact,
+				),
+			).result;
+			expect(result.status).toBe("incompatible");
+			expect(result.pass).toBe(false);
+			expect(result.sample_count).toBe(20);
+			expect(result.warmup_count).toBe(1);
+			expect(result.artifact_sha256).toBe("d".repeat(64));
+			expect(
+				result.notes.some((note) =>
+					note.startsWith("profile-incompatible:host_profile_id:"),
+				),
+			).toBe(true);
+			expect(
+				result.notes.some((note) => note.startsWith("baseline-regression:")),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("runs sandbox benchmarks with one warmup and three measured samples", () => {

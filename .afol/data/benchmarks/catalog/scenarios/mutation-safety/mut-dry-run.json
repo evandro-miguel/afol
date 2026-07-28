@@ -4,6 +4,7 @@
   "scenario_version": "1.0.0",
   "pack_id": "mutation-safety",
   "command": "a f pt --dry-run --json",
+  "compiled_binary": true,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

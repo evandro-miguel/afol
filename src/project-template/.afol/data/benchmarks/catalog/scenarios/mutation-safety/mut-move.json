@@ -5,6 +5,7 @@
   "pack_id": "mutation-safety",
   "command": "afol f mv --session sb-mut --task-id T-01 --reason move-source --path tmp/move-src.txt --to tmp/move-dst.txt --json",
   "sandbox": true,
+  "compiled_binary": true,
   "setup": [
     [
       "node",

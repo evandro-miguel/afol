@@ -13,7 +13,13 @@ import {
 	buildRuntimeLiveAgentResults,
 	collectThresholdNotes,
 } from "./runtime-live";
-import { runScenarioCommand } from "./scenario-execution";
+import {
+	executeScenarioPackWithArtifact,
+	type PreparedCompiledReleaseArtifact,
+	RELEASE_BENCH_SAMPLES,
+	RELEASE_BENCH_WARMUP_SAMPLES,
+	runScenarioCommand,
+} from "./scenario-execution";
 
 export { resolveValidateInvocation } from "./args";
 export { runScenarioCommand } from "./scenario-execution";
@@ -27,6 +33,7 @@ import {
 	type PackId,
 	type RegistrySnapshot,
 	type Scenario,
+	type ScenarioBaseline,
 	VALIDATION_SCHEMA_VERSION,
 	type ValidationScope,
 } from "./types";
@@ -86,7 +93,9 @@ interface BenchmarkRunSummary {
 
 function appendBaselineRegressionNotes(
 	notes: string[],
-	baseline: Baseline | undefined,
+	baseline:
+		| Pick<Baseline | ScenarioBaseline, "timing_p50_ms" | "timing_p95_ms">
+		| undefined,
 	metrics: Record<string, number>,
 ): void {
 	if (!baseline) {
@@ -151,7 +160,7 @@ function resolveBenchmarkStatus(
 ): "passed" | "failed" | "skipped" {
 	return status === "skipped"
 		? "skipped"
-		: status === "baseline-missing"
+		: status === "baseline-missing" || status === "incompatible"
 			? "failed"
 			: status === "passed"
 				? "passed"
@@ -178,6 +187,9 @@ function summarizeBenchmarkResults(
 				break;
 			case "baseline-missing":
 				baselineMissing += 1;
+				break;
+			case "incompatible":
+				failed += 1;
 				break;
 		}
 	}
@@ -237,11 +249,69 @@ function collectBenchmarkPackResults(
 		};
 	}
 	return {
-		results: scenarios.map((scenario) =>
-			buildResult(projectRoot, scenario, baselinePath, baseline, timingMode),
+		results: executeScenarioPackWithArtifact(
+			projectRoot,
+			scenarios,
+			(scenario, artifact) =>
+				buildResult(
+					projectRoot,
+					scenario,
+					baselinePath,
+					baseline,
+					timingMode,
+					artifact,
+				),
 		),
 		notes: [],
 	};
+}
+
+export function collectProfileCompatibilityNotes(
+	scenario: Scenario,
+	baseline: Baseline | undefined,
+	scenarioBaseline: ScenarioBaseline | undefined,
+	execution: ReturnType<typeof runScenarioCommand> | null,
+): string[] {
+	if (scenario.pack_id !== "mutation-safety" || !baseline || !execution) {
+		return [];
+	}
+	const notes: string[] = [];
+	if (!scenarioBaseline) {
+		notes.push(
+			`baseline-incompatible:scenario-missing:${scenario.scenario_id}`,
+		);
+	} else if (
+		scenarioBaseline.scenario_id !== scenario.scenario_id ||
+		scenarioBaseline.scenario_version !== scenario.scenario_version
+	) {
+		notes.push(
+			`baseline-incompatible:scenario-identity:${scenario.scenario_id}@${scenario.scenario_version}`,
+		);
+	}
+	for (const field of [
+		"host_profile_id",
+		"os",
+		"arch",
+		"cpu_class",
+		"bun_version",
+		"runtime_version",
+		"execution_mode",
+		"artifact_mode",
+	] as const) {
+		const expected = baseline[field];
+		const actual = execution.profile[field];
+		if (expected === undefined || expected !== actual) {
+			notes.push(
+				`profile-incompatible:${field}:result=${actual}:baseline=${expected ?? "missing"}`,
+			);
+		}
+	}
+	if (execution.metrics.sample_count < RELEASE_BENCH_SAMPLES) {
+		notes.push(
+			`profile-incompatible:sample_count:${execution.metrics.sample_count}<${RELEASE_BENCH_SAMPLES}`,
+		);
+	}
+	return notes;
 }
 
 export function buildResult(
@@ -250,6 +320,7 @@ export function buildResult(
 	baselinePath: string,
 	baseline: Baseline | undefined,
 	timingMode: TimingMode = "enforce",
+	preparedArtifact?: PreparedCompiledReleaseArtifact,
 ): BenchmarkResult {
 	if (timingMode === "observe" && scenario.pack_id !== "governance-history") {
 		throw new Error(
@@ -263,7 +334,15 @@ export function buildResult(
 		hasCommand &&
 		scenario.implementation_status !== "planned" &&
 		(scenario.sandbox || scenario.implementation_status !== "skipped")
-			? runScenarioCommand(projectRoot, scenario)
+			? runScenarioCommand(projectRoot, scenario, {
+					...(preparedArtifact ? { artifact: preparedArtifact } : {}),
+					...(scenario.pack_id === "mutation-safety"
+						? {
+								sampleCount: RELEASE_BENCH_SAMPLES,
+								warmupCount: RELEASE_BENCH_WARMUP_SAMPLES,
+							}
+						: {}),
+				})
 			: null;
 	const metrics = execution?.metrics ?? scenario.deterministic_metrics;
 	const notes = execution?.notes
@@ -274,26 +353,36 @@ export function buildResult(
 		metrics as Record<string, number | undefined>,
 	);
 	const regressionNotes: string[] = [];
-	appendBaselineRegressionNotes(
-		regressionNotes,
+	const scenarioBaseline = baseline?.scenarios?.[scenario.scenario_id];
+	const compatibilityNotes = collectProfileCompatibilityNotes(
+		scenario,
 		baseline,
-		metrics as Record<string, number>,
+		scenarioBaseline,
+		execution,
 	);
+	if (compatibilityNotes.length === 0) {
+		appendBaselineRegressionNotes(
+			regressionNotes,
+			scenarioBaseline ?? baseline,
+			metrics as Record<string, number>,
+		);
+	}
 	const status = resolveResultStatus(
 		scenario,
 		baseline,
 		execution,
-		timingMode === "observe"
+		timingMode === "observe" || compatibilityNotes.length > 0
 			? thresholdNotes.filter((note) => !isTimingThresholdFailure(note))
 			: thresholdNotes,
 		timingMode === "observe"
 			? regressionNotes.filter((note) => !isTimingRegressionFailure(note))
 			: regressionNotes,
+		compatibilityNotes,
 	);
 	if (status === "baseline-missing") {
 		notes.push("baseline-missing");
 	} else {
-		notes.push(...thresholdNotes, ...regressionNotes);
+		notes.push(...thresholdNotes, ...regressionNotes, ...compatibilityNotes);
 	}
 	const resolvedStatus = resolveBenchmarkStatus(status);
 	return applyProjectTokenRule({
@@ -325,7 +414,19 @@ export function buildResult(
 			: {}),
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
-		git_commit: getGitCommit(projectRoot),
+		git_commit: execution?.git_commit ?? getGitCommit(projectRoot),
+		timestamp: execution?.timestamp ?? new Date().toISOString(),
+		sample_count: execution?.metrics.sample_count ?? 0,
+		warmup_count: execution?.metrics.warmup_count ?? 0,
+		host_profile_id: execution?.profile.host_profile_id ?? "unknown",
+		os: execution?.profile.os ?? process.platform,
+		arch: execution?.profile.arch ?? process.arch,
+		cpu_class: execution?.profile.cpu_class ?? "unknown",
+		bun_version: execution?.profile.bun_version ?? Bun.version,
+		runtime_version: execution?.profile.runtime_version ?? Bun.version,
+		execution_mode: execution?.profile.execution_mode ?? "source",
+		artifact_mode: execution?.profile.artifact_mode ?? "source",
+		artifact_sha256: execution?.profile.artifact_sha256 ?? "source",
 		notes:
 			status === "skipped"
 				? scenario.implementation_status === "planned"
@@ -341,6 +442,7 @@ function resolveResultStatus(
 	execution: ReturnType<typeof runScenarioCommand> | null,
 	thresholdNotes: readonly string[],
 	regressionNotes: readonly string[],
+	compatibilityNotes: readonly string[] = [],
 ): BenchmarkResult["status"] {
 	if (scenario.implementation_status === "planned") {
 		return "skipped";
@@ -357,11 +459,14 @@ function resolveResultStatus(
 	if (thresholdNotes.length > 0 || regressionNotes.length > 0) {
 		return "failed";
 	}
+	if (compatibilityNotes.length > 0) {
+		return "incompatible";
+	}
 	return "passed";
 }
 
 function getGitCommit(projectRoot: string): string {
-	const result = boundedSpawn("git", ["rev-parse", "--short=12", "HEAD"], {
+	const result = boundedSpawn("git", ["rev-parse", "HEAD"], {
 		cwd: projectRoot,
 		timeoutMs: 15_000,
 	});
