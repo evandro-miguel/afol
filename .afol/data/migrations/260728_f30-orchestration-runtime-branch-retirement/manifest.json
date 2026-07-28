@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "migration_id": "260728_f30-orchestration-runtime-branch-retirement",
+  "created_at": "2026-07-28T03:15:42Z",
+  "classification": "branch-retirement-metadata",
+  "authority": "historical-reference-only",
+  "reason": "governance-not-authorized",
+  "source_content_archived": false,
+  "deletion_approved": false,
+  "retention_policy": "retain-until-explicit-review",
+  "branch": {
+    "remote": "origin",
+    "name": "feat/f30-orchestration-runtime",
+    "ref": "refs/heads/feat/f30-orchestration-runtime",
+    "tip": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216",
+    "merge_base_with_dev": "9601d96decd7fc242bdc94130c8cf436738aafc9",
+    "captured_divergence": {
+      "behind_dev": 82,
+      "ahead_of_dev": 2
+    },
+    "retirement_authorized": true,
+    "retirement_status": "pending",
+    "remote_tip_guard": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216",
+    "deleted_at": null
+  },
+  "pull_request": {
+    "number": 58,
+    "url": "https://github.com/evandro-miguel/afol/pull/58",
+    "title": "feat(f30): gated dispatch/submit/review orchestration runtime",
+    "base": "dev",
+    "head": "feat/f30-orchestration-runtime",
+    "head_sha": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216",
+    "draft": true,
+    "state": "closed",
+    "merged": false,
+    "created_at": "2026-07-19T00:56:43Z",
+    "updated_at": "2026-07-26T21:49:27Z",
+    "closed_at": "2026-07-26T21:49:27Z",
+    "pull_head_ref": "refs/pull/58/head",
+    "pull_head_observed_sha": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216",
+    "pull_head_observed_at": "2026-07-28T03:15:42Z"
+  },
+  "commits": [
+    {
+      "sha": "4fa2b97877fe575de0b4a60dd7dbe4107012adee",
+      "parents": [
+        "9601d96decd7fc242bdc94130c8cf436738aafc9"
+      ],
+      "tree": "341fcb8b20c3f461384f2c77c40fab154c93fe18",
+      "author_date": "2026-07-18T21:56:30-03:00",
+      "committer_date": "2026-07-18T21:56:30-03:00",
+      "subject": "feat(lifecycle): expose task snapshots and observed-completion reuse"
+    },
+    {
+      "sha": "dc9d1657d09a5ee3e254c0df441dbd8cb982f216",
+      "parents": [
+        "4fa2b97877fe575de0b4a60dd7dbe4107012adee"
+      ],
+      "tree": "f37c8b894be6680c83c119289680fcd201b8253b",
+      "author_date": "2026-07-18T21:56:30-03:00",
+      "committer_date": "2026-07-18T21:56:30-03:00",
+      "subject": "feat(f30): land gated dispatch/submit/review orchestration runtime"
+    }
+  ],
+  "canonical_governance": {
+    "roadmap": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+    "spec": ".afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md",
+    "spec_implementation_status": "planned",
+    "adr": ".afol/adm/decisions/ADR-007-agent-submission-review-boundary.md",
+    "adr_status": "proposed",
+    "runtime_claim": "dispatch-submit-review-absent"
+  },
+  "unresolved_review_findings": [
+    {
+      "source": "github-review-thread",
+      "severity": "high",
+      "id": "PRRT_kwDORXCa1s6SCVp1",
+      "path": "cli/services/orchestration/index.ts",
+      "summary": "Git status paths are repository-root-relative and break AFOL runtime filtering and allowed-path checks for subprojects."
+    },
+    {
+      "source": "github-review-thread",
+      "severity": "medium",
+      "id": "PRRT_kwDORXCa1s6SCVp2",
+      "path": "cli/commands/orchestration.ts",
+      "summary": "JSON parsing and schema validation are not separated into deterministic error boundaries."
+    },
+    {
+      "source": "github-review-thread",
+      "severity": "medium",
+      "id": "PRRT_kwDORXCa1s6SCVp4",
+      "path": "cli/services/orchestration/index.ts",
+      "summary": "Submission arrays are not validated defensively before iteration."
+    },
+    {
+      "source": "github-review-thread",
+      "severity": "medium",
+      "id": "PRRT_kwDORXCa1s6SCVp5",
+      "path": "cli/services/orchestration/index.ts",
+      "summary": "Allowed-path normalization rejects the project root."
+    },
+    {
+      "source": "github-review-thread",
+      "severity": "medium",
+      "id": "PRRT_kwDORXCa1s6SCVp6",
+      "path": "cli/services/orchestration/index.ts",
+      "summary": "Declared checks are iterated without defensive runtime object validation."
+    },
+    {
+      "source": "independent-agent-review",
+      "severity": "high",
+      "id": "governance-authorization",
+      "summary": "The branch publishes dispatch, submit, and review while the governing spec is planned and ADR-007 is proposed."
+    },
+    {
+      "source": "independent-agent-review",
+      "severity": "high",
+      "id": "action-policy-bypass",
+      "summary": "The new commands are not classified by the canonical action policy and can project observed evidence from restricted agent contexts."
+    },
+    {
+      "source": "independent-agent-review",
+      "severity": "high",
+      "id": "integration-drift",
+      "summary": "The branch conflicts with current dev lifecycle and lazy-dispatch code and lacks current catalog, template, and live-evidence parity."
+    }
+  ],
+  "security_review": {
+    "gitleaks": "not-run",
+    "osv_scanner": "not-run",
+    "reason": "os-gov-preflight-blocked-missing-source-state-authority"
+  },
+  "recovery_limitation": "This metadata does not contain source content. After branch deletion, recovery depends on GitHub retaining the closed pull-request ref or another external object database retaining the recorded commits."
+}
