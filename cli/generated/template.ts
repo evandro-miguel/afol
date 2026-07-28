@@ -15,7 +15,7 @@ export const DEFAULT_TEMPLATE_METADATA = Object.freeze({
 	excludedForbiddenCount: 0,
 	generatedAt: "1970-01-01T00:00:00.000Z",
 	templateHash:
-		"2374c69efaf2a00a8796d77505c502cc81b0202e5b148ae84af2341d8fa5c4d3",
+		"21ba1aa98af07311f8cad75c9a01e41f29ad0e7b85d4ec373891d9b74e4ac0b9",
 	forbiddenPatterns: [
 		"a",
 		"afol",
@@ -406,9 +406,9 @@ export const DEFAULT_TEMPLATE_FILES: Readonly<
 	".afol/data/benchmarks/catalog/baselines/mutation-safety/baseline-v1.json": {
 		path: ".afol/data/benchmarks/catalog/baselines/mutation-safety/baseline-v1.json",
 		contentBase64:
-			"ewogICJzY2hlbWFfdmVyc2lvbiI6ICIxLjAuMCIsCiAgImJhc2VsaW5lX2lkIjogIm11dGF0aW9uLXNhZmV0eS12MSIsCiAgInBhY2tfaWQiOiAibXV0YXRpb24tc2FmZXR5IiwKICAiaG9zdF9wcm9maWxlX2lkIjogImxpbnV4LXg2NC1hbWQtZXB5Yy05MzU0cC0zMi1jb3JlLXByb2Nlc3NvciIsCiAgIm9zIjogImxpbnV4IiwKICAiYXJjaCI6ICJ4NjQiLAogICJjcHVfY2xhc3MiOiAiYW1kLWVweWMtOTM1NHAtMzItY29yZS1wcm9jZXNzb3IiLAogICJidW5fdmVyc2lvbiI6ICIxLjMuMTQiLAogICJydW50aW1lX3ZlcnNpb24iOiAiMS4zLjE0IiwKICAiZXhlY3V0aW9uX21vZGUiOiAiY29tcGlsZWQtcmVsZWFzZSIsCiAgImFydGlmYWN0X21vZGUiOiAiYnVuLWNvbXBpbGUiLAogICJzYW1wbGVfY291bnQiOiAyMCwKICAid2FybXVwX2NvdW50IjogMSwKICAicHJvdmVuYW5jZSI6ICJjYWxpYnJhdGlvbi1wZW5kaW5nOmJlbmNobWFyay1zYW5kYm94LWFib3J0ZWQtd2l0aC1kaXNrLXF1b3RhIiwKICAic2NlbmFyaW9zIjoge30KfQo=",
-		sha256: "89f271fc60e721283ec965d85eaf7eaae5b192ee1c370ac0e23c5a4a8d1e5885",
-		bytes: 530,
+			"ewogICJzY2hlbWFfdmVyc2lvbiI6ICIxLjAuMCIsCiAgImJhc2VsaW5lX2lkIjogIm11dGF0aW9uLXNhZmV0eS12MSIsCiAgInBhY2tfaWQiOiAibXV0YXRpb24tc2FmZXR5IiwKICAiY2FsaWJyYXRpb25fc3RhdHVzIjogInBlbmRpbmciLAogICJjYWxpYnJhdGlvbl9yZWFzb24iOiAiY29udHJvbGxlZC1yZWxlYXNlLWhvc3QtcmVxdWlyZWQiCn0K",
+		sha256: "001cbe081326a23a6c8ec2ec79d046343a7b94e7008ae8906039d5cf66c84567",
+		bytes: 198,
 	},
 	".afol/data/benchmarks/catalog/baselines/pstr-integrity/baseline-v1.json": {
 		path: ".afol/data/benchmarks/catalog/baselines/pstr-integrity/baseline-v1.json",

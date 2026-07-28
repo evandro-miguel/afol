@@ -6,6 +6,7 @@ import { runValidationCommands } from "./command-runner";
 import { outputJson, outputJsonWithStatus, registrySummary } from "./output";
 import {
 	baselineFilename,
+	formatMutationCalibrationReason,
 	loadRegistry,
 	validateRegistryContract,
 } from "./registry";
@@ -272,7 +273,15 @@ export function collectProfileCompatibilityNotes(
 	scenarioBaseline: ScenarioBaseline | undefined,
 	execution: ReturnType<typeof runScenarioCommand> | null,
 ): string[] {
-	if (scenario.pack_id !== "mutation-safety" || !baseline || !execution) {
+	if (scenario.pack_id !== "mutation-safety" || !baseline) {
+		return [];
+	}
+	if (baseline.calibration_status === "pending") {
+		return [
+			`baseline-incompatible:calibration-pending:${formatMutationCalibrationReason(baseline.calibration_reason)}`,
+		];
+	}
+	if (!execution) {
 		return [];
 	}
 	const notes: string[] = [];

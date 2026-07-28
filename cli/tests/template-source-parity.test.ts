@@ -11,7 +11,7 @@ import {
 	type TemplatePayload,
 } from "../services/template/payload";
 
-const expectedTemplatePathCount = 187;
+const expectedTemplatePathCount = 189;
 const forbiddenExactPaths = new Set([
 	"a",
 	"afol",

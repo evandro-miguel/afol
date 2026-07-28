@@ -95,6 +95,10 @@ risk_level: high
   - Sampling boundary: blocking p95 rejects fewer than 20 samples; explicit
     neutral timing remains available only to smoke/test flows.
   - Baseline boundary: missing scenario/version and `baseline-fixture` fail.
+  - Calibration transition: a minimal, reasoned `pending` baseline is accepted
+    structurally, rejects any mixed observed evidence, and yields a single
+    blocking `baseline-incompatible:calibration-pending:*` note while
+    functional failures retain precedence.
   - Safety boundary: expected exits, side effects, semantic oracles, token
     limits, and hard non-temporal thresholds remain blocking.
   - Parity boundary: source, template, generated catalog, and manifest agree.

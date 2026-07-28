@@ -287,6 +287,29 @@ function parseBaseline(
 			`${sourcePath}.schema_version`,
 		),
 	};
+	const calibrationStatus = asOptionalString(
+		data.calibration_status,
+		`${sourcePath}.calibration_status`,
+	);
+	if (
+		calibrationStatus !== undefined &&
+		calibrationStatus !== "observed" &&
+		calibrationStatus !== "pending"
+	) {
+		throw new Error(
+			`Invalid calibration status: ${sourcePath}.calibration_status`,
+		);
+	}
+	const calibrationReason = asOptionalString(
+		data.calibration_reason,
+		`${sourcePath}.calibration_reason`,
+	);
+	if (calibrationStatus !== undefined) {
+		baseline.calibration_status = calibrationStatus;
+	}
+	if (calibrationReason !== undefined) {
+		baseline.calibration_reason = calibrationReason;
+	}
 	const timingP50 = asOptionalNumber(
 		data.timing_p50_ms,
 		`${sourcePath}.timing_p50_ms`,
@@ -1340,6 +1363,19 @@ function isSyntheticProfileValue(value: string): boolean {
 	);
 }
 
+const MUTATION_CALIBRATION_REASON_MAX_LENGTH = 64;
+const MUTATION_CALIBRATION_REASON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function formatMutationCalibrationReason(
+	value: string | undefined,
+): string {
+	return typeof value === "string" &&
+		value.length <= MUTATION_CALIBRATION_REASON_MAX_LENGTH &&
+		MUTATION_CALIBRATION_REASON_PATTERN.test(value)
+		? value
+		: "reason-invalid";
+}
+
 export function validateMutationBaselineContract(
 	projectRoot: string | undefined,
 	scenarios: readonly Scenario[],
@@ -1347,6 +1383,56 @@ export function validateMutationBaselineContract(
 	now: Date = new Date(),
 ): string[] {
 	const issues: string[] = [];
+	for (const scenario of scenarios) {
+		if (scenario.compiled_binary !== true) {
+			issues.push(
+				`mutation-scenario-compiled-release-required:${scenario.scenario_id}`,
+			);
+		}
+	}
+	if (baseline.calibration_status === "pending") {
+		if (
+			typeof baseline.calibration_reason !== "string" ||
+			baseline.calibration_reason.trim() === ""
+		) {
+			issues.push("mutation-baseline-calibration-reason-required");
+		} else if (
+			baseline.calibration_reason.length >
+				MUTATION_CALIBRATION_REASON_MAX_LENGTH ||
+			!MUTATION_CALIBRATION_REASON_PATTERN.test(baseline.calibration_reason)
+		) {
+			issues.push("mutation-baseline-calibration-reason-format-invalid");
+		} else if (isSyntheticProfileValue(baseline.calibration_reason)) {
+			issues.push("mutation-baseline-calibration-reason-placeholder");
+		}
+		for (const field of [
+			"timing_p50_ms",
+			"timing_p95_ms",
+			"sample_count",
+			"warmup_count",
+			"git_commit",
+			"timestamp",
+			"provenance",
+			"host_profile_id",
+			"os",
+			"arch",
+			"cpu_class",
+			"bun_version",
+			"runtime_version",
+			"execution_mode",
+			"artifact_mode",
+			"artifact_sha256",
+			"scenarios",
+		] as const) {
+			if (baseline[field] !== undefined) {
+				issues.push(`mutation-baseline-pending-observed-field:${field}`);
+			}
+		}
+		return issues;
+	}
+	if (baseline.calibration_reason !== undefined) {
+		issues.push("mutation-baseline-calibration-reason-unexpected");
+	}
 	const requiredProfileFields = [
 		"host_profile_id",
 		"os",
@@ -1422,11 +1508,6 @@ export function validateMutationBaselineContract(
 		issues.push("mutation-baseline-warmup-count-required:1");
 	}
 	for (const scenario of scenarios) {
-		if (scenario.compiled_binary !== true) {
-			issues.push(
-				`mutation-scenario-compiled-release-required:${scenario.scenario_id}`,
-			);
-		}
 		const scenarioBaseline = baseline.scenarios?.[scenario.scenario_id];
 		if (!scenarioBaseline) {
 			issues.push(`mutation-scenario-baseline-missing:${scenario.scenario_id}`);

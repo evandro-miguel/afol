@@ -87,6 +87,11 @@ functional and safety oracle.
 - The pack baseline contains scenario-specific timing records. The synthetic
   `baseline-fixture` identity is removed, and every known baseline satisfies
   the unchanged hard SLO for its scenario.
+- Before a compatible calibration exists, the catalog uses an explicit minimal
+  `pending` state with a concrete reason and no observed provenance or scenario
+  metrics. This state is structurally valid but makes `mutation-safety`
+  results fail closed as `incompatible`; unrelated validation packs are not
+  contaminated by a global registry-contract failure.
 - Timing observation mode is never accepted as a blocking release gate.
 - Manifest, project-template, generated scenario catalog, and source registry
   remain in parity.

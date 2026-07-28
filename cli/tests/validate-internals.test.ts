@@ -75,8 +75,14 @@ import {
 } from "../validate/shared";
 import type { Baseline, RegistrySnapshot, Scenario } from "../validate/types";
 
+function createRepoLocalTestRoot(prefix: string): string {
+	const testTempRoot = join(process.cwd(), ".afol", "tmp", "tests");
+	mkdirSync(testTempRoot, { recursive: true });
+	return mkdtempSync(join(testTempRoot, prefix));
+}
+
 function createFixtureRoot(): string {
-	const root = mkdtempSync(join(tmpdir(), "validate-internals-"));
+	const root = createRepoLocalTestRoot("validate-internals-");
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
 	writeFileSync(
@@ -256,7 +262,7 @@ function createFixtureRoot(): string {
 }
 
 function createBenchExecutionFixtureRoot(): string {
-	const root = mkdtempSync(join(tmpdir(), "validate-bench-exec-"));
+	const root = createRepoLocalTestRoot("validate-bench-exec-");
 	mkdirSync(root, { recursive: true });
 	mkdirSync(join(root, ".afol"), { recursive: true });
 	writeFileSync(join(root, ".afol", ".keep"), "\n", "utf8");
@@ -825,13 +831,6 @@ describe("validate registry", () => {
 			}
 			const mutationScenarios =
 				snapshot.scenariosByPack["mutation-safety"] ?? [];
-			const mutationScenarioIds = [
-				"mut-dry-run",
-				"mut-move",
-				"mut-patch",
-				"mut-protected",
-				"mut-undo",
-			];
 			expect(mutationScenarios).toHaveLength(5);
 			for (const scenario of mutationScenarios) {
 				expect(scenario.compiled_binary).toBe(true);
@@ -840,14 +839,6 @@ describe("validate registry", () => {
 			}
 			const mutationBaseline = snapshot.baselinesByPack["mutation-safety"] as
 				| (Baseline & {
-						host_profile_id?: string;
-						os?: string;
-						arch?: string;
-						cpu_class?: string;
-						bun_version?: string;
-						runtime_version?: string;
-						execution_mode?: string;
-						artifact_mode?: string;
 						scenarios?: Record<
 							string,
 							{
@@ -862,23 +853,13 @@ describe("validate registry", () => {
 				  })
 				| undefined;
 			expect(mutationBaseline).toMatchObject({
-				host_profile_id: expect.any(String),
-				os: "linux",
-				arch: "x64",
-				cpu_class: expect.any(String),
-				bun_version: expect.any(String),
-				runtime_version: expect.any(String),
-				execution_mode: "compiled-release",
-				artifact_mode: "bun-compile",
-				sample_count: 20,
-				warmup_count: 1,
-				provenance:
-					"calibration-pending:benchmark-sandbox-aborted-with-disk-quota",
+				calibration_status: "pending",
+				calibration_reason: "controlled-release-host-required",
 			});
 			expect(mutationBaseline?.artifact_sha256).toBeUndefined();
 			expect(mutationBaseline?.git_commit).toBeUndefined();
 			expect(mutationBaseline?.timestamp).toBeUndefined();
-			expect(mutationBaseline?.scenarios).toEqual({});
+			expect(mutationBaseline?.scenarios).toBeUndefined();
 			const sequentialDone = snapshot.scenariosByPack["workbench-parity"]?.find(
 				(scenario) => scenario.scenario_id === "wb-sequential-done",
 			);
@@ -947,17 +928,7 @@ describe("validate registry", () => {
 			const mutationIssues = contractIssues.filter((issue) =>
 				issue.startsWith("mutation-"),
 			);
-			expect(mutationIssues).toEqual(
-				expect.arrayContaining([
-					"mutation-baseline-artifact-sha256-invalid",
-					"mutation-baseline-git-commit-invalid",
-					"mutation-baseline-timestamp-invalid",
-					"mutation-baseline-calibration-pending",
-					...mutationScenarioIds.map(
-						(scenarioId) => `mutation-scenario-baseline-missing:${scenarioId}`,
-					),
-				]),
-			);
+			expect(mutationIssues).toEqual([]);
 			expect(contractIssues).not.toContain(
 				"scenario-feature-coverage-missing:F-30",
 			);
@@ -1697,6 +1668,104 @@ describe("validate registry", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("accepts only an honest minimal pending mutation baseline", () => {
+		const scenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "mutation-pending",
+			scenario_version: "1.0.0",
+			pack_id: "mutation-safety",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_p95_ms: 300 },
+			baseline_id: "mutation-safety-v1",
+			deterministic_metrics: {},
+			compiled_binary: true,
+		};
+		const pending: Baseline = {
+			baseline_id: "mutation-safety-v1",
+			pack_id: "mutation-safety",
+			schema_version: "1.0.0",
+			calibration_status: "pending",
+			calibration_reason: "controlled-release-host-required",
+		};
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], pending),
+		).toEqual([]);
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				baseline_id: pending.baseline_id,
+				pack_id: pending.pack_id,
+				schema_version: pending.schema_version,
+				calibration_status: "pending",
+			}),
+		).toContain("mutation-baseline-calibration-reason-required");
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				...pending,
+				calibration_reason: "placeholder",
+			}),
+		).toContain("mutation-baseline-calibration-reason-placeholder");
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				...pending,
+				calibration_reason: "a".repeat(65),
+			}),
+		).toContain("mutation-baseline-calibration-reason-format-invalid");
+		expect(
+			collectProfileCompatibilityNotes(
+				scenario,
+				{ ...pending, calibration_reason: "a".repeat(2_000) },
+				undefined,
+				null,
+			),
+		).toEqual(["baseline-incompatible:calibration-pending:reason-invalid"]);
+		expect(
+			validateMutationBaselineContract(
+				undefined,
+				[{ ...scenario, compiled_binary: false }],
+				pending,
+			),
+		).toContain("mutation-scenario-compiled-release-required:mutation-pending");
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				...pending,
+				provenance: "observed-clean-commit",
+				scenarios: {},
+			}),
+		).toEqual(
+			expect.arrayContaining([
+				"mutation-baseline-pending-observed-field:provenance",
+				"mutation-baseline-pending-observed-field:scenarios",
+			]),
+		);
+	});
+
+	test("parses mutation calibration state strictly", () => {
+		const root = createFixtureRoot();
+		try {
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"mutation-safety",
+				"baseline-v1.json",
+			);
+			const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+			writeFileSync(
+				baselinePath,
+				`${JSON.stringify({ ...baseline, calibration_status: "unknown" })}\n`,
+			);
+			expect(() => loadRegistry(root)).toThrow(
+				`Invalid calibration status: ${baselinePath}.calibration_status`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("scenario benchmark execution", () => {
@@ -1727,19 +1796,22 @@ describe("scenario benchmark execution", () => {
 
 	test("prepares a registered sidecar and executes a compiled mutation", () => {
 		const fixtureRoot = createBenchExecutionFixtureRoot();
-		cpSync(
-			join(process.cwd(), ".afol", "config.json"),
-			join(fixtureRoot, ".afol", "config.json"),
-		);
-		mkdirSync(join(fixtureRoot, ".agents"), { recursive: true });
-		for (const metadataFile of ["lock.json", "manifest.json"]) {
-			cpSync(
-				join(process.cwd(), ".agents", metadataFile),
-				join(fixtureRoot, ".agents", metadataFile),
-			);
-		}
-		const artifact = prepareCompiledReleaseArtifact(process.cwd());
+		let artifact: PreparedCompiledReleaseArtifact | undefined;
+		let artifactRoot: string | undefined;
 		try {
+			cpSync(
+				join(process.cwd(), ".afol", "config.json"),
+				join(fixtureRoot, ".afol", "config.json"),
+			);
+			mkdirSync(join(fixtureRoot, ".agents"), { recursive: true });
+			for (const metadataFile of ["lock.json", "manifest.json"]) {
+				cpSync(
+					join(process.cwd(), ".agents", metadataFile),
+					join(fixtureRoot, ".agents", metadataFile),
+				);
+			}
+			artifact = prepareCompiledReleaseArtifact(process.cwd());
+			artifactRoot = dirname(artifact.binaryPath);
 			const provenancePath = `${artifact.binaryPath}.provenance.json`;
 			expect(existsSync(provenancePath)).toBe(true);
 			const provenance = readJson(provenancePath);
@@ -1787,10 +1859,11 @@ describe("scenario benchmark execution", () => {
 			expect(result.passed).toBe(true);
 			expect(result.metrics.error_count).toBe(0);
 		} finally {
-			const artifactRoot = dirname(artifact.binaryPath);
-			artifact.cleanup();
-			expect(existsSync(artifactRoot)).toBe(false);
+			artifact?.cleanup();
 			rmSync(fixtureRoot, { recursive: true, force: true });
+			if (artifactRoot !== undefined) {
+				expect(existsSync(artifactRoot)).toBe(false);
+			}
 		}
 	}, 30_000);
 
@@ -3067,10 +3140,53 @@ describe("scenario benchmark execution", () => {
 			expect(
 				result.notes.some((note) => note.startsWith("baseline-regression:")),
 			).toBe(false);
+
+			const pendingBaseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				calibration_status: "pending",
+				calibration_reason: "controlled-release-host-required",
+			};
+			const pendingResult = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					scenario,
+					join(root, "baseline.json"),
+					pendingBaseline,
+					"enforce",
+					artifact,
+				),
+			).result;
+			expect(pendingResult.status).toBe("incompatible");
+			expect(pendingResult.pass).toBe(false);
+			expect(pendingResult.tool_success_rate).toBe(1);
+			expect(pendingResult.error_count).toBe(0);
+			expect(pendingResult.sample_count).toBe(20);
+			expect(pendingResult.warmup_count).toBe(1);
+			expect(
+				pendingResult.notes.filter((note) =>
+					note.startsWith("baseline-incompatible:calibration-pending:"),
+				),
+			).toEqual([
+				"baseline-incompatible:calibration-pending:controlled-release-host-required",
+			]);
+
+			const failedResult = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					{ ...scenario, command: "false" },
+					join(root, "baseline.json"),
+					pendingBaseline,
+					"enforce",
+					artifact,
+				),
+			).result;
+			expect(failedResult.status).toBe("failed");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 
 	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
 		const root = createBenchExecutionFixtureRoot();

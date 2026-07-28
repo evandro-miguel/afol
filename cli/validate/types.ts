@@ -120,6 +120,8 @@ export interface Baseline {
 	baseline_id: string;
 	pack_id: PackId;
 	schema_version: string;
+	calibration_status?: "observed" | "pending";
+	calibration_reason?: string;
 	timing_p50_ms?: number;
 	timing_p95_ms?: number;
 	sample_count?: number;
