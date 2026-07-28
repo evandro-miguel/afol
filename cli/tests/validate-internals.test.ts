@@ -918,6 +918,10 @@ describe("validate registry", () => {
 			expect(featureSpecScenario?.coverage?.specs).toContain(
 				"260710_1256_typescript-7-toolchain-adoption_spec_01",
 			);
+			expect(featureSpecScenario?.coverage?.features).toContain("F-29");
+			expect(featureSpecScenario?.coverage?.specs).toContain(
+				"260726_governance-contract-reconciliation_spec-child_01",
+			);
 			const uxRegistryScenario = snapshot.scenariosByPack[
 				"governance-history"
 			]?.find((scenario) => scenario.scenario_id === "ux-registry-lifecycle");

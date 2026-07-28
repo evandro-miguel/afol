@@ -26,5 +26,5 @@ spec_waiver_reason: ""
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
 | T-01 | in_progress | worker | Define compatible mutation benchmark timing and baseline contract attempt=1 |
-| T-02 | pending | worker | Restore governance scenario coverage for the reconciled F-29 spec |
+| T-02 | done | worker | Restore governance scenario coverage for the reconciled F-29 spec attempt=1 |
 | T-03 | pending | worker | Validate release gates and document residual environment limits |
