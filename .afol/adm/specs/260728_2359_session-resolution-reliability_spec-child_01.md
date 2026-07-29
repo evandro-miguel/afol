@@ -3,7 +3,7 @@ doc_type: spec-child
 id: 260728_2359_session-resolution-reliability_spec-child_01
 theme: session-resolution-reliability
 status: final
-closure_note: "Delivered on dev (2026-07-29): invalid implicit context falls through safely; new and session switch repair malformed generated context; close unbinds after durable commit; all workbench release scenarios use one compiled artifact and context-only fixtures. Public workbench-parity passed 10/10 with 20 measured samples, zero errors/retries, short-path p50 58-92 ms and p95 79-151 ms; full suite 1779/0; independent critic PASS."
+closure_note: "Delivered on dev (2026-07-29): invalid implicit context falls through safely; new and session switch repair malformed generated context when a Git context exists; session list remains diagnostic when bindings are corrupt; close unbinds after durable commit; verification output is checkout-path independent; all workbench release scenarios use one compiled artifact and context-only fixtures. Public workbench-parity passed 10/10 with 20 measured samples, zero errors/retries, short-path p50 53-80 ms and p95 62-91 ms; full suite 1781/0; two independent critics PASS."
 owners:
 - orchestrator
 workstream_intent: Restore one reliable low-token session target across AFOL agent-facing commands.
@@ -115,7 +115,8 @@ risk_level: high
 - [x] A failed close preserves selectors; durable or idempotent close removes
       matching selectors without affecting another session.
 - [x] `session list` exposes raw binding state, ignored reason, effective
-      session, and source without noisy default output.
+      session, and source without noisy default output, and remains diagnostic
+      when the context file is malformed.
 - [x] Agent-facing implicit consumers are either routed through the canonical
       resolver or documented and tested as deliberate global-pointer guards.
 - [x] Focused RED reproductions became GREEN and the full suite remains green.
@@ -130,14 +131,17 @@ risk_level: high
 
 - `./dist/afol v bench --pack workbench-parity --json`: 10/10 pass, 20
   samples plus one warmup per scenario, zero errors and zero retries.
-- Context-only short path: start 58/97 ms, done 92/151 ms, close 68/79 ms
+- Context-only short path: start 53/62 ms, done 80/91 ms, close 69/77 ms
   (p50/p95); argv 12/24/6 characters; output about 5/16/8 tokens.
-- Eight sequential verifications: 176/213 ms, 163 argv characters, about 23
+- Eight sequential verifications: 155/182 ms, 163 argv characters, about 23
   output tokens.
-- `bun test --only-failures`: 1779 pass, 0 fail, 11868 assertions.
+- `verify-tasks`: path-independent session label, 37/43 ms p50/p95, about 34
+  output tokens in the compiled benchmark.
+- `bun test --only-failures`: 1781 pass, 0 fail, 11878 assertions.
 - `validate:toolchain`, typecheck, template/manifest parity, deterministic
   build/smokes, and `validate:security:release`: pass.
-- Independent `critic-codex-xhigh`: PASS after one REVISE remediation round.
+- Two independent `critic-codex-xhigh` reviews: PASS after the post-commit
+  findings were remediated.
 
 ---
 

@@ -463,7 +463,14 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 		currentWorktree,
 		debug,
 	);
-	const bindings = listBindings(projectRoot).map((binding) => ({
+	let contextFileState: "ok" | "corrupt" = "ok";
+	let rawBindings: ReturnType<typeof listBindings> = [];
+	try {
+		rawBindings = listBindings(projectRoot);
+	} catch {
+		contextFileState = "corrupt";
+	}
+	const bindings = rawBindings.map((binding) => ({
 		...binding,
 		worktree: displayWorktreePath(projectRoot, binding.worktree, debug),
 		matches_context:
@@ -485,6 +492,7 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 					: null,
 			effective_session: effective?.session ?? null,
 			effective_source: effective?.source ?? null,
+			context_file_state: contextFileState,
 			bindings,
 		},
 		lines: [
@@ -494,6 +502,11 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			`  global active: ${globalActiveSession ?? "(none)"}${globalActiveState && globalActiveState !== "open" ? ` (ignored: ${globalActiveState})` : ""}`,
 			`  context session: ${contextSession ?? "(none)"}${contextSessionState && contextSessionState !== "open" ? ` (ignored: ${contextSessionState})` : ""}`,
 			`  effective session: ${effective ? `${effective.session} (${effective.source})` : "(none)"}`,
+			...(contextFileState === "corrupt"
+				? [
+						"  context file: corrupt (bindings unavailable; switch repairs it, and new repairs it in a Git context)",
+					]
+				: []),
 			...(bindings.length > 0
 				? bindings.map((binding) => {
 						const flags = [

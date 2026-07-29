@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { inspectEventLedger } from "../services/events/ledger";
 import {
 	detectSessionHealth,
@@ -18,6 +18,7 @@ import {
 	evidenceCompletionAuthorization,
 	formatVerifyReport,
 	verifyAllSessions,
+	verifyTaskText,
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
 
@@ -206,6 +207,37 @@ function seedDoneWorkbenchTask(
 }
 
 describe("verifyWorkbenchTasks", () => {
+	test("formats the session path relative to cwd in deeply nested checkouts", () => {
+		const sessionPath = join(
+			process.cwd(),
+			".tmp",
+			"deep",
+			"nested",
+			"checkout",
+			".afol",
+			"wb",
+			"sb-wb",
+		);
+		const result = verifyTaskText(
+			[
+				"## State Board",
+				"",
+				"| Task | State | Owner | Notes |",
+				"|------|-------|-------|-------|",
+				"| T-01 | done | worker | verified |",
+				"",
+			].join("\n"),
+			join(sessionPath, "sb-wb_task_01.md"),
+		);
+
+		const report = formatVerifyReport(result);
+
+		expect(report).toContain(
+			`Session: ${relative(process.cwd(), sessionPath)}`,
+		);
+		expect(report).not.toContain(`Session: ${process.cwd()}`);
+	});
+
 	test("strict root verification ignores documentation task examples/templates", () => {
 		const root = mkRoot("docs-ignore");
 		try {

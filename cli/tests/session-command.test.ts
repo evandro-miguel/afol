@@ -491,6 +491,50 @@ describe("afol session command", () => {
 		}
 	});
 
+	test("list remains diagnostic when the context file is malformed", async () => {
+		const root = createProjectRoot("list-malformed-context");
+		initGitRepo(root);
+		try {
+			createSessionFixture(root, "GLOBAL");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"GLOBAL\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", "session-context.json"),
+				"{broken",
+				"utf8",
+			);
+
+			const text = captureIo();
+			expect(await runSessionCommand("list", [], root, text.io)).toBe(0);
+			expect(text.stdout.join("\n")).toContain(
+				"effective session: GLOBAL (global)",
+			);
+			expect(text.stdout.join("\n")).toContain("context file: corrupt");
+
+			const json = captureIo();
+			expect(await runSessionCommand("list", ["--json"], root, json.io)).toBe(
+				0,
+			);
+			const parsed = JSON.parse(json.stdout.join("\n")) as {
+				data: {
+					context_file_state: string;
+					effective_session: string;
+					effective_source: string;
+					bindings: unknown[];
+				};
+			};
+			expect(parsed.data.context_file_state).toBe("corrupt");
+			expect(parsed.data.effective_session).toBe("GLOBAL");
+			expect(parsed.data.effective_source).toBe("global");
+			expect(parsed.data.bindings).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("list distinguishes raw stale context from the effective session", async () => {
 		const root = createProjectRoot("list-effective");
 		initGitRepo(root);
