@@ -1,0 +1,19 @@
+{
+  "schema": "afol.multitask-throughput-baseline/v1",
+  "baseline_id": "multitask-throughput-v1",
+  "timing_mode": "paired-relative",
+  "sample_count_min": 12,
+  "gates": {
+    "ten_task_call_reduction_pct_min": 75,
+    "ten_task_verification_reduction_pct_min": 80,
+    "ten_task_p50_reduction_pct_min": 55,
+    "ten_task_p95_reduction_pct_min": 45,
+    "ten_task_output_reduction_pct_min": 25,
+    "ten_task_argv_reduction_pct_min": 65,
+    "batch_100_afol_calls_max": 4,
+    "batch_100_verification_runs_max": 1,
+    "batch_100_argv_chars_max": 120,
+    "batch_100_output_bytes_max": 5000,
+    "batch_100_duration_ms_max": 10000
+  }
+}

@@ -278,6 +278,23 @@ bun run validate:project-benchmarks
 bun run validate:release
 ```
 
+For multi-task lifecycle throughput:
+
+```bash
+bun run benchmark:multitask
+bun run benchmark:multitask:smoke
+bun run benchmark:multitask --save
+bun run benchmark:multitask:json
+```
+
+The default command runs 12 paired sequential/batch samples and fails when the
+versioned baseline gates regress. It compares AFOL calls, verification runs,
+authored hot-path characters, forced output bytes, p50/p95 latency, and the
+100-task boundary. `:smoke` is a one-run functional check and never makes a
+quality claim. `--save` writes the full JSON result under
+`.afol/data/benchmarks/results/`; temporary fixtures are removed unless
+`--keep-fixture` is explicitly requested.
+
 Release evidence is scoped to the observed Linux x64 path. The CI release
 runner is Ubuntu 24.04 x64; that evidence must not be generalized to Windows,
 macOS, or ARM. Run `bun run smoke:wsl2` separately from an observed Linux x64

@@ -1,0 +1,203 @@
+{
+  "schema": "afol.multitask-throughput/v2",
+  "generated_at": "2026-07-29T20:49:42.221Z",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "bun_version": "1.3.14",
+    "timing_mode": "paired-relative"
+  },
+  "runs": 12,
+  "first_attempt_success": true,
+  "retries": 0,
+  "scaling": [
+    {
+      "task_count": 1,
+      "sequential": {
+        "afolCalls": 4,
+        "verificationRuns": 1,
+        "durationMs": 323,
+        "outputBytes": 1692,
+        "argvChars": 22
+      },
+      "batch": {
+        "afolCalls": 4,
+        "verificationRuns": 1,
+        "durationMs": 317,
+        "outputBytes": 1612,
+        "argvChars": 22
+      }
+    },
+    {
+      "task_count": 5,
+      "sequential": {
+        "afolCalls": 12,
+        "verificationRuns": 5,
+        "durationMs": 909,
+        "outputBytes": 2028,
+        "argvChars": 106
+      },
+      "batch": {
+        "afolCalls": 4,
+        "verificationRuns": 1,
+        "durationMs": 401,
+        "outputBytes": 1609,
+        "argvChars": 34
+      }
+    },
+    {
+      "task_count": 10,
+      "sequential": {
+        "afolCalls": 22,
+        "verificationRuns": 10,
+        "durationMs": 1722,
+        "outputBytes": 2464,
+        "argvChars": 211
+      },
+      "batch": {
+        "afolCalls": 4,
+        "verificationRuns": 1,
+        "durationMs": 470,
+        "outputBytes": 1628,
+        "argvChars": 34
+      }
+    }
+  ],
+  "batch_boundary_100": {
+    "afolCalls": 4,
+    "verificationRuns": 1,
+    "durationMs": 1805,
+    "outputBytes": 1665,
+    "argvChars": 36
+  },
+  "repeated_10_tasks": {
+    "sequential": {
+      "afol_calls": 22,
+      "verification_runs": 10,
+      "samples_ms": [
+        1673,
+        1667,
+        1692,
+        1740,
+        1674,
+        1748,
+        2110,
+        1760,
+        1710,
+        1651,
+        1780,
+        1722
+      ],
+      "p50_ms": 1710,
+      "p95_ms": 2110,
+      "output_bytes_p50": 2432,
+      "argv_chars_p50": 211
+    },
+    "batch": {
+      "afol_calls": 4,
+      "verification_runs": 1,
+      "samples_ms": [
+        420,
+        441,
+        474,
+        407,
+        439,
+        497,
+        532,
+        457,
+        425,
+        478,
+        454,
+        424
+      ],
+      "p50_ms": 441,
+      "p95_ms": 532,
+      "output_bytes_p50": 1596,
+      "argv_chars_p50": 34
+    }
+  },
+  "comparison": {
+    "status": "passed",
+    "baseline_id": "multitask-throughput-v1",
+    "quality_claim": true,
+    "gates": [
+      {
+        "id": "ten_task_call_reduction_pct",
+        "actual": 81.8,
+        "operator": ">=",
+        "expected": 75,
+        "ok": true
+      },
+      {
+        "id": "ten_task_verification_reduction_pct",
+        "actual": 90,
+        "operator": ">=",
+        "expected": 80,
+        "ok": true
+      },
+      {
+        "id": "ten_task_p50_reduction_pct",
+        "actual": 74.2,
+        "operator": ">=",
+        "expected": 55,
+        "ok": true
+      },
+      {
+        "id": "ten_task_p95_reduction_pct",
+        "actual": 74.8,
+        "operator": ">=",
+        "expected": 45,
+        "ok": true
+      },
+      {
+        "id": "ten_task_output_reduction_pct",
+        "actual": 34.4,
+        "operator": ">=",
+        "expected": 25,
+        "ok": true
+      },
+      {
+        "id": "ten_task_argv_reduction_pct",
+        "actual": 83.9,
+        "operator": ">=",
+        "expected": 65,
+        "ok": true
+      },
+      {
+        "id": "batch_100_afol_calls",
+        "actual": 4,
+        "operator": "<=",
+        "expected": 4,
+        "ok": true
+      },
+      {
+        "id": "batch_100_verification_runs",
+        "actual": 1,
+        "operator": "<=",
+        "expected": 1,
+        "ok": true
+      },
+      {
+        "id": "batch_100_argv_chars",
+        "actual": 36,
+        "operator": "<=",
+        "expected": 120,
+        "ok": true
+      },
+      {
+        "id": "batch_100_output_bytes",
+        "actual": 1665,
+        "operator": "<=",
+        "expected": 5000,
+        "ok": true
+      },
+      {
+        "id": "batch_100_duration_ms",
+        "actual": 1805,
+        "operator": "<=",
+        "expected": 10000,
+        "ok": true
+      }
+    ]
+  }
+}
