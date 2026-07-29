@@ -38,6 +38,15 @@ afol d T-01 -x "afol validate project"
 afol c -m "Validation passed"
 ```
 
+For multiple execution-policy tasks covered by the same observed check, use a
+compact range. AFOL executes the check once and records distinct evidence for
+each task:
+
+```bash
+afol st T-01..T-10
+afol d T-01..T-10 -x "afol validate project"
+```
+
 `d -x` executes an argv command without shell parsing. Use
 `afol done --test-shell "<shell expression>"` explicitly for `&&`, pipes,
 redirection, or other shell syntax.

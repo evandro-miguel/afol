@@ -1,0 +1,69 @@
+{
+  "benchmark_id": "close-report-compact-factual-v1",
+  "recorded_at": "2026-07-29T17:37:29Z",
+  "source_commit": "c640fc9d2e1de0715fed3147d96f58a99920a5e2",
+  "runtime": {
+    "bun": "1.3.14",
+    "runs": 12,
+    "command": "bun test --only-failures cli/tests/workbench-lifecycle.test.ts -t closeSession keeps generated reports factual",
+    "scope": "end-to-end focused test process; includes Bun startup",
+    "samples_ms": [161, 121, 115, 105, 142, 129, 118, 122, 141, 134, 151, 122],
+    "p50_ms": 122,
+    "p95_ms": 161,
+    "min_ms": 105,
+    "max_ms": 161,
+    "forced_output_bytes_total": 1416
+  },
+  "report_size": {
+    "token_estimator": "ceil(utf8_bytes / 4)",
+    "session_id": "260729_1132_factual-close-report-local",
+    "scenarios": [
+      {
+        "name": "short",
+        "intent_chars": 10,
+        "legacy_bytes": 186,
+        "current_bytes": 179,
+        "saved_pct": 3.8,
+        "legacy_est_tokens": 47,
+        "current_est_tokens": 45
+      },
+      {
+        "name": "typical",
+        "intent_chars": 98,
+        "legacy_bytes": 274,
+        "current_bytes": 179,
+        "saved_pct": 34.7,
+        "legacy_est_tokens": 69,
+        "current_est_tokens": 45
+      },
+      {
+        "name": "long",
+        "intent_chars": 169,
+        "legacy_bytes": 345,
+        "current_bytes": 179,
+        "saved_pct": 48.1,
+        "legacy_est_tokens": 87,
+        "current_est_tokens": 45
+      }
+    ]
+  },
+  "interaction_count": {
+    "full_flow_commands": ["afol n", "afol st", "afol d", "afol c"],
+    "before": 4,
+    "after": 4,
+    "added_interactions": 0
+  },
+  "validation": {
+    "focused": "118 pass, 0 fail",
+    "verify_surfaces": "31 pass, 0 fail",
+    "full_suite": "1783 pass, 0 fail",
+    "typecheck": "passed",
+    "biome": "passed",
+    "manual_mutation": "counting mutant killed by focused close-report tests"
+  },
+  "limits": [
+    "Timing measures the focused test process, not closeSession in isolation.",
+    "Token counts are deterministic UTF-8 byte estimates, not provider billing tokens.",
+    "The CLI close stdout contract was not changed."
+  ]
+}

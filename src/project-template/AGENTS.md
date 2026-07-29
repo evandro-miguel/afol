@@ -45,6 +45,9 @@ Replace this section after bootstrap with real product purpose and constraints.
   3. Edit and run named verification.
   4. `afol d T-01 -x "<verification command>"`
   5. `afol c`
+- When execution-policy tasks share one verification, batch them with
+  `afol st T-01..T-10`, then
+  `afol d T-01..T-10 -x "<shared verification command>"`.
 - Explicit multi-agent/CI path when session is ambiguous:
   `afol st -S {session-id} -T T-01`, then `afol d -S {session-id} -T T-01 -x "…"`,
   then `afol c -S {session-id}`.

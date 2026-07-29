@@ -9,7 +9,11 @@ export type SessionTaskArgs = {
 	taskId: string;
 };
 
-export type SessionTaskJsonArgs = SessionTaskArgs & {
+export type SessionTaskBatchArgs = SessionTaskArgs & {
+	taskIds: string[];
+};
+
+export type SessionTaskJsonArgs = SessionTaskBatchArgs & {
 	json: boolean;
 	compact: boolean;
 	brief: boolean;
@@ -24,7 +28,7 @@ export type EvidenceArgs = SessionTaskArgs & {
 	json?: boolean;
 };
 
-export type DoneArgs = SessionTaskArgs & {
+export type DoneArgs = SessionTaskBatchArgs & {
 	testCommands: string[];
 	testShellCommand: string | null;
 	verifications: VerificationSpec[];

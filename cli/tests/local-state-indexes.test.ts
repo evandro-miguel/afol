@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
 	chmodSync,
 	mkdirSync,
@@ -1500,6 +1501,103 @@ describe("local-state project indexer", () => {
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(versionPath, future, future);
 			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index excludes gitignored files but keeps tracked and unignored files", () => {
+		const root = buildFixture();
+		try {
+			writeFileSync(
+				join(root, ".gitignore"),
+				"ignored.txt\nignored-dir/\ntracked-ignored.txt\n",
+				"utf8",
+			);
+			writeFileSync(join(root, "ignored.txt"), "ignored", "utf8");
+			mkdirSync(join(root, "ignored-dir"), { recursive: true });
+			writeFileSync(join(root, "ignored-dir", "nested.txt"), "ignored", "utf8");
+			writeFileSync(join(root, "tracked.txt"), "tracked", "utf8");
+			writeFileSync(join(root, "tracked-ignored.txt"), "tracked", "utf8");
+
+			expect(spawnSync("git", ["init", "-q"], { cwd: root }).status).toBe(0);
+			expect(
+				spawnSync("git", ["add", "tracked.txt"], { cwd: root }).status,
+			).toBe(0);
+			expect(
+				spawnSync("git", ["add", "-f", "tracked-ignored.txt"], { cwd: root })
+					.status,
+			).toBe(0);
+
+			const snapshot = rebuildFilesIndex(root);
+			const paths = snapshot.files.map((entry) => entry.path);
+			expect(paths).toContain("tracked.txt");
+			expect(paths).toContain("tracked-ignored.txt");
+			expect(paths).toContain("a.txt");
+			expect(paths).not.toContain("ignored.txt");
+			expect(paths).not.toContain("ignored-dir/nested.txt");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index handles Git output larger than the child-process buffer", () => {
+		const root = buildFixture();
+		try {
+			writeFileSync(join(root, ".gitignore"), "ignored.txt\n", "utf8");
+			writeFileSync(join(root, "ignored.txt"), "ignored", "utf8");
+			const bulkDir = join(root, "bulk");
+			mkdirSync(bulkDir, { recursive: true });
+			for (let index = 0; index < 10_000; index += 1) {
+				const name = `file-${"x".repeat(90)}-${index}.txt`;
+				writeFileSync(join(bulkDir, name), "bulk", "utf8");
+			}
+
+			expect(spawnSync("git", ["init", "-q"], { cwd: root }).status).toBe(0);
+			const snapshot = rebuildFilesIndex(root);
+			expect(snapshot.files.length).toBeGreaterThan(10_000);
+			expect(snapshot.files.some((entry) => entry.path === "ignored.txt")).toBe(
+				false,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index filters a project nested under a Git root", () => {
+		const gitRoot = mkdtempSync(join(tmpdir(), "nested-git-root-"));
+		const root = join(gitRoot, "project");
+		try {
+			mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+			mkdirSync(join(root, ".agents", "skills"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+			writeFileSync(join(root, "kept.txt"), "kept", "utf8");
+			writeFileSync(join(root, "ignored.txt"), "ignored", "utf8");
+			writeFileSync(
+				join(gitRoot, ".gitignore"),
+				"project/ignored.txt\n",
+				"utf8",
+			);
+
+			expect(spawnSync("git", ["init", "-q"], { cwd: gitRoot }).status).toBe(0);
+			const snapshot = rebuildFilesIndex(root);
+			const paths = snapshot.files.map((entry) => entry.path);
+			expect(paths).toContain("kept.txt");
+			expect(paths).not.toContain("ignored.txt");
+		} finally {
+			rmSync(gitRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("files index fails closed when Git listing fails", () => {
+		const root = buildFixture();
+		try {
+			writeFileSync(join(root, "visible.txt"), "visible", "utf8");
+			expect(spawnSync("git", ["init", "-q"], { cwd: root }).status).toBe(0);
+			mkdirSync(join(root, ".git", "index"));
+
+			const snapshot = rebuildFilesIndex(root);
+			expect(snapshot.files).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

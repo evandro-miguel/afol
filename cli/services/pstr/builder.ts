@@ -3,13 +3,18 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	statSync,
 } from "node:fs";
-import { extname, isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { loadJsonObject } from "../../core/schema";
 import { computeSourceHash } from "../../core/source-hash";
 import { atomicWriteText } from "../io/atomic";
-import { resolveProjectPaths } from "../project/paths";
+import {
+	resolveProjectConfigPath,
+	resolveProjectPaths,
+} from "../project/paths";
 import type {
 	PstrAffectedArea,
 	PstrAreaRegistryEntry,
@@ -57,6 +62,151 @@ export const PSTR_AREAS: readonly PstrAreaRegistryEntry[] = [
 		tags: ["pstr", "config"],
 	},
 ];
+
+const SAFE_AREA_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function isSafeAreaToken(value: unknown): value is string {
+	return typeof value === "string" && SAFE_AREA_TOKEN.test(value);
+}
+
+function configPstrAreas(projectRoot: string): unknown {
+	const configPath = resolveProjectConfigPath(projectRoot);
+	if (!configPath) {
+		return undefined;
+	}
+	const loaded = loadJsonObject(configPath.absolutePath);
+	if (!loaded.ok) {
+		throw new Error(loaded.error);
+	}
+	const config = loaded.value;
+	if (!Object.hasOwn(config, "pstr")) {
+		return undefined;
+	}
+	if (
+		config.pstr === null ||
+		typeof config.pstr !== "object" ||
+		Array.isArray(config.pstr)
+	) {
+		throw new Error("Invalid pstr: expected an object with areas");
+	}
+	const pstr = config.pstr as Record<string, unknown>;
+	if (!Object.hasOwn(pstr, "areas")) {
+		throw new Error("Invalid pstr.areas: expected an array");
+	}
+	return pstr.areas;
+}
+
+function pathIsInside(root: string, target: string): boolean {
+	const child = relative(root, target);
+	return child === "" || (!child.startsWith("..") && !isAbsolute(child));
+}
+
+function assertConfiguredRootSafe(
+	projectRoot: string,
+	rootValue: string,
+): string {
+	const raw = rootValue.trim().replace(/\\/g, "/");
+	if (!raw || isAbsolute(raw) || /^[A-Za-z]:\//.test(raw)) {
+		throw new Error(`Invalid pstr source root: ${rootValue}`);
+	}
+	const normalized = raw.replace(/^\.\//, "").replace(/\/+/g, "/");
+	const parts = normalized.split("/").filter((part) => part && part !== ".");
+	if (parts.some((part) => part === ".." || part.toLowerCase() === ".afol")) {
+		throw new Error(`Invalid pstr source root: ${rootValue}`);
+	}
+	const relativeRoot = parts.join("/") || ".";
+	const realProjectRoot = realpathSync(projectRoot);
+	const candidate = resolve(realProjectRoot, relativeRoot);
+	let probe = candidate;
+	while (
+		!existsSync(probe) &&
+		probe !== realProjectRoot &&
+		probe !== dirnamePath(probe)
+	) {
+		probe = dirnamePath(probe);
+	}
+	const realProbe = realpathSync(probe);
+	if (!pathIsInside(realProjectRoot, realProbe)) {
+		throw new Error(`Pstr source root escapes project root: ${rootValue}`);
+	}
+	if (
+		existsSync(candidate) &&
+		!pathIsInside(realProjectRoot, realpathSync(candidate))
+	) {
+		throw new Error(
+			`Pstr source root crosses symlink outside project root: ${rootValue}`,
+		);
+	}
+	const isDirectory =
+		existsSync(candidate) && statSync(candidate).isDirectory();
+	return `${relativeRoot}${isDirectory ? "/" : ""}`;
+}
+
+function dirnamePath(pathValue: string): string {
+	const index = pathValue.lastIndexOf(sep);
+	return index <= 0 ? sep : pathValue.slice(0, index);
+}
+
+function validateAreaToken(kind: string, value: unknown): string {
+	if (typeof value !== "string" || !SAFE_AREA_TOKEN.test(value.trim())) {
+		throw new Error(`Invalid pstr ${kind}: ${String(value)}`);
+	}
+	return value.trim();
+}
+
+export function resolvePstrAreas(
+	projectRoot: string,
+): readonly PstrAreaRegistryEntry[] {
+	const configured = configPstrAreas(projectRoot);
+	if (configured === undefined) {
+		return PSTR_AREAS;
+	}
+	if (!Array.isArray(configured)) {
+		throw new Error("Invalid pstr.areas: expected an array");
+	}
+
+	const defaultsById = new Set(PSTR_AREAS.map((area) => area.id));
+	const defaultsByScope = new Set(PSTR_AREAS.map((area) => area.scope));
+	const seenIds = new Set(defaultsById);
+	const seenScopes = new Set(defaultsByScope);
+	const areas = configured.map((raw, index): PstrAreaRegistryEntry => {
+		if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+			throw new Error(`Invalid pstr.areas[${index}]: expected an object`);
+		}
+		const value = raw as Record<string, unknown>;
+		const id = validateAreaToken("area id", value.id);
+		const scope = validateAreaToken("area scope", value.scope);
+		if (seenIds.has(id)) throw new Error(`Duplicate pstr area id: ${id}`);
+		if (seenScopes.has(scope))
+			throw new Error(`Duplicate pstr area scope: ${scope}`);
+		if (!Array.isArray(value.source_roots) || value.source_roots.length === 0) {
+			throw new Error(`Invalid pstr area source_roots: ${id}`);
+		}
+		if (!Array.isArray(value.tags) || value.tags.length === 0) {
+			throw new Error(`Invalid pstr area tags: ${id}`);
+		}
+		const sourceRoots = [
+			...new Set(
+				value.source_roots.map((root) => {
+					if (typeof root !== "string")
+						throw new Error(`Invalid pstr source root: ${String(root)}`);
+					return assertConfiguredRootSafe(projectRoot, root);
+				}),
+			),
+		].sort((left, right) => left.localeCompare(right));
+		const tags = [
+			...new Set(value.tags.map((tag) => validateAreaToken("tag", tag))),
+		].sort((left, right) => left.localeCompare(right));
+		seenIds.add(id);
+		seenScopes.add(scope);
+		return { id, scope, source_roots: sourceRoots, tags };
+	});
+
+	return [
+		...PSTR_AREAS,
+		...areas.sort((left, right) => left.id.localeCompare(right.id)),
+	];
+}
 
 const STALE_AFTER_DAYS = 30;
 const EXCLUDED_DIR_SEGMENTS = new Set([
@@ -120,7 +270,7 @@ function collectFilesUnder(root: string, startPath: string): string[] {
 	}
 
 	const sourceStat = statSync(startRoot);
-	if (sourceStat.isFile() || extname(startPath) !== "") {
+	if (sourceStat.isFile()) {
 		return [toRelativeProjectPath(root, startRoot)];
 	}
 
@@ -220,9 +370,11 @@ function buildMapEntry(
 function buildLiveMapEntries(
 	projectRoot: string,
 	areaIds?: Iterable<string>,
+	areas: readonly PstrAreaRegistryEntry[] = resolvePstrAreas(projectRoot),
 ): PstrMapEntry[] {
 	const allowedIds = areaIds ? new Set(areaIds) : null;
-	return PSTR_AREAS.filter((area) => !allowedIds || allowedIds.has(area.id))
+	return areas
+		.filter((area) => !allowedIds || allowedIds.has(area.id))
 		.map((area) => buildMapEntry(projectRoot, area))
 		.filter((entry) => entry.file_count > 0);
 }
@@ -231,6 +383,7 @@ function mergePstrMapEntries(
 	previousMaps: PstrMapEntry[],
 	affectedAreaIds: string[],
 	replacementEntries: PstrMapEntry[],
+	areas: readonly PstrAreaRegistryEntry[],
 ): PstrMapEntry[] {
 	const affectedIdSet = new Set(affectedAreaIds);
 	const previousById = new Map(previousMaps.map((entry) => [entry.id, entry]));
@@ -238,16 +391,19 @@ function mergePstrMapEntries(
 		replacementEntries.map((entry) => [entry.id, entry]),
 	);
 
-	return PSTR_AREAS.map((area) =>
-		affectedIdSet.has(area.id)
-			? replacementById.get(area.id)
-			: previousById.get(area.id),
-	).filter((entry): entry is PstrMapEntry => Boolean(entry));
+	return areas
+		.map((area) =>
+			affectedIdSet.has(area.id)
+				? replacementById.get(area.id)
+				: previousById.get(area.id),
+		)
+		.filter((entry): entry is PstrMapEntry => Boolean(entry));
 }
 
 function buildPstrSnapshot(
 	projectRoot: string,
 	maps: PstrMapEntry[],
+	areas: readonly PstrAreaRegistryEntry[],
 ): PstrIndexSnapshot {
 	const pstrPaths = resolveProjectPaths(projectRoot);
 	const snapshot: PstrIndexSnapshot = {
@@ -262,13 +418,16 @@ function buildPstrSnapshot(
 	};
 	return {
 		...snapshot,
-		manifest: buildPstrSnapshotManifest(snapshot),
+		manifest: buildPstrSnapshotManifest(snapshot, projectRoot, areas),
 	};
 }
 
 function sourceRootMatchesPath(path: string, sourceRoot: string): boolean {
 	const normalizedSourceRoot = normalizeRelativePath(sourceRoot);
 	if (sourceRoot.endsWith("/")) {
+		if (normalizedSourceRoot === ".") {
+			return true;
+		}
 		return (
 			path === normalizedSourceRoot ||
 			path.startsWith(`${normalizedSourceRoot}/`)
@@ -277,8 +436,12 @@ function sourceRootMatchesPath(path: string, sourceRoot: string): boolean {
 	return path === normalizedSourceRoot;
 }
 
-function getAreaById(id: string): PstrAreaRegistryEntry | undefined {
-	return PSTR_AREAS.find((area) => area.id === id);
+function getAreaById(
+	projectRoot: string,
+	id: string,
+	areas: readonly PstrAreaRegistryEntry[] = resolvePstrAreas(projectRoot),
+): PstrAreaRegistryEntry | undefined {
+	return areas.find((area) => area.id === id);
 }
 
 function compareStringArrays(left: string[], right: string[]): boolean {
@@ -333,7 +496,7 @@ function buildDiffEntry(
 	snapshot: PstrMapEntry | null,
 	live: PstrMapEntry | null,
 ): PstrDiffEntry {
-	const area = getAreaById(id);
+	const area = getAreaById(root, id);
 	return {
 		id,
 		scope: live?.scope ?? snapshot?.scope ?? area?.scope ?? id,
@@ -377,7 +540,10 @@ function manifestMatchesSnapshot(
 	manifest: PstrSnapshotManifest,
 	snapshot: PstrIndexSnapshot,
 ): boolean {
-	const expected = buildPstrSnapshotManifest(snapshot);
+	const expected = buildPstrSnapshotManifest(
+		snapshot,
+		snapshot.source.project_root,
+	);
 	if (!compareStringArrays(manifest.area_order, expected.area_order)) {
 		return false;
 	}
@@ -405,10 +571,14 @@ function manifestMatchesSnapshot(
 
 export function buildPstrSnapshotManifest(
 	input: Pick<PstrIndexSnapshot, "maps">,
+	projectRoot?: string,
+	areaRegistry?: readonly PstrAreaRegistryEntry[],
 ): PstrSnapshotManifest {
-	const areas = Object.fromEntries(
+	const resolvedAreas =
+		areaRegistry ?? (projectRoot ? resolvePstrAreas(projectRoot) : PSTR_AREAS);
+	const areaEntries = Object.fromEntries(
 		input.maps.map((entry) => {
-			const area = getAreaById(entry.id);
+			const area = resolvedAreas.find((candidate) => candidate.id === entry.id);
 			return [
 				entry.id,
 				{
@@ -429,7 +599,7 @@ export function buildPstrSnapshotManifest(
 
 	return {
 		area_order: input.maps.map((entry) => entry.id),
-		areas,
+		areas: areaEntries,
 	};
 }
 
@@ -437,12 +607,13 @@ export function getPstrAffectedAreas(
 	projectRoot: string,
 	changedPaths: string[],
 ): PstrAffectedArea[] {
+	const areas = resolvePstrAreas(projectRoot);
 	return uniqueSorted(
 		changedPaths
 			.map((pathValue) => normalizeChangedPath(projectRoot, pathValue))
 			.filter((pathValue) => pathValue.length > 0),
 	).map((pathValue) => {
-		const affected = PSTR_AREAS.filter((area) =>
+		const affected = areas.filter((area) =>
 			area.source_roots.some((sourceRoot) =>
 				sourceRootMatchesPath(pathValue, sourceRoot),
 			),
@@ -467,22 +638,30 @@ function getAffectedAreaIds(
 }
 
 export function buildPstrIndexSnapshot(projectRoot: string): PstrIndexSnapshot {
-	return buildPstrSnapshot(projectRoot, buildLiveMapEntries(projectRoot));
+	const areas = resolvePstrAreas(projectRoot);
+	return buildPstrSnapshot(
+		projectRoot,
+		buildLiveMapEntries(projectRoot, undefined, areas),
+		areas,
+	);
 }
 
 export function buildPstrDiff(
 	root: string,
 	options: PstrRebuildOptions = {},
 ): PstrDiffResult {
+	const areas = resolvePstrAreas(root);
 	const liveMaps = new Map(
-		buildLiveMapEntries(root).map((entry) => [entry.id, entry] as const),
+		buildLiveMapEntries(root, undefined, areas).map(
+			(entry) => [entry.id, entry] as const,
+		),
 	);
 	const snapshot = loadValidPstrIndex(root);
 	const snapshotMaps = new Map(
 		(snapshot?.maps ?? []).map((entry) => [entry.id, entry] as const),
 	);
 	const allIds = uniqueSorted([
-		...PSTR_AREAS.map((area) => area.id),
+		...areas.map((area) => area.id),
 		...snapshotMaps.keys(),
 		...liveMaps.keys(),
 	]);
@@ -560,20 +739,22 @@ export function buildPstrDiff(
 }
 
 export function detectPstrAreas(projectRoot: string): PstrDetectedArea[] {
-	return PSTR_AREAS.map((area) => {
-		const files = uniqueSorted(
-			area.source_roots.flatMap((sourcePath) =>
-				collectSourceFiles(projectRoot, sourcePath),
-			),
-		);
-		return {
-			id: area.id,
-			scope: area.scope,
-			source_roots: [...area.source_roots],
-			file_count: files.length,
-			tags: uniqueSorted(area.tags),
-		};
-	}).filter((area) => area.file_count > 0);
+	return resolvePstrAreas(projectRoot)
+		.map((area) => {
+			const files = uniqueSorted(
+				area.source_roots.flatMap((sourcePath) =>
+					collectSourceFiles(projectRoot, sourcePath),
+				),
+			);
+			return {
+				id: area.id,
+				scope: area.scope,
+				source_roots: [...area.source_roots],
+				file_count: files.length,
+				tags: uniqueSorted(area.tags),
+			};
+		})
+		.filter((area) => area.file_count > 0);
 }
 
 export function suggestPstrChanges(root: string): PstrSuggestion[] {
@@ -642,6 +823,9 @@ function pstrIndexPath(root: string): string {
 }
 
 function pstrAreaPath(root: string, areaId: string): string {
+	if (!isSafeAreaToken(areaId)) {
+		throw new Error(`Invalid pstr section id: ${areaId}`);
+	}
 	return join(resolveProjectPaths(root).abs.pstrDir, `${areaId}.md`);
 }
 
@@ -712,8 +896,8 @@ function manifestShapeIsValid(
 		(entry) =>
 			entry &&
 			typeof entry === "object" &&
-			typeof entry.id === "string" &&
-			typeof entry.scope === "string" &&
+			isSafeAreaToken(entry.id) &&
+			isSafeAreaToken(entry.scope) &&
 			(entry.status === "current" ||
 				entry.status === "stale" ||
 				entry.status === "partial" ||
@@ -747,8 +931,8 @@ function snapshotShapeIsValid(
 			Array.isArray(snapshot.maps) &&
 			snapshot.maps.every(
 				(entry) =>
-					typeof entry.id === "string" &&
-					typeof entry.scope === "string" &&
+					isSafeAreaToken(entry.id) &&
+					isSafeAreaToken(entry.scope) &&
 					(entry.status === "current" ||
 						entry.status === "stale" ||
 						entry.status === "partial" ||
@@ -772,6 +956,7 @@ export function rebuildPstrIndex(
 	projectRoot: string,
 	options: PstrRebuildOptions = {},
 ): PstrIndexSnapshot {
+	const areas = resolvePstrAreas(projectRoot);
 	const rawPreviousSnapshot = loadValidPstrIndex(projectRoot);
 	const previousSnapshot = snapshotBelongsToRoot(
 		projectRoot,
@@ -779,8 +964,16 @@ export function rebuildPstrIndex(
 	)
 		? rawPreviousSnapshot
 		: null;
+	const registryConfigChanged = options.changedPaths?.some((pathValue) => {
+		const normalized = normalizeChangedPath(projectRoot, pathValue);
+		return (
+			normalized === ".afol/config.json" || normalized === ".agents/config.json"
+		);
+	});
 	const affectedAreaIds =
-		options.changedPaths && options.changedPaths.length > 0
+		!registryConfigChanged &&
+		options.changedPaths &&
+		options.changedPaths.length > 0
 			? getAffectedAreaIds(projectRoot, options.changedPaths)
 			: null;
 	let snapshot: PstrIndexSnapshot;
@@ -793,9 +986,11 @@ export function rebuildPstrIndex(
 				previousSnapshot.maps,
 				affectedAreaIds,
 				affectedAreaIds.length > 0
-					? buildLiveMapEntries(projectRoot, affectedAreaIds)
+					? buildLiveMapEntries(projectRoot, affectedAreaIds, areas)
 					: [],
+				areas,
 			),
+			areas,
 		);
 		rewrittenAreaIds = affectedAreaIds;
 	} else {
@@ -834,6 +1029,14 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 	const snapshot = readJsonFile<PstrIndexSnapshot>(indexPath);
 	if (!snapshotShapeIsValid(snapshot)) {
 		return { ok: false, message: `invalid pstr index snapshot: ${indexPath}` };
+	}
+	try {
+		resolvePstrAreas(root);
+	} catch (error) {
+		return {
+			ok: false,
+			message: `invalid pstr area configuration: ${(error as Error).message}`,
+		};
 	}
 
 	const paths = resolveProjectPaths(root);
@@ -901,6 +1104,7 @@ export function checkPstrStale(
 }
 
 export function getPstrIndex(root: string): PstrIndexSnapshot | null {
+	resolvePstrAreas(root);
 	const indexPath = pstrIndexPath(root);
 	if (!existsSync(indexPath)) {
 		return null;
@@ -922,16 +1126,20 @@ export function getPstrSection(
 			message: `missing pstr index snapshot: ${pstrIndexPath(root)}`,
 		};
 	}
+	const areas = resolvePstrAreas(root);
 
 	const needle = idOrScope.trim().toLowerCase();
 	if (!needle) {
 		return null;
 	}
 
-	const entry = index.maps.find(
-		(map) =>
-			map.id.toLowerCase() === needle || map.scope.toLowerCase() === needle,
-	);
+	const entry = index.maps.find((map) => {
+		const area = areas.find((candidate) => candidate.id === map.id);
+		return Boolean(
+			area &&
+				(map.id.toLowerCase() === needle || map.scope.toLowerCase() === needle),
+		);
+	});
 	if (!entry) {
 		return null;
 	}

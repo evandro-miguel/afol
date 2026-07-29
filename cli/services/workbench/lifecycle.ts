@@ -54,6 +54,7 @@ import {
 	completionPolicyFromNotes,
 	evidenceCompletionAuthorization,
 	evidenceCompletionStatus,
+	evidenceResultIsFailure,
 	verifyWorkbenchTasks,
 } from "./verify";
 
@@ -490,18 +491,33 @@ function renderCloseReport(
 		closeMarkdownText(summary),
 		"",
 		"## Tasks",
-		...taskRows.map(
-			(row) =>
-				`- ${row.taskId}: ${row.state}${row.notes ? ` — ${closeMarkdownText(row.notes)}` : ""}`,
-		),
+		...taskRows.map((row) => `- ${row.taskId}: ${row.state}`),
 		"",
 		"## Evidence",
 		...evidence.map(
 			(entry) =>
-				`- ${entry.task_id}: ${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
+				`- ${entry.task_id}: ${entry.provenance === "observed" ? "" : "declared "}${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
 		),
 	];
 	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
+}
+
+function factualCloseSummary(
+	taskRows: TaskRow[],
+	evidence: EvidenceEntry[],
+): string {
+	let observed = 0;
+	let failed = 0;
+	for (const entry of evidence) {
+		if (entry.provenance === "observed") observed += 1;
+		if (
+			evidenceResultIsFailure(entry.result) ||
+			(typeof entry.exit_code === "number" && entry.exit_code !== 0)
+		) {
+			failed += 1;
+		}
+	}
+	return `closed: ${taskRows.length} task${taskRows.length === 1 ? "" : "s"}; evidence: ${observed} observed, ${failed} failed`;
 }
 
 function explicitTaskSummaries(metadata?: NewWorkstreamMetadata): string[] {
@@ -902,23 +918,48 @@ function transitionTaskStateChain(
 	nextStates: readonly TaskState[],
 	completionPolicy?: CompletionPolicy,
 ): void {
-	if (nextStates.length === 0) return;
+	transitionTaskStateChains(taskPath, [
+		{
+			taskId,
+			nextStates,
+			...(completionPolicy ? { completionPolicy } : {}),
+		},
+	]);
+}
+
+function transitionTaskStateChains(
+	taskPath: string,
+	changes: readonly {
+		taskId: string;
+		nextStates: readonly TaskState[];
+		completionPolicy?: CompletionPolicy;
+	}[],
+): void {
+	const pending = new Map(
+		changes
+			.filter((change) => change.nextStates.length > 0)
+			.map((change) => [change.taskId, change]),
+	);
+	if (pending.size === 0) return;
 	const lines = readFileSync(taskPath, "utf8").split("\n");
-	let changed = false;
+	const found = new Set<string>();
 	const nextLines = lines.map((line) => {
 		const parsedRow = parseTaskRow(line);
-		if (!parsedRow || parsedRow.taskId !== taskId) {
+		const change = parsedRow ? pending.get(parsedRow.taskId) : undefined;
+		if (!parsedRow || !change) {
 			return line;
 		}
-		changed = true;
+		found.add(parsedRow.taskId);
 		let row = parsedRow;
-		for (const nextState of nextStates) {
+		for (const nextState of change.nextStates) {
 			if (!isTaskState(row.state)) {
-				throw new Error(`Task ${taskId} has invalid state: ${row.state}.`);
+				throw new Error(
+					`Task ${parsedRow.taskId} has invalid state: ${row.state}.`,
+				);
 			}
 			if (!TASK_STATE_TRANSITIONS[row.state].includes(nextState)) {
 				throw new Error(
-					`Invalid task transition for ${taskId}: ${row.state} -> ${nextState}.`,
+					`Invalid task transition for ${parsedRow.taskId}: ${row.state} -> ${nextState}.`,
 				);
 			}
 			const nextAttempt =
@@ -928,7 +969,7 @@ function transitionTaskStateChain(
 			const baseNotes = row.notes
 				.replace(/(?:^|\s)attempt=\d+(?=\s|$)/g, " ")
 				.trim();
-			const policyNotes = completionPolicy
+			const policyNotes = change.completionPolicy
 				? [
 						baseNotes
 							.replace(
@@ -936,7 +977,7 @@ function transitionTaskStateChain(
 								" ",
 							)
 							.trim(),
-						`completion_policy=${completionPolicy}`,
+						`completion_policy=${change.completionPolicy}`,
 					]
 						.filter(Boolean)
 						.join(" ")
@@ -953,8 +994,9 @@ function transitionTaskStateChain(
 		}
 		return renderTaskRow(row);
 	});
-	if (!changed) {
-		throw new Error(`Task ${taskId} not found in ${taskPath}`);
+	const missing = [...pending.keys()].filter((taskId) => !found.has(taskId));
+	if (missing.length > 0) {
+		throw new Error(`Task ${missing.join(", ")} not found in ${taskPath}`);
 	}
 	atomicWriteText(taskPath, `${nextLines.join("\n").replace(/\n*$/g, "")}\n`);
 }
@@ -1243,35 +1285,59 @@ export function startTask(
 	input: WorkbenchTaskRef,
 	runtime: LifecycleAuxiliaryRuntime = {},
 ): string[] {
+	return startTasks(
+		root,
+		{ session: input.session, taskIds: [input.taskId] },
+		runtime,
+	);
+}
+
+export function startTasks(
+	root: string,
+	input: { session: string; taskIds: readonly string[] },
+	runtime: LifecycleAuxiliaryRuntime = {},
+): string[] {
 	return withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
 		ensureSessionOpenForMutation(root, input.session);
-		transitionTaskState(paths.taskPath, input.taskId, "in_progress");
+		const taskIds = [...new Set(input.taskIds)];
+		if (taskIds.length === 0) {
+			throw new Error("start requires at least one task.");
+		}
+		transitionTaskStateChains(
+			paths.taskPath,
+			taskIds.map((taskId) => ({
+				taskId,
+				nextStates: ["in_progress"],
+			})),
+		);
 		const warnings: string[] = [];
-		auxiliaryWarning(
-			warnings,
-			"workbench start event",
-			() =>
-				appendWorkbenchEvent(root, {
-					type: "workbench.start_task",
-					session: input.session,
-					taskId: input.taskId,
-				}),
-			runtime,
-		);
-		auxiliaryWarning(
-			warnings,
-			"task-start telemetry",
-			() =>
-				appendTelemetryEvent(root, {
-					event_type: "task_start",
-					session_id: input.session,
-					task_id: input.taskId,
-					cmd_type: "start",
-					outcome: "success",
-				}),
-			runtime,
-		);
+		for (const taskId of taskIds) {
+			auxiliaryWarning(
+				warnings,
+				"workbench start event",
+				() =>
+					appendWorkbenchEvent(root, {
+						type: "workbench.start_task",
+						session: input.session,
+						taskId,
+					}),
+				runtime,
+			);
+			auxiliaryWarning(
+				warnings,
+				"task-start telemetry",
+				() =>
+					appendTelemetryEvent(root, {
+						event_type: "task_start",
+						session_id: input.session,
+						task_id: taskId,
+						cmd_type: "start",
+						outcome: "success",
+					}),
+				runtime,
+			);
+		}
 		auxiliaryWarning(
 			warnings,
 			"local-state refresh",
@@ -2227,6 +2293,80 @@ export type CompleteObservedTaskResult = {
 	warnings: string[];
 };
 
+export type CompleteObservedTasksInput = Omit<
+	CompleteObservedTaskInput,
+	"taskId"
+> & {
+	taskIds: readonly string[];
+	taskAttemptSnapshots?: Readonly<Record<string, number>>;
+};
+
+export type CompleteObservedTasksResult = {
+	evidence: EvidenceEntry[];
+	done: DoneTaskResult[];
+	warnings: string[];
+};
+
+function assertObservedBatchTaskRows(
+	root: string,
+	session: string,
+	taskIds: readonly string[],
+	expectedAttempts?: Readonly<Record<string, number>>,
+): Record<string, number> {
+	ensureSessionOpenForMutation(root, session);
+	const paths = sessionPaths(root, session);
+	const rows = readTaskRows(paths.taskPath);
+	const attempts: Record<string, number> = {};
+	for (const taskId of taskIds) {
+		const row = rows.find((entry) => entry.taskId === taskId);
+		if (!row) {
+			throw new Error(`Task ${taskId} not found in ${session}.`);
+		}
+		observedCompletionTransitionChain(row.state, taskId);
+		if (completionPolicyFromNotes(row.notes) !== "execution") {
+			throw new Error(
+				`Batch done supports execution-policy tasks only: ${taskId}.`,
+			);
+		}
+		if (expectedAttempts && row.attempt !== expectedAttempts[taskId]) {
+			throw new Error(
+				`Task ${taskId} attempt changed during shared verification.`,
+			);
+		}
+		attempts[taskId] = row.attempt;
+	}
+	return attempts;
+}
+
+function assertObservedBatchTaskAttempts(
+	root: string,
+	session: string,
+	taskIds: readonly string[],
+	expectedAttempts: Readonly<Record<string, number>>,
+): void {
+	const rows = readTaskRows(sessionPaths(root, session).taskPath);
+	for (const taskId of taskIds) {
+		const row = rows.find((entry) => entry.taskId === taskId);
+		if (!row) {
+			throw new Error(`Task ${taskId} not found in ${session}.`);
+		}
+		if (row.attempt !== expectedAttempts[taskId]) {
+			throw new Error(
+				`Task ${taskId} attempt changed during shared verification.`,
+			);
+		}
+	}
+}
+
+export function assertObservedBatchTasksReady(
+	root: string,
+	input: { session: string; taskIds: readonly string[] },
+): Record<string, number> {
+	return withSessionLock(root, input.session, () => {
+		return assertObservedBatchTaskRows(root, input.session, input.taskIds);
+	});
+}
+
 /** Complete an observed test and task under one lock with one state refresh. */
 export function completeObservedTask(
 	root: string,
@@ -2300,6 +2440,109 @@ export function completeObservedTask(
 	});
 }
 
+/** Apply one observed verification result to multiple tasks under one lock. */
+export function completeObservedTasks(
+	root: string,
+	input: CompleteObservedTasksInput,
+	runtime: LifecycleAuxiliaryRuntime = {},
+): CompleteObservedTasksResult {
+	return withSessionLock(root, input.session, () => {
+		ensureSessionOpenForMutation(root, input.session);
+		const taskIds = [...new Set(input.taskIds)];
+		if (taskIds.length < 2) {
+			throw new Error("Batch completion requires at least two tasks.");
+		}
+		if (input.taskAttemptSnapshots) {
+			assertObservedBatchTaskAttempts(
+				root,
+				input.session,
+				taskIds,
+				input.taskAttemptSnapshots,
+			);
+		}
+		if (input.exitCode === 0) {
+			assertObservedBatchTaskRows(
+				root,
+				input.session,
+				taskIds,
+				input.taskAttemptSnapshots,
+			);
+		}
+
+		const evidence: EvidenceEntry[] = [];
+		const done: DoneTaskResult[] = [];
+		const warnings: string[] = [];
+		const deferredEventRecords: Record<string, unknown>[] = [];
+		try {
+			for (const taskId of taskIds) {
+				runtime.fencingCheck?.();
+				const entry = recordEvidence(
+					root,
+					{
+						...input,
+						taskId,
+						result: input.exitCode === 0 ? "passed" : "failed",
+						provenance: "observed",
+					},
+					{
+						...runtime,
+						deferLocalStateRefresh: true,
+						deferredEventRecords,
+						sessionMutationValidated: true,
+					},
+				);
+				evidence.push(entry);
+				warnings.push(...(entry.warnings ?? []));
+				if (input.exitCode === 0) {
+					const completion = doneTask(
+						root,
+						{ session: input.session, taskId },
+						{
+							...runtime,
+							deferLocalStateRefresh: true,
+							deferredEventRecords,
+							completeObservedTransitionChain: true,
+							sessionMutationValidated: true,
+							authorizingEvidence: entry,
+						},
+					);
+					done.push(completion);
+					warnings.push(...(completion.warnings ?? []));
+				}
+			}
+			if (input.exitCode === 0) {
+				warnings.push(
+					...observeCompletedSession(
+						root,
+						input.session,
+						runtime,
+						"production-day",
+					),
+				);
+			}
+		} finally {
+			if (evidence.length > 0) {
+				auxiliaryWarning(
+					warnings,
+					"local-state refresh",
+					() =>
+						refreshWorkbenchLocalState(
+							root,
+							input.session,
+							deferredEventRecords,
+						),
+					runtime,
+				);
+			}
+		}
+		return {
+			evidence,
+			done,
+			warnings: [...new Set(warnings)],
+		};
+	});
+}
+
 export function closeSession(
 	root: string,
 	session: string,
@@ -2363,6 +2606,11 @@ export function closeSession(
 					);
 				}
 			}
+			let reportEvidence: EvidenceEntry[] | undefined;
+			const getReportEvidence = () => {
+				reportEvidence ??= loadEvidenceEntries(paths.evidencePath);
+				return reportEvidence;
+			};
 			if (summary) {
 				summarySource = "flag";
 			} else if (reportStatus === "waived") {
@@ -2372,10 +2620,14 @@ export function closeSession(
 				summary = logSummary;
 				summarySource = "log";
 			} else {
-				summary = `Strict verification passed for ${taskRows.length} task${taskRows.length === 1 ? "" : "s"}.`;
+				summary = factualCloseSummary(taskRows, getReportEvidence());
 				summarySource = "state";
 			}
 			const summaryText = closeMarkdownText(summary);
+			const reportSummary =
+				summarySource === "flag" || summarySource === "log"
+					? `declared: ${summaryText}`
+					: summaryText;
 			const nextLog = canonicalizeLogSummary(originalLog, summaryText);
 			const reportWasPresent = existsSync(reportPath);
 			let reportCreated = false;
@@ -2387,8 +2639,8 @@ export function closeSession(
 						renderCloseReport(
 							session,
 							taskRows,
-							loadEvidenceEntries(paths.evidencePath),
-							summaryText,
+							getReportEvidence(),
+							reportSummary,
 						),
 						{ syncDirectory: false },
 					);

@@ -1,6 +1,6 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-import { PSTR_AREAS } from "./builder";
+import { resolvePstrAreas } from "./builder";
 
 const EXCLUDED_DIR_SEGMENTS = new Set([
 	"node_modules",
@@ -38,6 +38,16 @@ function resolveWatchAnchor(
 		candidate = dirname(candidate);
 	}
 	if (!existsSync(candidate)) {
+		return null;
+	}
+	try {
+		const realRoot = realpathSync(root);
+		const realCandidate = realpathSync(candidate);
+		const realRelative = relative(realRoot, realCandidate).replace(/\\/g, "/");
+		if (realRelative === ".." || realRelative.startsWith("../")) {
+			return null;
+		}
+	} catch {
 		return null;
 	}
 	const relativeCandidate = relative(root, candidate).replace(/\\/g, "/");
@@ -114,7 +124,7 @@ export function getPstrWatchTargets(
 	const seeds =
 		requestedPaths.length > 0
 			? requestedPaths
-			: PSTR_AREAS.flatMap((area) => area.source_roots);
+			: resolvePstrAreas(projectRoot).flatMap((area) => area.source_roots);
 	return [
 		...new Set(
 			seeds.flatMap((path) => {

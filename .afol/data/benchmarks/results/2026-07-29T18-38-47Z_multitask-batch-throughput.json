@@ -1,0 +1,90 @@
+{
+  "benchmark_id": "multitask-batch-throughput-v1",
+  "recorded_at": "2026-07-29T18:38:47Z",
+  "source_commit": "5ffe5ac374ebfa14cbec915dce00d55b440b4009",
+  "runtime": {
+    "bun": "1.3.14",
+    "platform": "linux-x64",
+    "benchmark_command": "bun run benchmark:multitask --runs 12",
+    "verification_command": "true"
+  },
+  "contract": {
+    "sequential_shape": [
+      "afol new",
+      "afol start T-xx per task",
+      "afol done T-xx --test true per task",
+      "afol close"
+    ],
+    "batch_shape": [
+      "afol new",
+      "afol start T-01..T-10",
+      "afol done T-01..T-10 --test true",
+      "afol close"
+    ],
+    "shared_check_executions": 1,
+    "evidence_entries_per_task": 1,
+    "completion_policy": "execution"
+  },
+  "scaling_sample": [
+    {
+      "task_count": 1,
+      "sequential": { "afol_calls": 4, "duration_ms": 370, "output_bytes": 1692 },
+      "batch": { "afol_calls": 4, "duration_ms": 358, "output_bytes": 1612 }
+    },
+    {
+      "task_count": 5,
+      "sequential": { "afol_calls": 12, "duration_ms": 983, "output_bytes": 2028 },
+      "batch": { "afol_calls": 4, "duration_ms": 431, "output_bytes": 1609 }
+    },
+    {
+      "task_count": 10,
+      "sequential": { "afol_calls": 22, "duration_ms": 2094, "output_bytes": 2464 },
+      "batch": { "afol_calls": 4, "duration_ms": 534, "output_bytes": 1628 }
+    }
+  ],
+  "repeated_10_task_run": {
+    "runs": 12,
+    "sequential": {
+      "afol_calls": 22,
+      "samples_ms": [1919, 1830, 1845, 2044, 2064, 1984, 2004, 2082, 2290, 2083, 1967, 1946],
+      "p50_ms": 1984,
+      "p95_ms": 2290,
+      "output_bytes_p50": 2432,
+      "estimated_output_tokens_p50": 608
+    },
+    "batch": {
+      "afol_calls": 4,
+      "samples_ms": [492, 440, 537, 544, 478, 500, 524, 866, 498, 479, 583, 517],
+      "p50_ms": 500,
+      "p95_ms": 866,
+      "output_bytes_p50": 1596,
+      "estimated_output_tokens_p50": 399
+    },
+    "improvement_pct": {
+      "afol_calls": 81.8,
+      "p50_latency": 74.8,
+      "p95_latency": 62.2,
+      "output_bytes_p50": 34.4
+    }
+  },
+  "validation": {
+    "focused_tests": "209 pass, 0 fail",
+    "full_suite": "passed through observed batch evidence",
+    "typecheck": "passed",
+    "biome": "passed",
+    "template_check": "passed",
+    "manifest_check": "passed",
+    "security_required": "OSV and Gitleaks passed",
+    "manual_mutations": [
+      "removed preflight: killed",
+      "completed only first selected task: killed"
+    ]
+  },
+  "limits": [
+    "Durations include AFOL process startup and lifecycle I/O but exclude scaffold bootstrap.",
+    "Output token values are ceil(UTF-8 bytes / 4), not provider billing tokens.",
+    "Batch completion intentionally supports one shared observed check for execution-policy tasks.",
+    "Project validation remains blocked by one pre-existing evidence issue in an unrelated open session.",
+    "Release validation remains blocked by the pre-existing mutation-safety calibration-pending baseline."
+  ]
+}

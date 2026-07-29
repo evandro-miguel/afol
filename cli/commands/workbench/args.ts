@@ -18,6 +18,49 @@ import {
 	splitCommandLine,
 } from "./verify";
 
+const TASK_SELECTOR_ITEM_RE = /^T-(\d{2,3})(?:\.\.T-(\d{2,3}))?$/;
+const TASK_SELECTOR_MAX_TASKS = 100;
+
+function parseTaskSelector(selector: string): string[] {
+	const taskIds: string[] = [];
+	const seen = new Set<string>();
+	for (const item of selector.split(",")) {
+		const normalized = item.trim();
+		const match = normalized.match(TASK_SELECTOR_ITEM_RE);
+		if (!match) {
+			throw new Error(`Invalid task selector: ${normalized || selector}.`);
+		}
+		const startText = match[1] ?? "";
+		const endText = match[2];
+		const start = Number.parseInt(startText, 10);
+		const end = endText ? Number.parseInt(endText, 10) : start;
+		if (end < start) {
+			throw new Error(`Task range must be ascending: ${normalized}.`);
+		}
+		const fixedRangeWidth =
+			endText && endText.length === startText.length
+				? startText.length
+				: undefined;
+		for (let current = start; current <= end; current += 1) {
+			const width =
+				endText === undefined
+					? startText.length
+					: (fixedRangeWidth ?? Math.max(2, String(current).length));
+			const taskId = `T-${String(current).padStart(width, "0")}`;
+			if (!seen.has(taskId)) {
+				seen.add(taskId);
+				taskIds.push(taskId);
+			}
+			if (taskIds.length > TASK_SELECTOR_MAX_TASKS) {
+				throw new Error(
+					`Task selector supports at most ${TASK_SELECTOR_MAX_TASKS} tasks.`,
+				);
+			}
+		}
+	}
+	return taskIds;
+}
+
 export function hasJsonFlag(args: readonly string[]): boolean {
 	return args.includes("--json") || args.includes("-j");
 }
@@ -247,7 +290,16 @@ export function parseSessionTaskArgs(
 	if (!taskId) {
 		throw new Error(`Missing --task-id for ${commandName}.`);
 	}
-	return { session: resolvedSession, taskId, json, compact, brief, briefMode };
+	const taskIds = parseTaskSelector(taskId);
+	return {
+		session: resolvedSession,
+		taskId: taskIds[0] ?? taskId,
+		taskIds,
+		json,
+		compact,
+		brief,
+		briefMode,
+	};
 }
 
 export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
@@ -523,6 +575,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	if (!taskId) {
 		throw new Error("Missing --task-id for done.");
 	}
+	const taskIds = parseTaskSelector(taskId);
 	if (
 		(evidenceCommand && !evidenceResult) ||
 		(!evidenceCommand && evidenceResult)
@@ -533,7 +586,8 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	}
 	return {
 		session: resolveSession(root, session, "done"),
-		taskId,
+		taskId: taskIds[0] ?? taskId,
+		taskIds,
 		testCommands,
 		testShellCommand,
 		verifications,

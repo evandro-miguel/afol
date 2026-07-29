@@ -29,6 +29,9 @@
     "manifest_file": ".agents/manifest.json",
     "docs_dir": "docs"
   },
+  "pstr": {
+    "areas": []
+  },
   "evolution": {
     "enabled": true,
     "suggestions": {

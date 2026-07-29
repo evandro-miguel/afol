@@ -8,6 +8,7 @@ export {
 	getPstrSection,
 	PSTR_AREAS,
 	rebuildPstrIndex,
+	resolvePstrAreas,
 	reviewPstrCandidates,
 	suggestPstrChanges,
 	validatePstrIndex,

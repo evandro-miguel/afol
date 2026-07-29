@@ -221,6 +221,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
+		guidance: ["Task selectors accept comma lists and ascending ranges."],
 		subcommands: [
 			{
 				usage: "--session <session-id> --task-id <task-id>",
@@ -253,6 +254,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		guidance: [
 			"Record evidence first, or repeat --test for up to eight ordered fail-fast checks.",
+			"Batch selectors run one shared check for execution-policy tasks.",
 		],
 		subcommands: [
 			{
@@ -704,6 +706,66 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect structure maps",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "show|sh --json",
+				sideEffect: "read",
+				description: "Show the current PSTR index",
+			},
+			{
+				usage: "rebuild|rb --json",
+				sideEffect: "generated",
+				requires_approval: true,
+				description: "Rebuild observed structure maps",
+			},
+			{
+				usage: "validate|v --json",
+				sideEffect: "read",
+				description: "Validate PSTR freshness and shape",
+			},
+			{
+				usage: "stale|st --json",
+				sideEffect: "read",
+				description: "List stale structure maps",
+			},
+			{
+				usage: "section|sec <id> --json",
+				sideEffect: "read",
+				description: "Read one structure map section",
+			},
+			{
+				usage: "diff --json",
+				sideEffect: "read",
+				description: "Compare live structure with the snapshot",
+			},
+			{
+				usage: "watch --once --json",
+				sideEffect: "generated",
+				requires_approval: true,
+				description: "Watch and refresh structure maps",
+			},
+			{
+				usage: "detect|det --json",
+				sideEffect: "read",
+				description: "Detect materialized structure areas",
+			},
+			{
+				usage: "suggest|sug --json",
+				sideEffect: "read",
+				description: "Suggest structure map maintenance",
+			},
+			{
+				usage: "review-candidates|review|rc --json",
+				sideEffect: "read",
+				description: "Review map rebuild candidates",
+			},
+			{
+				usage: "review-candidates --apply <id> --json",
+				sideEffect: "write",
+				requires_approval: true,
+				description: "Apply an approved map rebuild candidate",
+			},
+		],
 	},
 	{
 		command: "ctx",

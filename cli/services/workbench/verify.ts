@@ -387,10 +387,13 @@ export function evidenceResultIsSuccess(result: unknown): boolean {
 	);
 }
 
+export function evidenceResultIsFailure(result: unknown): boolean {
+	return typeof result === "string" && FAILURE_RESULT_RE.test(result);
+}
+
 function evidenceIsFailure(entry: EvidenceVerificationEntry): boolean {
 	return (
-		(typeof entry.result === "string" &&
-			FAILURE_RESULT_RE.test(entry.result)) ||
+		evidenceResultIsFailure(entry.result) ||
 		(typeof entry.exit_code === "number" && entry.exit_code !== 0)
 	);
 }

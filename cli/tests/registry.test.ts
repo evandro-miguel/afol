@@ -217,6 +217,90 @@ describe("kernel registry", () => {
 		]);
 	});
 
+	test("publishes all PSTR actions and separates review apply", () => {
+		const pstr = kernelRegistry.commands.find(
+			(entry) => entry.command === "pstr",
+		);
+		expect(pstr?.subcommands?.map((entry) => entry.usage)).toEqual([
+			"show|sh --json",
+			"rebuild|rb --json",
+			"validate|v --json",
+			"stale|st --json",
+			"section|sec <id> --json",
+			"diff --json",
+			"watch --once --json",
+			"detect|det --json",
+			"suggest|sug --json",
+			"review-candidates|review|rc --json",
+			"review-candidates --apply <id> --json",
+		]);
+		const review = pstr?.subcommands?.find((entry) =>
+			entry.usage.startsWith("review-candidates|"),
+		);
+		const apply = pstr?.subcommands?.find((entry) =>
+			entry.usage.includes("--apply"),
+		);
+		expect(review?.sideEffect).toBe("read");
+		expect(review?.requires_approval).toBe(false);
+		expect(apply?.sideEffect).toBe("write");
+		expect(apply?.requires_approval).toBe(true);
+	});
+
+	test("covers every PSTR registry action in the canonical benchmark catalog", () => {
+		const expected = [
+			"pstr show|sh --json",
+			"pstr rebuild|rb --json",
+			"pstr validate|v --json",
+			"pstr stale|st --json",
+			"pstr section|sec <id> --json",
+			"pstr diff --json",
+			"pstr watch --once --json",
+			"pstr detect|det --json",
+			"pstr suggest|sug --json",
+			"pstr review-candidates|review|rc --json",
+			"pstr review-candidates --apply <id> --json",
+		];
+		const scenarios = {
+			"pstr-show": "afol pstr show --json",
+			"pstr-rebuild": "afol pstr rebuild --json",
+			"pstr-validate": "afol pstr validate --json",
+			"pstr-stale": "afol pstr stale --json",
+			"pstr-section": "afol pstr section cli --json",
+			"pstr-diff": "afol pstr diff --json",
+			"pstr-watch-once": "afol pstr watch --once --json",
+			"pstr-detect": "afol pstr detect --json",
+			"pstr-suggest": "afol pstr suggest --json",
+			"pstr-review": "afol pstr review-candidates --json",
+			"pstr-review-apply":
+				"afol pstr review-candidates --apply rebuild-all --json",
+		} as const;
+		const covered = Object.entries(scenarios).flatMap(
+			([scenarioId, command]) => {
+				const scenario = JSON.parse(
+					readFileSync(
+						join(
+							process.cwd(),
+							`.afol/data/benchmarks/catalog/scenarios/pstr-integrity/${scenarioId}.json`,
+						),
+						"utf8",
+					),
+				) as {
+					command?: string;
+					sandbox?: boolean;
+					oracle?: string;
+					coverage?: { subcommands?: string[] };
+				};
+				expect(scenario.command).toBe(command);
+				expect(scenario.sandbox).toBe(true);
+				expect(scenario.oracle).toBe("normalized-envelope-and-threshold-check");
+				expect(scenario.coverage?.subcommands).toHaveLength(1);
+				return scenario.coverage?.subcommands ?? [];
+			},
+		);
+
+		expect([...new Set(covered)].sort()).toEqual([...expected].sort());
+	});
+
 	test("publishes project-benchmark subcommand metadata", () => {
 		const projectBenchmark = kernelRegistry.commands.find(
 			(entry) => entry.command === "project-benchmark",

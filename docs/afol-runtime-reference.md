@@ -49,6 +49,16 @@ afol d T-01 -x "<cmd>"
 afol c -m "<summary>"
 ```
 
+Shared-check batch path:
+
+```bash
+afol st T-01..T-10
+afol d T-01..T-10 -x "<shared-cmd>"
+```
+
+The batch path runs one observed check and records one evidence entry per
+selected execution-policy task.
+
 `afol status` has an optional `--catchup` flag to include the same session
 freshness checks as `afol catchup`.
 
@@ -110,6 +120,9 @@ agent context.
 ## State Ownership
 
 - `.afol/config.json`: static AFOL project configuration and root detection input.
+- `pstr.areas`: optional additive PSTR area registry. An empty array preserves
+  the four built-in areas; configured entries must use safe IDs/scopes/tags and
+  project-contained relative source roots.
 - `.agents/lock.json`, `.agents/manifest.json`: static scaffold metadata.
 - `.afol/adm/hooks/**`: static provider-neutral hook catalog.
 - `.afol/adm/rules/**`: static local contracts.
@@ -132,6 +145,28 @@ agent context.
   projection with explicit `PRAGMA user_version` migrations.
 - `.afol/tmp/**`: temporary AFOL-owned files.
 - `.afol/library/**` and `.afol/memory/**`: local knowledge and memory surfaces.
+
+PSTR keeps four built-in maps by default. Projects may add observed maps
+through the optional `pstr.areas` registry:
+
+```json
+{
+  "pstr": {
+    "areas": [
+      {
+        "id": "os",
+        "scope": "os",
+        "source_roots": ["src/os/"],
+        "tags": ["os"]
+      }
+    ]
+  }
+}
+```
+
+Entries are additive and sorted by ID after the defaults. IDs, scopes, and tags
+must be safe tokens; source roots must be relative, project-contained, and
+outside `.afol/**`.
 
 `.afol/state/afol.db` is the SQLite v1 surface. It materializes workbench
 sessions, task rows, source hashes, and evidence only. Broader
@@ -242,6 +277,23 @@ bun run manifest:check
 bun run validate:project-benchmarks
 bun run validate:release
 ```
+
+For multi-task lifecycle throughput:
+
+```bash
+bun run benchmark:multitask
+bun run benchmark:multitask:smoke
+bun run benchmark:multitask --save
+bun run benchmark:multitask:json
+```
+
+The default command runs 12 paired sequential/batch samples and fails when the
+versioned baseline gates regress. It compares AFOL calls, verification runs,
+authored hot-path characters, forced output bytes, p50/p95 latency, and the
+100-task boundary. `:smoke` is a one-run functional check and never makes a
+quality claim. `--save` writes the full JSON result under
+`.afol/data/benchmarks/results/`; temporary fixtures are removed unless
+`--keep-fixture` is explicitly requested.
 
 Release evidence is scoped to the observed Linux x64 path. The CI release
 runner is Ubuntu 24.04 x64; that evidence must not be generalized to Windows,
