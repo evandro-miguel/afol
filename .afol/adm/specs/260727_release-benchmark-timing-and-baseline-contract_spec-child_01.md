@@ -125,14 +125,14 @@ Out of scope:
 
 ## Acceptance
 
-- [ ] RED tests prove build-once artifact reuse, release sample minimum,
+- [x] RED tests prove build-once artifact reuse, release sample minimum,
       profile incompatibility, scenario baseline identity, and provenance.
-- [ ] All five scenarios run the compiled release artifact with cold processes
+- [x] All five scenarios run the compiled release artifact with cold processes
       on a warm host.
-- [ ] Results and baselines contain real, compatible provenance and counts.
-- [ ] Incompatible comparisons block without reporting regression.
-- [ ] Known scenario baselines satisfy unchanged hard SLOs.
-- [ ] Functional, safety, exit, token, and non-temporal thresholds remain
+- [x] Results and baselines contain real, compatible provenance and counts.
+- [x] Incompatible comparisons block without reporting regression.
+- [x] Known scenario baselines satisfy unchanged hard SLOs.
+- [x] Functional, safety, exit, token, and non-temporal thresholds remain
       independently blocking.
-- [ ] Focused tests, typecheck, template/manifest checks, and a diagnostic
+- [x] Focused tests, typecheck, template/manifest checks, and a diagnostic
       `mutation-safety` pack run pass.

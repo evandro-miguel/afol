@@ -127,6 +127,7 @@ export interface Baseline {
 	sample_count?: number;
 	warmup_count?: number;
 	git_commit?: string;
+	source_repository?: string;
 	timestamp?: string;
 	provenance?: string;
 	host_profile_id?: string;

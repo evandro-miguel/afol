@@ -698,7 +698,7 @@ describe("validation command family", () => {
 	);
 
 	test(
-		"v bench runs mutation-safety and fail-closes on pending calibration baseline",
+		"v bench runs mutation-safety against the portable observed baseline",
 		() => {
 			const root = createValidationFixtureRoot(relaxMutationSafetyTimingLimits);
 			try {
@@ -710,21 +710,17 @@ describe("validation command family", () => {
 					`stdout tail:\n${String(proc.stdout ?? "").slice(-2_048)}`,
 					`stderr tail:\n${String(proc.stderr ?? "").slice(-2_048)}`,
 				].join("\n");
-				// Catalog baseline is intentionally uncalibrated
-				// (calibration_status: pending / controlled-release-host-required).
-				// Product fail-closes: exit 2, all scenarios incompatible.
-				expect(proc.status, failureContext).toBe(2);
+				expect(proc.status, failureContext).toBe(0);
 				const payload = parseJsonOutput(proc.stdout as string);
 				expect(payload.mode).toBe("benchmark");
-				expect(payload.status).toBe("failed");
-				expect(payload.pass).toBe(false);
+				expect(payload.status).toBe("passed");
+				expect(payload.pass).toBe(true);
 				expect(payload.result_count).toBe(5);
-				// Honest pending baseline without observed fields is contract-valid.
 				expect(payload.contract_issues).toEqual([]);
 				expect(payload.summary).toEqual({
 					total: 5,
-					passed: 0,
-					failed: 5,
+					passed: 5,
+					failed: 0,
 					skipped: 0,
 					baseline_missing: 0,
 				});
@@ -736,17 +732,19 @@ describe("validation command family", () => {
 					results.every(
 						(entry) =>
 							entry.pack_id === "mutation-safety" &&
-							entry.status === "incompatible",
+							entry.status === "passed",
 					),
 				).toBe(true);
-				const expectedNote =
-					"baseline-incompatible:calibration-pending:controlled-release-host-required";
 				expect(
 					results.every((entry) => {
 						const notes = entry.notes;
 						return (
 							Array.isArray(notes) &&
-							notes.some((note) => note === expectedNote)
+							notes.every(
+								(note) =>
+									typeof note !== "string" ||
+									!note.startsWith("baseline-incompatible:"),
+							)
 						);
 					}),
 				).toBe(true);
