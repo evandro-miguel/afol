@@ -147,6 +147,8 @@ afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
 afol st T-01
 afol e T-01 -c "<cmd>" -o passed
 afol d T-01 -x "<cmd>"
+afol st T-01..T-10
+afol d T-01..T-10 -x "<shared-cmd>"
 afol c
 afol up check
 afol up preview
@@ -346,7 +348,10 @@ read), **very high reliability**. Write tokens are worse than read tokens.
   session resolves (`afol st T-01`, `afol d T-01 -x "<cmd>"`, `afol c`). Do not
   repeat long `--session <id>` on every step unless CI/multi-agent ambiguity
   requires `-S`. Prefer `d -x` over separate evidence + done when one
-  verification command is enough.
+  verification command is enough. When multiple execution-policy tasks share
+  one verification, use `st T-01..T-10` and
+  `d T-01..T-10 -x "<shared-cmd>"`; AFOL runs the check once and records
+  separate observed evidence per task.
 - **Forced output:** any single `afol` command emitting **>5,000 output tokens
   is non-ideal**; **>10,000 output tokens is prohibited**. `afol validate
   bench` enforces this automatically — a scenario exceeding 10k tokens FAILS

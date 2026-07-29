@@ -49,6 +49,16 @@ afol d T-01 -x "<cmd>"
 afol c -m "<summary>"
 ```
 
+Shared-check batch path:
+
+```bash
+afol st T-01..T-10
+afol d T-01..T-10 -x "<shared-cmd>"
+```
+
+The batch path runs one observed check and records one evidence entry per
+selected execution-policy task.
+
 `afol status` has an optional `--catchup` flag to include the same session
 freshness checks as `afol catchup`.
 

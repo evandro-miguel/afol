@@ -12,7 +12,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runStartCommand, runTransitionCommand } from "../commands/workbench";
+import {
+	runDoneCommand,
+	runStartCommand,
+	runTransitionCommand,
+} from "../commands/workbench";
 import {
 	agentOperationContext,
 	defaultOperationContext,
@@ -34,6 +38,7 @@ import {
 	completeObservedTask,
 	doneTask,
 	isSessionClosed,
+	loadEvidenceEntries,
 	newWorkstream,
 	prepareVerificationRun,
 	type RecordEvidenceInput,
@@ -4913,6 +4918,186 @@ describe("task completion authorization and transitions", () => {
 				console.log = originalLog;
 				rmSync(root, { recursive: true, force: true });
 			}
+		}
+	});
+
+	test("batch start is atomic when one selected task is missing", async () => {
+		const root = mkRoot("batch-start-preflight");
+		const originalError = console.error;
+		try {
+			const created = newWorkstream(root, "batch start preflight", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			console.error = () => {};
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01,T-99"],
+					root,
+				),
+			).toBe(2);
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task).toContain("| T-01 | pending |");
+			expect(task).toContain("| T-02 | pending |");
+		} finally {
+			console.error = originalError;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done executes one shared check and records evidence per task", async () => {
+		const root = mkRoot("batch-done-shared-check");
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch done shared check", {
+				tasks: ["first", "second", "third"],
+				noSpecRequiredReason: "fixture",
+			});
+			const counterPath = join(root, "verification-count.txt");
+			const verifierPath = join(root, "verify-once.ts");
+			writeFileSync(
+				verifierPath,
+				[
+					'import { existsSync, readFileSync, writeFileSync } from "node:fs";',
+					`const path = ${JSON.stringify(counterPath)};`,
+					'const count = existsSync(path) ? Number(readFileSync(path, "utf8")) : 0;',
+					'writeFileSync(path, String(count + 1), "utf8");',
+				].join("\n"),
+			);
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01..T-03"],
+					root,
+				),
+			).toBe(0);
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-03",
+						"--test",
+						`bun ${verifierPath}`,
+					],
+					root,
+				),
+			).toBe(0);
+
+			expect(readFileSync(counterPath, "utf8")).toBe("1");
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task.match(/\| T-0[1-3] \| done \|/g)).toHaveLength(3);
+			const evidence = loadEvidenceEntries(created.evidencePath);
+			expect(evidence).toHaveLength(3);
+			expect(evidence.every((entry) => entry.provenance === "observed")).toBe(
+				true,
+			);
+			expect(new Set(evidence.map((entry) => entry.id)).size).toBe(3);
+			const renderedOutput = output.join("\n");
+			expect(renderedOutput).toContain("tasks started: 3 (T-01..T-03)");
+			expect(renderedOutput).toContain("tasks done: 3 (T-01..T-03)");
+			expect(Buffer.byteLength(renderedOutput, "utf8")).toBeLessThan(160);
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done runs a failing shared check once and leaves every task open", async () => {
+		const root = mkRoot("batch-done-shared-failure");
+		const originalError = console.error;
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch done shared failure", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			const counterPath = join(root, "verification-count.txt");
+			const verifierPath = join(root, "verify-failure.ts");
+			writeFileSync(
+				verifierPath,
+				[
+					'import { existsSync, readFileSync, writeFileSync } from "node:fs";',
+					`const path = ${JSON.stringify(counterPath)};`,
+					'const count = existsSync(path) ? Number(readFileSync(path, "utf8")) : 0;',
+					'writeFileSync(path, String(count + 1), "utf8");',
+					"process.exit(1);",
+				].join("\n"),
+			);
+			console.error = () => {};
+			console.log = () => {};
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01..T-02"],
+					root,
+				),
+			).toBe(0);
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--test",
+						`bun ${verifierPath}`,
+					],
+					root,
+				),
+			).toBe(1);
+
+			expect(readFileSync(counterPath, "utf8")).toBe("1");
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task.match(/\| T-0[1-2] \| in_progress \|/g)).toHaveLength(2);
+			const evidence = loadEvidenceEntries(created.evidencePath);
+			expect(evidence).toHaveLength(2);
+			expect(evidence.every((entry) => entry.result === "failed")).toBe(true);
+		} finally {
+			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done rejects an unready task before running the shared check", async () => {
+		const root = mkRoot("batch-done-preflight");
+		const originalError = console.error;
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch done preflight", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			const markerPath = join(root, "unexpected-verification.txt");
+			const verifierPath = join(root, "must-not-run.ts");
+			writeFileSync(
+				verifierPath,
+				`await Bun.write(${JSON.stringify(markerPath)}, "ran");`,
+			);
+			console.error = () => {};
+			console.log = () => {};
+			expect(
+				await runStartCommand(["--session", created.session, "T-01"], root),
+			).toBe(0);
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--test",
+						`bun ${verifierPath}`,
+					],
+					root,
+				),
+			).toBe(2);
+			expect(existsSync(markerPath)).toBe(false);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
+		} finally {
+			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 

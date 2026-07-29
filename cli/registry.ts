@@ -221,6 +221,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
+		guidance: ["Task selectors accept comma lists and ascending ranges."],
 		subcommands: [
 			{
 				usage: "--session <session-id> --task-id <task-id>",
@@ -253,6 +254,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		guidance: [
 			"Record evidence first, or repeat --test for up to eight ordered fail-fast checks.",
+			"Batch selectors run one shared check for execution-policy tasks.",
 		],
 		subcommands: [
 			{

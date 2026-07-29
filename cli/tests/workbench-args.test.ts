@@ -96,6 +96,46 @@ describe("workbench parseCloseArgs", () => {
 });
 
 describe("workbench parseSessionTaskArgs", () => {
+	test("expands compact task lists and ranges", () => {
+		const parsed = parseSessionTaskArgs(
+			["--session", "260530_2256_cli-native", "T-01,T-03..T-05,T-03"],
+			"start",
+			process.cwd(),
+		);
+
+		expect(parsed.taskId).toBe("T-01");
+		expect(parsed.taskIds).toEqual(["T-01", "T-03", "T-04", "T-05"]);
+	});
+
+	test("rejects reversed task ranges", () => {
+		expect(() =>
+			parseSessionTaskArgs(
+				["--session", "260530_2256_cli-native", "T-05..T-01"],
+				"start",
+				process.cwd(),
+			),
+		).toThrow("Task range must be ascending");
+	});
+
+	test("keeps canonical widths across the 99 to 100 boundary", () => {
+		const parsed = parseSessionTaskArgs(
+			["--session", "260530_2256_cli-native", "T-99..T-100"],
+			"start",
+			process.cwd(),
+		);
+		expect(parsed.taskIds).toEqual(["T-99", "T-100"]);
+	});
+
+	test("bounds a selector to 100 tasks", () => {
+		expect(() =>
+			parseSessionTaskArgs(
+				["--session", "260530_2256_cli-native", "T-01..T-101"],
+				"start",
+				process.cwd(),
+			),
+		).toThrow("at most 100 tasks");
+	});
+
 	test("supports --brief shorthand", () => {
 		const parsed = parseSessionTaskArgs(
 			["--brief", "--session", "260530_2256_cli-native", "--task-id", "T-01"],
@@ -133,6 +173,22 @@ describe("workbench parseSessionTaskArgs", () => {
 });
 
 describe("parseDoneArgs", () => {
+	test("expands a compact batch selector", () => {
+		const parsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01..T-03",
+				"--test",
+				"bun test",
+			],
+			process.cwd(),
+		);
+
+		expect(parsed.taskId).toBe("T-01");
+		expect(parsed.taskIds).toEqual(["T-01", "T-02", "T-03"]);
+	});
+
 	test("preserves repeated --test values in order", () => {
 		const parsed = parseDoneArgs(
 			[

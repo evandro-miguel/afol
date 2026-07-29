@@ -17,8 +17,10 @@ import {
 } from "../services/workbench/completion-lock";
 import {
 	appendTimelineEntry,
+	assertObservedBatchTasksReady,
 	closeSession,
 	completeObservedTask,
+	completeObservedTasks,
 	completeVerificationRun,
 	doneTask,
 	failVerificationRun,
@@ -28,6 +30,7 @@ import {
 	recordEvidence,
 	recordVerificationRunStep,
 	startTask,
+	startTasks,
 	type TaskState,
 	taskAttemptSnapshot,
 	transitionTask,
@@ -193,6 +196,20 @@ function isStartBriefingUnavailable(
 	return "status" in briefing && briefing.status === "briefing_unavailable";
 }
 
+function formatTaskSelection(taskIds: readonly string[]): string {
+	if (taskIds.length === 1) return taskIds[0] ?? "";
+	const numeric = taskIds.map((taskId) =>
+		Number.parseInt(taskId.slice("T-".length), 10),
+	);
+	const contiguous = numeric.every(
+		(value, index) => index === 0 || value === (numeric[index - 1] ?? 0) + 1,
+	);
+	if (contiguous) {
+		return `${taskIds[0]}..${taskIds.at(-1)}`;
+	}
+	return taskIds.join(",");
+}
+
 export async function runStartCommand(
 	args: string[],
 	root: string = process.cwd(),
@@ -204,6 +221,9 @@ export async function runStartCommand(
 		const parsed = parseSessionTaskArgs(args, "start", root, {
 			allowAutoTask: true,
 		});
+		if (parsed.taskIds.length > 1 && parsed.brief) {
+			throw new Error("Batch start does not support --brief.");
+		}
 		const pending = getSessionPendingSpecNotice(
 			root,
 			parsed.session,
@@ -214,10 +234,21 @@ export async function runStartCommand(
 				`pending_spec blocks start for session ${parsed.session}; ${pending.resolutionHint.replace("<session>", parsed.session)}`,
 			);
 		}
-		const warnings = startTask(root, parsed, runtime);
+		const warnings =
+			parsed.taskIds.length === 1
+				? startTask(root, parsed, runtime)
+				: startTasks(
+						root,
+						{ session: parsed.session, taskIds: parsed.taskIds },
+						runtime,
+					);
+		const startedLabel =
+			parsed.taskIds.length === 1
+				? `task started: ${parsed.taskId}`
+				: `tasks started: ${parsed.taskIds.length} (${formatTaskSelection(parsed.taskIds)})`;
 		if (parsed.compact && !parsed.brief && !parsed.json) {
 			const lines = [
-				`task started: ${parsed.taskId}`,
+				startedLabel,
 				...warnings.map((warning) => `warning: ${warning}`),
 			];
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
@@ -227,7 +258,7 @@ export async function runStartCommand(
 		if (!parsed.brief) {
 			if (!parsed.json) {
 				const lines = [
-					`task started: ${parsed.taskId}`,
+					startedLabel,
 					...warnings.map((warning) => `warning: ${warning}`),
 				];
 				appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
@@ -240,6 +271,7 @@ export async function runStartCommand(
 							{
 								session: parsed.session,
 								task: parsed.taskId,
+								tasks: parsed.taskIds,
 								status: "in_progress",
 								warnings,
 								...pendingSpecFields(root, parsed.session, parsed.taskId),
@@ -710,6 +742,152 @@ async function executeDoneLocked(
 	return { ok: true, done, warnings };
 }
 
+async function withTaskCompletionLocks<T>(
+	root: string,
+	session: string,
+	taskIds: readonly string[],
+	action: (leases: readonly TaskCompletionLease[]) => Promise<T>,
+): Promise<T> {
+	const sortedTaskIds = [...new Set(taskIds)].sort();
+	const leases: TaskCompletionLease[] = [];
+	const acquire = async (index: number): Promise<T> => {
+		const taskId = sortedTaskIds[index];
+		if (!taskId) return action(leases);
+		return withTaskCompletionLock(root, session, taskId, async (lease) => {
+			leases.push(lease);
+			try {
+				return await acquire(index + 1);
+			} finally {
+				leases.pop();
+			}
+		});
+	};
+	return acquire(0);
+}
+
+async function runDoneBatch(
+	root: string,
+	parsed: DoneArgs,
+	ctx: OperationContext,
+): Promise<number> {
+	if (parsed.evidenceCommand || parsed.evidenceResult) {
+		throw new Error(
+			"Batch done requires one observed --test, --test-shell, or positional verification.",
+		);
+	}
+	if (parsed.testCommands.length > 1) {
+		throw new Error("Batch done supports exactly one shared verification.");
+	}
+	const verification: VerificationSpec | undefined = parsed.testShellCommand
+		? { mode: "shell", command: parsed.testShellCommand }
+		: parsed.verifications[0];
+	if (!verification) {
+		throw new Error(
+			"Batch done requires one observed --test, --test-shell, or positional verification.",
+		);
+	}
+	if (parsed.requireSpecCheck) {
+		for (const taskId of parsed.taskIds) {
+			const specCheck = resolveRequiredSpecCheck(root, parsed.session, taskId);
+			if (specCheck.status === "conflict") {
+				throw new Error(`spec check failed: ${specCheck.spec_id || taskId}`);
+			}
+		}
+	}
+
+	return withTaskCompletionLocks(
+		root,
+		parsed.session,
+		parsed.taskIds,
+		async (leases) => {
+			const assertOwned = () => {
+				for (const lease of leases) lease.assertOwned();
+			};
+			assertOwned();
+			assertObservedBatchTasksReady(root, {
+				session: parsed.session,
+				taskIds: parsed.taskIds,
+			});
+			const signal = leases[0]?.signal;
+			const observed = signal
+				? await runVerificationAsync(root, verification, { signal })
+				: await runVerificationAsync(root, verification);
+			assertOwned();
+			const command =
+				parsed.testShellCommand ??
+				parsed.testCommands[0] ??
+				formatVerificationCommand(verification);
+			const completion = completeObservedTasks(
+				root,
+				{
+					session: parsed.session,
+					taskIds: parsed.taskIds,
+					command,
+					exitCode: observed.exitCode,
+					approvalContext: ctx,
+					...(observed.signal ? { signal: observed.signal } : {}),
+					...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+					...(parsed.note ? { note: parsed.note } : {}),
+				},
+				{ fencingCheck: assertOwned },
+			);
+			const evidenceIds = completion.evidence.map((entry) => entry.id);
+			const warnings = completion.warnings;
+			if (observed.status !== "passed") {
+				if (parsed.json) {
+					console.log(
+						stringifyEnvelope({
+							...envelopeErr(
+								"workbench.verification_failed",
+								`shared verification failed with exit code ${observed.exitCode}`,
+								{ action: "workbench.done", exitCode: 1 },
+							),
+							data: {
+								session: parsed.session,
+								tasks: parsed.taskIds,
+								status: observed.status,
+								evidence_ids: evidenceIds,
+								warnings,
+							},
+						}),
+					);
+				} else {
+					console.error(
+						`shared verification failed: ${formatTaskSelection(parsed.taskIds)} (exit=${observed.exitCode})`,
+					);
+				}
+				return 1;
+			}
+			if (parsed.json) {
+				console.log(
+					stringifyEnvelope(
+						envelopeOk(
+							{
+								session: parsed.session,
+								tasks: parsed.taskIds,
+								status: warnings.length ? "committed_with_warnings" : "done",
+								evidence_ids: evidenceIds,
+								evidence_count: evidenceIds.length,
+								warnings,
+							},
+							{ action: "workbench.done" },
+						),
+					),
+				);
+			} else {
+				console.log(
+					[
+						`tasks done: ${parsed.taskIds.length} (${formatTaskSelection(parsed.taskIds)})`,
+						`authorizing evidence: ${evidenceIds.length}`,
+						...warnings.map((warning) => `warning: ${warning}`),
+					].join("\n"),
+				);
+			}
+			return 0;
+		},
+	);
+}
+
 export async function runDoneCommand(
 	args: string[],
 	root: string = process.cwd(),
@@ -718,6 +896,9 @@ export async function runDoneCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.done");
 		const parsed = parseDoneArgs(args, root);
+		if (parsed.taskIds.length > 1) {
+			return await runDoneBatch(root, parsed, ctx);
+		}
 		const result = await withTaskCompletionLock(
 			root,
 			parsed.session,
