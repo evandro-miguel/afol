@@ -110,6 +110,7 @@ function assertConfiguredRootSafe(
 		throw new Error(`Invalid pstr source root: ${rootValue}`);
 	}
 	const normalized = raw.replace(/^\.\//, "").replace(/\/+/g, "/");
+	const explicitDirectory = normalized.endsWith("/");
 	const parts = normalized.split("/").filter((part) => part && part !== ".");
 	if (parts.some((part) => part === ".." || part.toLowerCase() === ".afol")) {
 		throw new Error(`Invalid pstr source root: ${rootValue}`);
@@ -139,7 +140,7 @@ function assertConfiguredRootSafe(
 	}
 	const isDirectory =
 		existsSync(candidate) && statSync(candidate).isDirectory();
-	return `${relativeRoot}${isDirectory ? "/" : ""}`;
+	return `${relativeRoot}${explicitDirectory || isDirectory ? "/" : ""}`;
 }
 
 function dirnamePath(pathValue: string): string {

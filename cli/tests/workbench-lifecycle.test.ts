@@ -36,6 +36,7 @@ import {
 	appendTimelineEntry,
 	closeSession,
 	completeObservedTask,
+	completeObservedTasks,
 	doneTask,
 	isSessionClosed,
 	loadEvidenceEntries,
@@ -5502,6 +5503,57 @@ describe("task completion authorization and transitions", () => {
 				verificationAlive = false;
 			}
 			expect(verificationAlive).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch completion uses one fencing point before atomic mutation", () => {
+		const root = mkRoot("batch-atomic-fencing");
+		try {
+			const created = newWorkstream(root, "batch atomic fencing", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			const taskAttemptSnapshots = {
+				"T-01": taskAttemptSnapshot(root, {
+					session: created.session,
+					taskId: "T-01",
+				}),
+				"T-02": taskAttemptSnapshot(root, {
+					session: created.session,
+					taskId: "T-02",
+				}),
+			};
+			let fencingChecks = 0;
+			const completion = completeObservedTasks(
+				root,
+				{
+					session: created.session,
+					taskIds: ["T-01", "T-02"],
+					taskAttemptSnapshots,
+					command: "true",
+					exitCode: 0,
+					approvalContext: defaultOperationContext(),
+				},
+				{
+					fencingCheck: () => {
+						fencingChecks += 1;
+						if (fencingChecks > 1) {
+							throw new Error("late lease loss");
+						}
+					},
+				},
+			);
+
+			expect(fencingChecks).toBe(1);
+			expect(completion.evidence).toHaveLength(2);
+			expect(completion.done).toHaveLength(2);
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task).toContain("| T-01 | done |");
+			expect(task).toContain("| T-02 | done |");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

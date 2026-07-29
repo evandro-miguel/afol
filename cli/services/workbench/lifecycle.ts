@@ -2452,6 +2452,7 @@ export function completeObservedTasks(
 		if (taskIds.length < 2) {
 			throw new Error("Batch completion requires at least two tasks.");
 		}
+		runtime.fencingCheck?.();
 		if (input.taskAttemptSnapshots) {
 			assertObservedBatchTaskAttempts(
 				root,
@@ -2473,9 +2474,9 @@ export function completeObservedTasks(
 		const done: DoneTaskResult[] = [];
 		const warnings: string[] = [];
 		const deferredEventRecords: Record<string, unknown>[] = [];
+		const { fencingCheck: _fencingCheck, ...commitRuntime } = runtime;
 		try {
 			for (const taskId of taskIds) {
-				runtime.fencingCheck?.();
 				const entry = recordEvidence(
 					root,
 					{
@@ -2485,7 +2486,7 @@ export function completeObservedTasks(
 						provenance: "observed",
 					},
 					{
-						...runtime,
+						...commitRuntime,
 						deferLocalStateRefresh: true,
 						deferredEventRecords,
 						sessionMutationValidated: true,
@@ -2498,7 +2499,7 @@ export function completeObservedTasks(
 						root,
 						{ session: input.session, taskId },
 						{
-							...runtime,
+							...commitRuntime,
 							deferLocalStateRefresh: true,
 							deferredEventRecords,
 							completeObservedTransitionChain: true,

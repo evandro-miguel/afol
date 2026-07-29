@@ -2231,6 +2231,54 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
+	test("uses identity fallback for sandbox validation outside Linux", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const sandbox = join(root, ".afol", "tmp", "non-linux-sandbox");
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "non-linux-sandbox",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: "afol --version",
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: 1,
+				warmupCount: 0,
+				seams: {
+					platform: "darwin",
+					createSandboxRoot: () => {
+						mkdirSync(sandbox, { recursive: true });
+						return sandbox;
+					},
+					cleanupSandboxRoot: (path) => {
+						rmSync(path, { recursive: true, force: true });
+					},
+					runSample: () => ({
+						duration_ms: 1,
+						exit_code: 0,
+						signal: null,
+						spawn_error: null,
+						stdout: "ok",
+						stderr: "",
+					}),
+				},
+			});
+
+			expect(result.passed).toBe(true);
+			expect(result.notes).not.toContain("sandbox-root-replaced");
+			expect(existsSync(sandbox)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("does not follow a sandbox symlink swap to an external target", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {

@@ -29,4 +29,4 @@ spec_waiver_reason: ""
 | T-02 | done | worker | Fence batch completion on every lease and task attempt attempt=1 |
 | T-03 | done | worker | Rebuild PSTR registry changes correctly attempt=1 |
 | T-04 | done | worker | Traverse configured dotted directories correctly attempt=1 |
-| T-05 | pending | worker | Validate, obtain reviewer GO, and merge PR 75 |
+| T-05 | in_progress | worker | Validate, obtain reviewer GO, and merge PR 75 attempt=1 |
