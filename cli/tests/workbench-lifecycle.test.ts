@@ -4945,6 +4945,31 @@ describe("task completion authorization and transitions", () => {
 		}
 	});
 
+	test("batch start is atomic when one selected task already started", async () => {
+		const root = mkRoot("batch-start-state-preflight");
+		const originalError = console.error;
+		try {
+			const created = newWorkstream(root, "batch start state preflight", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-02" });
+			console.error = () => {};
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01..T-02"],
+					root,
+				),
+			).toBe(2);
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task).toContain("| T-01 | pending |");
+			expect(task).toContain("| T-02 | in_progress |");
+		} finally {
+			console.error = originalError;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("batch done executes one shared check and records evidence per task", async () => {
 		const root = mkRoot("batch-done-shared-check");
 		const output: string[] = [];
@@ -4999,6 +5024,70 @@ describe("task completion authorization and transitions", () => {
 			expect(renderedOutput).toContain("tasks started: 3 (T-01..T-03)");
 			expect(renderedOutput).toContain("tasks done: 3 (T-01..T-03)");
 			expect(Buffer.byteLength(renderedOutput, "utf8")).toBeLessThan(160);
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch start and done expose compact JSON contracts", async () => {
+		const root = mkRoot("batch-json-success");
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch json success", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01..T-02", "--json"],
+					root,
+				),
+			).toBe(0);
+			expect(parseEnvelope(output.at(-1) ?? "")).toMatchObject({
+				ok: true,
+				action: "workbench.start",
+				data: {
+					session: created.session,
+					task: "T-01",
+					tasks: ["T-01", "T-02"],
+					status: "in_progress",
+				},
+			});
+
+			output.length = 0;
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--test",
+						'bun -e "process.exit(0)"',
+						"--json",
+					],
+					root,
+				),
+			).toBe(0);
+			const envelope = parseEnvelope(output.at(-1) ?? "");
+			expect(envelope).toMatchObject({
+				ok: true,
+				action: "workbench.done",
+				data: {
+					session: created.session,
+					tasks: ["T-01", "T-02"],
+					status: "done",
+					evidence_count: 2,
+				},
+			});
+			const data = envelope.data as { evidence_ids: string[] };
+			expect(data.evidence_ids).toHaveLength(2);
+			expect(new Set(data.evidence_ids).size).toBe(2);
+			expect(Buffer.byteLength(output.at(-1) ?? "", "utf8")).toBeLessThan(
+				1_000,
+			);
 		} finally {
 			console.log = originalLog;
 			rmSync(root, { recursive: true, force: true });
@@ -5060,6 +5149,61 @@ describe("task completion authorization and transitions", () => {
 		}
 	});
 
+	test("batch done failure JSON reports every failed evidence record", async () => {
+		const root = mkRoot("batch-json-failure");
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch json failure", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01..T-02"],
+					root,
+				),
+			).toBe(0);
+			output.length = 0;
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--test",
+						'bun -e "process.exit(7)"',
+						"--json",
+					],
+					root,
+				),
+			).toBe(1);
+			const envelope = parseEnvelope(output.at(-1) ?? "");
+			expect(envelope).toMatchObject({
+				ok: false,
+				action: "workbench.done",
+				data: {
+					session: created.session,
+					tasks: ["T-01", "T-02"],
+					status: "failed",
+					evidence_count: 2,
+				},
+			});
+			const data = envelope.data as { evidence_ids: string[] };
+			expect(data.evidence_ids).toHaveLength(2);
+			expect(new Set(data.evidence_ids).size).toBe(2);
+			expect(
+				loadEvidenceEntries(created.evidencePath).every(
+					(entry) => entry.result === "failed",
+				),
+			).toBe(true);
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("batch done rejects an unready task before running the shared check", async () => {
 		const root = mkRoot("batch-done-preflight");
 		const originalError = console.error;
@@ -5096,6 +5240,117 @@ describe("task completion authorization and transitions", () => {
 			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
 		} finally {
 			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done rejects a mixed completion policy before verification", async () => {
+		const root = mkRoot("batch-done-policy-preflight");
+		const originalError = console.error;
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch done policy preflight", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			const markerPath = join(root, "unexpected-verification.txt");
+			const verifierPath = join(root, "must-not-run.ts");
+			writeFileSync(
+				verifierPath,
+				`await Bun.write(${JSON.stringify(markerPath)}, "ran");`,
+			);
+			startTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "implemented_untested",
+				completionPolicy: "artifact",
+			});
+			console.error = () => {};
+			console.log = () => {};
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--test",
+						`bun ${verifierPath}`,
+					],
+					root,
+				),
+			).toBe(2);
+			expect(existsSync(markerPath)).toBe(false);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task).toContain("| T-01 | in_progress |");
+			expect(task).toContain("| T-02 | implemented_untested |");
+		} finally {
+			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch lifecycle handles the 100-task selector limit in one check", async () => {
+		const root = mkRoot("batch-boundary-100");
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch boundary 100", {
+				tasks: Array.from({ length: 100 }, (_, index) => `task ${index + 1}`),
+				noSpecRequiredReason: "fixture",
+			});
+			const counterPath = join(root, "verification-count.txt");
+			const verifierPath = join(root, "verify-once.ts");
+			writeFileSync(
+				verifierPath,
+				[
+					'import { existsSync, readFileSync, writeFileSync } from "node:fs";',
+					`const path = ${JSON.stringify(counterPath)};`,
+					'const count = existsSync(path) ? Number(readFileSync(path, "utf8")) : 0;',
+					'writeFileSync(path, String(count + 1), "utf8");',
+				].join("\n"),
+			);
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runStartCommand(
+					["--session", created.session, "T-01..T-100"],
+					root,
+				),
+			).toBe(0);
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-100",
+						"--test",
+						`bun ${verifierPath}`,
+					],
+					root,
+				),
+			).toBe(0);
+
+			expect(readFileSync(counterPath, "utf8")).toBe("1");
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task.match(/\| T-\d{2,3} \| done \|/g)).toHaveLength(100);
+			const evidence = loadEvidenceEntries(created.evidencePath);
+			expect(evidence).toHaveLength(100);
+			expect(new Set(evidence.map((entry) => entry.id)).size).toBe(100);
+			const telemetry = readTelemetryEvents(root).filter(
+				(entry) => entry.session_id === created.session,
+			);
+			expect(
+				telemetry.filter((entry) => entry.event_type === "task_start"),
+			).toHaveLength(100);
+			expect(
+				telemetry.filter((entry) => entry.event_type === "task_complete"),
+			).toHaveLength(100);
+			expect(Buffer.byteLength(output.join("\n"), "utf8")).toBeLessThan(200);
+		} finally {
 			console.log = originalLog;
 			rmSync(root, { recursive: true, force: true });
 		}

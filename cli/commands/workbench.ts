@@ -847,6 +847,7 @@ async function runDoneBatch(
 								tasks: parsed.taskIds,
 								status: observed.status,
 								evidence_ids: evidenceIds,
+								evidence_count: evidenceIds.length,
 								warnings,
 							},
 						}),

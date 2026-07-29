@@ -4,6 +4,7 @@ import { join } from "node:path";
 type Measurement = {
 	durationMs: number;
 	outputBytes: number;
+	argvChars: number;
 	stdout: string;
 };
 
@@ -44,6 +45,7 @@ function run(cwd: string, args: string[]): Measurement {
 	return {
 		durationMs,
 		outputBytes: Buffer.byteLength(stdout) + Buffer.byteLength(stderr),
+		argvChars: Array.from(args.join(" ").trim()).length,
 		stdout,
 	};
 }
@@ -66,8 +68,10 @@ function executeScenario(
 	label: string,
 ): {
 	afolCalls: number;
+	verificationRuns: number;
 	durationMs: number;
 	outputBytes: number;
+	argvChars: number;
 } {
 	const projectRoot = join(fixtureRoot, label);
 	mkdirSync(projectRoot, { recursive: true });
@@ -83,20 +87,28 @@ function executeScenario(
 	]);
 	const session = JSON.parse(created.stdout).data.session as string;
 	const measurements = [created];
+	const authoredHotPath: Measurement[] = [];
 	if (mode === "sequential" || taskCount === 1) {
 		for (let index = 1; index <= taskCount; index += 1) {
 			const taskId = `T-${String(index).padStart(2, "0")}`;
-			measurements.push(run(projectRoot, ["start", taskId]));
-			measurements.push(run(projectRoot, ["done", taskId, "--test", "true"]));
+			const started = run(projectRoot, ["start", taskId]);
+			const completed = run(projectRoot, ["done", taskId, "--test", "true"]);
+			measurements.push(started, completed);
+			authoredHotPath.push(started, completed);
 		}
 	} else {
 		const selector = `T-01..T-${String(taskCount).padStart(2, "0")}`;
-		measurements.push(run(projectRoot, ["start", selector]));
-		measurements.push(run(projectRoot, ["done", selector, "--test", "true"]));
+		const started = run(projectRoot, ["start", selector]);
+		const completed = run(projectRoot, ["done", selector, "--test", "true"]);
+		measurements.push(started, completed);
+		authoredHotPath.push(started, completed);
 	}
-	measurements.push(run(projectRoot, ["close", "--session", session]));
+	const closed = run(projectRoot, ["close", "--session", session]);
+	measurements.push(closed);
+	authoredHotPath.push(closed);
 	return {
 		afolCalls: measurements.length,
+		verificationRuns: mode === "sequential" || taskCount === 1 ? taskCount : 1,
 		durationMs: Math.round(
 			measurements.reduce(
 				(total, measurement) => total + measurement.durationMs,
@@ -105,6 +117,10 @@ function executeScenario(
 		),
 		outputBytes: measurements.reduce(
 			(total, measurement) => total + measurement.outputBytes,
+			0,
+		),
+		argvChars: authoredHotPath.reduce(
+			(total, measurement) => total + measurement.argvChars,
 			0,
 		),
 	};
@@ -130,6 +146,7 @@ const repeated = {
 	sequential: [] as ReturnType<typeof executeScenario>[],
 	batch: [] as ReturnType<typeof executeScenario>[],
 };
+const batchBoundary100 = executeScenario("batch", 100, "boundary-batch-100");
 for (let index = 0; index < runs; index += 1) {
 	repeated.sequential.push(
 		executeScenario("sequential", 10, `repeat-${index}-sequential`),
@@ -140,12 +157,15 @@ for (let index = 0; index < runs; index += 1) {
 function summarize(values: ReturnType<typeof executeScenario>[]) {
 	const durations = values.map((value) => value.durationMs);
 	const outputs = values.map((value) => value.outputBytes);
+	const argvChars = values.map((value) => value.argvChars);
 	return {
 		afol_calls: values[0]?.afolCalls ?? 0,
+		verification_runs: values[0]?.verificationRuns ?? 0,
 		samples_ms: durations,
 		p50_ms: percentile(durations, 0.5),
 		p95_ms: percentile(durations, 0.95),
 		output_bytes_p50: percentile(outputs, 0.5),
+		argv_chars_p50: percentile(argvChars, 0.5),
 	};
 }
 
@@ -155,6 +175,7 @@ console.log(
 		fixture_root: fixtureRoot,
 		runs,
 		scaling,
+		batch_boundary_100: batchBoundary100,
 		repeated_10_tasks: {
 			sequential: summarize(repeated.sequential),
 			batch: summarize(repeated.batch),
