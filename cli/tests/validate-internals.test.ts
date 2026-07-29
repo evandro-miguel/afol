@@ -3223,6 +3223,72 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
+	test("applies an absolute process-jitter floor to mutation timing regressions", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				timing_p50_ms: 29,
+				timing_p95_ms: 29,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-jitter-floor",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: {
+					max_duration_ms: 300,
+					max_p95_ms: 300,
+					max_output_tokens: 10,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "mutation-safety-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {
+					duration_ms: 79,
+					timing_p50_ms: 79,
+					timing_p95_ms: 79,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 1,
+					context_bytes: 0,
+					output_bytes: 4,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+			expect(buildResult(root, scenario, baselinePath, baseline).status).toBe(
+				"passed",
+			);
+			const regression = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 80,
+						timing_p95_ms: 80,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(regression.status).toBe("failed");
+			expect(regression.notes).toContain(
+				"baseline-regression:timing_p95_ms:80>79",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("parses explicit benchmark timing modes and rejects them outside bench", () => {
 		expect(
 			parseValidationArgs(["bench", "--timing-mode", "observe"]).timingMode,

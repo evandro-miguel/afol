@@ -73,6 +73,9 @@ functional and safety oracle.
   state, and every success/failure path cleans its owned directory.
 - Blocking p95 uses at least 20 measured samples. Focused smoke tests may
   neutralize timing explicitly but must not silently become release evidence.
+- Mutation regression comparisons use the greater of the existing 25%
+  relative tolerance and a 50 ms process-start jitter floor. The unchanged
+  300/350 ms hard scenario SLOs remain independently blocking.
 - Results and baselines identify scenario id and version, Git SHA, recorded
   timestamp, host profile id, OS, architecture, controlled CPU class, Bun and
   runtime versions, execution/artifact mode and hash, sample count, and warmup

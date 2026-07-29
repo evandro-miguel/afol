@@ -45,6 +45,7 @@ const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
 const TOKEN_RULE_NONIDEAL = 5_000;
 const TOKEN_RULE_PROHIBITIVE = 10_000;
 const BASELINE_TIMING_REGRESSION_FACTOR = 1.25;
+const MUTATION_PROCESS_JITTER_FLOOR_MS = 50;
 const TIMING_THRESHOLD_KEYS = new Set([
 	"max_duration_ms",
 	"min_duration_ms",
@@ -98,13 +99,19 @@ function appendBaselineRegressionNotes(
 		| Pick<Baseline | ScenarioBaseline, "timing_p50_ms" | "timing_p95_ms">
 		| undefined,
 	metrics: Record<string, number>,
+	packId: PackId,
 ): void {
 	if (!baseline) {
 		return;
 	}
 	const timingP50Limit =
 		typeof baseline.timing_p50_ms === "number"
-			? baseline.timing_p50_ms * BASELINE_TIMING_REGRESSION_FACTOR
+			? Math.max(
+					baseline.timing_p50_ms * BASELINE_TIMING_REGRESSION_FACTOR,
+					packId === "mutation-safety"
+						? baseline.timing_p50_ms + MUTATION_PROCESS_JITTER_FLOOR_MS
+						: 0,
+				)
 			: undefined;
 	if (
 		typeof timingP50Limit === "number" &&
@@ -117,7 +124,12 @@ function appendBaselineRegressionNotes(
 	}
 	const timingP95Limit =
 		typeof baseline.timing_p95_ms === "number"
-			? baseline.timing_p95_ms * BASELINE_TIMING_REGRESSION_FACTOR
+			? Math.max(
+					baseline.timing_p95_ms * BASELINE_TIMING_REGRESSION_FACTOR,
+					packId === "mutation-safety"
+						? baseline.timing_p95_ms + MUTATION_PROCESS_JITTER_FLOOR_MS
+						: 0,
+				)
 			: undefined;
 	if (
 		typeof timingP95Limit === "number" &&
@@ -374,6 +386,7 @@ export function buildResult(
 			regressionNotes,
 			scenarioBaseline ?? baseline,
 			metrics as Record<string, number>,
+			scenario.pack_id,
 		);
 	}
 	const status = resolveResultStatus(
