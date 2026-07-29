@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import {
 	type Dirent,
 	existsSync,
@@ -129,6 +130,7 @@ const FILE_INDEX_ROOT_EXCLUDED_DIR_SEGMENTS = new Set([
 ]);
 
 const FILE_INDEX_EXCLUDED_PATHS = new Set([".git", "cli/generated/version.ts"]);
+const GIT_FILES_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 
 const FILE_INDEX_SENSITIVE_FILE_PATTERNS = [
 	/^\.env(?:\.|$)/,
@@ -348,11 +350,49 @@ function collectSpecFiles(projectRoot: string): string[] {
 }
 
 function collectFileIndexFiles(projectRoot: string, sorted = true): string[] {
-	return collectFilesUnder(
+	const files = collectFilesUnder(
 		projectRoot,
 		".",
 		(_entry, _relativePath) => true,
 		sorted,
+	);
+	const gitFiles = listGitFilesForIndex(projectRoot);
+	if (!gitFiles) {
+		return files;
+	}
+
+	return files.filter((filePath) =>
+		gitFiles.has(toRelativeProjectPath(projectRoot, filePath)),
+	);
+}
+
+function listGitFilesForIndex(projectRoot: string): Set<string> | null {
+	const rootResult = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+		cwd: projectRoot,
+		encoding: "utf8",
+	});
+	if (rootResult.status !== 0 || rootResult.error || !rootResult.stdout.trim()) {
+		return null;
+	}
+
+	const filesResult = spawnSync(
+		"git",
+		["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+		{
+			cwd: projectRoot,
+			encoding: "utf8",
+			maxBuffer: GIT_FILES_MAX_BUFFER_BYTES,
+		},
+	);
+	if (filesResult.status !== 0 || filesResult.error) {
+		return new Set();
+	}
+
+	return new Set(
+		filesResult.stdout
+			.split("\0")
+			.filter(Boolean)
+			.map((filePath) => filePath.replace(/\\/g, "/")),
 	);
 }
 
