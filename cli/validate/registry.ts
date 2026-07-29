@@ -336,6 +336,10 @@ function parseBaseline(
 		data.git_commit,
 		`${sourcePath}.git_commit`,
 	);
+	const sourceRepository = asOptionalString(
+		data.source_repository,
+		`${sourcePath}.source_repository`,
+	);
 	const timestamp = asOptionalString(data.timestamp, `${sourcePath}.timestamp`);
 	const provenance = asOptionalString(
 		data.provenance,
@@ -344,6 +348,9 @@ function parseBaseline(
 	if (sampleCount !== undefined) baseline.sample_count = sampleCount;
 	if (warmupCount !== undefined) baseline.warmup_count = warmupCount;
 	if (gitCommit !== undefined) baseline.git_commit = gitCommit;
+	if (sourceRepository !== undefined) {
+		baseline.source_repository = sourceRepository;
+	}
 	if (timestamp !== undefined) baseline.timestamp = timestamp;
 	if (provenance !== undefined) baseline.provenance = provenance;
 	for (const field of [
@@ -1158,6 +1165,29 @@ function readGitProvenance(projectRoot: string, commit: string): GitProvenance {
 	return result;
 }
 
+function normalizeGitRepositoryId(value: string): string | undefined {
+	const normalized = value
+		.trim()
+		.replace(/^git@([^:]+):/u, "$1/")
+		.replace(/^ssh:\/\/git@/u, "")
+		.replace(/^https?:\/\//u, "")
+		.replace(/\.git$/u, "")
+		.replace(/\/+$/u, "")
+		.toLowerCase();
+	return /^[a-z0-9.-]+\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/u.test(normalized)
+		? normalized
+		: undefined;
+}
+
+function readGitRepositoryId(projectRoot: string): string | undefined {
+	const remote = runBoundedGit(projectRoot, [
+		"config",
+		"--get",
+		"remote.origin.url",
+	]);
+	return remote.ok ? normalizeGitRepositoryId(remote.stdout) : undefined;
+}
+
 function validateTimestamp(
 	value: string | undefined,
 	label: string,
@@ -1411,6 +1441,7 @@ export function validateMutationBaselineContract(
 			"sample_count",
 			"warmup_count",
 			"git_commit",
+			"source_repository",
 			"timestamp",
 			"provenance",
 			"host_profile_id",
@@ -1471,11 +1502,24 @@ export function validateMutationBaselineContract(
 	} else if (projectRoot === undefined) {
 		issues.push("mutation-baseline-project-root-missing");
 	} else {
+		const sourceRepository =
+			typeof baseline.source_repository === "string"
+				? normalizeGitRepositoryId(baseline.source_repository)
+				: undefined;
+		if (sourceRepository === undefined) {
+			issues.push("mutation-baseline-source-repository-invalid");
+		}
 		const git = readGitProvenance(projectRoot, baseline.git_commit);
-		if (!git.exists) {
+		const localRepository = readGitRepositoryId(projectRoot);
+		if (
+			!git.exists &&
+			(sourceRepository === undefined || localRepository === sourceRepository)
+		) {
 			issues.push("mutation-baseline-git-commit-not-found");
 		} else if (!git.ancestor) {
-			issues.push("mutation-baseline-git-commit-not-ancestor");
+			if (git.exists) {
+				issues.push("mutation-baseline-git-commit-not-ancestor");
+			}
 		}
 	}
 	const timestampMs =

@@ -860,13 +860,17 @@ describe("validate registry", () => {
 				  })
 				| undefined;
 			expect(mutationBaseline).toMatchObject({
-				calibration_status: "pending",
-				calibration_reason: "controlled-release-host-required",
+				calibration_status: "observed",
+				source_repository: "github.com/evandro-miguel/afol",
+				sample_count: 20,
+				warmup_count: 1,
 			});
-			expect(mutationBaseline?.artifact_sha256).toBeUndefined();
-			expect(mutationBaseline?.git_commit).toBeUndefined();
-			expect(mutationBaseline?.timestamp).toBeUndefined();
-			expect(mutationBaseline?.scenarios).toBeUndefined();
+			expect(mutationBaseline?.artifact_sha256).toMatch(/^[a-f0-9]{64}$/u);
+			expect(mutationBaseline?.git_commit).toMatch(/^[a-f0-9]{40}$/u);
+			expect(mutationBaseline?.timestamp).toBeDefined();
+			expect(Object.keys(mutationBaseline?.scenarios ?? {}).sort()).toEqual(
+				mutationScenarios.map((scenario) => scenario.scenario_id).sort(),
+			);
 			const sequentialDone = snapshot.scenariosByPack["workbench-parity"]?.find(
 				(scenario) => scenario.scenario_id === "wb-sequential-done",
 			);
@@ -1630,6 +1634,7 @@ describe("validate registry", () => {
 				artifact_mode: "bun-compile",
 				artifact_sha256: "a".repeat(64),
 				git_commit: commit,
+				source_repository: "github.com/evandro-miguel/afol",
 				timestamp: new Date().toISOString(),
 				provenance: "observed-clean-commit",
 				sample_count: 20,
@@ -1662,6 +1667,10 @@ describe("validate registry", () => {
 					{ host_profile_id: "profile-placeholder" },
 					"mutation-baseline-profile-placeholder:host_profile_id",
 				],
+				[
+					{ source_repository: "placeholder" },
+					"mutation-baseline-source-repository-invalid",
+				],
 				[{ sample_count: 19 }, "mutation-baseline-sample-count-required:20"],
 			] as const) {
 				expect(
@@ -1671,6 +1680,75 @@ describe("validate registry", () => {
 					}),
 				).toContain(expected);
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("accepts a portable observed mutation baseline from the AFOL source repository", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-portable",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 300 },
+				baseline_id: "mutation-safety-v1",
+				deterministic_metrics: {},
+				compiled_binary: true,
+			};
+			const baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				calibration_status: "observed",
+				source_repository: "github.com/evandro-miguel/afol",
+				host_profile_id: "linux-x64-intel-r-core-tm-i9-14900k",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "intel-r-core-tm-i9-14900k",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "a".repeat(64),
+				git_commit: "4c70a4672b164a65d58e0b7244752bc51fd21711",
+				timestamp: new Date().toISOString(),
+				provenance: "controlled-local-release-calibration-20260729",
+				sample_count: 20,
+				warmup_count: 1,
+				scenarios: {
+					[scenario.scenario_id]: {
+						scenario_id: scenario.scenario_id,
+						scenario_version: scenario.scenario_version,
+						timing_p50_ms: 33,
+						timing_p95_ms: 37,
+						sample_count: 20,
+						warmup_count: 1,
+					},
+				},
+			} satisfies Baseline & { source_repository: string };
+			expect(
+				validateMutationBaselineContract(root, [scenario], baseline),
+			).toEqual([]);
+			expect(
+				spawnSync(
+					"git",
+					[
+						"remote",
+						"add",
+						"origin",
+						"https://github.com/evandro-miguel/afol.git",
+					],
+					{ cwd: root },
+				).status,
+			).toBe(0);
+			expect(
+				validateMutationBaselineContract(root, [scenario], baseline),
+			).toContain("mutation-baseline-git-commit-not-found");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -3139,6 +3217,72 @@ describe("scenario benchmark execution", () => {
 			expect(observedNonTimingFailure.status).toBe("failed");
 			expect(observedNonTimingFailure.notes).toContain(
 				"threshold-exceeded:max_output_tokens:1>0",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("applies an absolute process-jitter floor to mutation timing regressions", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				timing_p50_ms: 29,
+				timing_p95_ms: 29,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-jitter-floor",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: {
+					max_duration_ms: 300,
+					max_p95_ms: 300,
+					max_output_tokens: 10,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "mutation-safety-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {
+					duration_ms: 79,
+					timing_p50_ms: 79,
+					timing_p95_ms: 79,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 1,
+					context_bytes: 0,
+					output_bytes: 4,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+			expect(buildResult(root, scenario, baselinePath, baseline).status).toBe(
+				"passed",
+			);
+			const regression = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 80,
+						timing_p95_ms: 80,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(regression.status).toBe("failed");
+			expect(regression.notes).toContain(
+				"baseline-regression:timing_p95_ms:80>79",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

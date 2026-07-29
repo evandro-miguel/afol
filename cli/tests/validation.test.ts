@@ -77,9 +77,30 @@ function relaxMutationSafetyTimingLimits(root: string): void {
 		}
 		writeFileSync(path, `${JSON.stringify(scenario, null, 2)}\n`, "utf8");
 	}
-	// Do not inject observed timing fields into a pending calibration baseline:
-	// validateMutationBaselineContract rejects timing_p50_ms/timing_p95_ms while
-	// calibration_status is pending (fail-closed until controlled calibration).
+	const baselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"mutation-safety",
+		"baseline-v1.json",
+	);
+	const baseline = parseJsonOutput(readFileSync(baselinePath, "utf8"));
+	const baselineScenarios = baseline.scenarios as Record<
+		string,
+		Record<string, unknown>
+	>;
+	for (const scenarioId of expectedMutationScenarioIds) {
+		const scenarioBaseline = baselineScenarios[scenarioId];
+		if (scenarioBaseline === undefined) {
+			throw new Error(`Missing mutation baseline fixture: ${scenarioId}`);
+		}
+		scenarioBaseline.timing_p50_ms = timingLimitMs;
+		scenarioBaseline.timing_p95_ms = timingLimitMs;
+	}
+	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
 }
 
 function relaxCliKernelTimingLimits(root: string): void {
@@ -558,8 +579,21 @@ describe("validation command family", () => {
 				"cli/commands/validate.ts",
 				"--json",
 			]);
-			expect(proc.status).toBe(0);
 			const payload = parseJsonOutput(proc.stdout as string);
+			const failureContext = JSON.stringify({
+				status: payload.status,
+				summary: payload.summary,
+				contract_issues: payload.contract_issues,
+				command_results: (
+					payload.command_results as Array<Record<string, unknown>>
+				).map(({ pack_id, status, exit_code, stderr_tail }) => ({
+					pack_id,
+					status,
+					exit_code,
+					stderr_tail,
+				})),
+			});
+			expect(proc.status, failureContext).toBe(0);
 			expect(payload.mode).toBe("run");
 			expect(payload.status).toBe("passed");
 			expect(payload.pass).toBe(true);
@@ -698,7 +732,7 @@ describe("validation command family", () => {
 	);
 
 	test(
-		"v bench runs mutation-safety and fail-closes on pending calibration baseline",
+		"v bench runs mutation-safety against the portable observed baseline",
 		() => {
 			const root = createValidationFixtureRoot(relaxMutationSafetyTimingLimits);
 			try {
@@ -706,25 +740,32 @@ describe("validation command family", () => {
 					["v", "bench", "--pack", "mutation-safety", "--json"],
 					root,
 				);
-				const failureContext = [
-					`stdout tail:\n${String(proc.stdout ?? "").slice(-2_048)}`,
-					`stderr tail:\n${String(proc.stderr ?? "").slice(-2_048)}`,
-				].join("\n");
-				// Catalog baseline is intentionally uncalibrated
-				// (calibration_status: pending / controlled-release-host-required).
-				// Product fail-closes: exit 2, all scenarios incompatible.
-				expect(proc.status, failureContext).toBe(2);
 				const payload = parseJsonOutput(proc.stdout as string);
+				const failureContext = JSON.stringify({
+					status: payload.status,
+					pass: payload.pass,
+					summary: payload.summary,
+					contract_issues: payload.contract_issues,
+					results: (payload.results as Array<Record<string, unknown>>).map(
+						({ scenario_id, status, pass, notes }) => ({
+							scenario_id,
+							status,
+							pass,
+							notes,
+						}),
+					),
+					stderr_tail: String(proc.stderr ?? "").slice(-1_024),
+				});
+				expect(proc.status, failureContext).toBe(0);
 				expect(payload.mode).toBe("benchmark");
-				expect(payload.status).toBe("failed");
-				expect(payload.pass).toBe(false);
+				expect(payload.status).toBe("passed");
+				expect(payload.pass).toBe(true);
 				expect(payload.result_count).toBe(5);
-				// Honest pending baseline without observed fields is contract-valid.
 				expect(payload.contract_issues).toEqual([]);
 				expect(payload.summary).toEqual({
 					total: 5,
-					passed: 0,
-					failed: 5,
+					passed: 5,
+					failed: 0,
 					skipped: 0,
 					baseline_missing: 0,
 				});
@@ -735,18 +776,19 @@ describe("validation command family", () => {
 				expect(
 					results.every(
 						(entry) =>
-							entry.pack_id === "mutation-safety" &&
-							entry.status === "incompatible",
+							entry.pack_id === "mutation-safety" && entry.status === "passed",
 					),
 				).toBe(true);
-				const expectedNote =
-					"baseline-incompatible:calibration-pending:controlled-release-host-required";
 				expect(
 					results.every((entry) => {
 						const notes = entry.notes;
 						return (
 							Array.isArray(notes) &&
-							notes.some((note) => note === expectedNote)
+							notes.every(
+								(note) =>
+									typeof note !== "string" ||
+									!note.startsWith("baseline-incompatible:"),
+							)
 						);
 					}),
 				).toBe(true);

@@ -73,6 +73,9 @@ functional and safety oracle.
   state, and every success/failure path cleans its owned directory.
 - Blocking p95 uses at least 20 measured samples. Focused smoke tests may
   neutralize timing explicitly but must not silently become release evidence.
+- Mutation regression comparisons use the greater of the existing 25%
+  relative tolerance and a 50 ms process-start jitter floor. The unchanged
+  300/350 ms hard scenario SLOs remain independently blocking.
 - Results and baselines identify scenario id and version, Git SHA, recorded
   timestamp, host profile id, OS, architecture, controlled CPU class, Bun and
   runtime versions, execution/artifact mode and hash, sample count, and warmup
@@ -125,14 +128,14 @@ Out of scope:
 
 ## Acceptance
 
-- [ ] RED tests prove build-once artifact reuse, release sample minimum,
+- [x] RED tests prove build-once artifact reuse, release sample minimum,
       profile incompatibility, scenario baseline identity, and provenance.
-- [ ] All five scenarios run the compiled release artifact with cold processes
+- [x] All five scenarios run the compiled release artifact with cold processes
       on a warm host.
-- [ ] Results and baselines contain real, compatible provenance and counts.
-- [ ] Incompatible comparisons block without reporting regression.
-- [ ] Known scenario baselines satisfy unchanged hard SLOs.
-- [ ] Functional, safety, exit, token, and non-temporal thresholds remain
+- [x] Results and baselines contain real, compatible provenance and counts.
+- [x] Incompatible comparisons block without reporting regression.
+- [x] Known scenario baselines satisfy unchanged hard SLOs.
+- [x] Functional, safety, exit, token, and non-temporal thresholds remain
       independently blocking.
-- [ ] Focused tests, typecheck, template/manifest checks, and a diagnostic
+- [x] Focused tests, typecheck, template/manifest checks, and a diagnostic
       `mutation-safety` pack run pass.

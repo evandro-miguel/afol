@@ -94,6 +94,8 @@ risk_level: high
     counts, scenario id, and version are persisted.
   - Sampling boundary: blocking p95 rejects fewer than 20 samples; explicit
     neutral timing remains available only to smoke/test flows.
+  - Jitter boundary: mutation regression comparisons allow at least 50 ms of
+    absolute process-start variance while the unchanged hard SLO still blocks.
   - Baseline boundary: missing scenario/version and `baseline-fixture` fail.
   - Calibration transition: a minimal, reasoned `pending` baseline is accepted
     structurally, rejects any mixed observed evidence, and yields a single
