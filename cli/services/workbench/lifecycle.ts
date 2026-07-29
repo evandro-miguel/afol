@@ -490,18 +490,30 @@ function renderCloseReport(
 		closeMarkdownText(summary),
 		"",
 		"## Tasks",
-		...taskRows.map(
-			(row) =>
-				`- ${row.taskId}: ${row.state}${row.notes ? ` — ${closeMarkdownText(row.notes)}` : ""}`,
-		),
+		...taskRows.map((row) => `- ${row.taskId}: ${row.state}`),
 		"",
 		"## Evidence",
 		...evidence.map(
 			(entry) =>
-				`- ${entry.task_id}: ${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
+				`- ${entry.task_id}: ${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit=${entry.exit_code ?? "n/a"})`,
 		),
 	];
 	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
+}
+
+function factualCloseSummary(
+	taskRows: TaskRow[],
+	evidence: EvidenceEntry[],
+): string {
+	const observed = evidence.filter(
+		(entry) => entry.provenance === "observed",
+	).length;
+	const failed = evidence.filter(
+		(entry) =>
+			entry.result === "failed" ||
+			(typeof entry.exit_code === "number" && entry.exit_code !== 0),
+	).length;
+	return `closed: ${taskRows.length} task${taskRows.length === 1 ? "" : "s"}; evidence: ${observed} observed, ${failed} failed`;
 }
 
 function explicitTaskSummaries(metadata?: NewWorkstreamMetadata): string[] {
@@ -2363,6 +2375,7 @@ export function closeSession(
 					);
 				}
 			}
+			const reportEvidence = loadEvidenceEntries(paths.evidencePath);
 			if (summary) {
 				summarySource = "flag";
 			} else if (reportStatus === "waived") {
@@ -2372,7 +2385,7 @@ export function closeSession(
 				summary = logSummary;
 				summarySource = "log";
 			} else {
-				summary = `Strict verification passed for ${taskRows.length} task${taskRows.length === 1 ? "" : "s"}.`;
+				summary = factualCloseSummary(taskRows, reportEvidence);
 				summarySource = "state";
 			}
 			const summaryText = closeMarkdownText(summary);
@@ -2384,12 +2397,7 @@ export function closeSession(
 				if (reportStatus === "created") {
 					atomicWriteText(
 						reportPath,
-						renderCloseReport(
-							session,
-							taskRows,
-							loadEvidenceEntries(paths.evidencePath),
-							summaryText,
-						),
+						renderCloseReport(session, taskRows, reportEvidence, summaryText),
 						{ syncDirectory: false },
 					);
 					reportCreated = !reportWasPresent;

@@ -3276,6 +3276,62 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("closeSession keeps generated reports factual and cheaper than the legacy shape", () => {
+		const root = mkRoot("close-factual-benchmark");
+		const taskIntent =
+			"Design and implement a dependency graph with blocked_by edges, cycle detection, start guards, migration compatibility, focused parser coverage, and integration guidance.";
+		try {
+			const created = newWorkstream(root, "close factual benchmark", {
+				tasks: [taskIntent],
+			});
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "true",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			closeSession(root, created.session);
+			const reportPath = join(
+				root,
+				".afol",
+				"wb",
+				created.session,
+				`${created.session}_report_01.md`,
+			);
+			const report = readFileSync(reportPath, "utf8");
+			const legacyReport = [
+				`# Report: ${created.session}`,
+				"",
+				"## Summary",
+				"Strict verification passed for 1 task.",
+				"",
+				"## Tasks",
+				`- T-01: done — ${taskIntent}`,
+				"",
+				"## Evidence",
+				"- T-01: passed (true; exit_code=0)",
+				"",
+			].join("\n");
+			const reportBytes = Buffer.byteLength(report, "utf8");
+			const legacyBytes = Buffer.byteLength(legacyReport, "utf8");
+
+			expect(report).not.toContain(taskIntent);
+			expect(report).not.toContain("Strict verification passed");
+			expect(report).toContain(
+				"closed: 1 task; evidence: 1 observed, 0 failed",
+			);
+			expect(report).toContain("- T-01: done");
+			expect(report).toContain("- T-01: passed (true; exit=0)");
+			expect(Math.ceil(reportBytes / 4)).toBeLessThanOrEqual(
+				Math.ceil(legacyBytes / 4) * 0.6,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("closeSession records an explicit report waiver idempotently", () => {
 		const root = mkRoot("close-waiver-artifact");
 		try {
