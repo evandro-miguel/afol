@@ -371,7 +371,11 @@ function listGitFilesForIndex(projectRoot: string): Set<string> | null {
 		cwd: projectRoot,
 		encoding: "utf8",
 	});
-	if (rootResult.status !== 0 || rootResult.error || !rootResult.stdout.trim()) {
+	if (
+		rootResult.status !== 0 ||
+		rootResult.error ||
+		!rootResult.stdout.trim()
+	) {
 		return null;
 	}
 
