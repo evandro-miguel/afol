@@ -222,12 +222,12 @@ function sourceLatestFromPaths(paths: string[]): number {
 function isDirectoryExcluded(
 	projectRoot: string,
 	directoryPath: string,
+	projectPaths = resolveProjectPaths(projectRoot),
 ): boolean {
 	const normalizedPath = toRelativeProjectPath(
 		projectRoot,
 		directoryPath,
 	).replace(/\\/g, "/");
-	const projectPaths = resolveProjectPaths(projectRoot);
 	const pathMatches = (base: string): boolean =>
 		normalizedPath === base || normalizedPath.startsWith(`${base}/`);
 	const allowedOperationalRoots = [
@@ -293,6 +293,7 @@ function collectFilesUnder(
 	root: string,
 	startPath: string,
 	predicate: (entry: Dirent, relativePath: string, fullPath: string) => boolean,
+	sorted = true,
 ): string[] {
 	const startRoot = resolve(root, startPath);
 	if (!existsSync(startRoot)) {
@@ -301,6 +302,7 @@ function collectFilesUnder(
 
 	const out: string[] = [];
 	const stack: string[] = [startRoot];
+	const projectPaths = resolveProjectPaths(root);
 
 	while (stack.length > 0) {
 		const current = stack.pop();
@@ -308,15 +310,16 @@ function collectFilesUnder(
 			continue;
 		}
 
-		const entries = readdirSync(current, { withFileTypes: true }).sort((a, b) =>
-			a.name.localeCompare(b.name),
-		);
+		const entries = readdirSync(current, { withFileTypes: true });
+		if (sorted) {
+			entries.sort((a, b) => a.name.localeCompare(b.name));
+		}
 		for (const entry of entries) {
 			const entryPath = resolve(current, entry.name);
 			const relativePath = toRelativeProjectPath(root, entryPath);
 
 			if (entry.isDirectory()) {
-				if (isDirectoryExcluded(root, entryPath)) {
+				if (isDirectoryExcluded(root, entryPath, projectPaths)) {
 					continue;
 				}
 				stack.push(entryPath);
@@ -333,7 +336,7 @@ function collectFilesUnder(
 		}
 	}
 
-	return out.sort((a, b) => a.localeCompare(b));
+	return sorted ? out.sort((a, b) => a.localeCompare(b)) : out;
 }
 
 function collectSpecFiles(projectRoot: string): string[] {
@@ -344,8 +347,13 @@ function collectSpecFiles(projectRoot: string): string[] {
 	);
 }
 
-function collectFileIndexFiles(projectRoot: string): string[] {
-	return collectFilesUnder(projectRoot, ".", (_entry, _relativePath) => true);
+function collectFileIndexFiles(projectRoot: string, sorted = true): string[] {
+	return collectFilesUnder(
+		projectRoot,
+		".",
+		(_entry, _relativePath) => true,
+		sorted,
+	);
 }
 
 function frontmatterFrom(content: string): Record<string, string> {
@@ -414,7 +422,7 @@ function latestSpecsSource(root: string): number {
 }
 
 function latestFilesSource(root: string): number {
-	const files = collectFileIndexFiles(root);
+	const files = collectFileIndexFiles(root, false);
 	return sourceLatestFromPaths(collectSourceFiles([...files]));
 }
 

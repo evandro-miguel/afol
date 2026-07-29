@@ -630,6 +630,8 @@ describe("release and toolchain contracts", () => {
 			expect(provenance.build_target).toBe(
 				`bun-${process.platform}-${process.arch}`,
 			);
+			expect(provenance.compile_bytecode).toBe(true);
+			expect(provenance.module_format).toBe("esm");
 			expect(provenance.compile_autoload_dotenv).toBe(false);
 			expect(provenance.compile_autoload_bunfig).toBe(false);
 			expect(provenance.security_scanners).toHaveLength(2);

@@ -22,6 +22,10 @@ import {
 	computeCatchup,
 } from "../services/workbench/catchup";
 import { sessionLifecycleState } from "../services/workbench/lifecycle";
+import {
+	defaultAllowGlobalFallback,
+	resolveSession as resolveEffectiveSession,
+} from "../services/workbench/session-context";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type StatusSnapshot = {
@@ -517,11 +521,12 @@ function readStatusSnapshot(
 	const globalFindings = includeHealthFindings
 		? collectGlobalStatusFindings(loaded.value.root)
 		: [];
-	const activeSession = existsSync(activeSessionPath)
-		? readFileSync(activeSessionPath, "utf8").trim() || null
-		: null;
-	const catchupSession = freshnessSession ?? activeSession;
-	const selectedSession = freshnessSession ?? activeSession;
+	const selectedSession =
+		resolveEffectiveSession(loaded.value.root, {
+			...(freshnessSession ? { explicit: freshnessSession } : {}),
+			allowGlobalFallback: defaultAllowGlobalFallback(),
+		})?.session ?? null;
+	const catchupSession = selectedSession;
 	const catchupReport = includeCatchup
 		? catchupSession
 			? computeCatchupImpl(loaded.value.root, { session: catchupSession })

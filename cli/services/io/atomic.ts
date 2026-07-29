@@ -32,7 +32,11 @@ function sanitizeTempLabel(path: string): string {
 		.replace(/^$/g, "file");
 }
 
-export function atomicWriteText(path: string, content: string): void {
+export function atomicWriteText(
+	path: string,
+	content: string,
+	options: { syncDirectory?: boolean } = {},
+): void {
 	const dir = dirname(path);
 	mkdirSync(dir, { recursive: true });
 	const tempPath = join(
@@ -43,7 +47,9 @@ export function atomicWriteText(path: string, content: string): void {
 		writeFileSync(tempPath, content, "utf8");
 		fsyncPath(tempPath);
 		renameSync(tempPath, path);
-		fsyncPath(dir);
+		if (options.syncDirectory !== false) {
+			fsyncPath(dir);
+		}
 	} catch (error) {
 		if (existsSync(tempPath)) {
 			rmSync(tempPath, { force: true });

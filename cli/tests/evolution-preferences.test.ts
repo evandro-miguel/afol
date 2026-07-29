@@ -161,6 +161,66 @@ describe("Evolution preference projection", () => {
 		}
 	});
 
+	test("rolls back the whole pending migration sequence on failure", () => {
+		const db = new Database(":memory:");
+		try {
+			db.exec(`
+				CREATE TABLE evolution_migrations (
+					version INTEGER PRIMARY KEY,
+					checksum TEXT NOT NULL,
+					applied_at TEXT NOT NULL
+				);
+				CREATE TRIGGER reject_migration_four
+				BEFORE INSERT ON evolution_migrations
+				WHEN NEW.version = 4
+				BEGIN
+					SELECT RAISE(ABORT, 'injected migration failure');
+				END;
+			`);
+
+			expect(() => applyMigrations(db)).toThrow("injected migration failure");
+			expect(
+				(db.query("PRAGMA user_version").get() as { user_version: number })
+					.user_version,
+			).toBe(0);
+			expect(
+				(
+					db
+						.query("SELECT COUNT(*) AS count FROM evolution_migrations")
+						.get() as { count: number }
+				).count,
+			).toBe(0);
+			expect(
+				db
+					.query(
+						"SELECT name FROM sqlite_master WHERE name = 'production_days'",
+					)
+					.get(),
+			).toBeNull();
+		} finally {
+			db.close();
+		}
+	});
+
+	test("fast-path migration validation rejects a tampered checksum", () => {
+		const db = new Database(":memory:");
+		try {
+			applyMigrations(db);
+			db.exec(
+				"UPDATE evolution_migrations SET checksum = 'tampered' WHERE version = 4",
+			);
+			expect(() => applyMigrations(db)).toThrow(
+				"evolution migration checksum mismatch at version 4",
+			);
+			expect(
+				(db.query("PRAGMA user_version").get() as { user_version: number })
+					.user_version,
+			).toBe(EVOLUTION_SCHEMA_VERSION);
+		} finally {
+			db.close();
+		}
+	});
+
 	test("uses production ordinal freshness boundaries", () => {
 		expect(preferenceFreshness(6)).toBe(1);
 		expect(preferenceFreshness(7)).toBe(1);

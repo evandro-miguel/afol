@@ -75,11 +75,21 @@ export type EventLedgerValidation = {
 	omitted_issue_count: number;
 };
 
-type EventLedgerInspection = EventLedgerValidation & {
+export type EventLedgerInspection = EventLedgerValidation & {
 	records: Record<string, unknown>[];
 };
 
+type FilteredRecordCollection = {
+	predicate: (record: Record<string, unknown>) => boolean;
+	limits: BoundedSourceLimits;
+	bytes: number;
+	lines: number;
+	candidates: number;
+	limitExceeded: boolean;
+};
+
 export type DurableJsonlIo = {
+	afterValidation?: () => void;
 	writeBytes?: (fd: number, value: Buffer) => number;
 	syncFile?: (fd: number) => void;
 	truncateFile?: (fd: number, size: number) => void;
@@ -145,6 +155,18 @@ function sameIdentity(
 	return (
 		String(left.dev) === String(right.dev) &&
 		String(left.ino) === String(right.ino)
+	);
+}
+
+function sameSnapshot(
+	left: ReturnType<typeof fstatSync>,
+	right: ReturnType<typeof fstatSync>,
+): boolean {
+	return (
+		sameIdentity(left, right) &&
+		Number(left.size) === Number(right.size) &&
+		Number(left.mtimeMs) === Number(right.mtimeMs) &&
+		Number(left.ctimeMs) === Number(right.ctimeMs)
 	);
 }
 
@@ -223,6 +245,8 @@ function assertAppendWithinLimits(
 	fd: number,
 	originalSize: number,
 	payloadSize: number,
+	payloadLines: number,
+	validatedExistingLines?: number,
 ): void {
 	if (
 		!Number.isSafeInteger(originalSize) ||
@@ -231,10 +255,13 @@ function assertAppendWithinLimits(
 		originalSize > EVENT_LEDGER_LIMITS.maxBytes - payloadSize
 	)
 		throw new EventLedgerValidationError(limitExceededValidation());
-	const existingLines = countLfBytes(fd, originalSize);
+	const existingLines =
+		validatedExistingLines ?? countLfBytes(fd, originalSize);
 	if (
-		existingLines >= EVENT_LEDGER_LIMITS.maxLines ||
-		existingLines >= EVENT_LEDGER_LIMITS.maxCandidates
+		payloadLines > EVENT_LEDGER_LIMITS.maxLines ||
+		existingLines > EVENT_LEDGER_LIMITS.maxLines - payloadLines ||
+		payloadLines > EVENT_LEDGER_LIMITS.maxCandidates ||
+		existingLines > EVENT_LEDGER_LIMITS.maxCandidates - payloadLines
 	)
 		throw new EventLedgerValidationError(limitExceededValidation());
 }
@@ -272,27 +299,43 @@ function syncParentDirectory(path: string): void {
 }
 
 /**
- * Append exactly one JSON object plus LF under the global event-file lock.
+ * Append one or more JSON objects plus LF under the global event-file lock.
  * Success is returned only after every byte and the file have been synced.
  * A process crash before the successful sync remains subject to filesystem and
  * device durability guarantees; existing corrupt tails are never auto-repaired.
  */
-export function appendEventLedgerRecord<T extends Record<string, unknown>>(
+export function appendEventLedgerRecords<T extends Record<string, unknown>>(
 	root: string,
-	record: T,
+	records: readonly T[],
 	io: DurableJsonlIo = {},
-): T {
+	validated?: {
+		identity: ReturnType<typeof fstatSync> | null;
+		recordCount: number;
+	},
+): T[] {
+	if (records.length === 0) return [];
 	const path = resolveEventLedgerPath(root);
-	const serialized = JSON.stringify(record);
-	if (serialized === undefined)
-		throw new Error("event ledger record must be a JSON object");
-	const payload = Buffer.from(`${serialized}\n`, "utf8");
+	const serialized = records.map((record) => {
+		const value = JSON.stringify(record);
+		if (value === undefined)
+			throw new Error("event ledger record must be a JSON object");
+		return value;
+	});
+	const payload = Buffer.from(`${serialized.join("\n")}\n`, "utf8");
 
 	return withResourceLocks(root, [path], () => {
 		if (resolveEventLedgerPath(root) !== path)
 			throw new Error("event ledger path changed before append");
 		mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 		const before = assertSafeSourceFile(path, EVENT_LEDGER_LABEL);
+		if (
+			validated &&
+			((validated.identity === null && before !== null) ||
+				(validated.identity !== null &&
+					(before === null || !sameSnapshot(validated.identity, before))))
+		) {
+			throw new Error("event ledger target changed after validation");
+		}
 		const fd = openSync(
 			path,
 			safeOpenFlags(
@@ -319,6 +362,9 @@ export function appendEventLedgerRecord<T extends Record<string, unknown>>(
 			verifyOpenedTarget(path, opened);
 			if (before && !sameIdentity(before, opened))
 				throw new Error("event ledger target changed before append");
+			if (validated?.identity && !sameSnapshot(validated.identity, opened)) {
+				throw new Error("event ledger target changed after validation");
+			}
 			originalSize = Number(opened.size);
 			if (!hasLfTail(fd, originalSize))
 				throw new EventLedgerValidationError({
@@ -334,7 +380,13 @@ export function appendEventLedgerRecord<T extends Record<string, unknown>>(
 					],
 					omitted_issue_count: 0,
 				});
-			assertAppendWithinLimits(fd, originalSize, payload.byteLength);
+			assertAppendWithinLimits(
+				fd,
+				originalSize,
+				payload.byteLength,
+				records.length,
+				validated?.recordCount,
+			);
 
 			appendAttempted = true;
 			writeAll(fd, payload, writeBytes);
@@ -377,7 +429,88 @@ export function appendEventLedgerRecord<T extends Record<string, unknown>>(
 			throw primaryError;
 		}
 		if (closeError !== undefined) throw closeError;
-		return record;
+		return [...records];
+	});
+}
+
+/** Append one JSON object with the same atomic durability contract as a batch. */
+export function appendEventLedgerRecord<T extends Record<string, unknown>>(
+	root: string,
+	record: T,
+	io: DurableJsonlIo = {},
+): T {
+	appendEventLedgerRecords(root, [record], io);
+	return record;
+}
+
+/**
+ * Validate the existing ledger and the prospective records under the same
+ * canonical resource lock, then durably append the complete batch.
+ */
+export function appendValidatedEventLedgerRecords<
+	T extends Record<string, unknown>,
+>(root: string, records: readonly T[], io: DurableJsonlIo = {}): T[] {
+	if (records.length === 0) return [];
+	const path = resolveEventLedgerPath(root);
+	return withResourceLocks(root, [path], () => {
+		const validatedIdentity = assertSafeSourceFile(
+			path,
+			EVENT_LEDGER_LABEL,
+			false,
+		);
+		const existing = readInspectionUnlocked(path, EVENT_LEDGER_LIMITS, true);
+		if (!existing.ok) {
+			throw new EventLedgerValidationError(existing);
+		}
+		io.afterValidation?.();
+		const currentIdentity = assertSafeSourceFile(
+			path,
+			EVENT_LEDGER_LABEL,
+			false,
+		);
+		if (
+			(validatedIdentity === null && currentIdentity !== null) ||
+			(validatedIdentity !== null &&
+				(currentIdentity === null ||
+					!sameSnapshot(validatedIdentity, currentIdentity)))
+		) {
+			throw new Error("event ledger target changed after validation");
+		}
+
+		const prospectiveText = `${records
+			.map((record) => JSON.stringify(record))
+			.join("\n")}\n`;
+		const prospective = inspectEventLedgerText(prospectiveText);
+		if (!prospective.ok) {
+			throw new EventLedgerValidationError(prospective);
+		}
+		const existingIds = new Set(
+			existing.records
+				.map((record) => record.id)
+				.filter((id): id is string => nonemptyString(id)),
+		);
+		for (const [index, record] of records.entries()) {
+			if (nonemptyString(record.id) && existingIds.has(record.id)) {
+				throw new EventLedgerValidationError({
+					ok: false,
+					record_count: existing.record_count,
+					error_count: 1,
+					warning_count: 0,
+					issues: [
+						{
+							code: "EVENT_LEDGER_DUPLICATE_ID",
+							severity: "error",
+							line: existing.record_count + index + 1,
+						},
+					],
+					omitted_issue_count: 0,
+				});
+			}
+		}
+		return appendEventLedgerRecords(root, records, io, {
+			identity: validatedIdentity,
+			recordCount: existing.record_count,
+		});
 	});
 }
 
@@ -408,6 +541,68 @@ function validateRecordShape(
 	line: number,
 	state: Parameters<typeof addIssue>[0],
 ): boolean {
+	const canonicalWorkbench =
+		record.source === "cli-workbench" &&
+		strictIsoInstant(record.ts) &&
+		(record.type !== undefined || record.session !== undefined);
+	if (canonicalWorkbench) {
+		const valid =
+			nonemptyString(record.id) &&
+			nonemptyString(record.type) &&
+			WORKBENCH_EVENT_TYPES.has(record.type) &&
+			nonemptyString(record.session) &&
+			record.event_type === undefined &&
+			record.session_id === undefined &&
+			strictIsoInstant(record.ts) &&
+			(record.schema_version === undefined || record.schema_version === "1") &&
+			(record.taskId === undefined || typeof record.taskId === "string") &&
+			(record.command === undefined || typeof record.command === "string") &&
+			(record.result === undefined || typeof record.result === "string") &&
+			(record.detail === undefined || isRecord(record.detail));
+		if (!valid) {
+			addIssue(state, {
+				code: "EVENT_LEDGER_SCHEMA_INVALID",
+				severity: "error",
+				line,
+			});
+		}
+		return valid;
+	}
+
+	const canonicalTelemetry =
+		record.source === "afol-cli" &&
+		record.schema_version === "1" &&
+		(record.event_type !== undefined || record.session_id !== undefined);
+	if (canonicalTelemetry) {
+		const valid =
+			nonemptyString(record.id) &&
+			nonemptyString(record.event_type) &&
+			TELEMETRY_EVENT_TYPES.has(record.event_type) &&
+			nonemptyString(record.session_id) &&
+			record.type === undefined &&
+			record.session === undefined &&
+			strictIsoInstant(record.ts) &&
+			(record.task_id === undefined || typeof record.task_id === "string") &&
+			(record.cmd_type === undefined || typeof record.cmd_type === "string") &&
+			(record.note === undefined || typeof record.note === "string") &&
+			(record.error_type === undefined ||
+				typeof record.error_type === "string") &&
+			(record.outcome === undefined ||
+				record.outcome === "success" ||
+				record.outcome === "failure") &&
+			(record.provenance === undefined ||
+				record.provenance === "declared" ||
+				record.provenance === "observed");
+		if (!valid) {
+			addIssue(state, {
+				code: "EVENT_LEDGER_SCHEMA_INVALID",
+				severity: "error",
+				line,
+			});
+		}
+		return valid;
+	}
+
 	const idValid = nonemptyString(record.id);
 	const hasWorkbenchDiscriminant =
 		record.type !== undefined || record.session !== undefined;
@@ -515,83 +710,220 @@ function validateRecordShape(
 	return true;
 }
 
-export function inspectEventLedgerText(text: string): EventLedgerInspection {
+function inspectParsedRecord(
+	parsed: unknown,
+	line: number,
+	lineBytes: number,
+	state: {
+		errorCount: number;
+		warningCount: number;
+		issues: EventLedgerIssue[];
+		totalIssues: number;
+		recordCount: number;
+	},
+	ids: Set<string>,
+	records: Record<string, unknown>[],
+	collectRecords: boolean,
+	filteredCollection?: FilteredRecordCollection,
+): boolean {
+	if (!isRecord(parsed)) {
+		addIssue(state, {
+			code: "EVENT_LEDGER_NON_OBJECT",
+			severity: "error",
+			line,
+		});
+		return false;
+	}
+	state.recordCount += 1;
+	if (filteredCollection?.predicate(parsed)) {
+		filteredCollection.bytes += lineBytes;
+		filteredCollection.lines += 1;
+		filteredCollection.candidates += 1;
+		if (
+			filteredCollection.bytes > filteredCollection.limits.maxBytes ||
+			filteredCollection.lines > filteredCollection.limits.maxLines ||
+			filteredCollection.candidates > filteredCollection.limits.maxCandidates
+		) {
+			if (!filteredCollection.limitExceeded) {
+				addIssue(state, {
+					code: "EVENT_LEDGER_LIMIT_EXCEEDED",
+					severity: "error",
+					line,
+				});
+				filteredCollection.limitExceeded = true;
+			}
+		} else {
+			records.push(parsed);
+		}
+	} else if (collectRecords) {
+		records.push(parsed);
+	}
+	const validShape = validateRecordShape(parsed, line, state);
+	let duplicate = false;
+	if (nonemptyString(parsed.id)) {
+		if (ids.has(parsed.id)) {
+			duplicate = true;
+			addIssue(state, {
+				code: "EVENT_LEDGER_DUPLICATE_ID",
+				severity: "error",
+				line,
+			});
+		} else ids.add(parsed.id);
+	}
+	return validShape && !duplicate;
+}
+
+function parseJsonLinesFast(text: string): unknown[] | null {
+	if (text.length === 0) return [];
+	if (!text.endsWith("\n")) return null;
+	if (/(?:^|\n)[\t ]*(?:\n|$)/.test(text)) return null;
+	try {
+		const parsed = Bun.JSONL.parse(text);
+		return Array.isArray(parsed) ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+function inspectEventLedgerTextInternal(
+	text: string,
+	collectRecords: boolean,
+	filteredCollection?: FilteredRecordCollection,
+): EventLedgerInspection {
 	const state = {
 		errorCount: 0,
 		warningCount: 0,
 		issues: [] as EventLedgerIssue[],
 		totalIssues: 0,
+		recordCount: 0,
 	};
 	const records: Record<string, unknown>[] = [];
 	const ids = new Set<string>();
 	const missingFinalNewline = text.length > 0 && !text.endsWith("\n");
-	const lines = text.split("\n");
 	let lastNonemptyLineWasValidRecord = false;
+	let lastNonemptyLine = 0;
+	const fastRecords = parseJsonLinesFast(text);
+	if (fastRecords) {
+		let fastOffset = 0;
+		for (let index = 0; index < fastRecords.length; index += 1) {
+			const line = index + 1;
+			const record = fastRecords[index];
+			const newline = filteredCollection ? text.indexOf("\n", fastOffset) : -1;
+			const lineEnd = newline === -1 ? text.length : newline;
+			const matchesFilter =
+				filteredCollection &&
+				isRecord(record) &&
+				filteredCollection.predicate(record);
+			const lineBytes = matchesFilter
+				? Buffer.byteLength(text.slice(fastOffset, lineEnd), "utf8") +
+					(newline === -1 ? 0 : 1)
+				: 0;
+			lastNonemptyLine = line;
+			lastNonemptyLineWasValidRecord = inspectParsedRecord(
+				record,
+				line,
+				lineBytes,
+				state,
+				ids,
+				records,
+				collectRecords,
+				filteredCollection,
+			);
+			if (filteredCollection && newline !== -1) fastOffset = newline + 1;
+		}
+		if (
+			missingFinalNewline &&
+			lastNonemptyLine > 0 &&
+			lastNonemptyLineWasValidRecord
+		) {
+			addIssue(state, {
+				code: "EVENT_LEDGER_MISSING_FINAL_NEWLINE",
+				severity: "warning",
+				line: lastNonemptyLine,
+			});
+		}
+		return {
+			ok: state.errorCount === 0,
+			record_count: state.recordCount,
+			error_count: state.errorCount,
+			warning_count: state.warningCount,
+			issues: state.issues,
+			omitted_issue_count: state.totalIssues - state.issues.length,
+			records,
+		};
+	}
+	let offset = 0;
+	let line = 1;
 
-	for (let index = 0; index < lines.length; index += 1) {
-		let lineText = lines[index] ?? "";
+	while (offset < text.length) {
+		const newline = text.indexOf("\n", offset);
+		const lineEnd = newline === -1 ? text.length : newline;
+		let lineText = text.slice(offset, lineEnd);
 		if (lineText.endsWith("\r")) lineText = lineText.slice(0, -1);
-		if (lineText.trim().length === 0) continue;
+		if (lineText.trim().length === 0) {
+			if (newline === -1) break;
+			offset = newline + 1;
+			line += 1;
+			continue;
+		}
 		lastNonemptyLineWasValidRecord = false;
-		const line = index + 1;
+		lastNonemptyLine = line;
 		let parsed: unknown;
 		try {
 			parsed = JSON.parse(lineText);
 		} catch {
 			addIssue(state, {
 				code:
-					missingFinalNewline && index === lines.length - 1
+					missingFinalNewline && newline === -1
 						? "EVENT_LEDGER_TRUNCATED_TAIL"
 						: "EVENT_LEDGER_MALFORMED_JSON",
 				severity: "error",
 				line,
 			});
+			if (newline === -1) break;
+			offset = newline + 1;
+			line += 1;
 			continue;
 		}
-		if (!isRecord(parsed)) {
-			addIssue(state, {
-				code: "EVENT_LEDGER_NON_OBJECT",
-				severity: "error",
-				line,
-			});
-			continue;
-		}
-		records.push(parsed);
-		const validShape = validateRecordShape(parsed, line, state);
-		let duplicate = false;
-		if (nonemptyString(parsed.id)) {
-			if (ids.has(parsed.id)) {
-				duplicate = true;
-				addIssue(state, {
-					code: "EVENT_LEDGER_DUPLICATE_ID",
-					severity: "error",
-					line,
-				});
-			} else ids.add(parsed.id);
-		}
-		lastNonemptyLineWasValidRecord = validShape && !duplicate;
+		lastNonemptyLineWasValidRecord = inspectParsedRecord(
+			parsed,
+			line,
+			Buffer.byteLength(lineText, "utf8") + (newline === -1 ? 0 : 1),
+			state,
+			ids,
+			records,
+			collectRecords,
+			filteredCollection,
+		);
+		if (newline === -1) break;
+		offset = newline + 1;
+		line += 1;
 	}
 
 	if (
 		missingFinalNewline &&
-		(lines.at(-1)?.trim().length ?? 0) > 0 &&
+		lastNonemptyLine > 0 &&
 		lastNonemptyLineWasValidRecord
 	)
 		addIssue(state, {
 			code: "EVENT_LEDGER_MISSING_FINAL_NEWLINE",
 			severity: "warning",
-			line: lines.length,
+			line: lastNonemptyLine,
 		});
 
 	return {
 		ok: state.errorCount === 0,
-		record_count: records.length,
+		record_count: state.recordCount,
 		error_count: state.errorCount,
 		warning_count: state.warningCount,
 		issues: state.issues,
 		omitted_issue_count: state.totalIssues - state.issues.length,
 		records,
 	};
+}
+
+export function inspectEventLedgerText(text: string): EventLedgerInspection {
+	return inspectEventLedgerTextInternal(text, true);
 }
 
 function unreadableInspection(
@@ -611,12 +943,18 @@ function unreadableInspection(
 function readInspectionUnlocked(
 	path: string,
 	limits: BoundedSourceLimits,
+	collectRecords = true,
+	filteredCollection?: FilteredRecordCollection,
 ): EventLedgerInspection {
 	try {
 		const text = readBoundedSourceFile(path, EVENT_LEDGER_LABEL, limits);
 		return text === null
-			? inspectEventLedgerText("")
-			: inspectEventLedgerText(text);
+			? inspectEventLedgerTextInternal("", collectRecords, filteredCollection)
+			: inspectEventLedgerTextInternal(
+					text,
+					collectRecords,
+					filteredCollection,
+				);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "";
 		return unreadableInspection(
@@ -631,11 +969,25 @@ export function inspectEventLedger(
 	root: string,
 	limits: BoundedSourceLimits = EVENT_LEDGER_LIMITS,
 ): EventLedgerInspection {
+	return inspectEventLedgerInternal(root, limits, true);
+}
+
+function inspectEventLedgerInternal(
+	root: string,
+	limits: BoundedSourceLimits,
+	collectRecords: boolean,
+	filteredCollection?: FilteredRecordCollection,
+): EventLedgerInspection {
 	const path = resolveEventLedgerPath(root);
 	return withResourceLocks(root, [path], () => {
 		if (resolveEventLedgerPath(root) !== path)
 			return unreadableInspection("EVENT_LEDGER_UNREADABLE");
-		return readInspectionUnlocked(path, limits);
+		return readInspectionUnlocked(
+			path,
+			limits,
+			collectRecords,
+			filteredCollection,
+		);
 	});
 }
 
@@ -643,7 +995,11 @@ export function validateEventLedger(
 	root: string,
 	limits: BoundedSourceLimits = EVENT_LEDGER_LIMITS,
 ): EventLedgerValidation {
-	const { records: _records, ...validation } = inspectEventLedger(root, limits);
+	const { records: _records, ...validation } = inspectEventLedgerInternal(
+		root,
+		limits,
+		false,
+	);
 	return validation;
 }
 
@@ -661,6 +1017,30 @@ export function readEventLedgerRecords(
 	limits: BoundedSourceLimits = EVENT_LEDGER_LIMITS,
 ): Record<string, unknown>[] {
 	const inspection = inspectEventLedger(root, limits);
+	if (!inspection.ok) throw new EventLedgerValidationError(inspection);
+	return inspection.records;
+}
+
+export function readEventLedgerRecordsMatching(
+	root: string,
+	predicate: (record: Record<string, unknown>) => boolean,
+	matchLimits: BoundedSourceLimits,
+	ledgerLimits: BoundedSourceLimits = EVENT_LEDGER_LIMITS,
+): Record<string, unknown>[] {
+	const collection: FilteredRecordCollection = {
+		predicate,
+		limits: matchLimits,
+		bytes: 0,
+		lines: 0,
+		candidates: 0,
+		limitExceeded: false,
+	};
+	const inspection = inspectEventLedgerInternal(
+		root,
+		ledgerLimits,
+		false,
+		collection,
+	);
 	if (!inspection.ok) throw new EventLedgerValidationError(inspection);
 	return inspection.records;
 }

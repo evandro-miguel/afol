@@ -8,7 +8,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { detectSessionHealth } from "../services/local-state/workbench-index";
+import { inspectEventLedger } from "../services/events/ledger";
+import {
+	detectSessionHealth,
+	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import {
 	evidenceCompletionAuthorization,
 	formatVerifyReport,
@@ -913,6 +918,15 @@ describe("verifyWorkbenchTasks", () => {
 			const stale = warnings.filter((w) => w.type === "stale_open_tasks");
 			expect(stale.length).toBeGreaterThanOrEqual(1);
 			expect(stale[0]?.session).toBe(session);
+
+			const workbenchSnapshot = rebuildWorkBenchIndex(root);
+			const eventLedger = inspectEventLedger(root);
+			expect(validateWorkBenchIndex(root, { eventLedger })).toEqual(
+				validateWorkBenchIndex(root),
+			);
+			expect(
+				detectSessionHealth(root, { eventLedger, workbenchSnapshot }),
+			).toEqual(detectSessionHealth(root));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

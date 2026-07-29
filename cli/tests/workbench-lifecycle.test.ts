@@ -19,7 +19,10 @@ import {
 } from "../core/operation-context";
 import { readTelemetryEvents } from "../services/events/telemetry";
 import { resolvePendingSpec } from "../services/governance/pending-specs";
-import { validateFilesIndex } from "../services/local-state/project-indexes";
+import {
+	rebuildFilesIndex,
+	validateFilesIndex,
+} from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
@@ -40,6 +43,11 @@ import {
 	taskAttemptSnapshot,
 	transitionTask,
 } from "../services/workbench/lifecycle";
+import {
+	bindSession,
+	readSessionContext,
+	resolveSession,
+} from "../services/workbench/session-context";
 import {
 	briefingUnavailableFor,
 	buildStartBriefing,
@@ -119,6 +127,33 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
 	});
+}
+
+function initGitRepo(root: string): void {
+	for (const args of [
+		["init"],
+		["config", "user.email", "test@example.com"],
+		["config", "user.name", "Test User"],
+	] as const) {
+		const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+		if (result.status !== 0) {
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")}`,
+			);
+		}
+	}
+	writeFileSync(join(root, "README.md"), "fixture\n", "utf8");
+	for (const args of [
+		["add", "README.md"],
+		["commit", "-m", "init"],
+	] as const) {
+		const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+		if (result.status !== 0) {
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")}`,
+			);
+		}
+	}
 }
 
 function readLocalStateEvents(root: string): Array<Record<string, unknown>> {
@@ -231,6 +266,178 @@ function parseEnvelope(stdout: string): Record<string, unknown> {
 }
 
 describe("workbench lifecycle service", () => {
+	test("new command selects the new session over an older open context binding", () => {
+		const root = mkRoot("new-selects-current-context");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const old = newWorkstream(root, "old context", {
+				noSpecRequiredReason: "test fixture",
+			});
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, {
+				session: old.session,
+				branch,
+				worktree: root,
+			});
+
+			const proc = runKernel(root, [
+				"new",
+				"new context",
+				"--no-spec-required",
+				"--reason",
+				"test fixture",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const envelope = JSON.parse(proc.stdout as string) as {
+				data: { session: string };
+			};
+			expect(resolveSession(root, {})).toEqual({
+				session: envelope.data.session,
+				source: "context",
+			});
+			expect(readSessionContext(root).bindings).toEqual([
+				expect.objectContaining({ session: envelope.data.session }),
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("new command warns when AFOL_SESSION intentionally overrides selection", () => {
+		const root = mkRoot("new-env-override");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const proc = spawnSync(
+				"bun",
+				[
+					kernelPath,
+					"new",
+					"env override",
+					"--no-spec-required",
+					"--reason",
+					"test fixture",
+					"--json",
+				],
+				{
+					cwd: root,
+					encoding: "utf8",
+					stdio: ["ignore", "pipe", "pipe"],
+					env: { ...process.env, AFOL_SESSION: "PINNED" },
+				},
+			);
+			expect(proc.status).toBe(0);
+			const envelope = JSON.parse(proc.stdout as string) as {
+				data: { session: string; status: string; warnings: string[] };
+				warnings?: string[];
+			};
+			expect(envelope.data.status).toBe("created_with_warnings");
+			expect(proc.stdout as string).toContain(
+				"AFOL_SESSION still selects PINNED",
+			);
+			expect(proc.stdout as string).toContain(`-S ${envelope.data.session}`);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("new repairs malformed context and preserves the implicit short path", () => {
+		const root = mkRoot("new-binding-recovery");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			mkdirSync(join(root, ".afol", "wb"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", "session-context.json"),
+				"{broken",
+				"utf8",
+			);
+			const proc = runKernel(root, [
+				"new",
+				"binding warning",
+				"--no-spec-required",
+				"--reason",
+				"test fixture",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const envelope = JSON.parse(proc.stdout as string) as {
+				data: { session: string; status: string; warnings: string[] };
+			};
+			expect(envelope.data.status).toBe("created");
+			expect(envelope.data.warnings).toEqual([]);
+			expect(readSessionContext(root).bindings[0]?.session).toBe(
+				envelope.data.session,
+			);
+			const started = runKernel(root, ["start", "T-01"]);
+			expect(started.status).toBe(0);
+			expect(started.stdout as string).toContain("task started: T-01");
+			expect(
+				existsSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						envelope.data.session,
+						`${envelope.data.session}_task_01.md`,
+					),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("concurrent new commands leave active and context selectors aligned", async () => {
+		const root = mkRoot("new-selector-concurrency");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const procs = Array.from({ length: 6 }, (_value, index) =>
+				spawn(
+					"bun",
+					[
+						kernelPath,
+						"new",
+						`parallel ${index}`,
+						"--no-spec-required",
+						"--reason",
+						"test fixture",
+						"--json",
+					],
+					{
+						cwd: root,
+						stdio: ["ignore", "pipe", "pipe"],
+					},
+				),
+			);
+			const results = await Promise.all(procs.map(waitForExit));
+			expect(results.every((result) => result.code === 0)).toBe(true);
+			const sessions = results.map((result) => {
+				const envelope = JSON.parse(result.stdout) as {
+					data: { session: string };
+				};
+				return envelope.data.session;
+			});
+			expect(new Set(sessions).size).toBe(6);
+			const active = readFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"utf8",
+			).trim();
+			expect(resolveSession(root, {})).toEqual({
+				session: active,
+				source: "context",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("newWorkstream creates plan/task/log/evidence and active session pointer", () => {
 		const root = mkRoot("new");
 		try {
@@ -1069,6 +1276,23 @@ describe("workbench lifecycle service", () => {
 			expect(
 				readFileSync(created.evidencePath, "utf8").trim().split("\n"),
 			).toHaveLength(1);
+			const completionEvents = readFileSync(
+				resolveWorkbenchEventLogPath(root),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>)
+				.slice(-6)
+				.map((event) => event.type ?? event.event_type);
+			expect(completionEvents).toEqual([
+				"workbench.record_evidence",
+				"tool_exec",
+				"workbench.transition_task",
+				"workbench.transition_task",
+				"workbench.mark_done",
+				"task_complete",
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1199,7 +1423,8 @@ describe("workbench lifecycle service", () => {
 				noSpecRequiredReason: "fixture",
 			});
 			startTask(root, { session: created.session, taskId: "T-01" });
-			const result = completeObservedTask(
+			let productionDayCalls = 0;
+			const completion = completeObservedTask(
 				root,
 				{
 					session: created.session,
@@ -1208,13 +1433,22 @@ describe("workbench lifecycle service", () => {
 					exitCode: 0,
 				},
 				{
-					observerSeam: () => {
-						throw new Error("injected observer failure");
+					observerSeam: ({ mode }) => {
+						expect(mode).toBe("production-day");
+						productionDayCalls += 1;
+						return {
+							appended: 0,
+							duplicates: 0,
+							skipped: 0,
+							warnings: [],
+							observation_ids: [],
+						};
 					},
 				},
 			);
 			// Task is still done.
-			expect(result.done?.authorizingEvidenceId).toBeTruthy();
+			expect(completion.done?.authorizingEvidenceId).toBeTruthy();
+			expect(productionDayCalls).toBe(1);
 			expect(readFileSync(created.taskPath, "utf8")).toContain(
 				"| T-01 | done |",
 			);
@@ -1228,9 +1462,42 @@ describe("workbench lifecycle service", () => {
 				session_id: created.session,
 				provenance: "observed",
 			});
-			// Observer failure is captured as a warning.
-			expect(result.warnings).toContain(
-				"observer failed after durable commit: injected observer failure",
+			const closeResult = closeSession(
+				root,
+				created.session,
+				{},
+				{
+					observerSeam: ({ mode }) => {
+						expect(mode).toBe("full");
+						throw new Error("injected observer failure");
+					},
+				},
+			);
+			// Observer failure is captured after the durable close.
+			expect(closeResult).toContain(
+				"observer observation ingest failed after durable commit: injected observer failure",
+			);
+			let retryCalls = 0;
+			const retryResult = closeSession(
+				root,
+				created.session,
+				{},
+				{
+					observerSeam: () => {
+						retryCalls += 1;
+						return {
+							appended: 0,
+							duplicates: 1,
+							skipped: 0,
+							warnings: [],
+							observation_ids: [],
+						};
+					},
+				},
+			);
+			expect(retryCalls).toBe(1);
+			expect(retryResult).not.toContain(
+				expect.stringContaining("observer failed"),
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1302,7 +1569,7 @@ describe("workbench lifecycle service", () => {
 			});
 			startTask(root, { session: created.session, taskId: "T-01" });
 			let called = false;
-			const result = completeObservedTask(
+			completeObservedTask(
 				root,
 				{
 					session: created.session,
@@ -1317,8 +1584,16 @@ describe("workbench lifecycle service", () => {
 					},
 				},
 			);
-			expect(result.warnings).not.toContain(
-				"observer failed after durable commit: must not run",
+			closeSession(
+				root,
+				created.session,
+				{},
+				{
+					observerSeam: () => {
+						called = true;
+						throw new Error("must not run");
+					},
+				},
 			);
 			expect(called).toBe(false);
 		} finally {
@@ -1930,9 +2205,12 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("workbench lifecycle updates local state events and index snapshot", () => {
+	test("workbench lifecycle refreshes its index without rebuilding excluded files", () => {
 		const root = mkRoot("local-state");
 		try {
+			rebuildFilesIndex(root);
+			const filesIndexPath = join(root, ".afol", "data", "index", "files.json");
+			const filesIndexBefore = readFileSync(filesIndexPath, "utf8");
 			const created = newWorkstream(root, "local-state");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			recordObservedCompletion(root, {
@@ -1979,9 +2257,7 @@ describe("workbench lifecycle service", () => {
 			});
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(true);
-			expect(
-				existsSync(join(root, ".afol", "data", "index", "files.json")),
-			).toBe(true);
+			expect(readFileSync(filesIndexPath, "utf8")).toBe(filesIndexBefore);
 
 			const second = newWorkstream(root, "local-state-second");
 			startTask(root, { session: second.session, taskId: "T-01" });
@@ -1996,6 +2272,7 @@ describe("workbench lifecycle service", () => {
 
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(true);
+			expect(readFileSync(filesIndexPath, "utf8")).toBe(filesIndexBefore);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2197,6 +2474,93 @@ describe("workbench lifecycle service", () => {
 				"utf8",
 			);
 			expect(() => closeSession(root, created.session)).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close command cleans matching context only after durable close", () => {
+		const root = mkRoot("close-context-cleanup");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const created = newWorkstream(root, "close context cleanup", {
+				noSpecRequiredReason: "test fixture",
+			});
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, {
+				session: created.session,
+				branch,
+				worktree: root,
+			});
+
+			const blocked = runKernel(root, ["close", "--session", created.session]);
+			expect(blocked.status).toBe(2);
+			expect(readSessionContext(root).bindings).toHaveLength(1);
+
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const closed = runKernel(root, ["close", "--session", created.session]);
+			expect(closed.status).toBe(0);
+			expect(readSessionContext(root).bindings).toHaveLength(0);
+
+			bindSession(root, {
+				session: created.session,
+				branch,
+				worktree: root,
+			});
+			const repaired = runKernel(root, ["close", "--session", created.session]);
+			expect(repaired.status).toBe(0);
+			expect(readSessionContext(root).bindings).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close command keeps durable close when context cleanup fails", () => {
+		const root = mkRoot("close-context-warning");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "close context warning", {
+				noSpecRequiredReason: "test fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			writeFileSync(
+				join(root, ".afol", "wb", "session-context.json"),
+				"{broken",
+				"utf8",
+			);
+
+			const proc = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			expect(isSessionClosed(root, created.session)).toBe(true);
+			expect(proc.stdout as string).toContain(
+				"session context cleanup failed after the durable close commit",
+			);
+			expect(proc.stdout as string).toContain(
+				`afol ss unbind ${created.session}`,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2437,7 +2801,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("closeSession recovery reconciles stale local-state indexes", () => {
+	test("closeSession repairs workbench state without bootstrapping the files index", () => {
 		const root = mkRoot("close-recovery-local-state");
 		try {
 			const created = newWorkstream(root, "close recovery local state");
@@ -2481,6 +2845,8 @@ describe("workbench lifecycle service", () => {
 
 			expect(() => closeSession(root, created.session)).not.toThrow();
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
+			expect(validateFilesIndex(root).ok).toBe(false);
+			rebuildFilesIndex(root);
 			expect(validateFilesIndex(root).ok).toBe(true);
 			expect(readFileSync(created.taskPath, "utf8")).toContain(
 				`closed_at: ${JSON.stringify(closedAt)}`,

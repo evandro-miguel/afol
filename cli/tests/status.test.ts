@@ -20,6 +20,7 @@ import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import type { CatchupReport } from "../services/workbench/catchup";
+import { bindSession } from "../services/workbench/session-context";
 
 type CapturedIo = {
 	stdout: string[];
@@ -143,6 +144,54 @@ function createFixture(): string {
 
 	return root;
 }
+
+test("implicit status uses the same open context session as lifecycle commands", () => {
+	const root = createFixture();
+	try {
+		initGitRoot(root);
+		const session = "260729_0001_context-status";
+		const sessionDir = join(root, ".afol", "wb", session);
+		mkdirSync(sessionDir, { recursive: true });
+		writeFileSync(
+			join(sessionDir, `${session}_task_01.md`),
+			[
+				"---",
+				"task_id: T-01",
+				"status: in_progress",
+				"---",
+				"",
+				"FILES_WRITTEN:",
+				"- cli/context-target.ts",
+				"VALIDATION_OR_CHECKS:",
+				"- bun test",
+				"BLOCKERS:",
+				"- none",
+				"NEXT:",
+				"- finish context target",
+				"",
+				"| Task | State | Owner | Notes |",
+				"|------|-------|-------|-------|",
+				"| T-01 | in_progress | worker | context status |",
+			].join("\n"),
+			"utf8",
+		);
+		const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+			cwd: root,
+			encoding: "utf8",
+		}).stdout.trim();
+		bindSession(root, { session, branch, worktree: root });
+
+		const captured = captureIo();
+		expect(runStatusCommand(root, ["--json"], captured.io)).toBe(0);
+		const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+			data: { paths: { task_file: string }; files_written: string[] };
+		};
+		expect(payload.data.paths.task_file).toContain(session);
+		expect(payload.data.files_written).toEqual(["cli/context-target.ts"]);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
 
 function createFreshnessFixture(mode: "fresh" | "stale-log"): {
 	root: string;
@@ -788,7 +837,7 @@ describe("status command", () => {
 		}
 	});
 
-	test("reports no active task when active session points to missing task files", () => {
+	test("ignores an invalid implicit active session", () => {
 		const root = createFixture();
 		try {
 			const activeSessionFile = join(root, ".afol", "wb", ".active_session");
@@ -802,8 +851,7 @@ describe("status command", () => {
 				string,
 				unknown
 			>;
-			expect(payload.status).toBe("corrupt");
-			expect(payload.blockers).toContain("missing canonical task file");
+			expect(payload.status).toBe("none");
 			expect(payload.task).toBe("none");
 			expect((payload.paths as Record<string, unknown>).task_file).toBeNull();
 		} finally {

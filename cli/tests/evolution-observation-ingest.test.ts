@@ -169,7 +169,7 @@ function seedFailedEvidence(
 		exit_code: e.exitCode ?? 1,
 		purpose: "completion",
 		authorization_type: "execution",
-		...(e.extra ?? {}),
+		...e.extra,
 	}));
 	const existing = existsSync(join(dir, ".evidence.jsonl"))
 		? readFileSync(join(dir, ".evidence.jsonl"), "utf8")
@@ -484,7 +484,18 @@ describe("observation-ingest", () => {
 		mkdirSync(dirname(telemetryPath), { recursive: true });
 		writeFileSync(
 			telemetryPath,
-			`${Array.from({ length: OBSERVE_TELEMETRY_LIMITS.maxCandidates + 1 }, () => "{}").join("\n")}\n`,
+			`${Array.from(
+				{ length: OBSERVE_TELEMETRY_LIMITS.maxCandidates + 1 },
+				(_, index) =>
+					JSON.stringify({
+						schema_version: "1",
+						id: `TEL-${index}`,
+						ts: "2026-07-28T20:00:00.000Z",
+						source: "afol-cli",
+						event_type: "error",
+						session_id: session,
+					}),
+			).join("\n")}\n`,
 			"utf8",
 		);
 		expect(() =>
@@ -492,6 +503,62 @@ describe("observation-ingest", () => {
 		).toThrow("EVENT_LEDGER_LIMIT_EXCEEDED");
 		expect(existsSync(evolutionDbPath(root))).toBe(false);
 		expect(existsSync(observationJournalPath(root))).toBe(false);
+	});
+
+	test("allocates production day before telemetry and reuses its receipt", () => {
+		const root = fixtureRoot();
+		const session = "S-two-phase";
+		seedCompleteEvidence(root, session);
+		const telemetryPath = resolveTelemetryEventPath(root);
+		mkdirSync(dirname(telemetryPath), { recursive: true });
+		writeFileSync(telemetryPath, "{malformed\n", "utf8");
+
+		expect(() =>
+			ingestObservationsForSession({
+				root,
+				projectId: PROJECT_ID,
+				session,
+				mode: "production-day",
+			}),
+		).not.toThrow();
+		const productionPath = productionDayJournalPath(root);
+		const allocation = readFileSync(productionPath, "utf8");
+		expect(allocation.trim().split("\n")).toHaveLength(1);
+
+		writeFileSync(telemetryPath, "", "utf8");
+		const result = ingestObservationsForSession({
+			root,
+			projectId: PROJECT_ID,
+			session,
+		});
+		expect(result).toMatchObject({ appended: 0, skipped: 0 });
+		expect(readFileSync(productionPath, "utf8")).toBe(allocation);
+	});
+
+	test("ignores unrelated telemetry when enforcing the session limit", () => {
+		const root = fixtureRoot();
+		const session = "S-filtered-telemetry";
+		seedCompleteEvidence(root, session);
+		const telemetryPath = resolveTelemetryEventPath(root);
+		mkdirSync(dirname(telemetryPath), { recursive: true });
+		writeFileSync(
+			telemetryPath,
+			`${Array.from({ length: 5_000 }, (_, index) =>
+				JSON.stringify({
+					schema_version: "1",
+					id: `TEL-OTHER-${index}`,
+					ts: "2026-07-28T20:00:00.000Z",
+					source: "afol-cli",
+					event_type: "error",
+					session_id: "S-OTHER",
+				}),
+			).join("\n")}\n`,
+			"utf8",
+		);
+
+		expect(() =>
+			ingestObservationsForSession({ root, projectId: PROJECT_ID, session }),
+		).not.toThrow();
 	});
 
 	test("bounds the observation journal before observe parsing", () => {

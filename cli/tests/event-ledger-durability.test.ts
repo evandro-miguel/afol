@@ -19,10 +19,13 @@ import { runLocalStateCommand } from "../commands/local-state";
 import { runTelemetryCommand } from "../commands/telemetry";
 import {
 	appendEventLedgerRecord,
+	appendEventLedgerRecords,
+	appendValidatedEventLedgerRecords,
 	EVENT_LEDGER_LIMITS,
 	EventLedgerValidationError,
 	inspectEventLedgerText,
 	readEventLedgerRecords,
+	readEventLedgerRecordsMatching,
 	validateEventLedger,
 } from "../services/events/ledger";
 import { appendTelemetryEvent } from "../services/events/telemetry";
@@ -80,6 +83,20 @@ function canonicalWorkbenchRecord(id: string): Record<string, unknown> {
 	};
 }
 
+function canonicalTelemetryRecord(
+	id: string,
+	session: string,
+): Record<string, unknown> {
+	return {
+		id,
+		event_type: "task_complete",
+		ts: "2026-07-26T20:00:00.000Z",
+		source: "afol-cli",
+		schema_version: "1",
+		session_id: session,
+	};
+}
+
 function waitForExit(
 	proc: ReturnType<typeof spawn>,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
@@ -108,6 +125,190 @@ async function waitForFile(path: string): Promise<void> {
 }
 
 describe("shared event ledger durability", () => {
+	test("validates the full ledger while collecting only matching records", () => {
+		const root = configureRoot("filtered-read");
+		try {
+			const lines = Array.from({ length: 5_000 }, (_, index) =>
+				JSON.stringify(canonicalWorkbenchRecord(`WB-${index}`)),
+			);
+			lines.splice(
+				2_500,
+				0,
+				JSON.stringify(canonicalTelemetryRecord("TEL-TARGET", "S-TARGET")),
+			);
+			writeFileSync(eventPath(root), `${lines.join("\n")}\n`, "utf8");
+
+			const records = readEventLedgerRecordsMatching(
+				root,
+				(record) => record.session_id === "S-TARGET",
+				{ maxBytes: 1_024, maxLines: 2, maxCandidates: 2 },
+			);
+
+			expect(records.map((record) => record.id)).toEqual(["TEL-TARGET"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("filtered reads remain fail-closed for invalid trailing records", () => {
+		const root = configureRoot("filtered-invalid-tail");
+		try {
+			writeFileSync(
+				eventPath(root),
+				`${JSON.stringify(canonicalTelemetryRecord("TEL-TARGET", "S-TARGET"))}\n{malformed\n`,
+				"utf8",
+			);
+
+			expect(() =>
+				readEventLedgerRecordsMatching(
+					root,
+					(record) => record.session_id === "S-TARGET",
+					{ maxBytes: 1_024, maxLines: 2, maxCandidates: 2 },
+				),
+			).toThrow(EventLedgerValidationError);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("filtered reads enforce limits on matches instead of unrelated records", () => {
+		const root = configureRoot("filtered-match-limit");
+		try {
+			writeFileSync(
+				eventPath(root),
+				`${[
+					canonicalTelemetryRecord("TEL-1", "S-TARGET"),
+					canonicalTelemetryRecord("TEL-2", "S-TARGET"),
+				]
+					.map((record) => JSON.stringify(record))
+					.join("\n")}\n`,
+				"utf8",
+			);
+
+			expect(() =>
+				readEventLedgerRecordsMatching(
+					root,
+					(record) => record.session_id === "S-TARGET",
+					{ maxBytes: 1_024, maxLines: 1, maxCandidates: 1 },
+				),
+			).toThrow(/EVENT_LEDGER_LIMIT_EXCEEDED/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("appends an ordered batch with one durability sync", () => {
+		const root = configureRoot("batch-order");
+		try {
+			let syncCalls = 0;
+			const records = [
+				canonicalWorkbenchRecord("E-01"),
+				canonicalWorkbenchRecord("E-02"),
+				canonicalWorkbenchRecord("E-03"),
+			];
+			expect(
+				appendEventLedgerRecords(root, records, {
+					syncFile: () => {
+						syncCalls += 1;
+					},
+				}),
+			).toEqual(records);
+			expect(syncCalls).toBe(1);
+			expect(readEventLedgerRecords(root).map((record) => record.id)).toEqual([
+				"E-01",
+				"E-02",
+				"E-03",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rolls back the complete batch after a partial write failure", () => {
+		const root = configureRoot("batch-rollback");
+		try {
+			const path = eventPath(root);
+			const original = `${JSON.stringify(canonicalWorkbenchRecord("E-00"))}\n`;
+			writeFileSync(path, original, "utf8");
+			let calls = 0;
+			expect(() =>
+				appendEventLedgerRecords(
+					root,
+					[canonicalWorkbenchRecord("E-01"), canonicalWorkbenchRecord("E-02")],
+					{
+						writeBytes: (fd, value) => {
+							calls += 1;
+							if (calls === 1)
+								return writeSync(fd, value, 0, Math.min(7, value.length), null);
+							throw new Error("batch write failed");
+						},
+					},
+				),
+			).toThrow("batch write failed");
+			expect(readFileSync(path, "utf8")).toBe(original);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validated batch rejects a historical duplicate without mutation", () => {
+		const root = configureRoot("validated-batch-duplicate");
+		try {
+			const path = eventPath(root);
+			const original = `${JSON.stringify(canonicalWorkbenchRecord("E-01"))}\n`;
+			writeFileSync(path, original, "utf8");
+			expect(() =>
+				appendValidatedEventLedgerRecords(root, [
+					canonicalWorkbenchRecord("E-01"),
+				]),
+			).toThrow(/EVENT_LEDGER_DUPLICATE_ID/);
+			expect(readFileSync(path, "utf8")).toBe(original);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validated batch rejects an invalid existing ledger without mutation", () => {
+		const root = configureRoot("validated-batch-invalid-existing");
+		try {
+			const path = eventPath(root);
+			const original = `${JSON.stringify(canonicalWorkbenchRecord("E-00"))}\n{invalid\n`;
+			writeFileSync(path, original, "utf8");
+			expect(() =>
+				appendValidatedEventLedgerRecords(root, [
+					canonicalWorkbenchRecord("E-01"),
+				]),
+			).toThrow(/EVENT_LEDGER_MALFORMED_JSON/);
+			expect(readFileSync(path, "utf8")).toBe(original);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validated batch rejects a same-inode change after inspection", () => {
+		const root = configureRoot("validated-batch-same-inode-race");
+		try {
+			const path = eventPath(root);
+			const original = `${JSON.stringify(canonicalWorkbenchRecord("E-00"))}\n`;
+			const intruder = `${JSON.stringify(canonicalWorkbenchRecord("E-X"))}\n`;
+			writeFileSync(path, original, "utf8");
+			expect(() =>
+				appendValidatedEventLedgerRecords(
+					root,
+					[canonicalWorkbenchRecord("E-01")],
+					{
+						afterValidation: () => {
+							writeFileSync(path, `${original}${intruder}`, "utf8");
+						},
+					},
+				),
+			).toThrow("event ledger target changed after validation");
+			expect(readFileSync(path, "utf8")).toBe(`${original}${intruder}`);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects a pre-existing partial tail without changing its bytes", () => {
 		const root = configureRoot("partial-tail");
 		try {
@@ -517,6 +718,27 @@ describe("shared event ledger durability", () => {
 				appendEventLedgerRecord(root, canonicalWorkbenchRecord("LINE-OVER")),
 			).toThrow(/EVENT_LEDGER_LIMIT_EXCEEDED/);
 			expect(readFileSync(eventPath(root))).toEqual(atLimit);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a batch that would cross the line limit without mutation", () => {
+		const root = configureRoot("batch-line-boundary");
+		try {
+			writeFileSync(
+				eventPath(root),
+				"\n".repeat(EVENT_LEDGER_LIMITS.maxLines - 1),
+				"utf8",
+			);
+			const before = readFileSync(eventPath(root));
+			expect(() =>
+				appendEventLedgerRecords(root, [
+					canonicalWorkbenchRecord("LINE-100000"),
+					canonicalWorkbenchRecord("LINE-OVER"),
+				]),
+			).toThrow(/EVENT_LEDGER_LIMIT_EXCEEDED/);
+			expect(readFileSync(eventPath(root))).toEqual(before);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -203,5 +203,7 @@ export interface BenchmarkResult {
 	execution_mode?: "source" | "compiled-release";
 	artifact_mode?: "source" | "bun-compile";
 	artifact_sha256?: string;
+	source_state_sha256?: string;
+	source_dirty?: boolean | null;
 	notes: string[];
 }

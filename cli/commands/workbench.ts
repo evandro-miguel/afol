@@ -34,6 +34,10 @@ import {
 	VerificationRunConflictError,
 } from "../services/workbench/lifecycle";
 import {
+	bindCurrentContextSession,
+	removeBinding,
+} from "../services/workbench/session-context";
+import {
 	type briefingUnavailable,
 	briefingUnavailableFor,
 	buildStartBriefing,
@@ -126,7 +130,17 @@ export async function runNewCommand(
 			);
 			parsed.metadata.parentSpec = catalog.specId;
 		}
-		const created = newWorkstream(root, parsed.theme, parsed.metadata);
+		const created = newWorkstream(root, parsed.theme, parsed.metadata, {
+			afterActiveSessionWrite: (session) => {
+				bindCurrentContextSession(root, session);
+			},
+		});
+		const envSession = process.env.AFOL_SESSION?.trim() ?? "";
+		if (envSession && envSession !== created.session) {
+			created.warnings.push(
+				`AFOL_SESSION still selects ${envSession}; unset it or pass -S ${created.session} for the new session.`,
+			);
+		}
 		const creationStatus =
 			created.warnings.length > 0 ? "created_with_warnings" : "created";
 		if (parsed.json) {
@@ -912,6 +926,13 @@ export async function runCloseCommand(
 			reason: parsed.reason,
 			summary: parsed.summary,
 		});
+		try {
+			removeBinding(root, parsed.session);
+		} catch {
+			closeWarnings.push(
+				`session context cleanup failed after the durable close commit; run afol ss unbind ${parsed.session}.`,
+			);
+		}
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(

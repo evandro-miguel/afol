@@ -50,6 +50,7 @@ export function appendWorkbenchEvent(
 	event: Omit<WorkbenchEvent, "id" | "ts" | "source"> & {
 		detail?: Record<string, unknown>;
 	},
+	deferredRecords?: Record<string, unknown>[],
 ): WorkbenchEvent {
 	return withSessionLock(root, event.session, () => {
 		const now = new Date();
@@ -59,7 +60,11 @@ export function appendWorkbenchEvent(
 			source: "cli-workbench",
 			...event,
 		};
-		appendEventLedgerRecord(root, fullEvent);
+		if (deferredRecords) {
+			deferredRecords.push(fullEvent as unknown as Record<string, unknown>);
+		} else {
+			appendEventLedgerRecord(root, fullEvent);
+		}
 		return fullEvent;
 	});
 }

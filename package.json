@@ -35,7 +35,7 @@
 		"validate:template": "bun run template:check",
 		"validate:bootstrap": "bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts",
 		"kernel": "bun run cli/main.ts",
-		"build": "bun run version:generate && bun build --compile --no-compile-autoload-dotenv --no-compile-autoload-bunfig ./cli/main.ts --outfile dist/afol",
+		"build": "bun run version:generate && bun build --compile --bytecode --format=esm --no-compile-autoload-dotenv --no-compile-autoload-bunfig ./cli/main.ts --outfile dist/afol",
 		"build:deterministic": "bun install --frozen-lockfile && bun run build",
 		"validate:security": "bun run security:scan:informative",
 		"security:deps:informative": "bun run cli/dev/security-scan.ts deps",

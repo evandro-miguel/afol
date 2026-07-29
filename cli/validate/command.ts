@@ -436,6 +436,12 @@ export function buildResult(
 		execution_mode: execution?.profile.execution_mode ?? "source",
 		artifact_mode: execution?.profile.artifact_mode ?? "source",
 		artifact_sha256: execution?.profile.artifact_sha256 ?? "source",
+		...(execution?.source_state_sha256
+			? { source_state_sha256: execution.source_state_sha256 }
+			: {}),
+		...(execution?.source_dirty !== undefined
+			? { source_dirty: execution.source_dirty }
+			: {}),
 		notes:
 			status === "skipped"
 				? scenario.implementation_status === "planned"

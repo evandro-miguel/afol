@@ -11,7 +11,11 @@ import {
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
-import { readEventLedgerRecords } from "../events/ledger";
+import {
+	appendEventLedgerRecords,
+	assertValidEventLedger,
+	readEventLedgerRecords,
+} from "../events/ledger";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
 import { resolveEvolutionConfig } from "../evolution";
 import { ingestObservationsForSession } from "../evolution/observation-ingest";
@@ -21,9 +25,11 @@ import {
 } from "../governance/pending-specs";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
-import { rebuildFilesIndex } from "../local-state/project-indexes";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
-import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
+import {
+	appendEventsAndRebuildWorkBenchIndex,
+	rebuildWorkBenchIndex,
+} from "../local-state/workbench-index";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
 import { loadEvidenceEntries, sessionPaths } from "./session-reader";
@@ -204,6 +210,7 @@ export type CloseSessionResult = string[] & {
 export type LifecycleAuxiliaryRuntime = {
 	beforeAuxiliary?: (label: string) => void;
 	fencingCheck?: () => void;
+	afterActiveSessionWrite?: (session: string) => void;
 	/**
 	 * Inject a deterministic observer seam for testing.
 	 * When set, the observer calls this function instead of running
@@ -214,6 +221,7 @@ export type LifecycleAuxiliaryRuntime = {
 		root: string;
 		projectId: string;
 		session: string;
+		mode: "full" | "production-day";
 	}) => {
 		appended: number;
 		duplicates: number;
@@ -225,7 +233,54 @@ export type LifecycleAuxiliaryRuntime = {
 
 type InternalLifecycleAuxiliaryRuntime = LifecycleAuxiliaryRuntime & {
 	deferLocalStateRefresh?: boolean;
+	deferredEventRecords?: Record<string, unknown>[];
+	completeObservedTransitionChain?: boolean;
+	sessionMutationValidated?: boolean;
+	authorizingEvidence?: EvidenceEntry;
 };
+
+function observeCompletedSession(
+	root: string,
+	session: string,
+	runtime: LifecycleAuxiliaryRuntime = {},
+	mode: "full" | "production-day" = "full",
+): string[] {
+	try {
+		const config = resolveEvolutionConfig(readProjectConfig(root));
+		const autonomy = config.settings.autonomy;
+		const autoObserve =
+			autonomy !== null &&
+			typeof autonomy === "object" &&
+			!Array.isArray(autonomy) &&
+			(autonomy as Record<string, unknown>).auto_observe === true;
+		if (
+			!config.configured ||
+			!config.enabled ||
+			!config.projectId ||
+			!autoObserve
+		) {
+			return [];
+		}
+		const result = runtime.observerSeam
+			? runtime.observerSeam({
+					root,
+					projectId: config.projectId,
+					session,
+					mode,
+				})
+			: ingestObservationsForSession({
+					root,
+					projectId: config.projectId,
+					session,
+					mode,
+				});
+		return result.warnings;
+	} catch (error) {
+		return [
+			`observer ${mode === "production-day" ? "production-day allocation" : "observation ingest"} failed after durable commit: ${(error as Error).message}`,
+		];
+	}
+}
 
 export type TimelineEntryResult = {
 	logPath: string;
@@ -476,9 +531,16 @@ function escapeTaskNote(task: string): string {
 // Re-exported from session-reader for backward compat
 export { sessionPaths } from "./session-reader";
 
-function refreshWorkbenchLocalState(root: string, session?: string): void {
+function refreshWorkbenchLocalState(
+	root: string,
+	session?: string,
+	deferredEventRecords: readonly Record<string, unknown>[] = [],
+): void {
+	if (session && deferredEventRecords.length > 0) {
+		appendEventsAndRebuildWorkBenchIndex(root, session, deferredEventRecords);
+		return;
+	}
 	rebuildWorkBenchIndex(root, session);
-	rebuildFilesIndex(root);
 }
 
 export function readActiveSession(root: string): string | null {
@@ -831,51 +893,65 @@ function transitionTaskState(
 	nextState: TaskState,
 	completionPolicy?: CompletionPolicy,
 ): void {
+	transitionTaskStateChain(taskPath, taskId, [nextState], completionPolicy);
+}
+
+function transitionTaskStateChain(
+	taskPath: string,
+	taskId: string,
+	nextStates: readonly TaskState[],
+	completionPolicy?: CompletionPolicy,
+): void {
+	if (nextStates.length === 0) return;
 	const lines = readFileSync(taskPath, "utf8").split("\n");
 	let changed = false;
 	const nextLines = lines.map((line) => {
-		const row = parseTaskRow(line);
-		if (!row || row.taskId !== taskId) {
+		const parsedRow = parseTaskRow(line);
+		if (!parsedRow || parsedRow.taskId !== taskId) {
 			return line;
 		}
-		if (!isTaskState(row.state)) {
-			throw new Error(`Task ${taskId} has invalid state: ${row.state}.`);
-		}
-		if (!TASK_STATE_TRANSITIONS[row.state].includes(nextState)) {
-			throw new Error(
-				`Invalid task transition for ${taskId}: ${row.state} -> ${nextState}.`,
-			);
-		}
 		changed = true;
-		const nextAttempt =
-			nextState === "in_progress" || nextState === "problem"
-				? row.attempt + 1
-				: row.attempt;
-		const baseNotes = row.notes
-			.replace(/(?:^|\s)attempt=\d+(?=\s|$)/g, " ")
-			.trim();
-		const policyNotes = completionPolicy
-			? [
-					baseNotes
-						.replace(
-							/(?:^|\s)completion_policy=(?:execution|artifact|waiver)(?=\s|$)/g,
-							" ",
-						)
-						.trim(),
-					`completion_policy=${completionPolicy}`,
-				]
-					.filter(Boolean)
-					.join(" ")
-			: baseNotes;
-		const notes = [policyNotes, `attempt=${nextAttempt}`]
-			.filter(Boolean)
-			.join(" ");
-		return renderTaskRow({
-			...row,
-			state: nextState,
-			notes,
-			attempt: nextAttempt,
-		});
+		let row = parsedRow;
+		for (const nextState of nextStates) {
+			if (!isTaskState(row.state)) {
+				throw new Error(`Task ${taskId} has invalid state: ${row.state}.`);
+			}
+			if (!TASK_STATE_TRANSITIONS[row.state].includes(nextState)) {
+				throw new Error(
+					`Invalid task transition for ${taskId}: ${row.state} -> ${nextState}.`,
+				);
+			}
+			const nextAttempt =
+				nextState === "in_progress" || nextState === "problem"
+					? row.attempt + 1
+					: row.attempt;
+			const baseNotes = row.notes
+				.replace(/(?:^|\s)attempt=\d+(?=\s|$)/g, " ")
+				.trim();
+			const policyNotes = completionPolicy
+				? [
+						baseNotes
+							.replace(
+								/(?:^|\s)completion_policy=(?:execution|artifact|waiver)(?=\s|$)/g,
+								" ",
+							)
+							.trim(),
+						`completion_policy=${completionPolicy}`,
+					]
+						.filter(Boolean)
+						.join(" ")
+				: baseNotes;
+			const notes = [policyNotes, `attempt=${nextAttempt}`]
+				.filter(Boolean)
+				.join(" ");
+			row = {
+				...row,
+				state: nextState,
+				notes,
+				attempt: nextAttempt,
+			};
+		}
+		return renderTaskRow(row);
 	});
 	if (!changed) {
 		throw new Error(`Task ${taskId} not found in ${taskPath}`);
@@ -1095,6 +1171,15 @@ export function newWorkstream(
 		mkdirSync(dirname(paths.activeSessionPath), { recursive: true });
 		atomicWriteText(paths.activeSessionPath, `${session}\n`);
 		const warnings: string[] = [];
+		if (runtime.afterActiveSessionWrite) {
+			try {
+				runtime.afterActiveSessionWrite(session);
+			} catch {
+				warnings.push(
+					`session context binding failed after durable creation; run afol ss switch ${session} before using the implicit lifecycle path.`,
+				);
+			}
+		}
 		auxiliaryWarning(
 			warnings,
 			"workbench new event",
@@ -1228,18 +1313,22 @@ export function transitionTask(
 			warnings,
 			"workbench transition event",
 			() =>
-				appendWorkbenchEvent(root, {
-					type: "workbench.transition_task",
-					session: input.session,
-					taskId: input.taskId,
-					detail: {
-						from,
-						to: input.state,
-						...(input.completionPolicy
-							? { completion_policy: input.completionPolicy }
-							: {}),
+				appendWorkbenchEvent(
+					root,
+					{
+						type: "workbench.transition_task",
+						session: input.session,
+						taskId: input.taskId,
+						detail: {
+							from,
+							to: input.state,
+							...(input.completionPolicy
+								? { completion_policy: input.completionPolicy }
+								: {}),
+						},
 					},
-				}),
+					runtime.deferredEventRecords,
+				),
 			runtime,
 		);
 		if (!runtime.deferLocalStateRefresh) {
@@ -1293,6 +1382,23 @@ export function advanceTaskAfterObservedTest(
 	);
 }
 
+function observedCompletionTransitionChain(
+	state: string,
+	taskId: string,
+): TaskState[] {
+	if (state === "in_progress") {
+		return ["implemented_untested", "tested_needs_spec_validation", "done"];
+	}
+	if (state === "implemented_untested") {
+		return ["tested_needs_spec_validation", "done"];
+	}
+	if (state === "tested_needs_spec_validation") return ["done"];
+	if (state === "done") return [];
+	throw new Error(
+		`Observed test cannot advance ${taskId} from ${state}; start or recover the task first.`,
+	);
+}
+
 export function recordEvidence(
 	root: string,
 	input: RecordEvidenceInput,
@@ -1300,22 +1406,21 @@ export function recordEvidence(
 ): EvidenceEntry {
 	const entry = withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
-		ensureSessionOpenForMutation(root, input.session);
+		if (!runtime.sessionMutationValidated) {
+			ensureSessionOpenForMutation(root, input.session);
+		}
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
-		ensureTaskExists(paths.taskPath, input.session, input.taskId);
 		const now = new Date();
 		const sanitizedCommand = sanitizeEvidenceCommand(input.command);
 		const provenance: EvidenceProvenance = input.provenance ?? "declared";
-		const taskState = readTaskRows(paths.taskPath).find(
-			(row) => row.taskId === input.taskId,
-		)?.state;
 		const taskRow = ensureTaskExists(
 			paths.taskPath,
 			input.session,
 			input.taskId,
 		);
+		const taskState = taskRow.state;
 		const completionPolicy = completionPolicyFromNotes(taskRow.notes);
 		const evidence: EvidenceEntry = {
 			id: evidenceId(now),
@@ -1419,17 +1524,21 @@ export function recordEvidence(
 			warnings,
 			"workbench evidence event",
 			() =>
-				appendWorkbenchEvent(root, {
-					type: "workbench.record_evidence",
-					session: input.session,
-					taskId: input.taskId,
-					command: sanitizedCommand,
-					result: input.result,
-					detail: {
-						provenance,
-						evidence_id: evidence.id,
+				appendWorkbenchEvent(
+					root,
+					{
+						type: "workbench.record_evidence",
+						session: input.session,
+						taskId: input.taskId,
+						command: sanitizedCommand,
+						result: input.result,
+						detail: {
+							provenance,
+							evidence_id: evidence.id,
+						},
 					},
-				}),
+					runtime.deferredEventRecords,
+				),
 			runtime,
 		);
 		if (provenance === "observed") {
@@ -1437,17 +1546,21 @@ export function recordEvidence(
 				warnings,
 				"tool-exec telemetry",
 				() =>
-					appendTelemetryEvent(root, {
-						event_type: "tool_exec",
-						session_id: input.session,
-						task_id: input.taskId,
-						cmd_type: firstToken(sanitizedCommand),
-						provenance,
-						outcome:
-							evidenceCompletionStatus([evidence]) === "passed"
-								? "success"
-								: "failure",
-					}),
+					appendTelemetryEvent(
+						root,
+						{
+							event_type: "tool_exec",
+							session_id: input.session,
+							task_id: input.taskId,
+							cmd_type: firstToken(sanitizedCommand),
+							provenance,
+							outcome:
+								evidenceCompletionStatus([evidence]) === "passed"
+									? "success"
+									: "failure",
+						},
+						runtime.deferredEventRecords,
+					),
 				runtime,
 			);
 		}
@@ -1586,20 +1699,22 @@ function finalizeRecoveredRun(
 		},
 		runtime.fencingCheck,
 	);
-	const warnings = advanceTaskAfterObservedTest(root, input, {
-		...runtime,
-		deferLocalStateRefresh: true,
-	});
+	const deferredEventRecords: Record<string, unknown>[] = [];
 	const done = doneTask(
 		root,
 		{ ...input, verificationRunId: run.verification_run_id },
-		{ ...runtime, deferLocalStateRefresh: true },
+		{
+			...runtime,
+			deferLocalStateRefresh: true,
+			deferredEventRecords,
+			completeObservedTransitionChain: true,
+		},
 	);
-	warnings.push(...(done.warnings ?? []));
+	const warnings = [...(done.warnings ?? [])];
 	auxiliaryWarning(
 		warnings,
 		"local-state refresh",
-		() => refreshWorkbenchLocalState(root, input.session),
+		() => refreshWorkbenchLocalState(root, input.session, deferredEventRecords),
 		runtime,
 	);
 	return { runId: run.verification_run_id, evidenceIds, done, warnings };
@@ -1793,6 +1908,7 @@ export function recordVerificationRunStep(
 				`Verification command changed for step ${input.stepIndex}/${input.run.step_count}.`,
 			);
 		}
+		const deferredEventRecords: Record<string, unknown>[] = [];
 		const evidence = recordEvidence(
 			root,
 			{
@@ -1815,7 +1931,12 @@ export function recordVerificationRunStep(
 				...(input.artifact ? { artifact: input.artifact } : {}),
 				...(input.note ? { note: input.note } : {}),
 			},
-			{ ...runtime, deferLocalStateRefresh: true },
+			{
+				...runtime,
+				deferLocalStateRefresh: true,
+				deferredEventRecords,
+				sessionMutationValidated: true,
+			},
 		);
 		appendVerificationRunStep(
 			root,
@@ -1838,6 +1959,16 @@ export function recordVerificationRunStep(
 			},
 			runtime.fencingCheck,
 		);
+		const warnings = evidence.warnings ?? [];
+		if (deferredEventRecords.length > 0) {
+			auxiliaryWarning(
+				warnings,
+				"event ledger batch",
+				() => appendEventLedgerRecords(root, deferredEventRecords),
+				runtime,
+			);
+		}
+		evidence.warnings = warnings;
 		return evidence;
 	});
 }
@@ -1915,18 +2046,34 @@ export function doneTask(
 ): DoneTaskResult {
 	return withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
-		ensureSessionOpenForMutation(root, input.session);
-		const allEntries = loadEvidenceEntries(paths.evidencePath).filter(
-			(entry) => entry.task_id === input.taskId,
-		);
-		const taskRow = ensureTaskExists(
-			paths.taskPath,
-			input.session,
-			input.taskId,
-		);
-		const completionPolicy = completionPolicyFromNotes(taskRow.notes);
+		if (!runtime.sessionMutationValidated) {
+			ensureSessionOpenForMutation(root, input.session);
+		}
+		const allEntries = (
+			runtime.authorizingEvidence
+				? [runtime.authorizingEvidence]
+				: loadEvidenceEntries(paths.evidencePath)
+		).filter((entry) => entry.task_id === input.taskId);
+		const evidenceSnapshot = runtime.authorizingEvidence;
+		const canReuseEvidenceSnapshot =
+			evidenceSnapshot?.task_id === input.taskId &&
+			isTaskState(evidenceSnapshot.task_state ?? "") &&
+			typeof evidenceSnapshot.attempt === "number" &&
+			evidenceSnapshot.authorization_type !== undefined;
+		const taskRow = canReuseEvidenceSnapshot
+			? null
+			: ensureTaskExists(paths.taskPath, input.session, input.taskId);
+		const taskState = canReuseEvidenceSnapshot
+			? (evidenceSnapshot.task_state as TaskState)
+			: (taskRow?.state ?? "unknown");
+		const taskAttempt = canReuseEvidenceSnapshot
+			? (evidenceSnapshot.attempt as number)
+			: (taskRow?.attempt ?? 0);
+		const completionPolicy = canReuseEvidenceSnapshot
+			? (evidenceSnapshot.authorization_type as CompletionPolicy)
+			: completionPolicyFromNotes(taskRow?.notes ?? "");
 		const entries = allEntries.filter(
-			(entry) => (entry.attempt ?? 0) === taskRow.attempt,
+			(entry) => (entry.attempt ?? 0) === taskAttempt,
 		);
 		const authorization = evidenceCompletionAuthorization(
 			entries,
@@ -1959,7 +2106,7 @@ export function doneTask(
 					root,
 					input.session,
 					input.taskId,
-					taskRow.attempt,
+					taskAttempt,
 					authorization.evidenceId,
 					authorizingEntry.verification_run_id,
 				)
@@ -1987,34 +2134,71 @@ export function doneTask(
 					`Authorizing artifact changed after evidence: ${authorizingEntry.artifact}`,
 				);
 		}
-		if (taskRow.state === "done") {
+		if (taskState === "done") {
 			return { authorizingEvidenceId: authorization.evidenceId };
 		}
+		const completionTransitions = runtime.completeObservedTransitionChain
+			? observedCompletionTransitionChain(taskState, input.taskId)
+			: (["done"] as const);
 		runtime.fencingCheck?.();
-		transitionTaskState(paths.taskPath, input.taskId, "done");
+		transitionTaskStateChain(
+			paths.taskPath,
+			input.taskId,
+			completionTransitions,
+		);
 		const warnings: string[] = [];
+		if (runtime.completeObservedTransitionChain) {
+			let from = taskState;
+			for (const to of completionTransitions.slice(0, -1)) {
+				auxiliaryWarning(
+					warnings,
+					"workbench transition event",
+					() =>
+						appendWorkbenchEvent(
+							root,
+							{
+								type: "workbench.transition_task",
+								session: input.session,
+								taskId: input.taskId,
+								detail: { from, to },
+							},
+							runtime.deferredEventRecords,
+						),
+					runtime,
+				);
+				from = to;
+			}
+		}
 		auxiliaryWarning(
 			warnings,
 			"workbench done event",
 			() =>
-				appendWorkbenchEvent(root, {
-					type: "workbench.mark_done",
-					session: input.session,
-					taskId: input.taskId,
-				}),
+				appendWorkbenchEvent(
+					root,
+					{
+						type: "workbench.mark_done",
+						session: input.session,
+						taskId: input.taskId,
+					},
+					runtime.deferredEventRecords,
+				),
 			runtime,
 		);
 		auxiliaryWarning(
 			warnings,
 			"task-complete telemetry",
 			() =>
-				appendTelemetryEvent(root, {
-					event_type: "task_complete",
-					session_id: input.session,
-					task_id: input.taskId,
-					cmd_type: "done",
-					outcome: "success",
-				}),
+				appendTelemetryEvent(
+					root,
+					{
+						event_type: "task_complete",
+						session_id: input.session,
+						task_id: input.taskId,
+						cmd_type: "done",
+						outcome: "success",
+					},
+					runtime.deferredEventRecords,
+				),
 			runtime,
 		);
 		if (!runtime.deferLocalStateRefresh) {
@@ -2050,9 +2234,11 @@ export function completeObservedTask(
 	runtime: LifecycleAuxiliaryRuntime = {},
 ): CompleteObservedTaskResult {
 	return withSessionLock(root, input.session, () => {
+		ensureSessionOpenForMutation(root, input.session);
 		let evidenceWritten = false;
 		let result: CompleteObservedTaskResult | undefined;
 		const warnings: string[] = [];
+		const deferredEventRecords: Record<string, unknown>[] = [];
 		try {
 			const evidence = recordEvidence(
 				root,
@@ -2064,56 +2250,30 @@ export function completeObservedTask(
 				{
 					...runtime,
 					deferLocalStateRefresh: true,
+					deferredEventRecords,
+					sessionMutationValidated: true,
 				},
 			);
 			evidenceWritten = true;
 			warnings.push(...(evidence.warnings ?? []));
 			if (input.exitCode === 0) {
-				warnings.push(
-					...advanceTaskAfterObservedTest(root, input, {
-						...runtime,
-						deferLocalStateRefresh: true,
-					}),
-				);
 				const done = doneTask(root, input, {
 					...runtime,
 					deferLocalStateRefresh: true,
+					deferredEventRecords,
+					completeObservedTransitionChain: true,
+					sessionMutationValidated: true,
+					authorizingEvidence: evidence,
 				});
 				warnings.push(...(done.warnings ?? []));
-				// Observer — failures are caught and surfaced as warnings, never roll
-				// back the durable workbench completion.
-				try {
-					const config = resolveEvolutionConfig(readProjectConfig(root));
-					const autonomy = config.settings.autonomy;
-					const autoObserve =
-						autonomy !== null &&
-						typeof autonomy === "object" &&
-						!Array.isArray(autonomy) &&
-						(autonomy as Record<string, unknown>).auto_observe === true;
-					if (
-						config.configured &&
-						config.enabled &&
-						config.projectId &&
-						autoObserve
-					) {
-						const observerResult = runtime.observerSeam
-							? runtime.observerSeam({
-									root,
-									projectId: config.projectId,
-									session: input.session,
-								})
-							: ingestObservationsForSession({
-									root,
-									projectId: config.projectId,
-									session: input.session,
-								});
-						warnings.push(...observerResult.warnings);
-					}
-				} catch (observerError) {
-					warnings.push(
-						`observer failed after durable commit: ${(observerError as Error).message}`,
-					);
-				}
+				warnings.push(
+					...observeCompletedSession(
+						root,
+						input.session,
+						runtime,
+						"production-day",
+					),
+				);
 				result = { done, evidence, warnings };
 			} else {
 				result = { evidence, warnings };
@@ -2123,7 +2283,12 @@ export function completeObservedTask(
 				auxiliaryWarning(
 					warnings,
 					"local-state refresh",
-					() => refreshWorkbenchLocalState(root, input.session),
+					() =>
+						refreshWorkbenchLocalState(
+							root,
+							input.session,
+							deferredEventRecords,
+						),
 					runtime,
 				);
 			}
@@ -2139,6 +2304,7 @@ export function closeSession(
 	root: string,
 	session: string,
 	options: CloseSessionOptions = {},
+	runtime: LifecycleAuxiliaryRuntime = {},
 ): CloseSessionResult {
 	return withSessionLock(root, session, () => {
 		const paths = sessionPaths(root, session);
@@ -2146,7 +2312,13 @@ export function closeSession(
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
-		const diagnostics = closeDiagnosticState(root, session);
+		let diagnostics: { workbench: boolean; telemetry: boolean };
+		if (state.kind === "open") {
+			assertValidEventLedger(root);
+			diagnostics = { workbench: false, telemetry: false };
+		} else {
+			diagnostics = closeDiagnosticState(root, session);
+		}
 		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
 		const reportRelativePath = relative(root, reportPath).replaceAll("\\", "/");
 		let reportStatus: CloseSessionReport["status"] = existsSync(reportPath)
@@ -2218,11 +2390,14 @@ export function closeSession(
 							loadEvidenceEntries(paths.evidencePath),
 							summaryText,
 						),
+						{ syncDirectory: false },
 					);
 					reportCreated = !reportWasPresent;
 				}
 				if (nextLog !== originalLog) {
-					atomicWriteText(paths.logPath, nextLog);
+					atomicWriteText(paths.logPath, nextLog, {
+						syncDirectory: false,
+					});
 					logWritten = true;
 				}
 				markTaskMetadataClosed(
@@ -2261,22 +2436,30 @@ export function closeSession(
 				? evaluateCloseWarnings(session, paths.sessionDir)
 				: [];
 
-		for (const [alreadyRecorded, label, writeDiagnostic] of [
+		const deferredEventRecords: Record<string, unknown>[] = [];
+		for (const [alreadyRecorded, writeDiagnostic] of [
 			[
 				diagnostics.workbench,
-				"workbench close event",
-				() => appendWorkbenchEvent(root, { type: "workbench.close", session }),
+				() =>
+					appendWorkbenchEvent(
+						root,
+						{ type: "workbench.close", session },
+						deferredEventRecords,
+					),
 			],
 			[
 				diagnostics.telemetry,
-				"session-end telemetry",
 				() =>
-					appendTelemetryEvent(root, {
-						event_type: "session_end",
-						session_id: session,
-						cmd_type: "close",
-						outcome: "success",
-					}),
+					appendTelemetryEvent(
+						root,
+						{
+							event_type: "session_end",
+							session_id: session,
+							cmd_type: "close",
+							outcome: "success",
+						},
+						deferredEventRecords,
+					),
 			],
 		] as const) {
 			if (alreadyRecorded) {
@@ -2286,11 +2469,10 @@ export function closeSession(
 				writeDiagnostic();
 			} catch {
 				warnings.push(
-					`${label} failed after the durable close commit; the durable task metadata remains authoritative.`,
+					"close diagnostic preparation failed after the durable close commit; the durable task metadata remains authoritative.",
 				);
 			}
 		}
-
 		if (existsSync(paths.activeSessionPath)) {
 			try {
 				const active = readFileSync(paths.activeSessionPath, "utf8").trim();
@@ -2305,12 +2487,13 @@ export function closeSession(
 		}
 
 		try {
-			refreshWorkbenchLocalState(root, session);
+			refreshWorkbenchLocalState(root, session, deferredEventRecords);
 		} catch {
 			warnings.push(
 				"local-state refresh failed after the durable close commit; run afol local-state rebuild.",
 			);
 		}
+		warnings.push(...observeCompletedSession(root, session, runtime));
 		const result = warnings as CloseSessionResult;
 		result.report = {
 			status: reportStatus,

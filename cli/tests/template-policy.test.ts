@@ -283,6 +283,35 @@ describe("template forbidden-content policy", () => {
 		expect(templateRegistry.coverage?.subcommand_exemptions).toEqual([]);
 	});
 
+	test("workbench benchmark scenarios stay in template parity", async () => {
+		const projectRoot = process.cwd();
+		const relativeCatalog =
+			".afol/data/benchmarks/catalog/scenarios/workbench-parity";
+		const rootCatalog = join(projectRoot, relativeCatalog);
+		const templateCatalog = join(
+			projectRoot,
+			"src/project-template",
+			relativeCatalog,
+		);
+		const rootFiles = (await readdir(rootCatalog))
+			.filter((name) => name.endsWith(".json"))
+			.sort();
+		const templateFiles = (await readdir(templateCatalog))
+			.filter((name) => name.endsWith(".json"))
+			.sort();
+		expect(templateFiles).toEqual(rootFiles);
+		for (const name of rootFiles) {
+			const rootScenario = JSON.parse(
+				await readFile(join(rootCatalog, name), "utf8"),
+			) as Record<string, unknown>;
+			const templateScenario = JSON.parse(
+				await readFile(join(templateCatalog, name), "utf8"),
+			) as Record<string, unknown>;
+			delete rootScenario.compiled_binary;
+			expect(templateScenario).toEqual(rootScenario);
+		}
+	});
+
 	test("live repo and src/project-template do not vendor global agentic-folder-sys skill", async () => {
 		const projectRoot = process.cwd();
 		const forbiddenPaths = [

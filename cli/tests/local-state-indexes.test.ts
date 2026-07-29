@@ -848,7 +848,7 @@ describe("local-state project indexer", () => {
 		}
 	});
 
-	test("scoped rebuild falls back when a non-target session becomes stale", () => {
+	test("scoped rebuild preserves peer data while validation reports peer drift", () => {
 		const root = mkdtempSync(join(tmpdir(), "wb-scope-stale-peer-"));
 		const sessionA = "260618_alpha";
 		const sessionB = "260618_beta";
@@ -894,13 +894,24 @@ describe("local-state project indexer", () => {
 				expect.arrayContaining([
 					expect.objectContaining({
 						session: sessionA,
+						task_count: 1,
+					}),
+					expect.objectContaining({ session: sessionB, task_count: 1 }),
+				]),
+			);
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+
+			const repaired = rebuildWorkBenchIndex(root);
+			expect(repaired.sessions).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						session: sessionA,
 						task_count: 0,
 						degraded: true,
 					}),
 					expect.objectContaining({ session: sessionB, task_count: 1 }),
 				]),
 			);
-			expect(validateWorkBenchIndex(root).ok).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

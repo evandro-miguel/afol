@@ -11,7 +11,10 @@ import {
 	loadSessionState,
 	validateSessionState,
 } from "../services/state/session-state";
-import { readActiveSession } from "../services/workbench/lifecycle";
+import {
+	defaultAllowGlobalFallback,
+	resolveSession,
+} from "../services/workbench/session-context";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type StateAction = "show" | "validate" | "sync" | "export";
@@ -66,13 +69,16 @@ function parseStateArgs(args: string[]): { json: boolean; sessionId?: string } {
 }
 
 function resolveSessionId(projectRoot: string, parsed: { sessionId?: string }) {
-	const sessionId = parsed.sessionId ?? readActiveSession(projectRoot);
-	if (!sessionId) {
+	const resolved = resolveSession(projectRoot, {
+		...(parsed.sessionId ? { explicit: parsed.sessionId } : {}),
+		allowGlobalFallback: defaultAllowGlobalFallback(),
+	});
+	if (!resolved) {
 		throw new Error(
-			"Missing --session for state and no active session found. Run afol session list.",
+			"Missing usable session for state. Run afol ss list, switch an open session, or pass -S <session>.",
 		);
 	}
-	return sessionId;
+	return resolved.session;
 }
 
 function formatSnapshot(

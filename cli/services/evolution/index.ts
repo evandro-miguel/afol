@@ -54,6 +54,7 @@ export {
 	type ProductionDayJournalEvent,
 	productionDayJournalPath,
 	readProductionDayJournal,
+	resolveProductionDayReceipt,
 	validateProductionDayProjection,
 } from "./journal";
 export * from "./migrations";

@@ -104,7 +104,8 @@ function assertGovernedTask(
 
 function safeInline(value: unknown, max = 320): string {
 	return String(value ?? "")
-		.replace(/[\0\r\n\uFFFD]/g, " ")
+		.replaceAll("\0", " ")
+		.replace(/[\r\n\uFFFD]/g, " ")
 		.replace(/[<>`#{}[\]*]/g, "")
 		.replace(/\s+/g, " ")
 		.trim()
