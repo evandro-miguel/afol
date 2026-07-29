@@ -873,10 +873,19 @@ describe("local-state project indexer", () => {
 				taskRows("bob", "baseline"),
 				"utf8",
 			);
+			const unchangedMtime = new Date("2026-01-01T00:00:00.000Z");
+			const sessionATaskPath = join(
+				root,
+				".afol",
+				"wb",
+				sessionA,
+				`${sessionA}_task_01.md`,
+			);
+			utimesSync(sessionATaskPath, unchangedMtime, unchangedMtime);
 			rebuildWorkBenchIndex(root);
 
 			writeFileSync(
-				join(root, ".afol", "wb", sessionA, `${sessionA}_task_01.md`),
+				sessionATaskPath,
 				[
 					"| Task | State | Owner | Notes |",
 					"|------|-------|-------|-------|",
@@ -884,6 +893,7 @@ describe("local-state project indexer", () => {
 				].join("\n"),
 				"utf8",
 			);
+			utimesSync(sessionATaskPath, unchangedMtime, unchangedMtime);
 			writeFileSync(
 				join(root, ".afol", "wb", sessionB, `${sessionB}_task_01.md`),
 				taskRows("bob", "scoped rebuild"),
