@@ -2296,7 +2296,10 @@ export type CompleteObservedTaskResult = {
 export type CompleteObservedTasksInput = Omit<
 	CompleteObservedTaskInput,
 	"taskId"
-> & { taskIds: readonly string[] };
+> & {
+	taskIds: readonly string[];
+	taskAttemptSnapshots?: Readonly<Record<string, number>>;
+};
 
 export type CompleteObservedTasksResult = {
 	evidence: EvidenceEntry[];
@@ -2308,10 +2311,12 @@ function assertObservedBatchTaskRows(
 	root: string,
 	session: string,
 	taskIds: readonly string[],
-): void {
+	expectedAttempts?: Readonly<Record<string, number>>,
+): Record<string, number> {
 	ensureSessionOpenForMutation(root, session);
 	const paths = sessionPaths(root, session);
 	const rows = readTaskRows(paths.taskPath);
+	const attempts: Record<string, number> = {};
 	for (const taskId of taskIds) {
 		const row = rows.find((entry) => entry.taskId === taskId);
 		if (!row) {
@@ -2323,15 +2328,42 @@ function assertObservedBatchTaskRows(
 				`Batch done supports execution-policy tasks only: ${taskId}.`,
 			);
 		}
+		if (expectedAttempts && row.attempt !== expectedAttempts[taskId]) {
+			throw new Error(
+				`Task ${taskId} attempt changed during shared verification.`,
+			);
+		}
+		attempts[taskId] = row.attempt;
+	}
+	return attempts;
+}
+
+function assertObservedBatchTaskAttempts(
+	root: string,
+	session: string,
+	taskIds: readonly string[],
+	expectedAttempts: Readonly<Record<string, number>>,
+): void {
+	const rows = readTaskRows(sessionPaths(root, session).taskPath);
+	for (const taskId of taskIds) {
+		const row = rows.find((entry) => entry.taskId === taskId);
+		if (!row) {
+			throw new Error(`Task ${taskId} not found in ${session}.`);
+		}
+		if (row.attempt !== expectedAttempts[taskId]) {
+			throw new Error(
+				`Task ${taskId} attempt changed during shared verification.`,
+			);
+		}
 	}
 }
 
 export function assertObservedBatchTasksReady(
 	root: string,
 	input: { session: string; taskIds: readonly string[] },
-): void {
-	withSessionLock(root, input.session, () => {
-		assertObservedBatchTaskRows(root, input.session, input.taskIds);
+): Record<string, number> {
+	return withSessionLock(root, input.session, () => {
+		return assertObservedBatchTaskRows(root, input.session, input.taskIds);
 	});
 }
 
@@ -2420,8 +2452,21 @@ export function completeObservedTasks(
 		if (taskIds.length < 2) {
 			throw new Error("Batch completion requires at least two tasks.");
 		}
+		if (input.taskAttemptSnapshots) {
+			assertObservedBatchTaskAttempts(
+				root,
+				input.session,
+				taskIds,
+				input.taskAttemptSnapshots,
+			);
+		}
 		if (input.exitCode === 0) {
-			assertObservedBatchTaskRows(root, input.session, taskIds);
+			assertObservedBatchTaskRows(
+				root,
+				input.session,
+				taskIds,
+				input.taskAttemptSnapshots,
+			);
 		}
 
 		const evidence: EvidenceEntry[] = [];

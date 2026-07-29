@@ -426,6 +426,11 @@ export async function runTransitionCommand(
 			(_, index) => index !== stateIndex && index !== stateIndex + 1,
 		);
 		const parsed = parseSessionTaskArgs(sessionArgs, "transition", root);
+		if (parsed.taskIds.length > 1) {
+			throw new Error(
+				"Transition accepts exactly one task; batch selectors are not supported.",
+			);
+		}
 		const warnings = transitionTask(
 			root,
 			{
@@ -804,11 +809,12 @@ async function runDoneBatch(
 				for (const lease of leases) lease.assertOwned();
 			};
 			assertOwned();
-			assertObservedBatchTasksReady(root, {
+			const taskAttemptSnapshots = assertObservedBatchTasksReady(root, {
 				session: parsed.session,
 				taskIds: parsed.taskIds,
 			});
-			const signal = leases[0]?.signal;
+			const signals = leases.map((lease) => lease.signal);
+			const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
 			const observed = signal
 				? await runVerificationAsync(root, verification, { signal })
 				: await runVerificationAsync(root, verification);
@@ -822,6 +828,7 @@ async function runDoneBatch(
 				{
 					session: parsed.session,
 					taskIds: parsed.taskIds,
+					taskAttemptSnapshots,
 					command,
 					exitCode: observed.exitCode,
 					approvalContext: ctx,

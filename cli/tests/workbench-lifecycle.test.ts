@@ -4829,6 +4829,36 @@ describe("task completion authorization and transitions", () => {
 		}
 	});
 
+	test("transition rejects a batch selector without partial mutation", async () => {
+		const root = mkRoot("transition-batch-rejected");
+		const originalError = console.error;
+		try {
+			const created = newWorkstream(root, "transition batch rejected", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			console.error = () => {};
+			expect(
+				await runTransitionCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--state",
+						"in_progress",
+					],
+					root,
+				),
+			).toBe(2);
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task).toContain("| T-01 | pending |");
+			expect(task).toContain("| T-02 | pending |");
+		} finally {
+			console.error = originalError;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("transition preserves explicit session without a completion policy", async () => {
 		const root = mkRoot("transition-explicit-session");
 		try {
@@ -5290,6 +5320,189 @@ describe("task completion authorization and transitions", () => {
 		} finally {
 			console.error = originalError;
 			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done rejects a changed task attempt after shared verification", async () => {
+		const root = mkRoot("batch-done-attempt-fence");
+		const originalError = console.error;
+		const originalLog = console.log;
+		const errors: string[] = [];
+		try {
+			const created = newWorkstream(root, "batch done attempt fence", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			const markerPath = join(root, "verification-started.txt");
+			const verifierPath = join(root, "slow-verifier.ts");
+			writeFileSync(
+				verifierPath,
+				`await Bun.write(${JSON.stringify(markerPath)}, "started"); await Bun.sleep(300);`,
+			);
+			startTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			console.error = (...values: unknown[]) =>
+				errors.push(values.map(String).join(" "));
+			console.log = () => {};
+			const completion = runDoneCommand(
+				[
+					"--session",
+					created.session,
+					"T-01..T-02",
+					"--test",
+					`bun ${verifierPath}`,
+				],
+				root,
+			);
+			for (
+				let attempts = 0;
+				attempts < 100 && !existsSync(markerPath);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(markerPath)).toBe(true);
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "problem",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "in_progress",
+			});
+			expect(await completion).toBe(2);
+			expect(errors.join("\n")).toContain(
+				"Task T-02 attempt changed during shared verification.",
+			);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
+			const task = readFileSync(created.taskPath, "utf8");
+			expect(task).toContain("| T-01 | in_progress |");
+			expect(task).toContain("| T-02 | in_progress |");
+		} finally {
+			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done does not attach stale failed evidence after restart", async () => {
+		const root = mkRoot("batch-done-failed-attempt-fence");
+		const originalError = console.error;
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "batch failed attempt fence", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			const markerPath = join(root, "failed-verification-started.txt");
+			const verifierPath = join(root, "slow-failing-verifier.ts");
+			writeFileSync(
+				verifierPath,
+				`await Bun.write(${JSON.stringify(markerPath)}, "started"); await Bun.sleep(300); process.exit(1);`,
+			);
+			startTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			console.error = () => {};
+			console.log = () => {};
+			const completion = runDoneCommand(
+				[
+					"--session",
+					created.session,
+					"T-01..T-02",
+					"--test",
+					`bun ${verifierPath}`,
+				],
+				root,
+			);
+			for (
+				let attempts = 0;
+				attempts < 100 && !existsSync(markerPath);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(markerPath)).toBe(true);
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "problem",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "in_progress",
+			});
+			expect(await completion).toBe(2);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
+		} finally {
+			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done aborts when any selected task loses its lease", async () => {
+		if (process.platform === "win32") return;
+		const root = mkRoot("batch-done-lease-loss");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "batch done lease loss", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			const marker = join(root, "batch-fenced-child.pid");
+			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setTimeout(() => {}, 5000);`;
+			const child = spawn(
+				"bun",
+				[
+					kernelPath,
+					"done",
+					"-S",
+					created.session,
+					"-T",
+					"T-01..T-02",
+					"-x",
+					`bun -e ${JSON.stringify(script)}`,
+					"--json",
+				],
+				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+			);
+			for (
+				let attempts = 0;
+				attempts < 200 && !existsSync(marker);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(marker)).toBe(true);
+			const verificationPid = Number.parseInt(readFileSync(marker, "utf8"), 10);
+			const lockPath = resolveTaskCompletionLockPath(
+				root,
+				created.session,
+				"T-02",
+			);
+			const fencePath = `${lockPath}.fence`;
+			const generation = Number.parseInt(readFileSync(fencePath, "utf8"), 10);
+			const fencedAt = Date.now();
+			writeFileSync(fencePath, `${generation + 1}\n`, "utf8");
+
+			const result = await waitForExit(child);
+			expect(Date.now() - fencedAt).toBeLessThan(3_000);
+			expect(result.code).toBe(2);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
+			let verificationAlive = true;
+			try {
+				process.kill(verificationPid, 0);
+			} catch {
+				verificationAlive = false;
+			}
+			expect(verificationAlive).toBe(false);
+		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

@@ -1146,6 +1146,72 @@ describe("pstr service helpers", () => {
 		}
 	});
 
+	test("config changes force a full rebuild of the PSTR registry", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			mkdirSync(join(root, "os", "kernel"), { recursive: true });
+			writeFileSync(join(root, "os", "kernel", "README.md"), "kernel\n");
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "kernel",
+								scope: "os.kernel",
+								source_roots: ["os/kernel"],
+								tags: ["os"],
+							},
+						],
+					},
+				}),
+			);
+
+			const snapshot = rebuildPstrIndex(root, {
+				changedPaths: [".afol/config.json"],
+			});
+
+			expect(snapshot.maps.map((entry) => entry.id)).toContain("kernel");
+			expect(existsSync(join(root, ".afol", "pstr", "kernel.md"))).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("traverses configured directories whose names contain dots", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, "packages", "app.v2"), { recursive: true });
+			writeFileSync(
+				join(root, "packages", "app.v2", "index.ts"),
+				"export {};\n",
+			);
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "dotted-app",
+								scope: "packages.app-v2",
+								source_roots: ["packages/app.v2"],
+								tags: ["packages"],
+							},
+						],
+					},
+				}),
+			);
+
+			const snapshot = rebuildPstrIndex(root);
+			const dotted = snapshot.maps.find((entry) => entry.id === "dotted-app");
+			expect(dotted?.file_count).toBe(1);
+			expect(dotted?.source_paths).toEqual(["packages/app.v2/index.ts"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	test("watch rejects configured roots whose symlink leaves the project", () => {
 		const root = createFixture();
 		const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));

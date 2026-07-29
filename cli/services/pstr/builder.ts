@@ -7,7 +7,7 @@ import {
 	rmSync,
 	statSync,
 } from "node:fs";
-import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadJsonObject } from "../../core/schema";
 import { computeSourceHash } from "../../core/source-hash";
 import { atomicWriteText } from "../io/atomic";
@@ -270,7 +270,7 @@ function collectFilesUnder(root: string, startPath: string): string[] {
 	}
 
 	const sourceStat = statSync(startRoot);
-	if (sourceStat.isFile() || extname(startPath) !== "") {
+	if (sourceStat.isFile()) {
 		return [toRelativeProjectPath(root, startRoot)];
 	}
 
@@ -964,8 +964,16 @@ export function rebuildPstrIndex(
 	)
 		? rawPreviousSnapshot
 		: null;
+	const registryConfigChanged = options.changedPaths?.some((pathValue) => {
+		const normalized = normalizeChangedPath(projectRoot, pathValue);
+		return (
+			normalized === ".afol/config.json" || normalized === ".agents/config.json"
+		);
+	});
 	const affectedAreaIds =
-		options.changedPaths && options.changedPaths.length > 0
+		!registryConfigChanged &&
+		options.changedPaths &&
+		options.changedPaths.length > 0
 			? getAffectedAreaIds(projectRoot, options.changedPaths)
 			: null;
 	let snapshot: PstrIndexSnapshot;
