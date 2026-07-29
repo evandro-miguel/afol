@@ -17,6 +17,7 @@ import {
 	getSectionIndex,
 	rebuildSectionIndex,
 	resolveSection,
+	SectionIndexTrustError,
 } from "../services/context/section-index";
 import {
 	addClaim,
@@ -87,8 +88,10 @@ function createBaseFixture(): string {
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
-	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
-	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "decisions"), { recursive: true });
+	mkdirSync(join(root, "docs"), { recursive: true });
+	writeFileSync(join(root, "docs", "readme.md"), "# Docs\n", "utf8");
 	writeFileSync(
 		join(root, ".agents", "config.json"),
 		'{"version":"0.1.0"}',
@@ -110,7 +113,7 @@ function createBaseFixture(): string {
 function createSectionFixture(): string {
 	const root = createBaseFixture();
 	writeFileSync(
-		join(root, "docs", "arc", "SPECS", "alpha-spec.md"),
+		join(root, ".afol", "adm", "specs", "alpha-spec.md"),
 		[
 			"---",
 			"doc_type: spec",
@@ -135,7 +138,7 @@ function createSectionFixture(): string {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, "docs", "arc", "DECISIONS", "adr-1.md"),
+		join(root, ".afol", "adm", "decisions", "adr-1.md"),
 		[
 			"---",
 			"doc_type: adr",
@@ -336,7 +339,7 @@ function createBundleFixture(options?: {
 
 	if (options?.inflate) {
 		writeFileSync(
-			join(root, "docs", "arc", "SPECS", "alpha-spec.md"),
+			join(root, ".afol", "adm", "specs", "alpha-spec.md"),
 			[
 				"---",
 				"doc_type: spec",
@@ -389,7 +392,7 @@ function createBundleFixture(options?: {
 
 	if (options?.pstr === "stale") {
 		writeFileSync(
-			join(root, "docs", "arc", "SPECS", "alpha-spec.md"),
+			join(root, ".afol", "adm", "specs", "alpha-spec.md"),
 			[
 				"---",
 				"doc_type: spec",
@@ -415,6 +418,7 @@ function createBundleFixture(options?: {
 		);
 	}
 
+	rebuildSectionIndex(root);
 	return root;
 }
 
@@ -481,18 +485,24 @@ describe("context system", () => {
 		const root = createSectionFixture();
 		try {
 			const snapshot = rebuildSectionIndex(root);
-			expect(snapshot.kind).toBe("sections_index_v1");
-			expect(snapshot.version).toBe(1);
+			expect(snapshot.kind).toBe("sections_index_v2");
+			expect(snapshot.version).toBe(2);
 			expect(snapshot.sections.length).toBe(4);
 			expect(snapshot.sections[0]?.title).toBe("Decision");
 			expect(
-				snapshot.sections.some((entry) => entry.ref === "spec:alpha#overview"),
+				snapshot.sections.some(
+					(entry) => entry.ref === "spec:alpha/specs-alpha-spec#overview",
+				),
 			).toBe(true);
 			expect(
-				snapshot.sections.some((entry) => entry.ref === "spec:alpha#details"),
+				snapshot.sections.some(
+					(entry) => entry.ref === "spec:alpha/specs-alpha-spec#details",
+				),
 			).toBe(true);
 			expect(
-				snapshot.sections.some((entry) => entry.ref === "spec:alpha#notes"),
+				snapshot.sections.some(
+					(entry) => entry.ref === "spec:alpha/specs-alpha-spec#notes",
+				),
 			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -556,11 +566,12 @@ describe("context system", () => {
 		}
 	});
 
-	test("resolveSection does not persist missing index", () => {
+	test("resolveSection fails closed and does not persist a missing index", () => {
 		const root = createSectionFixture();
 		try {
-			const section = resolveSection(root, "spec:alpha#overview");
-			expect(section?.title).toBe("Overview");
+			expect(() => resolveSection(root, "spec:alpha#overview")).toThrow(
+				SectionIndexTrustError,
+			);
 			expect(getSectionIndex(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -582,15 +593,15 @@ describe("context system", () => {
 		try {
 			const snapshot = rebuildSectionIndex(root);
 			const details = snapshot.sections.find(
-				(entry) => entry.ref === "spec:alpha#details",
+				(entry) => entry.ref === "spec:alpha/specs-alpha-spec#details",
 			);
 			expect(details).toEqual({
-				ref: "spec:alpha#details",
+				ref: "spec:alpha/specs-alpha-spec#details",
 				title: "Details",
 				level: 3,
 				line_start: 13,
 				line_end: 16,
-				source_path: "docs/arc/SPECS/alpha-spec.md",
+				source_path: ".afol/adm/specs/alpha-spec.md",
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -602,12 +613,12 @@ describe("context system", () => {
 		try {
 			const snapshot = rebuildSectionIndex(root);
 			const specEntries = snapshot.sections.filter(
-				(entry) => entry.source_path === "docs/arc/SPECS/alpha-spec.md",
+				(entry) => entry.source_path === ".afol/adm/specs/alpha-spec.md",
 			);
 			expect(specEntries.map((entry) => entry.ref)).toEqual([
-				"spec:alpha#overview",
-				"spec:alpha#details",
-				"spec:alpha#notes",
+				"spec:alpha/specs-alpha-spec#overview",
+				"spec:alpha/specs-alpha-spec#details",
+				"spec:alpha/specs-alpha-spec#notes",
 			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1594,7 +1605,7 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx section reads section without rebuilding sections", async () => {
+	test("afol ctx section fails closed without rebuilding a missing index", async () => {
 		const root = createSectionFixture();
 		try {
 			const captured = captureIo();
@@ -1605,16 +1616,16 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
+			).toBe(1);
 			expect(getSectionIndex(root)).toBeNull();
 			expect(existsSync(sectionIndexPath(root))).toBe(false);
-			expect(captured.stdout[0]).toContain('"title":"Overview"');
+			expect(captured.stderr[0]).toContain("afol ctx build");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("afol ctx bundle --full reads sections without rebuilding sections", async () => {
+	test("afol ctx bundle --full fails closed without rebuilding a missing index", async () => {
 		const root = createSectionFixture();
 		try {
 			const captured = captureIo();
@@ -1625,19 +1636,20 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
+			).toBe(1);
 			expect(getSectionIndex(root)).toBeNull();
 			expect(existsSync(sectionIndexPath(root))).toBe(false);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				data: { expanded_sections?: unknown[] };
+				error?: { code?: string; message?: string };
 			};
-			expect(payload.data.expanded_sections?.length).toBeGreaterThan(0);
+			expect(payload.error?.code).toBe("CTX_TRUST_ERROR");
+			expect(payload.error?.message).toContain("afol ctx build");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("afol ctx explain reads sections without rebuilding sections", async () => {
+	test("afol ctx explain fails closed without rebuilding a missing index", async () => {
 		const root = createSectionFixture();
 		try {
 			const captured = captureIo();
@@ -1648,13 +1660,10 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
+			).toBe(1);
 			expect(getSectionIndex(root)).toBeNull();
 			expect(existsSync(sectionIndexPath(root))).toBe(false);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				bundle_size?: { expanded_sections: number };
-			};
-			expect(payload.bundle_size?.expanded_sections).toBeGreaterThan(0);
+			expect(captured.stderr[0]).toContain("afol ctx build");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

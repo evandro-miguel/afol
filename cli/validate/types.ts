@@ -3,6 +3,7 @@ export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
 
 export const REQUIRED_PACKS = [
 	"cli-kernel-local",
+	"evolution-core",
 	"routing-accuracy",
 	"mutation-safety",
 	"update-safety",
@@ -31,6 +32,27 @@ export interface ScenarioCoverage {
 	specs?: string[];
 }
 
+export interface ScenarioMeasurement {
+	status?: string;
+	source?: string;
+	sample_count?: number;
+	warmup_count?: number;
+	git_commit?: string;
+	timestamp?: string;
+}
+
+export interface BenchmarkExecutionProfile {
+	host_profile_id: string;
+	os: string;
+	arch: string;
+	cpu_class: string;
+	bun_version: string;
+	runtime_version: string;
+	execution_mode: "source" | "compiled-release";
+	artifact_mode: "source" | "bun-compile";
+	artifact_sha256: string;
+}
+
 export interface Scenario {
 	schema_version: string;
 	scenario_id: string;
@@ -46,9 +68,10 @@ export interface Scenario {
 	thresholds: Record<string, number>;
 	baseline_id: string;
 	deterministic_metrics: Record<string, number>;
-	implementation_status?: "implemented" | "skipped";
+	implementation_status?: "implemented" | "planned" | "skipped";
 	live_runner_scenario_id?: string;
 	compiled_binary?: boolean;
+	measurement?: ScenarioMeasurement;
 }
 
 export interface ToolCoverageExemption {
@@ -97,8 +120,34 @@ export interface Baseline {
 	baseline_id: string;
 	pack_id: PackId;
 	schema_version: string;
+	calibration_status?: "observed" | "pending";
+	calibration_reason?: string;
 	timing_p50_ms?: number;
 	timing_p95_ms?: number;
+	sample_count?: number;
+	warmup_count?: number;
+	git_commit?: string;
+	timestamp?: string;
+	provenance?: string;
+	host_profile_id?: string;
+	os?: string;
+	arch?: string;
+	cpu_class?: string;
+	bun_version?: string;
+	runtime_version?: string;
+	execution_mode?: "source" | "compiled-release";
+	artifact_mode?: "source" | "bun-compile";
+	artifact_sha256?: string;
+	scenarios?: Record<string, ScenarioBaseline>;
+}
+
+export interface ScenarioBaseline {
+	scenario_id: string;
+	scenario_version: string;
+	timing_p50_ms: number;
+	timing_p95_ms: number;
+	sample_count: number;
+	warmup_count: number;
 }
 
 export interface PackMetadata {
@@ -123,7 +172,7 @@ export interface BenchmarkResult {
 	scenario_id: string;
 	scenario_version: string;
 	pack_id: PackId;
-	status: "passed" | "failed" | "skipped" | "baseline-missing";
+	status: "passed" | "failed" | "skipped" | "baseline-missing" | "incompatible";
 	baseline_id: string;
 	baseline_reference: string;
 	threshold_reference: Record<string, number>;
@@ -142,5 +191,17 @@ export interface BenchmarkResult {
 	tool_call_count: number;
 	tool_success_rate: number;
 	git_commit: string;
+	timestamp?: string;
+	sample_count?: number;
+	warmup_count?: number;
+	host_profile_id?: string;
+	os?: string;
+	arch?: string;
+	cpu_class?: string;
+	bun_version?: string;
+	runtime_version?: string;
+	execution_mode?: "source" | "compiled-release";
+	artifact_mode?: "source" | "bun-compile";
+	artifact_sha256?: string;
 	notes: string[];
 }

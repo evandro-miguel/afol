@@ -1,54 +1,5 @@
 #!/usr/bin/env bun
 
-import { runAdapterCommand } from "./commands/adapter";
-import { runAdmCommand } from "./commands/adm";
-import { runAdrCommand } from "./commands/adr";
-import { runBenchCommand } from "./commands/bench";
-import { runBootstrapCommand } from "./commands/bootstrap";
-import {
-	runHookCommand,
-	runRuleCommand,
-	runSkillCommand,
-} from "./commands/catalog";
-import { runCatchupCommand } from "./commands/catchup";
-import { runChangelogCommand } from "./commands/changelog";
-import { runContextCommand } from "./commands/context";
-import { runDbCommand } from "./commands/db";
-import { runDoctorCommand } from "./commands/doctor";
-import { runFeedbackCommand } from "./commands/feedback";
-import { runFileCommand } from "./commands/file";
-import { runGovernanceCommand } from "./commands/governance";
-import { runHealthCommand } from "./commands/health";
-import { runHydrateCommand } from "./commands/hydrate";
-import { runInitCommand } from "./commands/init";
-import { runLibraryCommand } from "./commands/library";
-import { runLocalStateCommand } from "./commands/local-state";
-import { runMaintenanceCommand } from "./commands/maintenance";
-import { runMemoryCommand } from "./commands/memory";
-import { runPreflightCommand } from "./commands/preflight";
-import { runProjectBenchmarkCommand } from "./commands/project-benchmark";
-import { runPstrCommand } from "./commands/pstr";
-import { runQuickTaskCommand } from "./commands/quick-task";
-import { runSchemaCommand } from "./commands/schema-cmd";
-import { runSessionCommand } from "./commands/session";
-import { runSpecCommand } from "./commands/spec";
-import { runStateCommand } from "./commands/state";
-import { runStatusCommand } from "./commands/status";
-import { runSweepCommand } from "./commands/sweep";
-import { runTelemetryCommand } from "./commands/telemetry";
-import { runUpdateCommand } from "./commands/update";
-import { runUxCommand } from "./commands/ux";
-import { runValidateCommand } from "./commands/validate";
-import {
-	runCloseCommand,
-	runDoneCommand,
-	runEvidenceCommand,
-	runLogCommand,
-	runNewCommand,
-	runStartCommand,
-	runTransitionCommand,
-	runVerifyTasksCommand,
-} from "./commands/workbench";
 import { captureDiagnostic } from "./core/diagnostic";
 import { envelopeErr, stringifyEnvelope } from "./core/envelope";
 import {
@@ -70,10 +21,6 @@ import {
 import { kernelRegistry } from "./registry";
 import { resolveCommand } from "./router";
 import { loadProjectRoot } from "./services/project/root";
-import {
-	resolveValidateInvocation,
-	runValidationCommand,
-} from "./validate/command";
 
 const NEW_COMMAND_HELP = [
 	"Usage: afol new <theme> [options]",
@@ -159,6 +106,7 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"ctx",
 	"library",
 	"memory",
+	"evolve",
 	"state",
 	"adapter",
 	"telemetry",
@@ -234,10 +182,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	// Resolve restricted operation context from env/flags early so mutation
 	// gates in schema/pstr/library/memory/file commands work for agent/remote
-	// callers. Default is local interactive (trusted, no approval required).
+	// callers. Privileged local evolution mutations require a real terminal.
 	let operationCtx: OperationContext = defaultOperationContext();
 	{
-		const resolved = resolveOperationContext(args);
+		const resolved = resolveOperationContext(
+			args,
+			process.env,
+			Boolean(process.stdin.isTTY && process.stderr.isTTY),
+		);
 		operationCtx = resolved.ctx;
 		args = resolved.remainingArgs;
 	}
@@ -386,15 +338,18 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "feedback") {
+		const { runFeedbackCommand } = await import("./commands/feedback");
 		const [action = "status", ...feedbackArgs] = resolution.args;
 		return runFeedbackCommand(action, feedbackArgs);
 	}
 
 	if (resolution.kind === "bootstrap") {
+		const { runBootstrapCommand } = await import("./commands/bootstrap");
 		return runBootstrapCommand(resolution.args, {}, operationCtx);
 	}
 
 	if (resolution.kind === "init") {
+		const { runInitCommand } = await import("./commands/init");
 		return runInitCommand(resolution.args, operationCtx);
 	}
 
@@ -405,26 +360,34 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "validate") {
+		const { resolveValidateInvocation, runValidationCommand } = await import(
+			"./validate/command"
+		);
 		const validateInvocation = resolveValidateInvocation(resolution.args);
 		if (validateInvocation.kind === "benchmark") {
 			return runValidationCommand(project.value.root, validateInvocation.args);
 		}
+		const { runValidateCommand } = await import("./commands/validate");
 		return runValidateCommand(project.value.root, validateInvocation.args);
 	}
 
 	if (resolution.kind === "status") {
+		const { runStatusCommand } = await import("./commands/status");
 		return runStatusCommand(project.value.root, resolution.args);
 	}
 
 	if (resolution.kind === "new") {
+		const { runNewCommand } = await import("./commands/workbench");
 		return runNewCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "start") {
+		const { runStartCommand } = await import("./commands/workbench");
 		return runStartCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "evidence") {
+		const { runEvidenceCommand } = await import("./commands/workbench");
 		return runEvidenceCommand(
 			resolution.args,
 			project.value.root,
@@ -433,10 +396,12 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "done") {
+		const { runDoneCommand } = await import("./commands/workbench");
 		return runDoneCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "transition") {
+		const { runTransitionCommand } = await import("./commands/workbench");
 		return runTransitionCommand(
 			resolution.args,
 			project.value.root,
@@ -445,10 +410,12 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "log") {
+		const { runLogCommand } = await import("./commands/workbench");
 		return runLogCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "quickTask") {
+		const { runQuickTaskCommand } = await import("./commands/quick-task");
 		return runQuickTaskCommand(
 			resolution.args,
 			project.value.root,
@@ -457,22 +424,27 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "verifyTasks") {
+		const { runVerifyTasksCommand } = await import("./commands/workbench");
 		return runVerifyTasksCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "hook") {
+		const { runHookCommand } = await import("./commands/catalog");
 		return runHookCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "rule") {
+		const { runRuleCommand } = await import("./commands/catalog");
 		return runRuleCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "skill") {
+		const { runSkillCommand } = await import("./commands/catalog");
 		return runSkillCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "update") {
+		const { runUpdateCommand } = await import("./commands/update");
 		return runUpdateCommand(
 			resolution.args,
 			project.value.root,
@@ -483,10 +455,12 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "close") {
+		const { runCloseCommand } = await import("./commands/workbench");
 		return runCloseCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "file") {
+		const { runFileCommand } = await import("./commands/file");
 		return runFileCommand(
 			resolution.args,
 			project.value.root,
@@ -496,6 +470,7 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "localState") {
+		const { runLocalStateCommand } = await import("./commands/local-state");
 		return runLocalStateCommand(
 			resolution.args,
 			project.value.root,
@@ -505,14 +480,17 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "catchup") {
+		const { runCatchupCommand } = await import("./commands/catchup");
 		return runCatchupCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "preflight") {
+		const { runPreflightCommand } = await import("./commands/preflight");
 		return runPreflightCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "subcommand" && resolution.group === "adm") {
+		const { runAdmCommand } = await import("./commands/adm");
 		return runAdmCommand(
 			resolution.action,
 			resolution.args,
@@ -522,12 +500,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "subcommand") {
 		if (resolution.group === "health") {
+			const { runHealthCommand } = await import("./commands/health");
 			return runHealthCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
 				project.value.root,
 			);
 		}
 		if (resolution.group === "governance") {
+			const { runGovernanceCommand } = await import("./commands/governance");
 			return runGovernanceCommand(
 				resolution.action,
 				resolution.args,
@@ -537,6 +517,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "db") {
+			const { runDbCommand } = await import("./commands/db");
 			return runDbCommand(
 				resolution.action,
 				resolution.args,
@@ -544,12 +525,14 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "doctor") {
+			const { runDoctorCommand } = await import("./commands/doctor");
 			return runDoctorCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
 				project.value.root,
 			);
 		}
 		if (resolution.group === "maintenance") {
+			const { runMaintenanceCommand } = await import("./commands/maintenance");
 			return runMaintenanceCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
 				project.value.root,
@@ -558,6 +541,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "pstr") {
+			const { runPstrCommand } = await import("./commands/pstr");
 			return runPstrCommand(
 				resolution.action,
 				resolution.args,
@@ -567,6 +551,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "schema") {
+			const { runSchemaCommand } = await import("./commands/schema-cmd");
 			return runSchemaCommand(
 				resolution.action,
 				resolution.args,
@@ -576,6 +561,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "session") {
+			const { runSessionCommand } = await import("./commands/session");
 			return runSessionCommand(
 				resolution.action,
 				resolution.args,
@@ -586,11 +572,13 @@ export async function main(argv: string[]): Promise<number> {
 		}
 		if (resolution.group === "bench") {
 			if (resolution.action === "" && resolution.args.includes("--pack")) {
+				const { runValidationCommand } = await import("./validate/command");
 				return runValidationCommand(project.value.root, [
 					"bench",
 					...resolution.args,
 				]);
 			}
+			const { runBenchCommand } = await import("./commands/bench");
 			return runBenchCommand(
 				resolution.action,
 				resolution.args,
@@ -598,6 +586,9 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "projectBenchmark") {
+			const { runProjectBenchmarkCommand } = await import(
+				"./commands/project-benchmark"
+			);
 			return runProjectBenchmarkCommand(
 				resolution.action,
 				resolution.args,
@@ -607,6 +598,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "sweep") {
+			const { runSweepCommand } = await import("./commands/sweep");
 			return runSweepCommand(
 				resolution.action,
 				resolution.args,
@@ -614,6 +606,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "spec") {
+			const { runSpecCommand } = await import("./commands/spec");
 			return runSpecCommand(
 				resolution.action,
 				resolution.args,
@@ -621,6 +614,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "ux") {
+			const { runUxCommand } = await import("./commands/ux");
 			return runUxCommand(
 				resolution.action,
 				resolution.args,
@@ -630,6 +624,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "adr") {
+			const { runAdrCommand } = await import("./commands/adr");
 			return runAdrCommand(
 				resolution.action,
 				resolution.args,
@@ -637,6 +632,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "changelog") {
+			const { runChangelogCommand } = await import("./commands/changelog");
 			return runChangelogCommand(
 				resolution.action,
 				resolution.args,
@@ -644,6 +640,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "ctx") {
+			const { runContextCommand } = await import("./commands/context");
 			return runContextCommand(
 				resolution.action,
 				resolution.args,
@@ -653,6 +650,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "library") {
+			const { runLibraryCommand } = await import("./commands/library");
 			return runLibraryCommand(
 				resolution.action,
 				resolution.args,
@@ -662,6 +660,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "memory") {
+			const { runMemoryCommand } = await import("./commands/memory");
 			return runMemoryCommand(
 				resolution.action,
 				resolution.args,
@@ -670,7 +669,18 @@ export async function main(argv: string[]): Promise<number> {
 				operationCtx,
 			);
 		}
+		if (resolution.group === "evolve") {
+			const { runEvolveCommand } = await import("./commands/evolve");
+			return runEvolveCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
+			);
+		}
 		if (resolution.group === "state") {
+			const { runStateCommand } = await import("./commands/state");
 			return runStateCommand(
 				resolution.action,
 				resolution.args,
@@ -678,6 +688,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "adapter") {
+			const { runAdapterCommand } = await import("./commands/adapter");
 			return runAdapterCommand(
 				resolution.action,
 				resolution.args,
@@ -685,6 +696,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "telemetry") {
+			const { runTelemetryCommand } = await import("./commands/telemetry");
 			return runTelemetryCommand(
 				resolution.action,
 				resolution.args,
@@ -692,6 +704,7 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "hydrate") {
+			const { runHydrateCommand } = await import("./commands/hydrate");
 			const hydrateArgs = resolution.action
 				? [resolution.action, ...resolution.args]
 				: resolution.args;

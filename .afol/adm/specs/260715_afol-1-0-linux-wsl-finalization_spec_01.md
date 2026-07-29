@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260715_afol-1-0-linux-wsl-finalization_spec_01
 theme: afol-1-0-linux-wsl-finalization
-status: final
+status: active
 owners:
 - orchestrator
 workstream_intent: feature
@@ -18,6 +18,10 @@ links:
   child_specs:
   - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
   - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
+  - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
+  - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
+  - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
+  - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
 risk_level: high
 ---
 
@@ -36,6 +40,20 @@ AFOL-only downstream boundary.
   persistence, redaction, contention limits, and integrity/error evidence.
 - `260715_afol-1-0-linux-wsl-release-hardening_spec-child_01` owns the Linux
   x64 build/provenance contract and observed WSL2 smoke/release gates.
+- `260726_canonical-adm-context-index-migration_spec-child_01` owns the
+  canonical administration section-index migration, fail-closed coverage and
+  freshness checks, and selectable-section token-health model.
+- `260726_afol-only-active-canon-migration_spec-child_01` owns the bounded
+  removal of legacy configuration from active factory authority, generic test
+  fixtures, source guidance, and exported-template contracts while preserving
+  explicit resolver fallback compatibility and a verified retention archive.
+- `260726_event-ledger-durability_spec-child_01` owns the shared global event
+  writer, ledger validation, and fail-closed local-state consumption needed
+  after the quota-induced partial-append incident.
+- `260726_governance-contract-reconciliation_spec-child_01` owns the bounded
+  reconciliation of final F-01, F-11, F-13, and F-15 contracts with the
+  AFOL-only TypeScript runtime while preserving their exact prior text in a
+  verified retention archive.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -80,7 +98,7 @@ Out of scope:
 
 ## Acceptance
 
-- F-29 parent and both children exist with valid frontmatter, explicit links,
+- F-29 parent and all children exist with valid frontmatter, explicit links,
   and an index row for every current spec.
 - `afol validate project --check-drift --json` reports no index/frontmatter
   drift after local-state rebuild.
@@ -93,12 +111,43 @@ Out of scope:
 
 ## Closure
 
-The parent is final in `260715_1811_afol-1-0-final-status` with diagnostics
+The original Linux/WSL release slice was finalized in
+`260715_1811_afol-1-0-final-status` with diagnostics
 evidence `E-20260715172724325-99e5fa`, release evidence
 `E-20260715180931454-766e6a` and observed artifact authorization
 `E-20260715181030468-8dd8d9`. Full tests were `1203/0` and
 `validate:release` exited 0 at HEAD `6210ac8`. The closure makes no global
 installation, deployment, remote CI, or unsupported-platform claim.
+
+The canonical administration context child is finalized in session
+`260726_1302_canonical-context-index-repair` after focused regression,
+typecheck, formatting, project validation, and independent spec/quality
+reviews. This does not invalidate the accepted release evidence or reopen the
+two previously final children. The local Gitleaks and OSV binaries were absent,
+so this bounded remediation makes no new security-scan or full-suite claim.
+
+The active-canon migration child is finalized after source-only payload parity,
+focused policy and compatibility checks, manifest/project validation, and
+redacted Gitleaks history/worktree scans. OSV parsed the unchanged `bun.lock`
+but could not match vulnerabilities because no offline database was available;
+dependency inputs remain unchanged from `532345f`, so the limitation is an
+explicit residual risk rather than a passing scan.
+
+F-29 is reopened only for the event-ledger durability child after a
+quota-induced partial append demonstrated that the shared JSONL writer and
+consumer trust boundary were not crash-safe. Earlier child evidence remains
+final and is not reinterpreted; the parent returns to final only after this
+child has focused RED/GREEN and independent quality evidence and the parent
+cross-child acceptance, release, and required security gates are current.
+
+The event-ledger durability child is final with its original governed evidence
+preserved. The governance-contract reconciliation child is also final in
+session `260726_1553_governance-contract-reconciliation` after exact archive
+verification, focused regressions, local-state/context rebuild, project drift
+validation, typecheck, formatting, manifest, redacted Gitleaks history/worktree,
+and OSV dependency scans. These bounded results do not create a new full-suite,
+build, release, deployment, or global-install claim; F-29 remains active until
+its broader cross-child release gates are refreshed.
 
 ## Verification Plan
 

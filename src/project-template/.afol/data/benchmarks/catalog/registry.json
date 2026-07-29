@@ -16,6 +16,16 @@
       ]
     },
     {
+      "pack_id": "evolution-core",
+      "min_scenarios": 1,
+      "selector_tags": [
+        "evolution",
+        "journal",
+        "production-days",
+        "status"
+      ]
+    },
+    {
       "pack_id": "routing-accuracy",
       "min_scenarios": 4,
       "selector_tags": [

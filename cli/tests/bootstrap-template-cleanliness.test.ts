@@ -68,6 +68,24 @@ describe("generated template cleanliness", () => {
 		);
 		expect(paths).not.toContain(".agents/tools.json");
 
+		for (const metadataPath of [".agents/manifest.json", ".agents/lock.json"]) {
+			const metadataEntry = DEFAULT_TEMPLATE_FILES[metadataPath];
+			const metadata = JSON.parse(
+				Buffer.from(metadataEntry?.contentBase64 ?? "", "base64").toString(
+					"utf8",
+				),
+			) as {
+				managed_hashes?: Record<string, string>;
+				ownership?: { "project-owned"?: string[] };
+			};
+			if (metadataPath === ".agents/manifest.json") {
+				expect(metadata.ownership?.["project-owned"]).toContain(
+					".afol/config.json",
+				);
+			}
+			expect(metadata.managed_hashes?.[".afol/config.json"]).toBeUndefined();
+		}
+
 		const config = JSON.parse(
 			Buffer.from(configEntry?.contentBase64 ?? "", "base64").toString("utf8"),
 		) as {

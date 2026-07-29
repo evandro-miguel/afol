@@ -2,6 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { resolveAdmPaths } from "../adm/paths";
 import {
+	type DailySuggestionPreview,
+	previewDailySuggestion,
+} from "../evolution/suggestion-query";
+import {
 	readMaintenanceReviewSummary,
 	scanLegacyReferences,
 } from "../health/maintenance-review";
@@ -38,6 +42,7 @@ export type StartBriefing = {
 	};
 	warnings: string[];
 	questions: string[];
+	evolution: DailySuggestionPreview;
 };
 
 type RoadmapSummary = StartBriefing["roadmap"];
@@ -197,6 +202,20 @@ export function buildStartBriefing(
 			: []),
 		...legacyRefs.warnings,
 	]);
+	let evolution: DailySuggestionPreview;
+	try {
+		evolution = previewDailySuggestion(root);
+	} catch {
+		evolution = {
+			daily_status: "unavailable",
+			suggestion: null,
+			pending_count: 0,
+			critical_alerts: [],
+		};
+		warnings.push(
+			"evolution suggestion unavailable: local state requires review",
+		);
+	}
 	const problemTasks = radar.open_tasks.filter(
 		(task) => task.state === "problem",
 	);
@@ -235,6 +254,7 @@ export function buildStartBriefing(
 			dueAreas: maintenance.due_areas,
 			legacyRefCount: legacyRefs.count,
 		}),
+		evolution,
 	};
 }
 
@@ -250,10 +270,16 @@ export function formatStartBriefing(briefing: StartBriefing): string[] {
 		briefing.questions.length > 0
 			? briefing.questions.slice(0, 2).join(" | ")
 			: "none";
+	const suggestion = briefing.evolution.suggestion;
+	const suggestionLine = suggestion
+		? `suggestion: ${String(suggestion.problem)} -> ${String(suggestion.recommendation)} risk=${String(suggestion.risk)}${briefing.evolution.pending_count > 0 ? ` +${briefing.evolution.pending_count} pending` : ""}`
+		: "suggestion: none";
 	return [
 		`briefing: ${briefing.project.name} branch=${briefing.project.branch ?? "detached"} session=${briefing.project.session} ${roadmap}`,
 		`resume: ${briefing.resume.session_status} changed=${briefing.resume.changed_files} next=${briefing.resume.next_step}`,
 		`tasks: open=${briefing.tasks.open_total} problem=${briefing.tasks.problem_total}`,
+		`evolution: ${briefing.evolution.daily_status} pending=${briefing.evolution.pending_count}`,
+		suggestionLine,
 		`warnings: ${warningLine}`,
 		`questions: ${questionLine}`,
 	];

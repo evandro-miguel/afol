@@ -1,5 +1,7 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { appendEventLedgerRecord } from "../events/ledger";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
@@ -51,18 +53,13 @@ export function appendWorkbenchEvent(
 ): WorkbenchEvent {
 	return withSessionLock(root, event.session, () => {
 		const now = new Date();
-		const eventPath = resolveWorkbenchEventLogPath(root);
 		const fullEvent: WorkbenchEvent = {
 			id: nextEventId(now),
 			ts: now.toISOString(),
 			source: "cli-workbench",
 			...event,
 		};
-		mkdirSync(resolve(eventPath, ".."), { recursive: true });
-		writeFileSync(eventPath, `${JSON.stringify(fullEvent)}\n`, {
-			encoding: "utf8",
-			flag: "a",
-		});
+		appendEventLedgerRecord(root, fullEvent);
 		return fullEvent;
 	});
 }
@@ -70,5 +67,3 @@ export function appendWorkbenchEvent(
 export function hasEventLog(root: string): boolean {
 	return existsSync(resolveWorkbenchEventLogPath(root));
 }
-
-import { randomUUID } from "node:crypto";

@@ -128,6 +128,8 @@ Template payload excludes:
 - `.agents/scripts`
 - `.agents/runtime`
 - `.agents/agents`
+- a project-local `afol` executable, wrapper, symlink, package bin, or command
+  runner
 - Python/uv payload
 - factory-only tests
 - tool internals
@@ -250,22 +252,29 @@ global/universal layer
 - template-policy scanner and validator
 
 project-local layer
-- .agents/config.json
+- .afol/config.json
 - .agents/lock.json
 - .agents/manifest.json
+- .agents/skills
 - .afol/adm, .afol/pstr, .afol/wb, .afol/state, rules, skills, data, tmp
 
-project wrapper
-- afol (public local front door)
+external operator layer
+- afol command provided outside the target project
 ```
 
-The public command entrypoint is `afol`.
+The public command entrypoint is the external operator command `afol`.
+The root `./afol` file is a factory development and package entrypoint only.
+It is not part of the downstream project payload and must not replace the
+globally installed executable contract.
 Retired `.agents/agents`, `agents.config`, and `legacy:` routes are not
 compatibility front doors.
 
 ## 8) Command Philosophy
 
-The local wrapper is `afol`.
+The routine operator command is `afol`, installed outside the target project.
+Factory development may invoke root `./afol`, `bun run kernel`, or
+`./dist/afol`; downstream projects receive no local executable or command
+runner.
 
 High-frequency commands should use short names through `afol`:
 

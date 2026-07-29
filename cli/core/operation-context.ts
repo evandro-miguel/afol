@@ -8,28 +8,58 @@ export type OperationContext = {
 	trustLevel: TrustLevel;
 };
 
+const ADMITTED_OPERATION_CONTEXTS = new WeakSet<object>();
+const LOCAL_OPERATOR_CONTEXTS = new WeakSet<object>();
+
+function admitOperationContext(context: OperationContext): OperationContext {
+	const admitted = Object.freeze(context);
+	ADMITTED_OPERATION_CONTEXTS.add(admitted);
+	return admitted;
+}
+
+export function assertAdmittedOperationContext(
+	context: OperationContext | undefined,
+): asserts context is OperationContext {
+	if (!context || !ADMITTED_OPERATION_CONTEXTS.has(context))
+		throw new Error("operation context was not admitted by the CLI boundary");
+}
+
 export function defaultOperationContext(): OperationContext {
-	return {
+	return admitOperationContext({
 		callerType: "local",
 		interactive: true,
 		trustLevel: "trusted",
-	};
+	});
+}
+
+function localOperatorOperationContext(): OperationContext {
+	const context = defaultOperationContext();
+	LOCAL_OPERATOR_CONTEXTS.add(context);
+	return context;
+}
+
+export function localNonInteractiveOperationContext(): OperationContext {
+	return admitOperationContext({
+		callerType: "local",
+		interactive: false,
+		trustLevel: "trusted",
+	});
 }
 
 export function agentOperationContext(): OperationContext {
-	return {
+	return admitOperationContext({
 		callerType: "agent",
 		interactive: false,
 		trustLevel: "restricted",
-	};
+	});
 }
 
 export function remoteOperationContext(): OperationContext {
-	return {
+	return admitOperationContext({
 		callerType: "remote",
 		interactive: false,
 		trustLevel: "restricted",
-	};
+	});
 }
 
 export function requiresApproval(ctx: OperationContext): boolean {
@@ -120,6 +150,36 @@ export function resolveCanonicalAction(
 	if (resolution.kind === "subcommand") {
 		const group = resolution.group ?? "";
 		const action = resolution.action ?? "";
+		if (group === "evolve" && action === "observe") {
+			return { action: "evolve.observe", sideEffect: "write" };
+		}
+		if (
+			group === "evolve" &&
+			["status", "analyze", "weekly", "after-merge", "review"].includes(action)
+		) {
+			return { action: `evolve.${action}`, sideEffect: "read" };
+		}
+		if (group === "evolve" && action === "evaluate") {
+			return {
+				action: "evolve.evaluate",
+				sideEffect: hasFlag(args, "--record") ? "write" : "preview",
+			};
+		}
+		if (
+			group === "evolve" &&
+			[
+				"suggest",
+				"skip",
+				"accept",
+				"reject",
+				"decision",
+				"repair",
+				"apply",
+				"rollback",
+			].includes(action)
+		) {
+			return { action: `evolve.${action}`, sideEffect: "write" };
+		}
 		if (group === "adm" && action === "migrate") {
 			return {
 				action: dryRun ? "adm.migrate.preview" : "adm.migrate.apply",
@@ -147,6 +207,14 @@ export function resolveCanonicalAction(
 		if (group === "state" && action === "sync") {
 			return { action: "state.sync", sideEffect: "write" };
 		}
+		if (group === "evolve" && action === "import") {
+			return hasFlag(args, "--confirm")
+				? { action: "evolve.import.confirm", sideEffect: "write" }
+				: { action: "evolve.import.preview", sideEffect: "preview" };
+		}
+		if (group === "evolve" && action === "external") {
+			return { action: "evolve.external.list", sideEffect: "read" };
+		}
 		if (group === "hydrate") {
 			return { action: "hydrate.run", sideEffect: "write" };
 		}
@@ -155,11 +223,36 @@ export function resolveCanonicalAction(
 	return undefined;
 }
 
+export function isTrustedLocalInteractive(context: OperationContext): boolean {
+	assertAdmittedOperationContext(context);
+	return (
+		context.callerType === "local" &&
+		context.interactive &&
+		context.trustLevel === "trusted"
+	);
+}
+
 export function isActionAllowed(
 	ctx: OperationContext,
 	policy: ActionPolicy | undefined,
 ): boolean {
+	if (
+		policy &&
+		(policy.action === "evolve.apply" ||
+			policy.action === "evolve.rollback" ||
+			policy.action === "evolve.evaluate")
+	) {
+		return (
+			ctx.callerType === "local" &&
+			ctx.interactive &&
+			LOCAL_OPERATOR_CONTEXTS.has(ctx)
+		);
+	}
 	if (!policy || !requiresApproval(ctx)) return true;
+	// Daily suggestion claim/show is a fenced derived-state receipt. Agents may
+	// perform this narrow operation; user decisions remain local-only.
+	if (policy.action === "evolve.suggest" && ctx.callerType === "agent")
+		return true;
 	return policy.sideEffect === "read" || policy.sideEffect === "preview";
 }
 
@@ -189,6 +282,7 @@ const FALSY_VALUES = new Set(["false", "0", "no", "off"]);
 export function resolveOperationContext(
 	args: string[],
 	env: Record<string, string | undefined> = process.env,
+	terminalInteractive = true,
 ): { ctx: OperationContext; remainingArgs: string[] } {
 	const consumed = new Set<number>();
 	let foundAgent = false;
@@ -240,5 +334,10 @@ export function resolveOperationContext(
 		return { ctx: remoteOperationContext(), remainingArgs: args };
 	}
 
-	return { ctx: defaultOperationContext(), remainingArgs: args };
+	return {
+		ctx: terminalInteractive
+			? localOperatorOperationContext()
+			: localNonInteractiveOperationContext(),
+		remainingArgs: args,
+	};
 }

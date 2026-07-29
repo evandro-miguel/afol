@@ -50,6 +50,7 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("hy")).toBe("hydrate");
 		expect(kernelRegistry.resolveKind("library")).toBe("library");
 		expect(kernelRegistry.resolveKind("lb")).toBe("library");
+		expect(kernelRegistry.resolveKind("evolve")).toBe("evolve");
 		expect(kernelRegistry.resolveKind("adm")).toBe("adm");
 		expect(kernelRegistry.resolveKind("ad")).toBe("adm");
 		expect(kernelRegistry.resolveKind("spec")).toBe("spec");
@@ -122,6 +123,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("hydrate")?.sideEffect).toBe("generated");
 		expect(byCommand.get("library")?.sideEffect).toBe("read");
 		expect(byCommand.get("memory")?.sideEffect).toBe("read");
+		expect(byCommand.get("evolve")?.sideEffect).toBe("read");
 		expect(byCommand.get("adm")?.sideEffect).toBe("read");
 		expect(byCommand.get("bench")?.sideEffect).toBe("read");
 		expect(byCommand.get("project-benchmark")?.sideEffect).toBe("generated");

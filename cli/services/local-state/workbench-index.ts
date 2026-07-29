@@ -8,6 +8,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+	assertValidEventLedger,
+	EventLedgerValidationError,
+	readEventLedgerRecords,
+	validateEventLedger,
+} from "../events/ledger";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveWorkbenchEventLogPath } from "./workbench-events";
@@ -271,27 +277,7 @@ function collectSessionLifecycleEvents(
 		return lifecycle;
 	}
 
-	let lines: string[];
-	try {
-		lines = readFileSync(eventLog, "utf8").split(/\r?\n/);
-	} catch {
-		return lifecycle;
-	}
-
-	for (const line of lines) {
-		if (!line.trim()) {
-			continue;
-		}
-		let raw: Record<string, unknown>;
-		try {
-			raw = JSON.parse(line) as Record<string, unknown>;
-		} catch {
-			continue;
-		}
-		if (!raw || typeof raw !== "object") {
-			continue;
-		}
-
+	for (const raw of readEventLedgerRecords(root)) {
 		const workbenchType = typeof raw.type === "string" ? raw.type : "";
 		const telemetryType =
 			typeof raw.event_type === "string" ? raw.event_type : "";
@@ -1312,8 +1298,9 @@ export function rebuildWorkBenchIndex(
 	sessionScope?: string,
 	options: WorkbenchIndexRebuildOptions = {},
 ): WorkbenchIndexSnapshot {
-	options.beforeWrite?.(sessionScope);
 	return withSessionLock(root, WORKBENCH_INDEX_LOCK_SESSION, () => {
+		assertValidEventLedger(root);
+		options.beforeWrite?.(sessionScope);
 		const current = loadWorkBenchIndexSnapshot(root);
 
 		if (sessionScope) {
@@ -1377,6 +1364,15 @@ export function validateWorkBenchIndex(root: string): {
 	ok: boolean;
 	message: string;
 } {
+	const ledger = validateEventLedger(root);
+	if (!ledger.ok) {
+		const first = ledger.issues.find((issue) => issue.severity === "error");
+		const location = first?.line ? ` line=${first.line}` : "";
+		return {
+			ok: false,
+			message: `${first?.code ?? "EVENT_LEDGER_UNREADABLE"}${location}: event ledger invalid; explicit repair required`,
+		};
+	}
 	const indexPath = resolveWorkbenchIndexPath(root);
 	if (!existsSync(indexPath)) {
 		return {
@@ -1425,10 +1421,10 @@ export function validateWorkBenchIndex(root: string): {
 
 export type SessionHealthWarning = {
 	type:
-		| "duplicate_theme"
 		| "stale_open_tasks"
 		| "missing_session_directory"
-		| "unreadable_session_directory";
+		| "unreadable_session_directory"
+		| "invalid_event_ledger";
 	session: string;
 	message: string;
 };
@@ -1436,27 +1432,23 @@ export type SessionHealthWarning = {
 export function detectSessionHealth(root: string): SessionHealthWarning[] {
 	const warnings: SessionHealthWarning[] = [];
 	const allSessionIds = collectSessionIds(root);
-	const lifecycle = collectSessionLifecycleEvents(root);
+	let lifecycle: Map<string, { started: boolean; closed: boolean }>;
+	try {
+		lifecycle = collectSessionLifecycleEvents(root);
+	} catch (error) {
+		const message =
+			error instanceof EventLedgerValidationError
+				? error.message
+				: "EVENT_LEDGER_UNREADABLE: event ledger invalid; explicit repair required";
+		warnings.push({
+			type: "invalid_event_ledger",
+			session: "",
+			message,
+		});
+		return warnings;
+	}
 	const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 	const now = Date.now();
-
-	// Detect duplicate themes (same suffix after timestamp prefix)
-	const themeToSessions = new Map<string, string[]>();
-	for (const session of allSessionIds) {
-		const theme = session.replace(/^\d{6}_\d{4}_/, "");
-		const existing = themeToSessions.get(theme) ?? [];
-		existing.push(session);
-		themeToSessions.set(theme, existing);
-	}
-	for (const [theme, sessions] of themeToSessions) {
-		if (sessions.length > 1) {
-			warnings.push({
-				type: "duplicate_theme",
-				session: sessions.join(", "),
-				message: `Duplicate session theme: "${theme}" appears in ${sessions.length} sessions: ${sessions.join(", ")}`,
-			});
-		}
-	}
 
 	// Detect stale open tasks (>7 days since last touched)
 	const wbRoot = resolveWorkbenchRoot(root);

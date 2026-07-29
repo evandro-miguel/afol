@@ -15,12 +15,12 @@ links:
   manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
-  - src/project-template
-  - packages
   - cli
-  - .agents
-  packages:
-  - agentic-cli
+  - src/project-template
+  - .afol
+  - .agents/lock.json
+  - .agents/manifest.json
+  - .agents/skills
 risk_level: high
 ---
 
@@ -28,72 +28,63 @@ risk_level: high
 
 ## 1) Feature Intent
 
-Build a universal Bun/TypeScript CLI that agents call from any governed project
-through the local command `afol`, with `afol` retained as a compatibility alias
-during migration.
+Provide one universal Bun/TypeScript command system that agents and operators
+use across AFOL-managed projects. The command system owns behavior; each project
+owns configuration, governance, and mutable state.
 
 The CLI is agent-primary. Success means:
 
 1. **Extreme ease of use** — short, obvious commands for the happy path.
-2. **Extremely low latency** — hot path in tens to low hundreds of ms.
-3. **Low write-token consumption** — agents rarely type long session ids or
-   flag spam; active-session fast path is first-class.
+2. **Extremely low latency** — hot paths stay in tens to low hundreds of ms.
+3. **Low write-token consumption** — active-session flows avoid repeated
+   identifiers and flag noise.
 4. **Very high reliability** — short and long forms share one state machine.
-5. **Low forced read tokens** — compact defaults; verbose/full is opt-in.
+5. **Low forced read tokens** — compact output is default and detail is opt-in.
 
-The intended simple operator surface includes `afol s`, `afol v`/`afol ck`, and
-`afol b <repo> --partial`. The workbench shortcuts `afol st`,
-`afol d -x "..."`, and `afol c` are the **agent-canonical** lifecycle path when
-session context resolves. Long aliases remain for humans, audits, CI, and
-multi-agent explicit session use.
+Command design detail:
+`.afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md`.
+The living residual is
+`.afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md`.
 
-Command design detail: `.afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md`
-Living residual:
-`.afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md`
+## Current AFOL Contract
 
-The CLI owns behavior. The project owns state.
+- Projects invoke the external `afol` operator. The root `./afol` exists only
+  in this factory as a repository-development and package entrypoint; exported
+  downstream projects receive no executable, wrapper, symlink, or command
+  runner.
+- Bun/TypeScript under `cli/**` owns registry, router, schemas, result
+  envelopes, project-root detection, services, validation, and lifecycle
+  behavior.
+- `.afol/config.json` is the canonical project configuration. Static provider
+  metadata and optional project skills remain limited to `.agents/lock.json`,
+  `.agents/manifest.json`, and `.agents/skills/**`.
+- Mutable state and governance live under `.afol/**`, including `.afol/wb/**`,
+  `.afol/state/afol.db`, `.afol/data/**`, `.afol/adm/**`, and `.afol/pstr/**`.
+- Retired command routing is absent from the active runtime.
+- Historical migration material is retained under
+  `.afol/data/migrations/**`; it is provenance, never active command
+  authority.
+- Bun/AFOL gates include `bun run typecheck`,
+  `./afol validate project --check-drift --json`, focused `bun test` commands,
+  deterministic build/smoke checks, and the governed release lane when release
+  evidence is in scope.
 
-## 2) Problem
+## 2) Kernel Contract
 
-If full implementation code is copied into every downstream project, the agent
-system fragments. Each project drifts, update paths become unsafe, and agents
-lose the shared operating layer this project is meant to provide.
+The CLI kernel is small, typed, and fail-closed:
 
-The current Python, Bash, uv, Just, and Markdown runtime remains the
-compatibility contract until Bun/TypeScript parity is proven by tests.
-
-2026-05-31 DR Addendum:
-
-- Keep this spec as the active CLI core definition; do not replace the staged
-  migration.
-- Core ownership must remain with Bun/TypeScript for registry, router, result
-  envelope, project-root detection, and versioned schema loader.
-
-## 3) Kernel Contract
-
-The first CLI kernel must be small and typed.
-
-Required kernel boundaries:
-
-- `afol` is the stable local entrypoint; `afol` remains a compatibility alias
-  during migration.
-- Bun/TypeScript owns the command router, schemas, output envelope, and project
-  loader.
-- The legacy `.agents/agents` command remains the fallback for commands that do
-  not have TypeScript parity yet.
-- The CLI must refuse unsafe or ambiguous roots before reading or mutating local
-  state.
-- Reads and writes must respect template-safe path scope and symlink policy.
+- `cli/registry.ts` is the command metadata authority.
+- `cli/router.ts` normalizes short and long command forms.
+- Every command produces a typed result envelope before formatting.
 - Compact text output is default; JSON is opt-in with `-j`.
-- Every command returns a typed result envelope before formatting.
-- Agent hot-path commands must stay within F-03 latency and write-token
-  contracts; do not trade reliability for shorter strings that change gates.
+- Project discovery rejects unsafe, ambiguous, or out-of-scope roots before
+  mutation.
+- Reads and writes respect project boundaries, protected paths, and symlink
+  policy.
+- Agent hot-path commands preserve the F-03 latency, output, and write-token
+  contracts.
 
-## 4) Versioned Project State
-
-Schema ownership is centralized in the CLI core package.
-
-Initial models:
+Core project models include:
 
 ```text
 ProjectStateV1
@@ -103,148 +94,116 @@ ProjectManifestV1
 CommandRequestV1
 CommandResultV1
 CommandErrorV1
-DelegationResultV1
 ```
 
-Authoritative local files:
+## 3) Versioned Project State
+
+Authoritative local surfaces are:
 
 ```text
-.agents/config.json
+.afol/config.json
+.afol/wb/
+.afol/adm/
+.afol/pstr/
+.afol/data/
+.afol/state/afol.db
 .agents/lock.json
 .agents/manifest.json
-.afol/wb/
-.afol/adm/rules/
 .agents/skills/
-.afol/data/
 ```
 
-Loader precedence:
+Loader order:
 
-1. Find project root from the current directory upward.
-2. Require `.agents/config.json` and `.agents/lock.json`.
-3. Load `.agents/manifest.json` when a command needs managed-file knowledge.
-4. Lazy-load workbench, rules, skills, and indexes only when the command needs
-   them.
-5. Rebuild or mark stale indexes before trusting indexed state.
-6. Reject paths that are outside project scope, symlinked, or blocked by policy.
+1. Find the project root from the current directory upward.
+2. Require `.afol/config.json` and `.agents/lock.json`.
+3. Load `.agents/manifest.json` when managed-file knowledge is required.
+4. Lazy-load only the state, rules, skills, indexes, or governance needed by
+   the selected command.
+5. Rebuild or report stale derived indexes before trusting them.
+6. Reject paths outside project ownership or blocked by policy.
 
-## 5) Failure Semantics
+## 4) Command and Failure Semantics
 
-Errors must be stable and actionable.
+The intended operator surface includes:
 
-| Condition | Exit | Default output |
+- `afol s` / `afol status`;
+- `afol validate project` / `afol v project`;
+- `afol bootstrap <target>` / `afol b <target>`, with `--dry-run` for preview;
+- `afol st T-01`, `afol d T-01 -x "<check>"`, and `afol c` when active context
+  resolves;
+- explicit `-S <session>` and `-T <task>` forms for concurrent agents and CI.
+
+Errors remain stable and actionable:
+
+| Condition | Exit | Default behavior |
 | --- | ---: | --- |
-| outside project | `2` | `err invalid-root hint="run inside project or init"` |
-| missing config | `2` | `err missing-config path=.agents/config.json` |
-| missing lock | `2` | `err missing-lock path=.agents/lock.json` |
-| invalid JSON | `2` | `err invalid-json path=<path>` |
-| unsupported command | `2` | `err unsupported-command hint="run afol -h"` |
-| delegated failure | legacy exit | legacy-compatible failure summary |
-| validation failure | `1` | command-specific failure summary |
+| outside project | `2` | identify invalid root and suggest a valid entry |
+| missing canonical config | `2` | identify `.afol/config.json` before mutation |
+| missing lock | `2` | identify `.agents/lock.json` before mutation |
+| invalid JSON | `2` | identify the exact invalid path |
+| unsupported command | `2` | suggest current help |
+| validation failure | `1` | provide a compact command-specific summary |
 
-JSON mode must return the same semantic data as compact mode.
+JSON output carries the same semantic result as compact output.
 
-## 6) Compatibility Delegation
-
-Delegation is explicit and temporary.
-
-| Family | MVP behavior | Stop condition |
-| --- | --- | --- |
-| `s/status` | TS or delegated status | semantic parity tests pass |
-| `-h/help` | TypeScript help | alias snapshot tests pass |
-| `n/new` | delegate until workbench kernel lands | fixture parity tests pass |
-| `t/task` | delegate until task model lands | state transition tests pass |
-| `e/evidence` | delegate until evidence model lands | ledger tests pass |
-| `l/log` | delegate until log model lands | log append tests pass |
-| `v/verify` | delegate until validator lands | strict parity passes |
-| `c/close` | delegate until closure model lands | closure parity passes |
-| `r/rule` | delegate or route by TS router | routing tests pass |
-| `sk/skill` | delegate until skill index lands | skill tests pass |
-| `up/update` | delegated or dry-run only in MVP | conflict tests pass |
-
-Delegation parity requires stdout, stderr, exit code, and normalized semantic
-fields to match the legacy command for the covered fixture.
-
-## 7) DR 2026-05-31 Scope Addendum
+## 5) Scope and Boundaries
 
 In scope:
 
-- CLI skeleton.
-- Typed schemas.
-- Project root detection.
-- Config, lock, and manifest loading.
-- Alias router.
-- Compact and JSON output.
-- Error model.
-- Compatibility delegation.
-- Focused tests for each boundary above.
-- Standalone build contract: `bun run build` and `bun run smoke:dist` paths are
-  deterministic and smoke-validated in the kernel validation slice.
+- typed CLI registry, router, schemas, envelopes, services, and validators;
+- safe project-root and configuration loading;
+- short/long alias parity;
+- compact and JSON output;
+- standalone factory build and smoke behavior;
+- session-bound, journaled mutations and safe update previews;
+- focused regression tests for each command boundary.
 
 Out of scope:
 
-- Reimplementing every legacy command in the first slice.
-- Cloud distribution.
-- GUI.
-- Always-running daemon.
-- Deleting Python/Bash behavior before parity evidence exists.
+- copying factory implementation into downstream projects;
+- a GUI, always-running daemon, or public backend;
+- cloud distribution or deployment;
+- unsupported platform claims without native or VM-backed evidence.
 
-Manifest ownership and mutation safety requirements are handled by F-09 and F-08
-but remain contractually coupled to CLI command execution:
-
-- Project-owned files are never blind-overwritten.
-- Real writes must be session/task bound and journaled.
-- Update/patch previews use diff artifacts before apply.
-
-## 8) TDD Entry Point
-
-Implementation starts with failing tests for:
-
-1. schema parsing and invalid file errors,
-2. root detection,
-3. alias normalization,
-4. compact vs JSON output equivalence,
-5. delegation parity for one legacy command,
-6. invalid-root and unsupported-command negative paths.
-
-## 9) Acceptance
+## 6) Acceptance
 
 - `afol -h` prints compact help.
 - `afol status` and `afol s` resolve to the same semantic status.
 - `afol -j status` returns valid JSON with the same semantic fields.
-- `afol ck`, `afol st -T T-01`, `afol d -T T-01 -x "just lint"`, and
-  `afol c` resolve to their long command equivalents.
+- Agent fast-path and explicit concurrent forms share one lifecycle model.
 - Running outside a project fails with an actionable error.
-- Missing or invalid local state fails before mutation.
-- Delegated commands preserve exit code and failure evidence.
-- `bun run typecheck` and `bun test` pass for the kernel.
+- Missing or invalid canonical state fails before mutation.
+- Registry, router, envelope, root, and lifecycle tests cover their current
+  behavior.
+- `bun run typecheck` and focused `bun test` gates pass for changed surfaces.
 
-## 10) Review Questions
+## 7) Review Questions
 
-- Does the CLI reduce copied logic in downstream projects?
-- Can a project remain reproducible through local state and lock files?
-- Are frequent commands short enough for agents but still auditable?
-- Is every fallback temporary and covered by a parity stop condition?
+- Does the operator remain external to downstream project payloads?
+- Can a project remain reproducible through canonical local state and lock
+  metadata?
+- Are frequent commands short, compact, and auditable?
+- Do failures stop before unsafe mutation?
 
-## 11) Closure
+## 8) Closure and Historical Provenance
 
 - Accepted implementation evidence:
   - `E-20260528215311949499`
   - `E-20260528220141194181`
 - Closeout session: `.afol/wb/260528_0722_slice2-cli-kernel-front-door/`
-- Strict verification:
-  `./.agents/agents verify-tasks --strict .afol/wb/260528_0722_slice2-cli-kernel-front-door/`
-  passed.
+- Strict verification passed for the accepted closeout.
+- The exact pre-reconciliation spec is retained under
+  `.afol/data/migrations/260726_f29-governance-contract-reconciliation/`,
+  with SHA-256, size, source commit, retention review, and
+  `deletion_approved: false`.
 
-## 12) Hermes Benchmark Decisions
+## 9) Benchmark Decisions
 
 - Pattern: registry-defined actions and standardized command results.
-- Hermes source concept: tool specs define metadata, input contracts, guards,
-  and output shape before runtime adapters expose them.
-- Local decision: adapt as CLI-kernel `ActionSpec` and `ResultEnvelope`; defer
-  broader discovery until the command surface is stable.
-- Acceptance criteria: CLI registry exposes command metadata as canonical
-  source; every command returns a typed result envelope for compact and JSON
-  output; unsupported or unsafe roots fail before mutation.
-- Non-goals: no Hermes runtime clone, no progressive tool discovery as an MVP
-  dependency, no auto-install of external tools.
+- Local decision: use typed `ActionSpec` and result-envelope contracts without
+  copying an external runtime architecture.
+- Acceptance anchor: command metadata is canonical in the CLI registry; every
+  command returns an equivalent compact/JSON semantic result; unsafe roots fail
+  before mutation.
+- Non-goals: no progressive tool discovery dependency and no automatic
+  installation of external tools.

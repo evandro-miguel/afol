@@ -1,14 +1,20 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
+	closeSync,
 	existsSync,
+	fsyncSync,
 	mkdirSync,
+	openSync,
 	readFileSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
+import { readEventLedgerRecords } from "../events/ledger";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
+import { resolveEvolutionConfig } from "../evolution";
+import { ingestObservationsForSession } from "../evolution/observation-ingest";
 import {
 	buildGovernanceFrontmatter,
 	recordPendingSpecForSession,
@@ -18,8 +24,25 @@ import { withSessionLock } from "../io/session-lock";
 import { rebuildFilesIndex } from "../local-state/project-indexes";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
-import { resolveProjectPaths } from "../project/paths";
+import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
+import { loadEvidenceEntries, sessionPaths } from "./session-reader";
+import {
+	appendVerificationRunStart,
+	appendVerificationRunStep,
+	appendVerificationRunTerminal,
+	latestRunForTask,
+	nextVerificationAttempt,
+	readVerificationRunLedger,
+	reconcileVerificationEvidenceOrphans,
+	runHasCompletePassedSteps,
+	stepsForRun,
+	terminalForRun,
+	type VerificationRunStartRecord,
+	type VerificationRunStatus,
+	verificationCommandDigest,
+	verificationRunAuthorizes,
+} from "./verification-runs";
 import {
 	type CompletionPolicy,
 	completionPolicyFromNotes,
@@ -37,7 +60,6 @@ const BLOCKING_STATES = new Set([
 	"tested_needs_spec_validation",
 	"problem",
 ]);
-const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const NEW_SESSION_LOCK_SESSION = "__workbench-new-session__";
 
 export type WorkbenchTaskRef = {
@@ -49,10 +71,20 @@ export type RecordEvidenceInput = WorkbenchTaskRef & {
 	command: string;
 	result: string;
 	exitCode?: number;
+	signal?: string;
 	artifact?: string;
 	note?: string;
 	provenance?: EvidenceProvenance;
 	approvalContext?: OperationContext;
+	verification?: {
+		runId: string;
+		taskAttempt: number;
+		verificationAttempt: number;
+		stepIndex: number;
+		stepCount: number;
+		status: VerificationRunStatus;
+		durationMs: number;
+	};
 };
 
 export type EvidenceProvenance = "declared" | "observed";
@@ -60,11 +92,14 @@ export type EvidenceProvenance = "declared" | "observed";
 export type EvidenceEntry = {
 	id: string;
 	task_id: string;
+	project_id?: string;
+	session_id?: string;
 	created_at: string;
 	command: string;
 	result: string;
 	provenance?: EvidenceProvenance;
 	exit_code?: number;
+	signal?: string;
 	artifact?: string;
 	note?: string;
 	task_state?: TaskState;
@@ -74,6 +109,14 @@ export type EvidenceEntry = {
 	waiver_reason?: string;
 	approved_by?: string;
 	attempt?: number;
+	verification_run_id?: string;
+	task_attempt?: number;
+	verification_attempt?: number;
+	step_index?: number;
+	step_count?: number;
+	verification_status?: VerificationRunStatus;
+	duration_ms?: number;
+	command_digest?: string;
 	warnings?: string[];
 };
 
@@ -85,6 +128,14 @@ const SENSITIVE_COMMAND_KEYS = new Set([
 	"API_KEY",
 	"ACCESS_KEY",
 	"PRIVATE_KEY",
+	"DATABASE_URL",
+	"DB_URL",
+	"REDIS_URL",
+	"MONGO_URL",
+	"MONGODB_URI",
+	"CONNECTION_STRING",
+	"DSN",
+	"AUTHORIZATION",
 ]);
 
 function sensitiveAssignmentKey(key: string): boolean {
@@ -113,6 +164,14 @@ export function sanitizeEvidenceCommand(command: string): string {
 			sensitiveLongOption(option)
 				? `${prefix}${option}${separator}[REDACTED]`
 				: match,
+	);
+	sanitized = sanitized.replace(
+		/(\bAuthorization\s*:\s*(?:Bearer|Basic)\s+)[^\s"']+/gi,
+		"$1[REDACTED]",
+	);
+	sanitized = sanitized.replace(
+		/([A-Za-z][A-Za-z0-9+.-]*:\/\/[^:\s/@]+:)([^@\s/]+)(@)/g,
+		"$1[REDACTED]$3",
 	);
 	return sanitized;
 }
@@ -144,6 +203,24 @@ export type CloseSessionResult = string[] & {
 
 export type LifecycleAuxiliaryRuntime = {
 	beforeAuxiliary?: (label: string) => void;
+	fencingCheck?: () => void;
+	/**
+	 * Inject a deterministic observer seam for testing.
+	 * When set, the observer calls this function instead of running
+	 * ingestObservationsForSession.  The seam must return a result
+	 * with the same shape as IngestObservationsResult or throw.
+	 */
+	observerSeam?: (input: {
+		root: string;
+		projectId: string;
+		session: string;
+	}) => {
+		appended: number;
+		duplicates: number;
+		skipped: number;
+		warnings: string[];
+		observation_ids: string[];
+	};
 };
 
 type InternalLifecycleAuxiliaryRuntime = LifecycleAuxiliaryRuntime & {
@@ -215,24 +292,6 @@ function sanitizeTheme(theme: string): string {
 		);
 	}
 	return cleaned.slice(0, 80).replace(/-$/g, "");
-}
-
-function resolveSafeSessionPath(root: string, session: string): string {
-	const normalized = session.trim();
-	if (
-		!SESSION_NAME_RE.test(normalized) ||
-		normalized.includes("..") ||
-		normalized.length === 0
-	) {
-		throw new Error(`Invalid session identifier: ${session}`);
-	}
-
-	const projectPaths = resolveProjectPaths(root);
-	const result = resolveProjectPath(root, join(projectPaths.wbDir, normalized));
-	if (!result.ok) {
-		throw new Error(result.error);
-	}
-	return result.value.path;
 }
 
 function twoDigits(value: number): string {
@@ -414,31 +473,8 @@ function escapeTaskNote(task: string): string {
 	return task.replace(/\|/g, "/");
 }
 
-export function sessionPaths(
-	root: string,
-	session: string,
-): {
-	wbRoot: string;
-	sessionDir: string;
-	planPath: string;
-	taskPath: string;
-	logPath: string;
-	evidencePath: string;
-	activeSessionPath: string;
-} {
-	const projectPaths = resolveProjectPaths(root);
-	const wbRoot = projectPaths.abs.wbDir;
-	const sessionDir = resolveSafeSessionPath(root, session);
-	return {
-		wbRoot,
-		sessionDir,
-		planPath: join(sessionDir, `${session}_plan_01.md`),
-		taskPath: join(sessionDir, `${session}_task_01.md`),
-		logPath: join(sessionDir, `${session}_log_01.md`),
-		evidencePath: join(sessionDir, ".evidence.jsonl"),
-		activeSessionPath: projectPaths.abs.activeSessionFile,
-	};
-}
+// Re-exported from session-reader for backward compat
+export { sessionPaths } from "./session-reader";
 
 function refreshWorkbenchLocalState(root: string, session?: string): void {
 	rebuildWorkBenchIndex(root, session);
@@ -767,31 +803,12 @@ function closeDiagnosticState(
 	root: string,
 	session: string,
 ): { workbench: boolean; telemetry: boolean } {
-	const eventPath = resolveProjectPaths(root).abs.eventsFile;
-	if (!existsSync(eventPath)) {
-		return { workbench: false, telemetry: false };
-	}
 	let workbench = false;
 	let telemetry = false;
-	let lines: string[];
-	try {
-		lines = readFileSync(eventPath, "utf8").split(/\r?\n/);
-	} catch {
-		return { workbench: false, telemetry: false };
-	}
-	for (const line of lines) {
-		if (!line.trim()) {
-			continue;
-		}
-		try {
-			const event = JSON.parse(line) as Record<string, unknown>;
-			workbench ||=
-				event.type === "workbench.close" && event.session === session;
-			telemetry ||=
-				event.event_type === "session_end" && event.session_id === session;
-		} catch {
-			// Malformed diagnostic lines are handled by validation, not close recovery.
-		}
+	for (const event of readEventLedgerRecords(root)) {
+		workbench ||= event.type === "workbench.close" && event.session === session;
+		telemetry ||=
+			event.event_type === "session_end" && event.session_id === session;
 	}
 	return { workbench, telemetry };
 }
@@ -877,84 +894,8 @@ function evidenceId(now: Date): string {
 	return `E-${yyyy}${mm}${dd}${hh}${mi}${ss}${msec}-${randomBytes(3).toString("hex")}`;
 }
 
-function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
-	if (!existsSync(evidencePath)) {
-		return [];
-	}
-	const rows = readFileSync(evidencePath, "utf8")
-		.split("\n")
-		.map((line) => line.trim())
-		.filter((line) => line.length > 0);
-	const entries: EvidenceEntry[] = [];
-	for (const [index, row] of rows.entries()) {
-		try {
-			const parsed = JSON.parse(row) as Partial<EvidenceEntry> & {
-				taskId?: unknown;
-				createdAt?: unknown;
-			};
-			const taskId =
-				typeof parsed.task_id === "string" ? parsed.task_id : parsed.taskId;
-			const createdAt =
-				typeof parsed.created_at === "string"
-					? parsed.created_at
-					: parsed.createdAt;
-			if (
-				typeof parsed.id === "string" &&
-				typeof taskId === "string" &&
-				typeof createdAt === "string" &&
-				typeof parsed.command === "string" &&
-				typeof parsed.result === "string"
-			) {
-				const entry: EvidenceEntry = {
-					id: parsed.id,
-					task_id: taskId,
-					created_at: createdAt,
-					command: parsed.command,
-					result: parsed.result,
-				};
-				if (typeof parsed.exit_code === "number") {
-					entry.exit_code = parsed.exit_code;
-				}
-				if (typeof parsed.artifact === "string") {
-					entry.artifact = parsed.artifact;
-				}
-				if (typeof parsed.note === "string") {
-					entry.note = parsed.note;
-				}
-				if (
-					parsed.authorization_type === "execution" ||
-					parsed.authorization_type === "artifact" ||
-					parsed.authorization_type === "waiver"
-				)
-					entry.authorization_type = parsed.authorization_type;
-				if (typeof parsed.artifact_sha256 === "string")
-					entry.artifact_sha256 = parsed.artifact_sha256;
-				if (typeof parsed.waiver_reason === "string")
-					entry.waiver_reason = parsed.waiver_reason;
-				if (typeof parsed.approved_by === "string")
-					entry.approved_by = parsed.approved_by;
-				if (
-					typeof parsed.attempt === "number" &&
-					Number.isSafeInteger(parsed.attempt) &&
-					parsed.attempt >= 0
-				)
-					entry.attempt = parsed.attempt;
-				if (
-					parsed.provenance === "declared" ||
-					parsed.provenance === "observed"
-				) {
-					entry.provenance = parsed.provenance;
-				}
-				entries.push(entry);
-			}
-		} catch (error) {
-			throw new Error(
-				`Malformed evidence ledger ${evidencePath}:${index + 1}: ${(error as Error).message}`,
-			);
-		}
-	}
-	return entries;
-}
+// Re-exported from session-reader for backward compat
+export { loadEvidenceEntries } from "./session-reader";
 
 export function selectSingleOpenTask(root: string, session: string): string {
 	const paths = sessionPaths(root, session);
@@ -1276,6 +1217,7 @@ export function transitionTask(
 		const from =
 			readTaskRows(paths.taskPath).find((row) => row.taskId === input.taskId)
 				?.state ?? "unknown";
+		runtime.fencingCheck?.();
 		transitionTaskState(
 			paths.taskPath,
 			input.taskId,
@@ -1388,9 +1330,35 @@ export function recordEvidence(
 			purpose: "completion",
 			authorization_type: completionPolicy,
 			attempt: taskRow.attempt,
+			...(input.verification
+				? {
+						verification_run_id: input.verification.runId,
+						task_attempt: input.verification.taskAttempt,
+						verification_attempt: input.verification.verificationAttempt,
+						step_index: input.verification.stepIndex,
+						step_count: input.verification.stepCount,
+						verification_status: input.verification.status,
+						duration_ms: input.verification.durationMs,
+						command_digest: verificationCommandDigest(sanitizedCommand),
+					}
+				: {}),
 		};
+		if (provenance === "observed") {
+			const evolution = resolveEvolutionConfig(readProjectConfig(root));
+			if (evolution.configured) {
+				if (!evolution.projectId)
+					throw new Error(
+						"configured evolution project is missing a stable project UUID",
+					);
+				evidence.project_id = evolution.projectId;
+				evidence.session_id = input.session;
+			}
+		}
 		if (input.exitCode !== undefined) {
 			evidence.exit_code = input.exitCode;
+		}
+		if (input.signal) {
+			evidence.signal = input.signal;
 		}
 		if (completionPolicy === "artifact") {
 			if (!input.artifact?.trim())
@@ -1431,10 +1399,21 @@ export function recordEvidence(
 			evidence.waiver_reason = input.note.trim();
 			evidence.approved_by = "local:interactive";
 		}
-		writeFileSync(paths.evidencePath, `${JSON.stringify(evidence)}\n`, {
-			encoding: "utf8",
-			flag: "a",
-		});
+		runtime.fencingCheck?.();
+		if (input.verification) {
+			const evidenceFd = openSync(paths.evidencePath, "a");
+			try {
+				writeFileSync(evidenceFd, `${JSON.stringify(evidence)}\n`, "utf8");
+				fsyncSync(evidenceFd);
+			} finally {
+				closeSync(evidenceFd);
+			}
+		} else {
+			writeFileSync(paths.evidencePath, `${JSON.stringify(evidence)}\n`, {
+				encoding: "utf8",
+				flag: "a",
+			});
+		}
 		const warnings: string[] = [];
 		auxiliaryWarning(
 			warnings,
@@ -1516,6 +1495,414 @@ export function appendTimelineEntry(
 	});
 }
 
+export type VerificationRunRuntime = InternalLifecycleAuxiliaryRuntime & {
+	fencingCheck: () => void;
+};
+
+export class VerificationRunConflictError extends Error {
+	readonly code = "stale_conflict";
+
+	constructor(message: string) {
+		super(message);
+		this.name = "VerificationRunConflictError";
+	}
+}
+
+export type PreparedVerificationRun =
+	| { kind: "new"; run: VerificationRunStartRecord }
+	| { kind: "recovered"; completion: VerificationRunCompletion };
+
+export type VerificationRunCompletion = {
+	runId: string;
+	evidenceIds: string[];
+	done: DoneTaskResult;
+	warnings: string[];
+};
+
+export function taskAttemptSnapshot(
+	root: string,
+	input: WorkbenchTaskRef,
+): number {
+	return withSessionLock(root, input.session, () => {
+		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
+		return ensureTaskExists(paths.taskPath, input.session, input.taskId)
+			.attempt;
+	});
+}
+
+function finalizeRecoveredRun(
+	root: string,
+	input: WorkbenchTaskRef,
+	run: VerificationRunStartRecord,
+	runtime: VerificationRunRuntime,
+): VerificationRunCompletion {
+	const records = readVerificationRunLedger(root, input.session);
+	const paths = sessionPaths(root, input.session);
+	const task = ensureTaskExists(paths.taskPath, input.session, input.taskId);
+	const existingTerminal = terminalForRun(records, run.verification_run_id);
+	if (task.attempt !== run.task_attempt) {
+		throw new VerificationRunConflictError(
+			`Task ${input.taskId} attempt changed before verification finalization.`,
+		);
+	}
+	if (
+		task.state !== "in_progress" &&
+		task.state !== "implemented_untested" &&
+		task.state !== "tested_needs_spec_validation" &&
+		!(task.state === "done" && existingTerminal?.status === "passed")
+	) {
+		throw new VerificationRunConflictError(
+			`Task ${input.taskId} became ineligible before verification finalization: ${task.state}.`,
+		);
+	}
+	if (!runHasCompletePassedSteps(records, run)) {
+		throw new Error(
+			`Verification run is incomplete: ${run.verification_run_id}`,
+		);
+	}
+	const steps = stepsForRun(records, run.verification_run_id);
+	const evidenceIds = steps.map((step) => step.evidence_id);
+	const authorizingEvidenceId = evidenceIds.at(-1);
+	if (!authorizingEvidenceId) {
+		throw new Error(
+			`Verification run has no evidence: ${run.verification_run_id}`,
+		);
+	}
+	appendVerificationRunTerminal(
+		root,
+		input.session,
+		{
+			record_type: "terminal",
+			verification_run_id: run.verification_run_id,
+			task_id: input.taskId,
+			task_attempt: run.task_attempt,
+			verification_attempt: run.verification_attempt,
+			status: "passed",
+			evidence_ids: evidenceIds,
+			evidence_count: evidenceIds.length,
+			authorizing_evidence_id: authorizingEvidenceId,
+			created_at: new Date().toISOString(),
+		},
+		runtime.fencingCheck,
+	);
+	const warnings = advanceTaskAfterObservedTest(root, input, {
+		...runtime,
+		deferLocalStateRefresh: true,
+	});
+	const done = doneTask(
+		root,
+		{ ...input, verificationRunId: run.verification_run_id },
+		{ ...runtime, deferLocalStateRefresh: true },
+	);
+	warnings.push(...(done.warnings ?? []));
+	auxiliaryWarning(
+		warnings,
+		"local-state refresh",
+		() => refreshWorkbenchLocalState(root, input.session),
+		runtime,
+	);
+	return { runId: run.verification_run_id, evidenceIds, done, warnings };
+}
+
+export function prepareVerificationRun(
+	root: string,
+	input: WorkbenchTaskRef & {
+		taskAttemptSnapshot: number;
+		commands: string[];
+	},
+	runtime: VerificationRunRuntime,
+): PreparedVerificationRun {
+	return withSessionLock(root, input.session, () => {
+		runtime.fencingCheck();
+		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
+		const task = ensureTaskExists(paths.taskPath, input.session, input.taskId);
+		if (task.attempt !== input.taskAttemptSnapshot) {
+			throw new VerificationRunConflictError(
+				`Task ${input.taskId} attempt changed before verification started.`,
+			);
+		}
+		if (
+			task.state !== "in_progress" &&
+			task.state !== "implemented_untested" &&
+			task.state !== "tested_needs_spec_validation" &&
+			task.state !== "done"
+		) {
+			throw new VerificationRunConflictError(
+				`Task ${input.taskId} is not eligible for verification from ${task.state}.`,
+			);
+		}
+
+		let records = readVerificationRunLedger(root, input.session);
+		const latest = latestRunForTask(records, input.taskId);
+		if (latest && latest.task_attempt !== task.attempt) {
+			reconcileVerificationEvidenceOrphans(
+				root,
+				input.session,
+				latest,
+				runtime.fencingCheck,
+			);
+			records = readVerificationRunLedger(root, input.session);
+			if (!terminalForRun(records, latest.verification_run_id)) {
+				const steps = stepsForRun(records, latest.verification_run_id);
+				appendVerificationRunTerminal(
+					root,
+					input.session,
+					{
+						record_type: "terminal",
+						verification_run_id: latest.verification_run_id,
+						task_id: input.taskId,
+						task_attempt: latest.task_attempt,
+						verification_attempt: latest.verification_attempt,
+						status: "superseded",
+						evidence_ids: steps.map((step) => step.evidence_id),
+						evidence_count: steps.length,
+						created_at: new Date().toISOString(),
+					},
+					runtime.fencingCheck,
+				);
+			}
+		} else if (latest) {
+			reconcileVerificationEvidenceOrphans(
+				root,
+				input.session,
+				latest,
+				runtime.fencingCheck,
+			);
+			records = readVerificationRunLedger(root, input.session);
+			const terminal = terminalForRun(records, latest.verification_run_id);
+			if (
+				terminal?.status === "passed" &&
+				runHasCompletePassedSteps(records, latest)
+			) {
+				return {
+					kind: "recovered",
+					completion: finalizeRecoveredRun(root, input, latest, runtime),
+				};
+			}
+			if (!terminal) {
+				if (runHasCompletePassedSteps(records, latest)) {
+					return {
+						kind: "recovered",
+						completion: finalizeRecoveredRun(root, input, latest, runtime),
+					};
+				}
+				const steps = stepsForRun(records, latest.verification_run_id);
+				appendVerificationRunTerminal(
+					root,
+					input.session,
+					{
+						record_type: "terminal",
+						verification_run_id: latest.verification_run_id,
+						task_id: input.taskId,
+						task_attempt: latest.task_attempt,
+						verification_attempt: latest.verification_attempt,
+						status: "superseded",
+						evidence_ids: steps.map((step) => step.evidence_id),
+						evidence_count: steps.length,
+						created_at: new Date().toISOString(),
+					},
+					runtime.fencingCheck,
+				);
+			}
+		}
+		if (task.state === "done") {
+			throw new VerificationRunConflictError(
+				`Task ${input.taskId} is already done and has no recoverable verification run.`,
+			);
+		}
+
+		records = readVerificationRunLedger(root, input.session);
+		const run: VerificationRunStartRecord = {
+			record_type: "start",
+			verification_run_id: `VR-${randomUUID()}`,
+			task_id: input.taskId,
+			task_attempt: task.attempt,
+			verification_attempt: nextVerificationAttempt(records, input.taskId),
+			step_count: input.commands.length,
+			commands: input.commands.map((command, index) => ({
+				step_index: index + 1,
+				command_digest: verificationCommandDigest(
+					sanitizeEvidenceCommand(command),
+				),
+			})),
+			created_at: new Date().toISOString(),
+		};
+		appendVerificationRunStart(root, input.session, run, runtime.fencingCheck);
+		return { kind: "new", run };
+	});
+}
+
+export function recordVerificationRunStep(
+	root: string,
+	input: WorkbenchTaskRef & {
+		run: VerificationRunStartRecord;
+		stepIndex: number;
+		command: string;
+		status: VerificationRunStatus;
+		exitCode: number;
+		durationMs: number;
+		signal?: string;
+		artifact?: string;
+		note?: string;
+	},
+	runtime: VerificationRunRuntime,
+): EvidenceEntry {
+	return withSessionLock(root, input.session, () => {
+		runtime.fencingCheck();
+		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
+		const task = ensureTaskExists(paths.taskPath, input.session, input.taskId);
+		if (task.attempt !== input.run.task_attempt) {
+			throw new VerificationRunConflictError(
+				`Task ${input.taskId} attempt changed during verification.`,
+			);
+		}
+		if (
+			task.state !== "in_progress" &&
+			task.state !== "implemented_untested" &&
+			task.state !== "tested_needs_spec_validation"
+		) {
+			throw new VerificationRunConflictError(
+				`Task ${input.taskId} became ineligible during verification: ${task.state}.`,
+			);
+		}
+		const records = readVerificationRunLedger(root, input.session);
+		const latest = latestRunForTask(records, input.taskId);
+		if (
+			latest?.verification_run_id !== input.run.verification_run_id ||
+			latest.task_attempt !== input.run.task_attempt ||
+			latest.verification_attempt !== input.run.verification_attempt
+		) {
+			throw new VerificationRunConflictError(
+				`Verification run is no longer current for ${input.taskId}.`,
+			);
+		}
+		if (terminalForRun(records, input.run.verification_run_id)) {
+			throw new VerificationRunConflictError(
+				`Verification run is already terminal: ${input.run.verification_run_id}`,
+			);
+		}
+		const sanitizedCommand = sanitizeEvidenceCommand(input.command);
+		const commandDigest = verificationCommandDigest(sanitizedCommand);
+		if (
+			input.run.commands[input.stepIndex - 1]?.command_digest !== commandDigest
+		) {
+			throw new Error(
+				`Verification command changed for step ${input.stepIndex}/${input.run.step_count}.`,
+			);
+		}
+		const evidence = recordEvidence(
+			root,
+			{
+				session: input.session,
+				taskId: input.taskId,
+				command: sanitizedCommand,
+				result: input.status === "passed" ? "passed" : "failed",
+				exitCode: input.exitCode,
+				...(input.signal ? { signal: input.signal } : {}),
+				provenance: "observed",
+				verification: {
+					runId: input.run.verification_run_id,
+					taskAttempt: input.run.task_attempt,
+					verificationAttempt: input.run.verification_attempt,
+					stepIndex: input.stepIndex,
+					stepCount: input.run.step_count,
+					status: input.status,
+					durationMs: input.durationMs,
+				},
+				...(input.artifact ? { artifact: input.artifact } : {}),
+				...(input.note ? { note: input.note } : {}),
+			},
+			{ ...runtime, deferLocalStateRefresh: true },
+		);
+		appendVerificationRunStep(
+			root,
+			input.session,
+			{
+				record_type: "step",
+				verification_run_id: input.run.verification_run_id,
+				task_id: input.taskId,
+				task_attempt: input.run.task_attempt,
+				verification_attempt: input.run.verification_attempt,
+				step_index: input.stepIndex,
+				step_count: input.run.step_count,
+				command_digest: commandDigest,
+				evidence_id: evidence.id,
+				status: input.status,
+				exit_code: input.exitCode,
+				...(input.signal ? { signal: input.signal } : {}),
+				duration_ms: input.durationMs,
+				created_at: new Date().toISOString(),
+			},
+			runtime.fencingCheck,
+		);
+		return evidence;
+	});
+}
+
+export function failVerificationRun(
+	root: string,
+	input: WorkbenchTaskRef & {
+		run: VerificationRunStartRecord;
+		terminalStatus?: "failed" | "interrupted";
+	},
+	runtime: VerificationRunRuntime,
+): { evidenceIds: string[]; warnings: string[] } {
+	return withSessionLock(root, input.session, () => {
+		runtime.fencingCheck();
+		reconcileVerificationEvidenceOrphans(
+			root,
+			input.session,
+			input.run,
+			runtime.fencingCheck,
+		);
+		const records = readVerificationRunLedger(root, input.session);
+		const steps = stepsForRun(records, input.run.verification_run_id);
+		const failed = steps.find((step) => step.status !== "passed");
+		appendVerificationRunTerminal(
+			root,
+			input.session,
+			{
+				record_type: "terminal",
+				verification_run_id: input.run.verification_run_id,
+				task_id: input.taskId,
+				task_attempt: input.run.task_attempt,
+				verification_attempt: input.run.verification_attempt,
+				status: input.terminalStatus ?? "failed",
+				evidence_ids: steps.map((step) => step.evidence_id),
+				evidence_count: steps.length,
+				...(failed ? { failed_step: failed.step_index } : {}),
+				created_at: new Date().toISOString(),
+			},
+			runtime.fencingCheck,
+		);
+		const warnings: string[] = [];
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, input.session),
+			runtime,
+		);
+		return {
+			evidenceIds: steps.map((step) => step.evidence_id),
+			warnings,
+		};
+	});
+}
+
+export function completeVerificationRun(
+	root: string,
+	input: WorkbenchTaskRef & { run: VerificationRunStartRecord },
+	runtime: VerificationRunRuntime,
+): VerificationRunCompletion {
+	return withSessionLock(root, input.session, () => {
+		runtime.fencingCheck();
+		return finalizeRecoveredRun(root, input, input.run, runtime);
+	});
+}
+
 export type DoneTaskResult = {
 	authorizingEvidenceId: string;
 	warnings?: string[];
@@ -1523,7 +1910,7 @@ export type DoneTaskResult = {
 
 export function doneTask(
 	root: string,
-	input: WorkbenchTaskRef,
+	input: WorkbenchTaskRef & { verificationRunId?: string },
 	runtime: InternalLifecycleAuxiliaryRuntime = {},
 ): DoneTaskResult {
 	return withSessionLock(root, input.session, () => {
@@ -1558,6 +1945,30 @@ export function doneTask(
 		const authorizingEntry = entries.find(
 			(entry) => entry.id === authorization.evidenceId,
 		);
+		if (authorizingEntry?.verification_run_id) {
+			if (
+				input.verificationRunId &&
+				input.verificationRunId !== authorizingEntry.verification_run_id
+			) {
+				throw new Error(
+					`Authorizing evidence belongs to a different verification run: ${authorizingEntry.verification_run_id}`,
+				);
+			}
+			if (
+				!verificationRunAuthorizes(
+					root,
+					input.session,
+					input.taskId,
+					taskRow.attempt,
+					authorization.evidenceId,
+					authorizingEntry.verification_run_id,
+				)
+			) {
+				throw new Error(
+					`Task ${input.taskId} requires a complete matching verification run.`,
+				);
+			}
+		}
 		if (
 			completionPolicy === "artifact" &&
 			authorizingEntry?.artifact &&
@@ -1579,6 +1990,7 @@ export function doneTask(
 		if (taskRow.state === "done") {
 			return { authorizingEvidenceId: authorization.evidenceId };
 		}
+		runtime.fencingCheck?.();
 		transitionTaskState(paths.taskPath, input.taskId, "done");
 		const warnings: string[] = [];
 		auxiliaryWarning(
@@ -1668,6 +2080,40 @@ export function completeObservedTask(
 					deferLocalStateRefresh: true,
 				});
 				warnings.push(...(done.warnings ?? []));
+				// Observer — failures are caught and surfaced as warnings, never roll
+				// back the durable workbench completion.
+				try {
+					const config = resolveEvolutionConfig(readProjectConfig(root));
+					const autonomy = config.settings.autonomy;
+					const autoObserve =
+						autonomy !== null &&
+						typeof autonomy === "object" &&
+						!Array.isArray(autonomy) &&
+						(autonomy as Record<string, unknown>).auto_observe === true;
+					if (
+						config.configured &&
+						config.enabled &&
+						config.projectId &&
+						autoObserve
+					) {
+						const observerResult = runtime.observerSeam
+							? runtime.observerSeam({
+									root,
+									projectId: config.projectId,
+									session: input.session,
+								})
+							: ingestObservationsForSession({
+									root,
+									projectId: config.projectId,
+									session: input.session,
+								});
+						warnings.push(...observerResult.warnings);
+					}
+				} catch (observerError) {
+					warnings.push(
+						`observer failed after durable commit: ${(observerError as Error).message}`,
+					);
+				}
 				result = { done, evidence, warnings };
 			} else {
 				result = { evidence, warnings };
@@ -1700,6 +2146,7 @@ export function closeSession(
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
+		const diagnostics = closeDiagnosticState(root, session);
 		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
 		const reportRelativePath = relative(root, reportPath).replaceAll("\\", "/");
 		let reportStatus: CloseSessionReport["status"] = existsSync(reportPath)
@@ -1814,7 +2261,6 @@ export function closeSession(
 				? evaluateCloseWarnings(session, paths.sessionDir)
 				: [];
 
-		const diagnostics = closeDiagnosticState(root, session);
 		for (const [alreadyRecorded, label, writeDiagnostic] of [
 			[
 				diagnostics.workbench,

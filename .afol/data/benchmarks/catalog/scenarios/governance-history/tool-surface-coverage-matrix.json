@@ -43,7 +43,8 @@
 			"telemetry",
 			"session",
 			"transition",
-			"feedback"
+			"feedback",
+			"evolve"
 		],
 		"subcommands": [
 			"status --json",
@@ -54,6 +55,7 @@
 			"validate project --check-drift --json",
 			"validate drift --json",
 			"validate bench --pack <pack-id> --json",
+			"validate bench --pack governance-history --timing-mode observe --json",
 			"validate select --changed-path <path>",
 			"validate run --changed-path <path>",
 			"init --dry-run",
@@ -166,6 +168,7 @@
 			"feedback annotate --note <text>",
 			"feedback purge --confirm",
 			"feedback last -m <text>",
+			"evolve status [--json]",
 			"done -- <argv...>"
 		],
 		"journeys": [

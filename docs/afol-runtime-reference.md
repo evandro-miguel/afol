@@ -86,6 +86,7 @@ afol pstr stale
 afol ctx
 afol state show
 afol hydrate --session <session-id>
+afol evolve status
 afol spec list
 afol adr list
 ```
@@ -122,15 +123,45 @@ agent context.
 - `.afol/pstr/**`: generated project-structure maps when present.
 - `.afol/wb/**`: governed execution sessions.
 - `.afol/data/events/**`: append-only runtime event data.
+- `.afol/data/events/evolution/**`: canonical append-only evolution evidence
+  journal; derived databases never replace it.
 - `.afol/data/index/**`: local indexes.
 - `.afol/data/mutations/**`: mutation and update records.
 - `.afol/state/afol.db`: SQLite v1 local state database.
+- `.afol/state/evolution.db`: separately migrated, rebuildable evolution
+  projection with explicit `PRAGMA user_version` migrations.
 - `.afol/tmp/**`: temporary AFOL-owned files.
 - `.afol/library/**` and `.afol/memory/**`: local knowledge and memory surfaces.
 
 `.afol/state/afol.db` is the SQLite v1 surface. It materializes workbench
 sessions, task rows, source hashes, and evidence only. Broader
 `adm/pstr/memory/library/ctx` materialization is State DB v2/future.
+
+### Legacy project opt-in
+
+Projects without `project.id`, `project.timezone`, the four evolution path
+keys, and the `evolution` object remain valid and report
+`legacy_unconfigured`. AFOL does not silently rewrite their project-owned
+configuration during bootstrap or update.
+
+Opt-in is an explicit configuration change. Generate one stable UUID with
+`bun -e 'console.log(crypto.randomUUID())'`, choose the project's IANA
+timezone, then copy `project.id`, `project.timezone`,
+`paths.external_dir`, `paths.evolution_db`, `paths.evolution_data_dir`,
+`paths.evolution_events_dir`, and the complete `evolution` object from
+`src/project-template/.afol/config.json` into `.afol/config.json`. Preserve the
+existing `project.name` and unrelated configuration. Validate the approved
+edit before using the derived state:
+
+```bash
+afol validate project --json
+afol doctor --json
+afol evolve status --json
+```
+
+The expected final state is `ready_uninitialized`; status must not create the
+database. The first verified production event creates the rebuildable
+projection in a later observation flow.
 
 ## Governance
 

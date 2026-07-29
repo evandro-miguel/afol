@@ -5,6 +5,7 @@
   "pack_id": "mutation-safety",
   "command": "a f pt --json --path .agents/config.json",
   "expected_exit": 2,
+  "compiled_binary": true,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

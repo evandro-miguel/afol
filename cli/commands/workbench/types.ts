@@ -25,9 +25,9 @@ export type EvidenceArgs = SessionTaskArgs & {
 };
 
 export type DoneArgs = SessionTaskArgs & {
-	testCommand: string | null;
+	testCommands: string[];
 	testShellCommand: string | null;
-	verification: VerificationSpec | null;
+	verifications: VerificationSpec[];
 	evidenceCommand: string | null;
 	evidenceResult: string | null;
 	requireSpecCheck: boolean;

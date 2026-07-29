@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { isAbsolute, relative } from "node:path";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { isAbsolute, join, relative } from "node:path";
 import { resolveProjectPaths } from "../../services/project/paths";
 import { resolveProjectPath } from "../../services/project/root";
 import {
@@ -141,6 +141,156 @@ export type RunVerificationResult = {
 	error?: string;
 	signal?: string;
 };
+
+export type ObservedVerificationStatus =
+	| "passed"
+	| "failed"
+	| "timed_out"
+	| "output_limit"
+	| "signaled"
+	| "spawn_failed"
+	| "lock_lost";
+
+export type ObservedVerificationResult = {
+	exitCode: number;
+	status: ObservedVerificationStatus;
+	durationMs: number;
+	signal?: string;
+};
+
+export type RunVerificationAsyncOptions = {
+	timeoutMs?: number;
+	maxOutputBytes?: number;
+	signal?: AbortSignal;
+};
+
+const DEFAULT_VERIFICATION_TIMEOUT_MS = 120_000;
+const DEFAULT_VERIFICATION_OUTPUT_BYTES = 1024 * 1024;
+
+function terminateProcessTree(child: ChildProcess, force: boolean): void {
+	const pid = child.pid;
+	if (!pid) return;
+	if (process.platform === "win32") {
+		const systemRoot = process.env.SystemRoot ?? process.env.WINDIR ?? "";
+		const taskkill = isAbsolute(systemRoot)
+			? join(systemRoot, "System32", "taskkill.exe")
+			: "taskkill.exe";
+		spawnSync(taskkill, ["/pid", String(pid), "/t", ...(force ? ["/f"] : [])], {
+			shell: false,
+			stdio: "ignore",
+			windowsHide: true,
+		});
+		return;
+	}
+	try {
+		process.kill(-pid, force ? "SIGKILL" : "SIGTERM");
+	} catch {
+		child.kill(force ? "SIGKILL" : "SIGTERM");
+	}
+}
+
+export function runVerificationAsync(
+	root: string,
+	spec: VerificationSpec,
+	options: RunVerificationAsyncOptions = {},
+): Promise<ObservedVerificationResult> {
+	const startedAt = Date.now();
+	const durationMs = (): number => Date.now() - startedAt;
+	if (
+		(spec.mode === "shell" && spec.command.trim().length === 0) ||
+		(spec.mode === "argv" && spec.executable.trim().length === 0)
+	) {
+		return Promise.resolve({
+			exitCode: 1,
+			status: "spawn_failed",
+			durationMs: durationMs(),
+		});
+	}
+	if (options.signal?.aborted) {
+		return Promise.resolve({
+			exitCode: 1,
+			status: "lock_lost",
+			durationMs: durationMs(),
+		});
+	}
+
+	return new Promise((resolve) => {
+		const child =
+			spec.mode === "shell"
+				? spawn(spec.command, {
+						cwd: root,
+						detached: process.platform !== "win32",
+						shell: true,
+						stdio: ["ignore", "pipe", "pipe"],
+					})
+				: spawn(spec.executable, spec.args, {
+						cwd: root,
+						detached: process.platform !== "win32",
+						shell: false,
+						stdio: ["ignore", "pipe", "pipe"],
+					});
+		let settled = false;
+		let outputBytes = 0;
+		let forcedStatus: ObservedVerificationStatus | null = null;
+		let forceKill: ReturnType<typeof setTimeout> | null = null;
+		const maxOutputBytes =
+			options.maxOutputBytes ?? DEFAULT_VERIFICATION_OUTPUT_BYTES;
+		const finish = (result: ObservedVerificationResult): void => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			if (forceKill) clearTimeout(forceKill);
+			options.signal?.removeEventListener("abort", abortHandler);
+			resolve(result);
+		};
+		const terminate = (status: ObservedVerificationStatus): void => {
+			if (settled || forcedStatus) return;
+			forcedStatus = status;
+			terminateProcessTree(child, false);
+			forceKill = setTimeout(() => terminateProcessTree(child, true), 100);
+			forceKill.unref();
+		};
+		const countOutput = (chunk: Buffer | string): void => {
+			outputBytes += Buffer.isBuffer(chunk)
+				? chunk.byteLength
+				: Buffer.byteLength(chunk, "utf8");
+			if (outputBytes > maxOutputBytes) terminate("output_limit");
+		};
+		child.stdout?.on("data", countOutput);
+		child.stderr?.on("data", countOutput);
+		const abortHandler = (): void => terminate("lock_lost");
+		options.signal?.addEventListener("abort", abortHandler, { once: true });
+		const timeout = setTimeout(
+			() => terminate("timed_out"),
+			options.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS,
+		);
+		timeout.unref();
+		child.once("error", () => {
+			finish({
+				exitCode: 1,
+				status: forcedStatus ?? "spawn_failed",
+				durationMs: durationMs(),
+			});
+		});
+		child.once("close", (code, signal) => {
+			const status =
+				forcedStatus ??
+				(signal ? "signaled" : code === 0 ? "passed" : "failed");
+			const observedExitCode = code ?? 1;
+			finish({
+				exitCode:
+					status === "passed"
+						? 0
+						: observedExitCode === 0
+							? 1
+							: observedExitCode,
+				status,
+				durationMs: durationMs(),
+				...(signal ? { signal } : {}),
+			});
+		});
+	});
+}
 
 export function runVerification(
 	root: string,

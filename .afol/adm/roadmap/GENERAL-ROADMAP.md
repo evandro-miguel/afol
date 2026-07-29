@@ -211,6 +211,11 @@ Minimum acceptance:
   .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
 - Living residual:
   .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md
+- Sequential verification residual:
+  .afol/adm/specs/260716_1234_agent-cli-sequential-verification-runs_spec-child_01.md
+- Sequential residual state: implementation is complete on PR #46. The final
+  residual is clean CI proof for the explicit governance timing-observation
+  mode discovered by the closeout merge-candidate run.
 - Why: Agents need extreme ease of use, extremely low latency, low
   **write-token** cost for CLI argv, low forced stdout, and very high
   reliability. Long commands and long default output train agents to waste
@@ -227,7 +232,9 @@ Minimum acceptance:
   `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
   passed. The residual child is final on `E-20260715181045803-75a16e` in
   `.afol/wb/260715_1628_afol-1-0-agent-cli-residual/`; final-status session
-  `260715_1811_afol-1-0-final-status` recorded the reconciled closure.
+  `260715_1811_afol-1-0-final-status` recorded the reconciled closure. Sequential
+  verification remains active until its timing-gate follow-up passes both
+  required PR #46 CI events.
 
 ### F-04 Governance Workbench System
 
@@ -591,7 +598,7 @@ Minimum acceptance:
   - Durable artifacts carry timestamps, status, authority, source hash, and
     branch/commit metadata where relevant.
   - `afol health` is fast by default and reports `fail`, `warn`, and `info`.
-  - `afol health --area adm|pstr|wb|memory|library|state|ctx|token_budget`
+  - `afol health --area adm|pstr|wb|memory|library|state|ctx|evolution|token_budget`
     is the canonical domain health surface.
   - `afol pstr stale` blocks stale maps from trusted context bundles.
   - State health checks schema, migrations, source hashes, FTS freshness,
@@ -630,21 +637,38 @@ Minimum acceptance:
 
 #### F-18.S10 Memory and Library Adoption Loop
 
-- Status: planned follow-on
+- Status: active
 - Governing specs:
   .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md
   and
   .afol/adm/specs/260612_global-project-research-library_spec-child_01.md
+  and
+  .afol/adm/specs/260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01.md
 - Why: health-green memory/library systems can still remain empty after real
   project work when agents never run the explicit proposal/promotion flows.
   Empty stores are valid when there is no reusable material, but AFOL should
   distinguish "nothing worth retaining" from "workflow never asked".
+- Current gap: AFOL exposes manual memory and library proposal/promotion
+  primitives, while healthy empty stores remain valid. Those primitives and a
+  green health result do not satisfy this slice because no session-to-candidate
+  adoption path exists yet.
+- Evolution boundary: implement this direction as a planned, read-only AFOL
+  Evolution candidate-review slice. It may inspect completed project artifacts
+  and emit `adoption_candidate` records with source/session provenance, but it
+  must not promote, mutate, or auto-ingest canonical knowledge.
+- Governance gate: the dedicated F-18.S10 child spec is approved and
+  cross-references the AFOL Evolution governance; implementation remains
+  planned until its bounded slice is authorized. The approved governance
+  parent is F-30 and its dedicated spec is
+  `.afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md`.
+  The current final specs define the memory/library primitives, not the missing
+  adoption integration.
 - Scope:
   - Add a compact post-session or maintenance review path that inspects
     workbench reports, evidence, lessons, decisions, and sourced research for
     memory/library candidates.
   - Produce reviewable candidates only; promotion stays explicit and
-    human-auditable.
+    human-auditable through the existing proposal/promotion mutation paths.
   - Keep memory for durable project continuity and library for sourced claims;
     do not merge them into hidden prompt memory, raw transcript storage, or
     automatic research ingest.
@@ -666,9 +690,10 @@ Follow-on slices under this direction:
 
 - Implement each feature above as narrow slices.
 - Immediate adoption gap: Memory and Library Adoption Loop v1. Connect
-  workbench closeout or maintenance review to explicit candidate generation so
-  real project usage can feed reviewed memory/library proposals instead of
-  leaving those stores empty by default.
+  completed workbench or maintenance artifacts to read-only candidate discovery
+  so real project usage can feed reviewed memory/library proposals instead of
+  leaving those stores empty by default. The child spec is active and
+  implementation is planned under F-30; promotion remains explicit.
 - Immediate next slice: Temporal Reliability v1. Implement explicit path
   config, `afol pstr stale --json`, trusted-context stale gates,
   `afol health --area state|library|memory`, weekly/monthly maintenance dry-run
@@ -873,7 +898,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: final
+- Status: active
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -885,12 +910,28 @@ Follow-on slices under this direction:
   - Child specs:
     - .afol/adm/specs/260715_afol-1-0-local-diagnostics_spec-child_01.md
     - .afol/adm/specs/260715_afol-1-0-linux-wsl-release-hardening_spec-child_01.md
+    - .afol/adm/specs/260726_canonical-adm-context-index-migration_spec-child_01.md
+    - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
+    - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
+    - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
     `afol.result/v1` and existing error output contracts.
   - Prove Linux x64 and observed WSL2 release behavior with bounded,
     redacted, file-backed evidence.
+  - Index canonical `.afol/adm/specs/**` and `.afol/adm/decisions/**` context
+    recursively, reject false-green empty/stale coverage, and measure the
+    worst selectable three-section token envelope.
+  - Remove `.agents/config.json` from active factory authority and generic
+    fixtures while retaining explicit fallback compatibility and a verified
+    AFOL-owned archive.
+  - Make the shared event ledger durable under partial-write and sync failure,
+    serialize cross-session writers, and block validation/rebuild on corrupt
+    input without automatic truncation.
+  - Reconcile accepted F-01, F-11, F-13, and F-15 governance contracts with
+    the AFOL-only TypeScript runtime while retaining their pre-reconciliation
+    bytes in a verified AFOL migration archive.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,
@@ -921,6 +962,123 @@ Follow-on slices under this direction:
   `260715_2109_pr-40-template-spec-index-remediation` closed with two tasks
   complete, full-suite evidence `E-20260715211444533-1df252`, and independent
   downstream scaffold review.
+- Canonical context remediation: the bounded child
+  `260726_canonical-adm-context-index-migration_spec-child_01` is final after
+  focused regression evidence and independent spec/quality approval. It fails
+  closed before hydrate or heavy gates when canonical administration documents
+  exist but the section index is missing, stale, corrupt, foreign, or
+  incomplete. No new full-suite or security-scan claim is made for this
+  degraded-host follow-up.
+- Active-canon migration: the bounded child
+  `260726_afol-only-active-canon-migration_spec-child_01` is final. It removes
+  legacy configuration from active factory and fixture authority, preserves
+  explicit resolver fallback compatibility, and records the retired root
+  config byte-for-byte in an AFOL-owned retention archive. Redacted Gitleaks
+  history and worktree scans found no leaks. OSV could parse the unchanged
+  `bun.lock` but could not perform vulnerability matching because no offline
+  database was available; dependency inputs remain unchanged from `532345f`,
+  and that residual risk is explicit rather than reported as a pass.
+- Event-ledger durability: the bounded child
+  `260726_event-ledger-durability_spec-child_01` is final with crash-safe
+  append, serialized writers, fail-closed readers, and its original governed
+  evidence preserved.
+- Governance contract reconciliation: the bounded child
+  `260726_governance-contract-reconciliation_spec-child_01` is final. F-01,
+  F-11, F-13, and F-15 now describe the current AFOL-only TypeScript runtime;
+  their exact prior bytes remain in the verified AFOL migration archive.
+  Focused regressions, project drift validation, typecheck, formatting,
+  manifest, Gitleaks history/worktree, and OSV dependency scans passed. This
+  bounded remediation makes no new full-suite, build, release, deployment, or
+  global-install claim.
+
+### F-30 AFOL Evolution System
+
+- Status: active
+- Governing spec:
+  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
+- Why: AFOL needs a controlled learning loop that connects native and
+  explicitly imported session evidence, user decisions, recurring friction,
+  production-day metrics, and later evaluation without silently changing
+  critical project behavior.
+- Relationship to prior features: F-30 consumes the workbench, evidence,
+  telemetry, maintenance, memory, library, context, and Universal Skills
+  surfaces delivered by F-04, F-07, F-18, and F-29. It is the governance
+  parent for the F-18.S10 adoption loop and must not create a parallel
+  canonical knowledge store.
+- Core contract: `Observer -> Analyst -> Proposal -> Critic -> User/Policy ->
+  Apply -> Evaluate`. Observation and derived counters may be automatic;
+  critical surfaces remain approval-gated and every proposal must retain
+  evidence, risk, validation, and evaluation references.
+- Product modes:
+  - one short, report-first daily suggestion per project on the first session
+    of the local calendar date, with shared receipts across harnesses;
+  - intentional, read-only analysis and preview through `afol evolve`, with
+    application only through the normal AFOL workbench lifecycle.
+- Scope includes production-day ledger, preference evidence with temporal
+  decay, deterministic recurrence detection, scorecards, suggestion receipts,
+  proposal/evaluation/canary state, explicit external-session imports,
+  normalization/redaction/linking, low-risk undoable lessons/memory updates,
+  and maintenance of derived evolution state.
+- Autonomy boundary: no daemon, silent provider reads, cloud chat sync,
+  automatic rule/skill/config/spec/ADR/roadmap/code changes, global preference
+  promotion, merge, or automatic research generation in the first release.
+- Planned child slices:
+  0. Governance, schemas, threat model, UX journey, metrics, and canonical vs
+     derived-state boundary.
+  1. Evolution config, project identity, migrations, health, and production-day
+     ledger.
+  2. Preference evidence, precedence, confidence, and 7/20 production-day
+     degradation.
+  3. Observation normalization, fingerprints, recurrence clusters, and
+     comparable-task scorecards.
+  4. Daily suggestion queue, project/day deduplication, TTL claims, skip,
+     reject, reminders, and critical-alert separation.
+  5. Intentional `afol evolve` analysis/status/proposal/review flow.
+  6. Explicit Codex and Pi imports first, then additional versioned adapters;
+     streaming, resumability, redaction, idempotency, linking, and hostile
+     transcript boundaries.
+  7. Bounded low-risk lessons/memory application with canonical mutation
+     journal, undo, validation, and initial first-release
+     `auto_apply_mode: canary`; `none` remains selectable and promotion to
+     `lessons_memory_only` requires successful evaluation plus explicit
+     policy/configuration approval.
+  8. Comparable-session evaluation, canary, stabilization, reopening, and
+     rollback.
+  9. Universal Skills integration for read-only `good-morning` and
+     session-retro consumption, without moving evolution logic into skills.
+- Acceptance direction: every suggestion/proposal is traceable to source
+  evidence; daily dedupe is concurrency-safe; skipped work can be reprioritized;
+  explicit rejection suppresses recurrence until material evidence changes;
+  preferences age by production ordinals; imports are explicit, redacted,
+  idempotent, resumable, and fail closed; critical knowledge surfaces are
+  never silently mutated; and improvements are accepted only when quality,
+  integrity, and user-load metrics do not regress.
+- Delivery policy: implement in independent PRs by child slice. The first
+  slice must remain schema/governance-only, with no LLM call, external
+  import, automatic application, or daemon. Do not combine F-30 slices with
+  SQLite, memory, library, context, or maintenance rewrites.
+
+#### Agent Submission and Batch Review (F-30 child)
+
+- Child status: active
+- Governing spec:
+  .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
+- Parent spec:
+  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
+- Intent: explore a bounded one-worker submission and review workflow that may
+  reduce lifecycle round trips while preserving AFOL's existing authority and
+  evidence boundaries.
+- Architectural decision:
+  .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md
+- No public `dispatch`, `submit`, or F-30 benchmark pack exists in the current
+  registry. These names remain design vocabulary only until an implementation
+  slice is approved and shipped.
+- Backlog acceptance requires a governing child spec, registered commands and
+  scenarios, deterministic authority/integrity tests, and fresh observed
+  evidence. Planned intent is not production proof.
+- Governance: F-30 is the shared Evolution parent and submission/review child
+  lane. ADR-007 governs submission/review boundaries, while ADR-008 governs
+  Evolution autonomy and evidence boundaries; both decisions remain distinct.
 
 ## 6) Recommended Delivery Phases
 

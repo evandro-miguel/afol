@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
 	chmodSync,
 	cpSync,
@@ -29,6 +29,10 @@ import type {
 	ManagedOwnership,
 } from "../services/bootstrap/planner";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
+import {
+	isValidIanaTimezone,
+	isValidProjectUuid,
+} from "../services/evolution/config";
 import { withExternalPathLock } from "../services/io/session-lock";
 import {
 	CANONICAL_PROJECT_CONFIG_PATH,
@@ -446,6 +450,79 @@ function buildBootstrapTemplateFiles(
 	return templateFiles;
 }
 
+function configuredEvolutionIdentity(content: string | undefined): {
+	projectId?: string;
+	timezone?: string;
+} {
+	if (!content) return {};
+	let config: Record<string, unknown>;
+	try {
+		config = JSON.parse(content) as Record<string, unknown>;
+	} catch {
+		return {};
+	}
+	const project =
+		config.project !== null &&
+		typeof config.project === "object" &&
+		!Array.isArray(config.project)
+			? (config.project as Record<string, unknown>)
+			: {};
+	// Legacy projects may carry a non-UUID project identifier. They are not
+	// evolution participants until the user explicitly adds the evolution
+	// extension, so bootstrap must leave that identity untouched.
+	if (config.evolution === undefined) return {};
+	if (project.id !== undefined && !isValidProjectUuid(project.id)) {
+		throw new Error("Existing project.id is not a valid stable UUID");
+	}
+	if (
+		project.timezone !== undefined &&
+		!isValidIanaTimezone(project.timezone)
+	) {
+		throw new Error("Existing project.timezone is not a valid IANA timezone");
+	}
+	return {
+		...(isValidProjectUuid(project.id) ? { projectId: project.id } : {}),
+		...(isValidIanaTimezone(project.timezone)
+			? { timezone: project.timezone }
+			: {}),
+	};
+}
+
+function personalizeEvolutionConfig(
+	templateFiles: TemplateFileMap,
+	currentFiles: Record<string, string>,
+): void {
+	const entry = templateFiles[CANONICAL_PROJECT_CONFIG_PATH];
+	if (!entry) return;
+	const config = JSON.parse(
+		Buffer.from(entry.contentBase64, "base64").toString("utf8"),
+	) as Record<string, unknown>;
+	const project =
+		config.project !== null &&
+		typeof config.project === "object" &&
+		!Array.isArray(config.project)
+			? { ...(config.project as Record<string, unknown>) }
+			: {};
+	const existing = configuredEvolutionIdentity(
+		currentFiles[CANONICAL_PROJECT_CONFIG_PATH],
+	);
+	const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	config.project = {
+		...project,
+		id: existing.projectId ?? randomUUID(),
+		timezone:
+			existing.timezone ??
+			(isValidIanaTimezone(detectedTimezone) ? detectedTimezone : "UTC"),
+	};
+	const payload = Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
+	templateFiles[CANONICAL_PROJECT_CONFIG_PATH] = {
+		path: CANONICAL_PROJECT_CONFIG_PATH,
+		contentBase64: payload.toString("base64"),
+		sha256: sha256Hex(payload),
+		bytes: payload.byteLength,
+	};
+}
+
 function planMutableBaselines(
 	targetRoot: string,
 	mutableDir: string,
@@ -735,6 +812,7 @@ export async function runBootstrapCommand(
 			);
 			const templatePaths = Object.keys(templateFiles).sort();
 			const currentFiles = readTargetFiles(parsed.targetRoot, templatePaths);
+			personalizeEvolutionConfig(templateFiles, currentFiles);
 			const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
 			const plan = planBootstrapOperations({
 				templateFiles,

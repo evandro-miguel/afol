@@ -47,6 +47,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	render: "memory render alias",
 	library: "inspect library",
 	memory: "inspect memory",
+	evolve: "evolution status",
 	adm: "inspect adm",
 	spec: "inspect specs",
 	adr: "inspect ADRs",
@@ -81,6 +82,7 @@ const HELP_INTENT_COMMANDS: Record<HelpIntent, readonly string[]> = {
 		"project-benchmark",
 		"library",
 		"memory",
+		"evolve",
 		"rule",
 		"skill",
 		"hook",
@@ -132,10 +134,11 @@ function formatEntry(spec: CommandSpec): string {
 function formatVerboseEntry(spec: CommandSpec): string[] {
 	const lines = [
 		`  ${spec.command}`,
-		`    aliases: ${spec.aliases.length > 0 ? spec.aliases.join(", ") : "none"}`,
 		`    effect: ${spec.sideEffect}`,
 		`    description: ${spec.description}`,
 	];
+	if (spec.aliases.length > 0)
+		lines.splice(1, 0, `    aliases: ${spec.aliases.join(", ")}`);
 	if (spec.guidance?.length) {
 		lines.push("    guidance:");
 		for (const guidance of spec.guidance) {
@@ -160,6 +163,7 @@ export type CommandCatalogEntry = {
 	sideEffect: CommandSpec["sideEffect"];
 	requires_approval: boolean;
 	description: string;
+	capabilities?: string[];
 	category: CommandCategory | "uncategorized";
 	guidance?: readonly string[];
 	subcommands?: (CommandSubcommandSpec & { requires_approval: boolean })[];
@@ -192,6 +196,9 @@ function withApprovalMetadata(spec: CommandSpec): CommandCatalogEntry & {
 		requires_approval:
 			spec.requires_approval ?? requiresApprovalForSideEffect(spec.sideEffect),
 		description: spec.description,
+		...(spec.capabilities !== undefined
+			? { capabilities: [...spec.capabilities] }
+			: {}),
 		category: spec.category ?? "uncategorized",
 		...(spec.guidance !== undefined ? { guidance: [...spec.guidance] } : {}),
 		...(spec.subcommands !== undefined
@@ -243,6 +250,9 @@ export function buildCommandHelpJson(
 			spec.requires_approval ?? requiresApprovalForSideEffect(spec.sideEffect),
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
+		...(spec.capabilities !== undefined
+			? { capabilities: [...spec.capabilities] }
+			: {}),
 	};
 	if (spec.guidance !== undefined) {
 		entry.guidance = [...spec.guidance];

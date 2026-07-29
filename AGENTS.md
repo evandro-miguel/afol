@@ -83,12 +83,28 @@ not a project-local skills root.
 
 ## Project RAG
 
-- Status: stale after repo/path/branch rename on 2026-06-26. Do not rely on
-  Project RAG until reindexed and verified.
-- Intended Project RAG slug: `afol-dev`.
-- Intended indexed root: `/home/ozy/01_projects/dev/afol/afol.dev`.
-- Indexed include roots: `cli`, `src`, `docs`, `.afol`, `.agents`.
-- Critical read-only checks after reindex:
+- Status: active (reindexed 2026-07-19). Postgres id `1707`, slug `afol-dev`.
+- Indexed root: `/home/ozy/01_projects/dev/afol/afol.dev`.
+- Include roots (platform rejects leading-dot dirs): `cli`, `src`, `docs`.
+  Do not pass `.afol` or `.agents` as include roots; Project RAG forbids them.
+- Allowlist (blocked findings suppressed):
+  - `cli/generated` (`generated_dir`)
+  - `src/project-template/.afol/tmp` (`temp_dir`)
+- Known verify drift: 8 `docs/templates/*.md` symlinks report
+  `PROJECT_INDEX_SCOPE_DRIFT` because inventory expects the link path while
+  content is already indexed via `src/project-template/docs/templates/**`.
+  Search still works; treat that gate as non-blocking until symlink accounting
+  improves.
+- Reindex (from the rag-v2 checkout):
+  ```bash
+  bun run register-project --root /home/ozy/01_projects/dev/afol/afol.dev \
+    --include cli,src,docs \
+    --replace-blocked-finding-allowlist \
+    '[{"relativePath":"cli/generated","category":"generated_dir"},{"relativePath":"src/project-template/.afol/tmp","category":"temp_dir"}]'
+  bun run ingest-project --root /home/ozy/01_projects/dev/afol/afol.dev \
+    --include cli,src,docs --force
+  ```
+- Critical read-only checks:
   - `ragctl project verify --project afol-dev --json`
   - `ragctl project search --project afol-dev "<query>" --mode vector --json`
   - `ragctl project file --project afol-dev --file <repo-relative-path> --json`

@@ -27,7 +27,6 @@ const MANAGED_HASH_PATHS = [
 
 const TEMPLATE_MANAGED_HASH_FILES = [
 	".afol/adm/tools.json",
-	".afol/config.json",
 	".afol/data/events/README.md",
 	".afol/data/index/README.md",
 	".afol/data/telemetry/schemas/event.json",

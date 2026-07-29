@@ -120,6 +120,50 @@ describe("validate command", () => {
 		});
 	});
 
+	test("rejects unknown and unexpected validate arguments", async () => {
+		for (const [args, message] of [
+			[["--unknown"], "Unknown validate argument: --unknown"],
+			[["unexpected"], "Unexpected validate argument: unexpected"],
+		] as const) {
+			const captured = captureIo();
+			expect(await runValidateCommand(".", [...args], captured.io)).toBe(2);
+			expect(captured.stdout).toEqual([]);
+			expect(captured.stderr).toEqual([message]);
+		}
+	});
+
+	test("renders failing drift validation in JSON and human modes", async () => {
+		const root = createValidationFixture();
+		try {
+			const json = captureIo();
+			expect(await runValidateCommand(root, ["drift", "--json"], json.io)).toBe(
+				1,
+			);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
+				ok: boolean;
+				findings: Array<{ hint?: string }>;
+			};
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				exit_code: 1,
+				ok: false,
+			});
+			expect(payload.findings.length).toBeGreaterThan(0);
+
+			const human = captureIo();
+			expect(
+				await runValidateCommand(root, ["validate", "drift"], human.io),
+			).toBe(1);
+			expect(human.stdout[0]).toContain("drift: failed");
+			expect(human.stdout[0]).toContain("findings:");
+			expect(human.stdout[0]).toContain("hint=");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("passes structural checks in a minimal project fixture", async () => {
 		const root = createValidationFixture();
 		try {
@@ -208,6 +252,58 @@ describe("validate command", () => {
 						entry.id === "files_local_state_index" && entry.ok === true,
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("accepts timestamp-distinct closed sessions that reuse a theme", async () => {
+		const root = createValidationFixture();
+		try {
+			const sessionA = "260609_1001_same-feature";
+			const sessionB = "260610_1002_same-feature";
+			mkdirSync(join(root, ".afol", "wb", sessionA), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", sessionB), { recursive: true });
+			for (const session of [sessionA, sessionB]) {
+				writeFileSync(
+					join(root, ".afol", "wb", session, `${session}_task_01.md`),
+					[
+						"## State Board",
+						"",
+						"| Task | State | Owner | Notes |",
+						"|------|-------|-------|-------|",
+						"| T-01 | done | worker | historical task |",
+						"",
+					].join("\n"),
+					"utf8",
+				);
+			}
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "data", "events", "events.jsonl"),
+				`${[
+					{ type: "workbench.new", session: sessionA },
+					{ type: "workbench.close", session: sessionA },
+					{ type: "workbench.new", session: sessionB },
+					{ type: "workbench.close", session: sessionB },
+				]
+					.map((event, index) => JSON.stringify({ ...event, id: `E-${index}` }))
+					.join("\n")}\n`,
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id?: string; ok?: boolean; message?: string }>;
+			};
+			const sessionHealth = payload.checks?.find(
+				(entry) => entry.id === "session_health",
+			);
+			expect(sessionHealth?.ok).toBe(true);
+			expect(sessionHealth?.message).not.toContain("Duplicate session theme");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

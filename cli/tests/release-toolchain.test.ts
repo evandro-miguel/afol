@@ -6,6 +6,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -22,6 +23,22 @@ import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 const repoRoot = join(import.meta.dir, "..", "..");
 const SEMVER_PATTERN =
 	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
+function parseScriptIncludes(script: string): string[] {
+	const tokens = script.trim().split(/\s+/);
+	const includes: string[] = [];
+	for (let index = 0; index < tokens.length; index += 1) {
+		const token = tokens[index];
+		if (token === "--include") {
+			const value = tokens[index + 1];
+			if (value) includes.push(value);
+			index += 1;
+		} else if (token?.startsWith("--include=")) {
+			includes.push(token.slice("--include=".length));
+		}
+	}
+	return includes;
+}
 
 function writeReleaseVersionRegistry(
 	root: string,
@@ -239,9 +256,11 @@ describe("release and toolchain contracts", () => {
 			"bun run validate:security:required",
 		);
 		expect(scripts["validate:release"]).not.toContain("bun run typecheck");
+		expect(scripts["test:full"]).toBe("bun test --only-failures");
+		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
 		expect(scripts["validate:ux-governance"]).toBe(
-			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --json",
+			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --timing-mode observe --json",
 		);
 		expect(scripts["validate:release"]).toContain(
 			"bun run validate:ux-governance",
@@ -268,6 +287,9 @@ describe("release and toolchain contracts", () => {
 			stepIndex("bun run validate:ux-governance"),
 		);
 		expect(stepIndex("bun run validate:ux-governance")).toBeLessThan(
+			stepIndex("bun run test:full"),
+		);
+		expect(stepIndex("bun run test:full")).toBeLessThan(
 			stepIndex("bun run coverage:check"),
 		);
 		expect(stepIndex("bun run smoke:clean")).toBeLessThan(
@@ -277,11 +299,44 @@ describe("release and toolchain contracts", () => {
 			stepIndex("bun run release:provenance:release"),
 		);
 		expect(scripts["coverage:check"]).toBe(
-			"bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark",
+			"bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/validate-internals.test.ts cli/tests/validation.test.ts cli/tests/version-metadata.test.ts",
 		);
-		expect(scripts["coverage:project-benchmarks"]).toContain(
-			"cli/tests/validation.test.ts",
+		expect(scripts["coverage:check"]).toContain(
+			"cli/tests/coverage-check.test.ts",
 		);
+		expect(scripts["coverage:project-benchmarks"]).toBe(
+			"bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --max-concurrency 1 --timeout 30000 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts",
+		);
+		expect(scripts["validate:mutation-performance"]).toBe(
+			"bun run kernel -- v bench --pack mutation-safety --json",
+		);
+		expect(scripts["validate:project-benchmarks"]).toContain(
+			"bun run validate:mutation-performance && bun run coverage:project-benchmarks",
+		);
+	});
+
+	test("coverage scripts track every project-benchmark source file", () => {
+		const pkg = JSON.parse(
+			readFileSync(join(repoRoot, "package.json"), "utf8"),
+		) as { scripts?: Record<string, string> };
+		const scripts = pkg.scripts ?? {};
+		const sourcePrefix = "cli/services/project-benchmark/";
+		const expectedSources = readdirSync(join(repoRoot, sourcePrefix), {
+			withFileTypes: true,
+		})
+			.filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+			.map((entry) => `${sourcePrefix}${entry.name}`)
+			.sort();
+
+		for (const scriptName of [
+			"coverage:check",
+			"coverage:project-benchmarks",
+		]) {
+			const actualSources = parseScriptIncludes(scripts[scriptName] ?? "")
+				.filter((path) => path.startsWith(sourcePrefix))
+				.sort();
+			expect(actualSources, scriptName).toEqual(expectedSources);
+		}
 	});
 
 	test("CI keeps frozen install and blocking typecheck before release validation", () => {
@@ -372,6 +427,7 @@ describe("release and toolchain contracts", () => {
 			"validate:bootstrap",
 			"validate:project-benchmarks",
 			"validate:ux-governance",
+			"test:full",
 			"coverage:check",
 			"build:deterministic",
 			"smoke:dist",

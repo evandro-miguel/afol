@@ -45,6 +45,7 @@ accepted_at: '2026-07-11T08:47:38Z'
 - Explicit agent and remote contexts are restrictive policy modes only.
 - Command/action metadata is the canonical admission policy. Handler-local checks remain defense in depth.
 - Same-account process isolation and a launcher-issued multi-principal model are outside C01.
+- TTY/PTY context is a policy signal only and is not caller authentication.
 
 ## Scope
 
@@ -80,7 +81,8 @@ Allowed tests:
 Out of scope:
 
 - A daemon, broker, launcher binary, key store, bearer token, host-account change, container policy, or downstream wrapper.
-- Authentication claims for direct invocation, omitted markers, task owners, or session actors.
+- Authentication claims for direct invocation, omitted markers, task owners,
+  same-account PTY-capable actor abuse, or session actors.
 - Cross-host ownership, revocation, or replay systems.
 - Adapter handler changes or transactionality, bootstrap transactionality, journal recovery, broad event auditing, or unrelated registry cleanup.
 - `src/project-template/**`, generated payloads, manifests, provider configuration, legacy runtime surfaces, deploy, install, or release work.
@@ -96,6 +98,9 @@ Out of scope:
 6. Direct invocation retains documented local-operator behavior. Tests label this as deployment policy, not identity proof.
 7. Existing restrictive context cannot become local through another flag, environment value, owner, or actor label within the same invocation.
 8. C01 creates no persistent policy-decision audit. A denial returns `ok: false`, `exit_code: 2`, the normalized action, and `error.code: approval-required` before handler I/O. The denial path leaves project files unchanged.
+9. Same-account PTY-capable shell-like actors do not acquire
+   local-operator rights from transport cues; explicit allowed context is still
+   required for local action.
 
 ## Closed Action-Policy Matrix
 
@@ -202,7 +207,9 @@ Operand rules:
 ## Rollout and Backout
 
 - Rollout: enable the central policy and protected-resource behavior in the source CLI after the accepted authority decision, accepted scope, green focused suite, and independent review.
-- Deployment prerequisite: agent and remote tool catalogs expose only constrained AFOL entries and no unrestricted AFOL or generic shell route.
+- Deployment prerequisite: agent and remote tool catalogs expose only
+  constrained AFOL entries and no unrestricted AFOL or generic shell route,
+  including unmarked mutate commands such as `apply`, `rollback`, and `raw`.
 - Backout: revert the single C01 implementation commit and keep the deployment catalog restriction in place. The rollback oracle is restoration of the accepted S-C01-R evidence: the 7 kernel and 5 mutation assertions for `R-02`, `SEC-001`, `SEC-003`, and `SEC-004` fail for the documented status-0-versus-2 reason, while the previously recorded nearest baseline groups remain green. Do not report the complete six-file suite as green after implementation-only rollback. Do not replace the decision with a self-issued token or wrapper.
 
 ## Acceptance

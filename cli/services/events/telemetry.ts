@@ -1,6 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import type { BoundedSourceLimits } from "../io/safe-source";
 import { resolveProjectPaths } from "../project/paths";
+import {
+	appendEventLedgerRecord,
+	EventLedgerValidationError,
+	inspectEventLedgerText,
+	readEventLedgerRecords,
+} from "./ledger";
 
 /**
  * AFOL-native telemetry event type.
@@ -79,11 +86,8 @@ export function firstToken(cmd: string): string {
 
 /**
  * Append a telemetry event to the shared events.jsonl file.
- * This writer does not acquire its own session lock. Callers that write next to
- * workbench lifecycle events must invoke it from inside the existing
- * withSessionLock flow so workbench and telemetry event ordering stays stable.
- * Standalone callers may still rely on append-only writes for line integrity,
- * but not for ordering relative to workbench events.
+ * Both standalone and lifecycle callers are serialized by the canonical
+ * shared-ledger resource lock.
  *
  * Returns the created TelemetryEvent for test assertions.
  */
@@ -92,7 +96,6 @@ export function appendTelemetryEvent(
 	event: Omit<TelemetryEvent, "id" | "ts" | "source" | "schema_version">,
 ): TelemetryEvent {
 	const now = new Date();
-	const eventPath = resolveTelemetryEventPath(root);
 	const fullEvent: TelemetryEvent = {
 		schema_version: "1",
 		id: nextTelemetryId(now),
@@ -101,11 +104,7 @@ export function appendTelemetryEvent(
 		...event,
 	};
 
-	mkdirSync(resolve(eventPath, ".."), { recursive: true });
-	writeFileSync(eventPath, `${JSON.stringify(fullEvent)}\n`, {
-		encoding: "utf8",
-		flag: "a",
-	});
+	appendEventLedgerRecord(root, fullEvent);
 	return fullEvent;
 }
 
@@ -114,16 +113,31 @@ export function appendTelemetryEvent(
  * Used only for testing and diagnostics.
  */
 export function readTelemetryEvents(root: string): TelemetryEvent[] {
-	const eventPath = resolveTelemetryEventPath(root);
-	if (!existsSync(eventPath)) {
-		return [];
-	}
-	return readFileSync(eventPath, "utf8")
-		.split(/\r?\n/)
-		.map((line: string) => line.trim())
-		.filter((line: string) => line.length > 0)
-		.map((line: string) => JSON.parse(line) as TelemetryEvent)
-		.filter((e: TelemetryEvent) => e.schema_version === "1");
+	return telemetryRecords(readEventLedgerRecords(root));
 }
 
-import { randomUUID } from "node:crypto";
+export function parseTelemetryEvents(text: string): TelemetryEvent[] {
+	const inspection = inspectEventLedgerText(text);
+	if (!inspection.ok) throw new EventLedgerValidationError(inspection);
+	return telemetryRecords(inspection.records);
+}
+
+export function readBoundedTelemetryEvents(
+	root: string,
+	limits: BoundedSourceLimits,
+): TelemetryEvent[] {
+	return telemetryRecords(readEventLedgerRecords(root, limits));
+}
+
+function telemetryRecords(
+	records: Record<string, unknown>[],
+): TelemetryEvent[] {
+	return records
+		.filter(
+			(record) =>
+				record.schema_version === "1" &&
+				typeof record.event_type === "string" &&
+				typeof record.session_id === "string",
+		)
+		.map((record) => record as TelemetryEvent);
+}

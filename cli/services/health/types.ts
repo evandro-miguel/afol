@@ -1,6 +1,6 @@
 export type HealthSeverity = "fail" | "warn" | "info";
 export type HealthFinding = {
-	area: string; // "adm", "pstr", "wb", "memory", "library", "state", "ctx", "token_budget"
+	area: string; // "adm", "pstr", "wb", "memory", "library", "state", "ctx", "evolution", "token_budget"
 	severity: HealthSeverity;
 	message: string;
 	hint?: string;
@@ -12,6 +12,7 @@ export type HealthReport = {
 	summary: { fail: number; warn: number; info: number };
 };
 export type DoctorReport = {
+	configuration: Record<string, Record<string, unknown>>;
 	scores: { area: string; score: number; max: number }[];
 	remediation: {
 		step: number;
@@ -29,4 +30,5 @@ export type HealthArea =
 	| "library"
 	| "state"
 	| "ctx"
+	| "evolution"
 	| "token_budget";

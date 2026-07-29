@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -20,8 +21,16 @@ import {
 	type BenchResult,
 	DEFAULT_BENCH_MODEL,
 } from "../services/benchmark/types";
+import {
+	resolveTaskCompletionLockPath,
+	withTaskCompletionLock,
+} from "../services/workbench/completion-lock";
+import { parseValidationArgs } from "../validate/args";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
-import { buildResult } from "../validate/command";
+import {
+	buildResult,
+	collectProfileCompatibilityNotes,
+} from "../validate/command";
 import {
 	loadRegistry,
 	runValidationCommand,
@@ -33,11 +42,27 @@ import {
 	outputTail,
 	registrySummary,
 } from "../validate/output";
-import { validateRegistryContract } from "../validate/registry";
+import {
+	validateBenchmarkProvenance,
+	validateMutationBaselineContract,
+	validateRegistryContract,
+} from "../validate/registry";
 import {
 	buildRuntimeLiveAgentResults,
 	collectThresholdNotes,
 } from "../validate/runtime-live";
+import {
+	compiledReleaseBuildArgs,
+	ensureBenchmarkTempRoot,
+	executeScenarioPackWithArtifact,
+	type PreparedCompiledReleaseArtifact,
+	prepareCompiledReleaseArtifact,
+	resolveScenarioSampleCount,
+	runScenarioCommand,
+	type ScenarioExecutionResult,
+	type ScenarioSamplePhase,
+	type ScenarioSampleRun,
+} from "../validate/scenario-execution";
 import {
 	asBoolean,
 	asNumberRecord,
@@ -50,13 +75,20 @@ import {
 } from "../validate/shared";
 import type { Baseline, RegistrySnapshot, Scenario } from "../validate/types";
 
+function createRepoLocalTestRoot(prefix: string): string {
+	const testTempRoot = join(process.cwd(), ".afol", "tmp", "tests");
+	mkdirSync(testTempRoot, { recursive: true });
+	return mkdtempSync(join(testTempRoot, prefix));
+}
+
 function createFixtureRoot(): string {
-	const root = mkdtempSync(join(tmpdir(), "validate-internals-"));
+	const root = createRepoLocalTestRoot("validate-internals-");
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
-	cpSync(
-		join(process.cwd(), ".agents", "config.json"),
-		join(root, ".agents", "config.json"),
+	writeFileSync(
+		join(root, ".afol", "config.json"),
+		'{"schema_version":1,"project":{"name":"afol"}}\n',
+		"utf8",
 	);
 	cpSync(
 		join(process.cwd(), ".agents", "lock.json"),
@@ -67,6 +99,24 @@ function createFixtureRoot(): string {
 		join(root, ".afol", "data", "benchmarks", "catalog"),
 		{ recursive: true },
 	);
+	const historicalBaselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"evolution-core",
+		"baseline-v1.json",
+	);
+	const baselinePath = historicalBaselinePath.replace(
+		"baseline-v1.json",
+		"baseline-v2.json",
+	);
+	const baseline = readJson(historicalBaselinePath);
+	baseline.baseline_id = "evolution-core-v2";
+	baseline.run_id = "bench-evolution-core-evolution-status-contract-1.1.0";
+	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
 	cpSync(
 		join(process.cwd(), ".afol", "data", "benchmarks", "snapshots"),
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
@@ -93,6 +143,12 @@ function createFixtureRoot(): string {
 	);
 	if (existsSync(runtimeLiveSnapshotPath)) {
 		const runtimeLiveSnapshot = readJson(runtimeLiveSnapshotPath);
+		runtimeLiveSnapshot.generated_at = new Date().toISOString();
+		writeFileSync(
+			runtimeLiveSnapshotPath,
+			`${JSON.stringify(runtimeLiveSnapshot, null, 2)}\n`,
+			"utf8",
+		);
 		const savedResultPath = join(
 			root,
 			runtimeLiveSnapshot.saved_result_path as string,
@@ -138,11 +194,75 @@ function createFixtureRoot(): string {
 			);
 		}
 	}
+	// The copied catalog may carry provenance from the source checkout. Rebind
+	// measured fixtures to this disposable repository so registry validation
+	// exercises the same ancestor/timestamp contract without trusting that hash.
+	const fixtureCommit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
+	const fixtureTimestamp = gitFixtureValue(root, [
+		"show",
+		"-s",
+		"--format=%cI",
+		fixtureCommit,
+	]);
+	const evolutionScenarioPath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"scenarios",
+		"evolution-core",
+		"evolution-status-contract.json",
+	);
+	const historicalEvolutionBaselinePath = join(
+		root,
+		".afol",
+		"data",
+		"benchmarks",
+		"catalog",
+		"baselines",
+		"evolution-core",
+		"baseline-v1.json",
+	);
+	const evolutionBaselinePath = historicalEvolutionBaselinePath.replace(
+		"baseline-v1.json",
+		"baseline-v2.json",
+	);
+	if (
+		existsSync(evolutionScenarioPath) &&
+		existsSync(historicalEvolutionBaselinePath)
+	) {
+		const evolutionScenario = readJson(evolutionScenarioPath);
+		const measurement = evolutionScenario.measurement;
+		if (isObject(measurement)) {
+			evolutionScenario.measurement = {
+				...measurement,
+				git_commit: fixtureCommit,
+				timestamp: fixtureTimestamp,
+			};
+			writeFileSync(
+				evolutionScenarioPath,
+				`${JSON.stringify(evolutionScenario, null, 2)}\n`,
+				"utf8",
+			);
+			const evolutionBaseline = readJson(historicalEvolutionBaselinePath);
+			evolutionBaseline.baseline_id = "evolution-core-v2";
+			evolutionBaseline.run_id =
+				"bench-evolution-core-evolution-status-contract-1.1.0";
+			evolutionBaseline.git_commit = fixtureCommit;
+			evolutionBaseline.timestamp = fixtureTimestamp;
+			writeFileSync(
+				evolutionBaselinePath,
+				`${JSON.stringify(evolutionBaseline, null, 2)}\n`,
+				"utf8",
+			);
+		}
+	}
 	return root;
 }
 
 function createBenchExecutionFixtureRoot(): string {
-	const root = mkdtempSync(join(tmpdir(), "validate-bench-exec-"));
+	const root = createRepoLocalTestRoot("validate-bench-exec-");
 	mkdirSync(root, { recursive: true });
 	mkdirSync(join(root, ".afol"), { recursive: true });
 	writeFileSync(join(root, ".afol", ".keep"), "\n", "utf8");
@@ -286,6 +406,60 @@ function getCliKernelPaths(root: string): {
 	};
 }
 
+function gitFixtureValue(root: string, args: string[]): string {
+	const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+	if (result.status !== 0) {
+		throw new Error(result.stderr || `git ${args.join(" ")} failed`);
+	}
+	return result.stdout.trim();
+}
+
+function createProvenanceFixtures(root: string): {
+	scenario: Scenario;
+	baseline: Baseline;
+	commitTime: Date;
+	commit: string;
+} {
+	const commit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
+	const commitTime = new Date(
+		gitFixtureValue(root, ["show", "-s", "--format=%cI", commit]),
+	);
+	const timestamp = commitTime.toISOString();
+	return {
+		scenario: {
+			schema_version: "1.0.0",
+			scenario_id: "provenance-fixture",
+			scenario_version: "1.0.0",
+			pack_id: "evolution-core",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_duration_ms: 1000 },
+			baseline_id: "provenance-fixture-v1",
+			deterministic_metrics: { duration_ms: 1 },
+			measurement: {
+				status: "observed",
+				source: "fixture",
+				sample_count: 3,
+				warmup_count: 1,
+				git_commit: commit,
+				timestamp,
+			},
+		},
+		baseline: {
+			baseline_id: "provenance-fixture-v1",
+			pack_id: "evolution-core",
+			schema_version: "1.0.0",
+			sample_count: 3,
+			warmup_count: 1,
+			git_commit: commit,
+			timestamp,
+			provenance: "fixture",
+		},
+		commitTime,
+		commit,
+	};
+}
+
 describe("validate shared helpers", () => {
 	test("validate known values and reject invalid inputs", () => {
 		expect(isObject({ ok: true })).toBe(true);
@@ -370,16 +544,17 @@ describe("validate output helpers", () => {
 		expect(outputTail("x".repeat(4100))).toBe("x".repeat(4000));
 
 		const summary = registrySummary(snapshot);
-		expect(summary).toHaveLength(15);
+		expect(summary).toHaveLength(16);
 		expect(summary[0]).toMatchObject({
 			pack_id: "cli-kernel-local",
 			min_scenarios: 6,
 			scenario_count: 8,
 			baseline_present: true,
 		});
-		expect(summary.some((entry) => entry.baseline_present === false)).toBe(
-			false,
-		);
+		expect(
+			summary.find((entry) => entry.pack_id === "evolution-core")
+				?.baseline_present,
+		).toBe(true);
 	});
 });
 
@@ -425,9 +600,20 @@ describe("validate selector", () => {
 			]),
 		);
 
+		expect(
+			selectPacks({
+				scope: "default",
+				changedPaths: ["cli/services/evolution/journal.ts"],
+			}),
+		).toEqual({
+			selected_pack_ids: ["evolution-core"],
+			reasons: ["evolution-change:cli/services/evolution/journal.ts"],
+		});
+
 		expect(selectPacks({ scope: "default", changedPaths: [] })).toEqual({
 			selected_pack_ids: [
 				"cli-kernel-local",
+				"evolution-core",
 				"routing-accuracy",
 				"mutation-safety",
 				"update-safety",
@@ -449,12 +635,168 @@ describe("validate selector", () => {
 });
 
 describe("validate registry", () => {
+	test("accepts an observed baseline bound to an ancestor commit", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects missing and mismatched observed metadata", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const missing = {
+				...fixture.scenario,
+				measurement: { ...fixture.scenario.measurement, source: undefined },
+			} as unknown as Scenario;
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					missing,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-missing:evolution-core:provenance-fixture:measurement.source",
+			);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					{ ...fixture.baseline, sample_count: 4 },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-mismatch:evolution-core:provenance-fixture:sample_count",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects unknown and non-ancestor commits", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const unknownCommit = "f".repeat(40);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					{
+						...fixture.scenario,
+						measurement: {
+							...fixture.scenario.measurement,
+							git_commit: unknownCommit,
+						},
+					},
+					{ ...fixture.baseline, git_commit: unknownCommit },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				`benchmark-provenance-commit-not-found:evolution-core:provenance-fixture:${unknownCommit}`,
+			);
+
+			const orphan = gitFixtureValue(root, ["mktree"]);
+			const nonAncestor = spawnSync("git", ["commit-tree", orphan], {
+				cwd: root,
+				encoding: "utf8",
+				input: "non-ancestor\n",
+			}).stdout.trim();
+			expect(nonAncestor).toMatch(/^[0-9a-f]{40}$/);
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					{
+						...fixture.scenario,
+						measurement: {
+							...fixture.scenario.measurement,
+							git_commit: nonAncestor,
+						},
+					},
+					{ ...fixture.baseline, git_commit: nonAncestor },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				`benchmark-provenance-commit-not-ancestor:evolution-core:provenance-fixture:${nonAncestor}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects timestamps before the recorded commit", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const beforeCommit = new Date(
+				fixture.commitTime.getTime() - 1_000,
+			).toISOString();
+			const issues = validateBenchmarkProvenance(
+				root,
+				{
+					...fixture.scenario,
+					measurement: {
+						...fixture.scenario.measurement,
+						timestamp: beforeCommit,
+					},
+				},
+				{ ...fixture.baseline, timestamp: beforeCommit },
+				new Date(fixture.commitTime.getTime() + 1_000),
+			);
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-timestamp-before-commit:evolution-core:provenance-fixture:measurement.timestamp",
+					"benchmark-provenance-timestamp-before-commit:evolution-core:provenance-fixture:baseline.timestamp",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects timestamps in the future", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const now = new Date(fixture.commitTime.getTime() + 1_000);
+			const future = new Date(now.getTime() + 1_000).toISOString();
+			const issues = validateBenchmarkProvenance(
+				root,
+				{
+					...fixture.scenario,
+					measurement: { ...fixture.scenario.measurement, timestamp: future },
+				},
+				{ ...fixture.baseline, timestamp: future },
+				now,
+			);
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-timestamp-future:evolution-core:provenance-fixture:measurement.timestamp",
+					"benchmark-provenance-timestamp-future:evolution-core:provenance-fixture:baseline.timestamp",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("loads the real catalog and flags contract issues", () => {
 		const root = createFixtureRoot();
 		try {
 			const snapshot = loadRegistry(root);
 			expect(snapshot.schema_version).toBe("1.0.0");
-			expect(snapshot.packs).toHaveLength(15);
+			expect(snapshot.packs).toHaveLength(16);
 			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["pstr-integrity"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);
@@ -487,6 +829,52 @@ describe("validate registry", () => {
 				expect(scenario.thresholds.max_argv_chars).toBeDefined();
 				expect(scenario.compiled_binary).toBe(true);
 			}
+			const mutationScenarios =
+				snapshot.scenariosByPack["mutation-safety"] ?? [];
+			expect(mutationScenarios).toHaveLength(5);
+			for (const scenario of mutationScenarios) {
+				expect(scenario.compiled_binary).toBe(true);
+				expect(scenario.thresholds.max_duration_ms).toBeLessThanOrEqual(300);
+				expect(scenario.thresholds.max_p95_ms).toBeLessThanOrEqual(350);
+			}
+			const mutationBaseline = snapshot.baselinesByPack["mutation-safety"] as
+				| (Baseline & {
+						scenarios?: Record<
+							string,
+							{
+								scenario_id?: string;
+								scenario_version?: string;
+								timing_p50_ms?: number;
+								timing_p95_ms?: number;
+								sample_count?: number;
+								warmup_count?: number;
+							}
+						>;
+				  })
+				| undefined;
+			expect(mutationBaseline).toMatchObject({
+				calibration_status: "pending",
+				calibration_reason: "controlled-release-host-required",
+			});
+			expect(mutationBaseline?.artifact_sha256).toBeUndefined();
+			expect(mutationBaseline?.git_commit).toBeUndefined();
+			expect(mutationBaseline?.timestamp).toBeUndefined();
+			expect(mutationBaseline?.scenarios).toBeUndefined();
+			const sequentialDone = snapshot.scenariosByPack["workbench-parity"]?.find(
+				(scenario) => scenario.scenario_id === "wb-sequential-done",
+			);
+			expect(sequentialDone).toBeDefined();
+			const sequentialCommand = sequentialDone?.command ?? "";
+			const oneStepCommand = 'afol d T-01 -x "bun --version"';
+			expect(sequentialCommand.match(/(?:^| )-x /g)).toHaveLength(8);
+			expect(Array.from(sequentialCommand)).toHaveLength(163);
+			expect(Array.from(sequentialCommand).length).toBeLessThan(
+				Array.from(oneStepCommand).length * 8,
+			);
+			expect(sequentialDone?.thresholds).toMatchObject({
+				max_argv_chars: 239,
+				max_output_tokens: 500,
+			});
 			expect(snapshot.coverage?.exemptions).toHaveLength(0);
 			expect(snapshot.coverage?.subcommand_exemptions).toHaveLength(0);
 			expect(
@@ -511,6 +899,10 @@ describe("validate registry", () => {
 			expect(featureSpecScenario?.coverage?.specs).toContain(
 				"260710_1256_typescript-7-toolchain-adoption_spec_01",
 			);
+			expect(featureSpecScenario?.coverage?.features).toContain("F-29");
+			expect(featureSpecScenario?.coverage?.specs).toContain(
+				"260726_governance-contract-reconciliation_spec-child_01",
+			);
 			const uxRegistryScenario = snapshot.scenariosByPack[
 				"governance-history"
 			]?.find((scenario) => scenario.scenario_id === "ux-registry-lifecycle");
@@ -532,7 +924,109 @@ describe("validate registry", () => {
 			expect(snapshot.baselinesByPack["cli-kernel-local"]?.timing_p50_ms).toBe(
 				200,
 			);
-			expect(validateRegistryContract(snapshot)).toEqual([]);
+			const contractIssues = validateRegistryContract(snapshot);
+			const mutationIssues = contractIssues.filter((issue) =>
+				issue.startsWith("mutation-"),
+			);
+			expect(mutationIssues).toEqual([]);
+			expect(contractIssues).not.toContain(
+				"scenario-feature-coverage-missing:F-30",
+			);
+
+			const evolutionScenarios = snapshot.scenariosByPack["evolution-core"];
+			if (!evolutionScenarios?.[0]) {
+				throw new Error("Expected evolution-core scenario fixture");
+			}
+			const evolutionBaseline = snapshot.baselinesByPack["evolution-core"];
+			if (!evolutionBaseline) {
+				throw new Error("Expected evolution-core baseline fixture");
+			}
+			expect(evolutionScenarios[0].scenario_version).toBe("1.1.0");
+			expect(evolutionScenarios[0].baseline_id).toBe("evolution-core-v2");
+			expect(evolutionBaseline.baseline_id).toBe("evolution-core-v2");
+			const missingEvolutionScenario = { ...evolutionScenarios[0] };
+			delete missingEvolutionScenario.measurement;
+			const missingEvolutionMeasurement: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"evolution-core": [
+						missingEvolutionScenario,
+						...evolutionScenarios.slice(1),
+					],
+				},
+			};
+			expect(validateRegistryContract(missingEvolutionMeasurement)).toContain(
+				`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+			);
+			const missingStatus = { ...missingEvolutionScenario };
+			delete missingStatus.implementation_status;
+			const skippedStatus = {
+				...missingEvolutionScenario,
+				implementation_status: "skipped" as const,
+			};
+			const invalidStatus = {
+				...missingEvolutionScenario,
+				implementation_status: "invalid",
+			} as unknown as Scenario;
+			for (const [scenario, status] of [
+				[missingStatus, "missing"],
+				[skippedStatus, "skipped"],
+				[invalidStatus, "invalid"],
+			] as const) {
+				const issues = validateRegistryContract({
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"evolution-core": [scenario],
+					},
+				});
+				expect(issues).toContain(
+					`scenario-implementation-status-required:evolution-core:${evolutionScenarios[0].scenario_id}:${status}`,
+				);
+				expect(issues).toContain(
+					`benchmark-provenance-missing:evolution-core:${evolutionScenarios[0].scenario_id}:measurement`,
+				);
+			}
+			const mismatchedPack = {
+				...evolutionScenarios[0],
+				pack_id: "cli-kernel-local" as const,
+			};
+			expect(
+				validateRegistryContract({
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"evolution-core": [mismatchedPack],
+					},
+				}),
+			).toContain(
+				`scenario-pack-mismatch:evolution-core:${evolutionScenarios[0].scenario_id}`,
+			);
+			const weakSampleScenario = {
+				...evolutionScenarios[0],
+				measurement: {
+					...evolutionScenarios[0].measurement,
+					sample_count: 1,
+				},
+			};
+			const weakSampleIssues = validateRegistryContract({
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"evolution-core": [weakSampleScenario],
+				},
+				baselinesByPack: {
+					...snapshot.baselinesByPack,
+					"evolution-core": {
+						...evolutionBaseline,
+						sample_count: 1,
+					},
+				},
+			});
+			expect(weakSampleIssues).toContain(
+				`benchmark-provenance-sample-count-required:evolution-core:${evolutionScenarios[0].scenario_id}:3`,
+			);
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
 			const routingScenarios = snapshot.scenariosByPack["routing-accuracy"];
@@ -612,6 +1106,111 @@ describe("validate registry", () => {
 			expect(issues).toContain(
 				"baseline-schema-version-mismatch:cli-kernel-local:0.0.0",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("requires an explicit supported implementation status", () => {
+		const root = createFixtureRoot();
+		try {
+			const scenarioPath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"scenarios",
+				"cli-kernel-local",
+				"cli-status-json.json",
+			);
+			const scenario = readJson(scenarioPath);
+			delete scenario.implementation_status;
+			writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+			expect(() => loadRegistry(root)).toThrow(
+				"Invalid or missing implementation_status field",
+			);
+			writeFileSync(
+				scenarioPath,
+				`${JSON.stringify({ ...scenario, implementation_status: "invented" }, null, 2)}\n`,
+			);
+			expect(() => loadRegistry(root)).toThrow(
+				"Invalid or missing implementation_status field",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed on missing or noncanonical roadmap/spec statuses", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const originalRoadmap = readFileSync(roadmapPath, "utf8");
+			const f30Start = originalRoadmap.indexOf("### F-30 ");
+			const f30End = originalRoadmap.indexOf("\n### ", f30Start + 1);
+			const f30Section = originalRoadmap.slice(
+				f30Start,
+				f30End === -1 ? undefined : f30End,
+			);
+			for (const [statusLine, expected] of [
+				["- Status:", "roadmap-feature-status-invalid:F-30:missing"],
+				["- Status: Active", "roadmap-feature-status-invalid:F-30:Active"],
+				["- Status: actve", "roadmap-feature-status-invalid:F-30:actve"],
+			] as const) {
+				writeFileSync(
+					roadmapPath,
+					originalRoadmap.replace(
+						f30Section,
+						f30Section.replace(/^- Status:.*$/m, statusLine),
+					),
+					"utf8",
+				);
+				const issues = validateRegistryContract(snapshot);
+				expect(issues).toContain(expected);
+				expect(issues).not.toContain("scenario-feature-coverage-missing:F-30");
+			}
+			writeFileSync(
+				roadmapPath,
+				originalRoadmap.replace(
+					f30Section,
+					f30Section.replace(/^- Status:.*$/m, "- Status: final"),
+				),
+				"utf8",
+			);
+			expect(validateRegistryContract(snapshot)).not.toContain(
+				"scenario-feature-coverage-missing:F-30",
+			);
+
+			const specId = "260717_agent-submission-and-batch-review_spec_01";
+			const specPath = join(root, ".afol", "adm", "specs", `${specId}.md`);
+			const originalSpec = readFileSync(specPath, "utf8");
+			for (const [status, expected] of [
+				["", `spec-status-invalid:${specId}:missing`],
+				["Final", `spec-status-invalid:${specId}:Final`],
+				["actve", `spec-status-invalid:${specId}:actve`],
+			] as const) {
+				writeFileSync(
+					specPath,
+					originalSpec.replace(
+						/^status:.*$/m,
+						status ? `status: ${status}` : "status:",
+					),
+					"utf8",
+				);
+				const issues = validateRegistryContract(snapshot);
+				expect(issues).toContain(expected);
+				expect(issues).not.toContain(
+					`scenario-spec-coverage-missing:${specId}`,
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -798,7 +1397,9 @@ describe("validate registry", () => {
 			writeFileSync(f20SpecPath, originalF20Spec, "utf8");
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
-			const cliKernelScenario = cliKernelScenarios?.[0];
+			const cliKernelScenario = cliKernelScenarios?.find(
+				(scenario) => scenario.implementation_status === "implemented",
+			);
 			if (!cliKernelScenarios || !cliKernelScenario) {
 				throw new Error("Expected cli-kernel-local scenarios fixture");
 			}
@@ -817,6 +1418,30 @@ describe("validate registry", () => {
 			};
 			expect(validateRegistryContract(unknownScenarioCoverage)).toContain(
 				`scenario-tool-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:not-a-command`,
+			);
+			const plannedUnknownCoverage: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"cli-kernel-local": [
+						{
+							...cliKernelScenario,
+							implementation_status: "planned",
+							coverage: {
+								commands: ["not-a-command"],
+								subcommands: ["status --definitely-nope"],
+								journeys: ["fixture-journey"],
+							},
+						},
+						...cliKernelScenarios.slice(1),
+					],
+				},
+			};
+			expect(validateRegistryContract(plannedUnknownCoverage)).toEqual(
+				expect.arrayContaining([
+					`scenario-tool-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:not-a-command`,
+					`scenario-tool-subcommand-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:status --definitely-nope`,
+				]),
 			);
 			const unknownScenarioSubcommandCoverage: RegistrySnapshot = {
 				...snapshot,
@@ -914,9 +1539,646 @@ describe("validate registry", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("rejects missing and non-finite scenario baseline numbers", () => {
+		const root = createFixtureRoot();
+		try {
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"mutation-safety",
+				"baseline-v1.json",
+			);
+			const baseline = readJson(baselinePath);
+			const validScenarioBaseline = {
+				scenario_id: "mut-dry-run",
+				scenario_version: "1.0.0",
+				timing_p50_ms: 100,
+				timing_p95_ms: 150,
+				sample_count: 20,
+				warmup_count: 1,
+			};
+			for (const [field, value] of [
+				["timing_p50_ms", undefined],
+				["timing_p95_ms", null],
+				["sample_count", "20"],
+			] as const) {
+				const invalid = { ...validScenarioBaseline } as Record<string, unknown>;
+				if (value === undefined) delete invalid[field];
+				else invalid[field] = value;
+				writeFileSync(
+					baselinePath,
+					`${JSON.stringify(
+						{
+							...baseline,
+							scenarios: { "mut-dry-run": invalid },
+						},
+						null,
+						2,
+					)}\n`,
+				);
+				expect(() => loadRegistry(root)).toThrow(
+					`Invalid or missing finite numeric field: ${baselinePath}.scenarios.mut-dry-run.${field}`,
+				);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validates mutation baseline provenance and calibration identity", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const commit = spawnSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-provenance",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 300 },
+				baseline_id: "mutation-safety-v1",
+				deterministic_metrics: {},
+				compiled_binary: true,
+			};
+			const baseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				host_profile_id: "linux-x64-amd-epyc",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "amd-epyc",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "a".repeat(64),
+				git_commit: commit,
+				timestamp: new Date().toISOString(),
+				provenance: "observed-clean-commit",
+				sample_count: 20,
+				warmup_count: 1,
+				scenarios: {
+					[scenario.scenario_id]: {
+						scenario_id: scenario.scenario_id,
+						scenario_version: scenario.scenario_version,
+						timing_p50_ms: 100,
+						timing_p95_ms: 150,
+						sample_count: 20,
+						warmup_count: 1,
+					},
+				},
+			};
+			expect(
+				validateMutationBaselineContract(root, [scenario], baseline),
+			).toEqual([]);
+			for (const [patch, expected] of [
+				[
+					{ git_commit: "baseline-fixture" },
+					"mutation-baseline-git-commit-invalid",
+				],
+				[{ timestamp: "not-a-date" }, "mutation-baseline-timestamp-invalid"],
+				[
+					{ artifact_sha256: "abc" },
+					"mutation-baseline-artifact-sha256-invalid",
+				],
+				[
+					{ host_profile_id: "profile-placeholder" },
+					"mutation-baseline-profile-placeholder:host_profile_id",
+				],
+				[{ sample_count: 19 }, "mutation-baseline-sample-count-required:20"],
+			] as const) {
+				expect(
+					validateMutationBaselineContract(root, [scenario], {
+						...baseline,
+						...patch,
+					}),
+				).toContain(expected);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("accepts only an honest minimal pending mutation baseline", () => {
+		const scenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "mutation-pending",
+			scenario_version: "1.0.0",
+			pack_id: "mutation-safety",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_p95_ms: 300 },
+			baseline_id: "mutation-safety-v1",
+			deterministic_metrics: {},
+			compiled_binary: true,
+		};
+		const pending: Baseline = {
+			baseline_id: "mutation-safety-v1",
+			pack_id: "mutation-safety",
+			schema_version: "1.0.0",
+			calibration_status: "pending",
+			calibration_reason: "controlled-release-host-required",
+		};
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], pending),
+		).toEqual([]);
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				baseline_id: pending.baseline_id,
+				pack_id: pending.pack_id,
+				schema_version: pending.schema_version,
+				calibration_status: "pending",
+			}),
+		).toContain("mutation-baseline-calibration-reason-required");
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				...pending,
+				calibration_reason: "placeholder",
+			}),
+		).toContain("mutation-baseline-calibration-reason-placeholder");
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				...pending,
+				calibration_reason: "a".repeat(65),
+			}),
+		).toContain("mutation-baseline-calibration-reason-format-invalid");
+		expect(
+			collectProfileCompatibilityNotes(
+				scenario,
+				{ ...pending, calibration_reason: "a".repeat(2_000) },
+				undefined,
+				null,
+			),
+		).toEqual(["baseline-incompatible:calibration-pending:reason-invalid"]);
+		expect(
+			validateMutationBaselineContract(
+				undefined,
+				[{ ...scenario, compiled_binary: false }],
+				pending,
+			),
+		).toContain("mutation-scenario-compiled-release-required:mutation-pending");
+		expect(
+			validateMutationBaselineContract(undefined, [scenario], {
+				...pending,
+				provenance: "observed-clean-commit",
+				scenarios: {},
+			}),
+		).toEqual(
+			expect.arrayContaining([
+				"mutation-baseline-pending-observed-field:provenance",
+				"mutation-baseline-pending-observed-field:scenarios",
+			]),
+		);
+	});
+
+	test("parses mutation calibration state strictly", () => {
+		const root = createFixtureRoot();
+		try {
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"mutation-safety",
+				"baseline-v1.json",
+			);
+			const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+			writeFileSync(
+				baselinePath,
+				`${JSON.stringify({ ...baseline, calibration_status: "unknown" })}\n`,
+			);
+			expect(() => loadRegistry(root)).toThrow(
+				`Invalid calibration status: ${baselinePath}.calibration_status`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("scenario benchmark execution", () => {
+	test("resolves benchmark-owned temp state under .afol/tmp", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-bench-temp-root-"));
+		try {
+			const resolved = ensureBenchmarkTempRoot(root);
+			expect(resolved).toBe(join(root, ".afol", "tmp"));
+			expect(existsSync(resolved)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("uses the canonical release compiler flags", () => {
+		expect(compiledReleaseBuildArgs("/fixture/.afol/tmp/release/afol")).toEqual(
+			[
+				"build",
+				"--compile",
+				"--no-compile-autoload-dotenv",
+				"--no-compile-autoload-bunfig",
+				join(process.cwd(), "cli", "main.ts"),
+				"--outfile",
+				"/fixture/.afol/tmp/release/afol",
+			],
+		);
+	});
+
+	test("prepares a registered sidecar and executes a compiled mutation", () => {
+		const fixtureRoot = createBenchExecutionFixtureRoot();
+		let artifact: PreparedCompiledReleaseArtifact | undefined;
+		let artifactRoot: string | undefined;
+		try {
+			cpSync(
+				join(process.cwd(), ".afol", "config.json"),
+				join(fixtureRoot, ".afol", "config.json"),
+			);
+			mkdirSync(join(fixtureRoot, ".agents"), { recursive: true });
+			for (const metadataFile of ["lock.json", "manifest.json"]) {
+				cpSync(
+					join(process.cwd(), ".agents", metadataFile),
+					join(fixtureRoot, ".agents", metadataFile),
+				);
+			}
+			artifact = prepareCompiledReleaseArtifact(process.cwd());
+			artifactRoot = dirname(artifact.binaryPath);
+			const provenancePath = `${artifact.binaryPath}.provenance.json`;
+			expect(existsSync(provenancePath)).toBe(true);
+			const provenance = readJson(provenancePath);
+			expect(provenance).toMatchObject({
+				artifact: expect.any(String),
+				package_name: "afol",
+				version: expect.any(String),
+				sha256: artifact.profile.artifact_sha256,
+				compile_autoload_dotenv: false,
+				compile_autoload_bunfig: false,
+			});
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "compiled-mutation-sidecar",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					"afol f pt --session sb-pt --task-id T-01 --reason seed --path tmp/patch-src.txt --append x --json",
+				sandbox: true,
+				compiled_binary: true,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-pt'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'), session+'\\n','utf8'); writeFileSync(join(dir,session+'_task_01.md'), ['---','feature_id: F-sb','---','','# Tasks','','| Task | State | Owner | Notes |','|------|-------|-------|-------|','| T-01 | in_progress | worker | seed |',''].join('\\n'),'utf8');",
+					],
+				],
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 1_000,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "fixture",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(fixtureRoot, scenario, {
+				artifact,
+				sampleCount: 3,
+				warmupCount: 1,
+			});
+			expect(result.notes).toEqual([]);
+			expect(result.passed).toBe(true);
+			expect(result.metrics.error_count).toBe(0);
+		} finally {
+			artifact?.cleanup();
+			rmSync(fixtureRoot, { recursive: true, force: true });
+			if (artifactRoot !== undefined) {
+				expect(existsSync(artifactRoot)).toBe(false);
+			}
+		}
+	}, 30_000);
+
+	test("prepares one compiled artifact per pack and reuses its identity", () => {
+		let prepareCount = 0;
+		let cleanupCount = 0;
+		const artifact: PreparedCompiledReleaseArtifact = {
+			binaryPath: "/fixture/.afol/tmp/afol-bench-release-1/afol",
+			profile: {
+				host_profile_id: "linux-x64-test",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "test-cpu",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "a".repeat(64),
+			},
+			timestamp: "2026-07-28T00:00:00.000Z",
+			git_commit: "b".repeat(40),
+			cleanup: () => {
+				cleanupCount += 1;
+			},
+		};
+		const baseScenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "one",
+			scenario_version: "1.0.0",
+			pack_id: "mutation-safety",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_p95_ms: 300 },
+			baseline_id: "mutation-safety-v1",
+			deterministic_metrics: {},
+			compiled_binary: true,
+		};
+		const seenArtifacts = executeScenarioPackWithArtifact(
+			"/fixture",
+			[
+				baseScenario,
+				{ ...baseScenario, scenario_id: "two" },
+				{ ...baseScenario, scenario_id: "three" },
+				{
+					...baseScenario,
+					scenario_id: "source-only",
+					compiled_binary: false,
+				},
+			],
+			(_scenario, prepared) => prepared,
+			() => {
+				prepareCount += 1;
+				return artifact;
+			},
+		);
+		expect(prepareCount).toBe(1);
+		expect(cleanupCount).toBe(1);
+		expect(seenArtifacts).toHaveLength(4);
+		expect(seenArtifacts.slice(0, 3).every((entry) => entry === artifact)).toBe(
+			true,
+		);
+		expect(seenArtifacts[3]).toBeUndefined();
+	});
+
+	test("orchestrates cold samples with setup outside measured duration", () => {
+		const root = mkdtempSync(join(tmpdir(), "validate-bench-seams-"));
+		try {
+			const artifactDir = join(
+				root,
+				".afol",
+				"tmp",
+				"afol-bench-release-fixture",
+			);
+			mkdirSync(artifactDir, { recursive: true });
+			const artifactPath = join(artifactDir, "afol");
+			writeFileSync(artifactPath, "fixture\n");
+			const artifact: PreparedCompiledReleaseArtifact = {
+				binaryPath: artifactPath,
+				profile: {
+					host_profile_id: "linux-x64-test",
+					os: "linux",
+					arch: "x64",
+					cpu_class: "test-cpu",
+					bun_version: Bun.version,
+					runtime_version: Bun.version,
+					execution_mode: "compiled-release",
+					artifact_mode: "bun-compile",
+					artifact_sha256: "a".repeat(64),
+				},
+				timestamp: "2026-07-28T00:00:00.000Z",
+				git_commit: "b".repeat(40),
+				cleanup: () => {},
+			};
+			const phases: ScenarioSamplePhase[] = [];
+			const invocationRoots: string[] = [];
+			const invocationCommands: string[] = [];
+			const createdSandboxes: string[] = [];
+			const cleanedSandboxes: string[] = [];
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "instrumented-release",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				command: "afol --version",
+				sandbox: true,
+				compiled_binary: true,
+				setup: [["afol", "--version"]],
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 300 },
+				baseline_id: "mutation-safety-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario, {
+				artifact,
+				sampleCount: 20,
+				warmupCount: 1,
+				seams: {
+					createSandboxRoot: () => {
+						const sandbox = join(
+							root,
+							".afol",
+							"tmp",
+							`afol-bench-sandbox-fixture-${createdSandboxes.length}`,
+						);
+						mkdirSync(sandbox, { recursive: true });
+						createdSandboxes.push(sandbox);
+						return sandbox;
+					},
+					cleanupSandboxRoot: (sandbox) => {
+						cleanedSandboxes.push(sandbox);
+						rmSync(sandbox, { recursive: true, force: true });
+					},
+					runSample: (sampleRoot, invocation, phase): ScenarioSampleRun => {
+						phases.push(phase);
+						invocationRoots.push(sampleRoot);
+						invocationCommands.push(invocation.command);
+						return {
+							duration_ms:
+								phase === "setup" ? 9_000 : phase === "warmup" ? 8_000 : 10,
+							exit_code: 0,
+							signal: null,
+							spawn_error: null,
+							stdout: "ok",
+							stderr: "",
+						};
+					},
+				},
+			});
+			expect(result.passed).toBe(true);
+			expect(result.metrics.sample_count).toBe(20);
+			expect(result.metrics.warmup_count).toBe(1);
+			expect(result.metrics.timing_p50_ms).toBe(10);
+			expect(result.metrics.timing_p95_ms).toBe(10);
+			expect(phases.filter((phase) => phase === "setup")).toHaveLength(21);
+			expect(phases.filter((phase) => phase === "warmup")).toHaveLength(1);
+			expect(phases.filter((phase) => phase === "sample")).toHaveLength(20);
+			expect(createdSandboxes).toHaveLength(21);
+			expect(
+				new Set(
+					invocationRoots.filter((_root, index) => phases[index] === "sample"),
+				).size,
+			).toBe(20);
+			expect(cleanedSandboxes).toEqual(createdSandboxes);
+			expect(
+				createdSandboxes.every((path) => path.includes("/.afol/tmp/")),
+			).toBe(true);
+			expect(
+				invocationCommands.every((command) => command === artifactPath),
+			).toBe(true);
+			expect(createdSandboxes.every((path) => !existsSync(path))).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps AFOL benchmark temp state out of sandbox copies and cleans sandboxes", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const sentinel = join(
+				root,
+				".afol",
+				"tmp",
+				"afol-bench-release-sentinel",
+				"afol",
+			);
+			mkdirSync(dirname(sentinel), { recursive: true });
+			writeFileSync(sentinel, "must-not-copy\n");
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-temp-exclusion",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					'node -e \'process.exit(require("node:fs").existsSync(".afol/tmp/afol-bench-release-sentinel/afol") ? 9 : 0)\'',
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario);
+			expect(result.passed).toBe(true);
+			expect(readFileSync(sentinel, "utf8")).toBe("must-not-copy\n");
+			expect(
+				readdirSync(join(root, ".afol", "tmp")).filter((entry) =>
+					entry.startsWith("afol-bench-sandbox-"),
+				),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects fewer than twenty mutation samples at the release gate", () => {
+		expect(() =>
+			resolveScenarioSampleCount({ pack_id: "mutation-safety" }, 19),
+		).toThrow("release-benchmark-sample-count-required:20");
+		expect(resolveScenarioSampleCount({ pack_id: "mutation-safety" }, 20)).toBe(
+			20,
+		);
+	});
+
+	test("does not require artifact hash equality for profile compatibility", () => {
+		const scenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "artifact-identity",
+			scenario_version: "1.0.0",
+			pack_id: "mutation-safety",
+			result_schema: "1.0.0",
+			oracle: "fixture",
+			thresholds: { max_p95_ms: 300 },
+			baseline_id: "mutation-safety-v1",
+			deterministic_metrics: {},
+			compiled_binary: true,
+		};
+		const baseline: Baseline = {
+			baseline_id: "mutation-safety-v1",
+			pack_id: "mutation-safety",
+			schema_version: "1.0.0",
+			host_profile_id: "linux-x64-test",
+			os: "linux",
+			arch: "x64",
+			cpu_class: "test-cpu",
+			bun_version: Bun.version,
+			runtime_version: Bun.version,
+			execution_mode: "compiled-release",
+			artifact_mode: "bun-compile",
+			artifact_sha256: "a".repeat(64),
+			scenarios: {
+				[scenario.scenario_id]: {
+					scenario_id: scenario.scenario_id,
+					scenario_version: scenario.scenario_version,
+					timing_p50_ms: 100,
+					timing_p95_ms: 150,
+					sample_count: 20,
+					warmup_count: 1,
+				},
+			},
+		};
+		const execution: ScenarioExecutionResult = {
+			metrics: {
+				duration_ms: 100,
+				timing_p50_ms: 100,
+				timing_p95_ms: 150,
+				error_count: 0,
+				retry_count: 0,
+				context_tokens: 0,
+				prompt_tokens: 0,
+				output_tokens: 0,
+				context_bytes: 0,
+				output_bytes: 0,
+				tool_call_count: 1,
+				tool_success_rate: 1,
+				sample_count: 20,
+				warmup_count: 1,
+			},
+			notes: [],
+			passed: true,
+			profile: {
+				host_profile_id: "linux-x64-test",
+				os: "linux",
+				arch: "x64",
+				cpu_class: "test-cpu",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "compiled-release",
+				artifact_mode: "bun-compile",
+				artifact_sha256: "b".repeat(64),
+			},
+			timestamp: "2026-07-28T00:00:00.000Z",
+			git_commit: "c".repeat(40),
+		};
+		expect(
+			collectProfileCompatibilityNotes(
+				scenario,
+				baseline,
+				baseline.scenarios?.[scenario.scenario_id],
+				execution,
+			),
+		).toEqual([]);
+	});
+
+	test("keeps completion-lock ignore policy in source/example parity", () => {
+		for (const file of [".gitignore", ".gitignore.example"]) {
+			const lines = readFileSync(join(process.cwd(), file), "utf8").split(
+				/\r?\n/,
+			);
+			expect(lines.filter((line) => line === ".afol/wb/.locks/")).toHaveLength(
+				1,
+			);
+		}
+	});
+
 	test("executes commands, records failures, and blocks tracked-file leaks", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
@@ -1064,6 +2326,20 @@ describe("scenario benchmark execution", () => {
 				failure.result.notes.some((note) => note.startsWith("sample-failed:")),
 			).toBe(true);
 
+			const plannedScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-planned-no-execution",
+				implementation_status: "planned",
+				command: `node -e 'require("node:fs").writeFileSync("planned-ran.txt","unexpected\\n")'`,
+			};
+			const planned = withCapturedConsoleError(() =>
+				buildResult(root, plannedScenario, baselinePath, baseline),
+			);
+			expect(planned.result.status).toBe("skipped");
+			expect(planned.result.pass).toBe(false);
+			expect(planned.result.notes).toEqual(["planned-no-execution"]);
+			expect(existsSync(join(root, "planned-ran.txt"))).toBe(false);
+
 			const sideEffectScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-side-effect",
@@ -1108,10 +2384,13 @@ describe("scenario benchmark execution", () => {
 				],
 				command: "node sandbox-mutate.cjs",
 			};
+			mkdirSync(join(root, ".coverage"), { recursive: true });
+			writeFileSync(join(root, ".coverage", "sentinel"), "derived\n", "utf8");
 			writeFileSync(
 				join(root, "sandbox-mutate.cjs"),
 				[
 					"const fs = require('node:fs');",
+					"if (fs.existsSync('.coverage')) process.exit(8);",
 					"const path = '.afol/memory/memory.md';",
 					"const text = fs.readFileSync(path, 'utf8');",
 					"if (!text.includes('MEM-SB-1')) process.exit(7);",
@@ -1195,6 +2474,421 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	}, 120_000);
+
+	test("ignores an active completion lock but still catches workbench leaks", async () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "bench-held-completion-lock",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: "afol --version",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+
+			await withTaskCompletionLock(
+				root,
+				"bench-session",
+				"T-01",
+				async () => {
+					const ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					const safe = withCapturedConsoleError(() =>
+						buildResult(root, scenario, baselinePath, baseline),
+					);
+					expect(safe.result.status).toBe("passed");
+					expect(
+						safe.result.notes.some((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe(false);
+					expect(existsSync(ownerLockPath)).toBe(true);
+
+					const arbitraryLockFile = join(
+						root,
+						".afol",
+						"wb",
+						".locks",
+						"unexpected.txt",
+					);
+					const arbitrary = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								...scenario,
+								scenario_id: "bench-held-lock-arbitrary-entry",
+								command: `node -e 'require("node:fs").writeFileSync(".afol/wb/.locks/unexpected.txt","leak\\n","utf8")'`,
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(arbitrary.result.status).toBe("failed");
+					expect(
+						arbitrary.result.notes.find((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe("side-effect-leak:.afol/wb/.locks/unexpected.txt");
+					expect(existsSync(arbitraryLockFile)).toBe(false);
+					expect(existsSync(ownerLockPath)).toBe(true);
+
+					const symlinkTarget = join(root, "lock-symlink-target.txt");
+					writeFileSync(symlinkTarget, "preserve\n", "utf8");
+					const symlinkEntry = join(
+						root,
+						".afol",
+						"wb",
+						".locks",
+						"unexpected-link",
+					);
+					const symlink = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								...scenario,
+								scenario_id: "bench-held-lock-symlink-entry",
+								command: `node -e 'require("node:fs").symlinkSync(${JSON.stringify(symlinkTarget)}, ".afol/wb/.locks/unexpected-link")'`,
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(symlink.result.status).toBe("failed");
+					expect(
+						symlink.result.notes.find((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe("side-effect-leak:.afol/wb/.locks/unexpected-link");
+					expect(existsSync(symlinkEntry)).toBe(false);
+					expect(readFileSync(symlinkTarget, "utf8")).toBe("preserve\n");
+					expect(existsSync(ownerLockPath)).toBe(true);
+
+					const leaked = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								...scenario,
+								scenario_id: "bench-held-lock-real-leak",
+								command: `node -e 'const fs=require("node:fs"); fs.mkdirSync(".afol/wb/session",{recursive:true}); fs.writeFileSync(".afol/wb/session/real-leak.txt","leak\\n","utf8")'`,
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(leaked.result.status).toBe("failed");
+					expect(
+						leaked.result.notes.find((note) =>
+							note.startsWith("side-effect-leak:"),
+						),
+					).toBe("side-effect-leak:.afol/wb/session/real-leak.txt");
+				},
+				{ heartbeatMs: 5 },
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("reports hostile completion-lock metadata and fence mutations without unsafe cleanup", async () => {
+		const mutations = [
+			{
+				id: "owner-token",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.owner_token="hostile-owner"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "generation",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.generation+=1000; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "extra-field",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.untrusted="extra"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "malformed",
+				command(lockPath: string): string {
+					return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(lockPath)},"malformed"+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "heartbeat-regression",
+				command(lockPath: string): string {
+					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.heartbeat_at="1970-01-01T00:00:00.000Z"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "lock" as const,
+			},
+			{
+				id: "fence",
+				command(lockPath: string): string {
+					return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(`${lockPath}.fence`)},"999999"+String.fromCharCode(10),"utf8")'`;
+				},
+				target: "fence" as const,
+			},
+		];
+
+		for (const mutation of mutations) {
+			const root = createBenchExecutionFixtureRoot();
+			try {
+				const baselinePath = join(root, "baseline-v1.json");
+				const baseline: Baseline = {
+					baseline_id: "bench-v1",
+					pack_id: "pstr-integrity",
+					schema_version: "1.0.0",
+					timing_p50_ms: 10_000,
+					timing_p95_ms: 10_000,
+				};
+				await withTaskCompletionLock(
+					root,
+					"bench-session",
+					"T-01",
+					async () => {
+						const ownerLockPath = resolveTaskCompletionLockPath(
+							root,
+							"bench-session",
+							"T-01",
+						);
+						const fencePath = `${ownerLockPath}.fence`;
+						const originalLock = readFileSync(ownerLockPath, "utf8");
+						const originalFence = readFileSync(fencePath, "utf8");
+						const relativeLockPath = ownerLockPath
+							.slice(root.length + 1)
+							.replaceAll("\\", "/");
+						const expectedLeakPath =
+							mutation.target === "fence"
+								? `${relativeLockPath}.fence`
+								: relativeLockPath;
+						try {
+							const result = withCapturedConsoleError(() =>
+								buildResult(
+									root,
+									{
+										schema_version: "1.0.0",
+										scenario_id: `bench-hostile-lock-${mutation.id}`,
+										scenario_version: "1.0.0",
+										pack_id: "pstr-integrity",
+										command: mutation.command(ownerLockPath),
+										result_schema: "1.0.0",
+										oracle: "normalized-envelope-and-threshold-check",
+										thresholds: {
+											max_duration_ms: 10_000,
+											max_p95_ms: 10_000,
+											max_output_tokens: 100,
+											min_tool_success_rate: 1,
+										},
+										baseline_id: "bench-v1",
+										deterministic_metrics: {},
+									},
+									baselinePath,
+									baseline,
+								),
+							);
+							expect(result.result.status).toBe("failed");
+							expect(
+								result.result.notes.some((note) =>
+									note.includes(`side-effect-leak:${expectedLeakPath}`),
+								),
+							).toBe(true);
+							if (mutation.target === "fence") {
+								expect(readFileSync(fencePath, "utf8")).toBe("999999\n");
+								expect(readFileSync(ownerLockPath, "utf8")).toBe(originalLock);
+							} else {
+								expect(readFileSync(ownerLockPath, "utf8")).not.toBe(
+									originalLock,
+								);
+								expect(readFileSync(fencePath, "utf8")).toBe(originalFence);
+							}
+						} finally {
+							writeFileSync(ownerLockPath, originalLock, "utf8");
+							writeFileSync(fencePath, originalFence, "utf8");
+						}
+					},
+					{ heartbeatMs: 60_000 },
+				);
+				const ownerLockPath = resolveTaskCompletionLockPath(
+					root,
+					"bench-session",
+					"T-01",
+				);
+				expect(existsSync(ownerLockPath)).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	}, 30_000);
+
+	test("reports atomic replacement of an owner lock and leaves the replacement for explicit recovery", async () => {
+		const root = createBenchExecutionFixtureRoot();
+		let ownerLockPath = "";
+		try {
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			await withTaskCompletionLock(
+				root,
+				"bench-session",
+				"T-01",
+				async () => {
+					ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					const original = readFileSync(ownerLockPath, "utf8");
+					const originalInode = lstatSync(ownerLockPath).ino;
+					const replacementPath = `${ownerLockPath}.hostile-replacement`;
+					const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); fs.renameSync(replacement,p)'`;
+					const result = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								schema_version: "1.0.0",
+								scenario_id: "bench-hostile-lock-atomic-replacement",
+								scenario_version: "1.0.0",
+								pack_id: "pstr-integrity",
+								command,
+								result_schema: "1.0.0",
+								oracle: "normalized-envelope-and-threshold-check",
+								thresholds: {
+									max_duration_ms: 10_000,
+									max_p95_ms: 10_000,
+									max_output_tokens: 100,
+									min_tool_success_rate: 1,
+								},
+								baseline_id: "bench-v1",
+								deterministic_metrics: {},
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					const relativeLockPath = ownerLockPath
+						.slice(root.length + 1)
+						.replaceAll("\\", "/");
+					expect(result.result.status).toBe("failed");
+					expect(
+						result.result.notes.some((note) =>
+							note.includes(`side-effect-leak:${relativeLockPath}`),
+						),
+					).toBe(true);
+					expect(readFileSync(ownerLockPath, "utf8")).toBe(original);
+					expect(lstatSync(ownerLockPath).ino).not.toBe(originalInode);
+				},
+				{ heartbeatMs: 60_000 },
+			);
+			// The owner identity was destroyed. Neither the benchmark nor the lease
+			// may unlink a same-content replacement that it does not own.
+			expect(existsSync(ownerLockPath)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("reports an owner lock root replaced by a symlink without touching its target", async () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const target = join(root, "lock-root-target");
+			mkdirSync(target);
+			writeFileSync(join(target, "preserve.txt"), "preserve\n", "utf8");
+			const baselinePath = join(root, "baseline-v1.json");
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			let ownerLockPath = "";
+			await withTaskCompletionLock(
+				root,
+				"bench-session",
+				"T-01",
+				async () => {
+					ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					const command = `node -e 'const fs=require("node:fs"); const p=".afol/wb/.locks"; try { const stat=fs.lstatSync(p); if (stat.isSymbolicLink()) fs.unlinkSync(p); else fs.rmSync(p,{recursive:true,force:true}); } catch {} fs.symlinkSync(${JSON.stringify(target)},p,"dir")'`;
+					const result = withCapturedConsoleError(() =>
+						buildResult(
+							root,
+							{
+								schema_version: "1.0.0",
+								scenario_id: "bench-lock-root-symlink",
+								scenario_version: "1.0.0",
+								pack_id: "pstr-integrity",
+								command,
+								result_schema: "1.0.0",
+								oracle: "normalized-envelope-and-threshold-check",
+								thresholds: {
+									max_duration_ms: 10_000,
+									max_p95_ms: 10_000,
+									max_output_tokens: 100,
+									min_tool_success_rate: 1,
+								},
+								baseline_id: "bench-v1",
+								deterministic_metrics: {},
+							},
+							baselinePath,
+							baseline,
+						),
+					);
+					expect(result.result.status).toBe("failed");
+					expect(
+						result.result.notes.some((note) =>
+							note.startsWith("side-effect-leak:.afol/wb/.locks"),
+						),
+					).toBe(true);
+					expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(false);
+					expect(readFileSync(join(target, "preserve.txt"), "utf8")).toBe(
+						"preserve\n",
+					);
+					expect(existsSync(ownerLockPath)).toBe(false);
+				},
+				{ heartbeatMs: 60_000 },
+			);
+			// Replacing the root destroyed the owner's inode. Cleanup removes only
+			// the hostile symlink and does not claim that the owner survived.
+			expect(existsSync(ownerLockPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	}, 30_000);
 
 	test("applies the documented timing tolerance to baseline comparisons", () => {
@@ -1264,6 +2958,48 @@ describe("scenario benchmark execution", () => {
 			expect(p50Regression.notes).toContain(
 				"baseline-regression:timing_p50_ms:251>250",
 			);
+			const observedP50Regression = buildResult(
+				root,
+				{
+					...scenario,
+					pack_id: "governance-history",
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 251,
+						timing_p50_ms: 251,
+					},
+				},
+				baselinePath,
+				baseline,
+				"observe",
+			);
+			expect(observedP50Regression.status).toBe("passed");
+			expect(observedP50Regression.timing_p50_ms).toBe(251);
+			expect(observedP50Regression.notes).toContain(
+				"baseline-regression:timing_p50_ms:251>250",
+			);
+			const observedTimingThreshold = buildResult(
+				root,
+				{
+					...scenario,
+					pack_id: "governance-history",
+					thresholds: {
+						...scenario.thresholds,
+						max_p95_ms: 300,
+						min_duration_ms: 300,
+					},
+				},
+				baselinePath,
+				baseline,
+				"observe",
+			);
+			expect(observedTimingThreshold.status).toBe("passed");
+			expect(observedTimingThreshold.notes).toContain(
+				"threshold-exceeded:max_p95_ms:375>300",
+			);
+			expect(observedTimingThreshold.notes).toContain(
+				"threshold-below-min:min_duration_ms:250<300",
+			);
 
 			const p95Regression = buildResult(
 				root,
@@ -1281,10 +3017,176 @@ describe("scenario benchmark execution", () => {
 			expect(p95Regression.notes).toContain(
 				"baseline-regression:timing_p95_ms:376>375",
 			);
+
+			const observedNonTimingFailure = buildResult(
+				root,
+				{
+					...scenario,
+					pack_id: "governance-history",
+					thresholds: { ...scenario.thresholds, max_output_tokens: 0 },
+				},
+				baselinePath,
+				baseline,
+				"observe",
+			);
+			expect(observedNonTimingFailure.status).toBe("failed");
+			expect(observedNonTimingFailure.notes).toContain(
+				"threshold-exceeded:max_output_tokens:1>0",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("parses explicit benchmark timing modes and rejects them outside bench", () => {
+		expect(
+			parseValidationArgs(["bench", "--timing-mode", "observe"]).timingMode,
+		).toBe("observe");
+		expect(parseValidationArgs(["bench"]).timingMode).toBe("enforce");
+		expect(() =>
+			parseValidationArgs(["bench", "--timing-mode", "invalid"]),
+		).toThrow("Unknown --timing-mode value: invalid");
+		expect(() =>
+			parseValidationArgs(["run", "--timing-mode", "observe"]),
+		).toThrow("--timing-mode requires bench mode");
+		expect(() =>
+			parseValidationArgs(["run", "--timing-mode", "enforce"]),
+		).toThrow("--timing-mode requires bench mode");
+	});
+
+	test("fails mutation timing closed when the execution profile is incompatible", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "mutation-profile-contract",
+				scenario_version: "1.0.0",
+				pack_id: "mutation-safety",
+				command: "node -e 'process.stdout.write(\"ok\")'",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "mutation-safety-v1",
+				implementation_status: "implemented",
+				deterministic_metrics: {},
+				compiled_binary: true,
+			};
+			const artifact: PreparedCompiledReleaseArtifact = {
+				binaryPath: join(root, ".afol", "tmp", "release", "afol"),
+				profile: {
+					host_profile_id: "actual-host",
+					os: process.platform,
+					arch: process.arch,
+					cpu_class: "actual-cpu",
+					bun_version: Bun.version,
+					runtime_version: Bun.version,
+					execution_mode: "compiled-release",
+					artifact_mode: "bun-compile",
+					artifact_sha256: "d".repeat(64),
+				},
+				timestamp: "2026-07-28T00:00:00.000Z",
+				git_commit: "e".repeat(40),
+				cleanup: () => {},
+			};
+			const baseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				host_profile_id: "different-host",
+				os: process.platform,
+				arch: process.arch,
+				cpu_class: "different-cpu",
+				bun_version: Bun.version,
+				runtime_version: Bun.version,
+				execution_mode: "source",
+				artifact_mode: "source",
+				artifact_sha256: "source",
+				scenarios: {
+					[scenario.scenario_id]: {
+						scenario_id: scenario.scenario_id,
+						scenario_version: scenario.scenario_version,
+						timing_p50_ms: 100,
+						timing_p95_ms: 100,
+						sample_count: 20,
+						warmup_count: 1,
+					},
+				},
+			};
+			const result = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					scenario,
+					join(root, "baseline.json"),
+					baseline,
+					"enforce",
+					artifact,
+				),
+			).result;
+			expect(result.status).toBe("incompatible");
+			expect(result.pass).toBe(false);
+			expect(result.sample_count).toBe(20);
+			expect(result.warmup_count).toBe(1);
+			expect(result.artifact_sha256).toBe("d".repeat(64));
+			expect(
+				result.notes.some((note) =>
+					note.startsWith("profile-incompatible:host_profile_id:"),
+				),
+			).toBe(true);
+			expect(
+				result.notes.some((note) => note.startsWith("baseline-regression:")),
+			).toBe(false);
+
+			const pendingBaseline: Baseline = {
+				baseline_id: "mutation-safety-v1",
+				pack_id: "mutation-safety",
+				schema_version: "1.0.0",
+				calibration_status: "pending",
+				calibration_reason: "controlled-release-host-required",
+			};
+			const pendingResult = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					scenario,
+					join(root, "baseline.json"),
+					pendingBaseline,
+					"enforce",
+					artifact,
+				),
+			).result;
+			expect(pendingResult.status).toBe("incompatible");
+			expect(pendingResult.pass).toBe(false);
+			expect(pendingResult.tool_success_rate).toBe(1);
+			expect(pendingResult.error_count).toBe(0);
+			expect(pendingResult.sample_count).toBe(20);
+			expect(pendingResult.warmup_count).toBe(1);
+			expect(
+				pendingResult.notes.filter((note) =>
+					note.startsWith("baseline-incompatible:calibration-pending:"),
+				),
+			).toEqual([
+				"baseline-incompatible:calibration-pending:controlled-release-host-required",
+			]);
+
+			const failedResult = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					{ ...scenario, command: "false" },
+					join(root, "baseline.json"),
+					pendingBaseline,
+					"enforce",
+					artifact,
+				),
+			).result;
+			expect(failedResult.status).toBe("failed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
 
 	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
 		const root = createBenchExecutionFixtureRoot();
@@ -1567,9 +3469,9 @@ describe("runtime live validation helpers", () => {
 				baselinePath,
 			);
 			expect(fallback.results).toHaveLength(4);
-			expect(fallback.results.every((entry) => entry.status === "passed")).toBe(
-				true,
-			);
+			expect(
+				fallback.results.filter((entry) => entry.status === "passed"),
+			).toHaveLength(4);
 			expect(fallback.notes).toContain(
 				"runtime-live-agent-evidence-source:result",
 			);
@@ -1592,16 +3494,18 @@ describe("runtime live validation helpers", () => {
 			);
 			expect(missingSavedResult.results).toHaveLength(4);
 			expect(
-				missingSavedResult.results.every((entry) => entry.status === "passed"),
+				missingSavedResult.results.filter((entry) => entry.status === "passed"),
+			).toHaveLength(4);
+			expect(
+				missingSavedResult.results
+					.filter((entry) => entry.status !== "skipped")
+					.every((entry) =>
+						entry.notes.includes("live-runner-evidence-source:snapshot"),
+					),
 			).toBe(true);
 			expect(missingSavedResult.notes).toContain(
 				"runtime-live-agent-evidence-source:snapshot",
 			);
-			expect(
-				missingSavedResult.results.every((entry) =>
-					entry.notes.includes("live-runner-evidence-source:snapshot"),
-				),
-			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1665,18 +3569,18 @@ describe("runtime live validation helpers", () => {
 				".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
 			);
 			const valid = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
-			expect(valid.results.every((entry) => entry.status === "passed")).toBe(
-				true,
-			);
+			expect(
+				valid.results.filter((entry) => entry.status === "passed"),
+			).toHaveLength(4);
 
 			const snapshotPath = getRuntimeLiveSnapshotPath(root);
 			const snapshot = readJson(snapshotPath);
 			snapshot.generated_at = "2020-01-01T00:00:00.000Z";
 			writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 			const stale = buildRuntimeLiveAgentResults(root, scenarios, baselinePath);
-			expect(stale.results.every((entry) => entry.status === "failed")).toBe(
-				true,
-			);
+			expect(
+				stale.results.filter((entry) => entry.status === "failed"),
+			).toHaveLength(4);
 			expect(stale.notes[0]).toStartWith("runtime-live-snapshot-stale:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1814,11 +3718,11 @@ describe("runtime live validation helpers", () => {
 				scenarios,
 				baselinePath,
 			);
-			expect(missing.results.every((entry) => entry.status === "failed")).toBe(
-				true,
-			);
+			expect(
+				missing.results.filter((entry) => entry.status === "failed"),
+			).toHaveLength(4);
 			expect(missing.notes).toContain(
-				`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
+				"runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol bench run --all --save;then:afol validate bench --pack runtime-live-agent --json",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1827,6 +3731,26 @@ describe("runtime live validation helpers", () => {
 });
 
 describe("validation command entrypoint", () => {
+	test("reports governance-history timing observation at the public entrypoint", () => {
+		const observed = withCapturedStdout(() =>
+			runValidationCommand(process.cwd(), [
+				"bench",
+				"--pack",
+				"governance-history",
+				"--timing-mode",
+				"observe",
+				"--json",
+			]),
+		);
+		expect(observed.result).toBe(0);
+		expect(JSON.parse(observed.stdout[0] ?? "{}")).toMatchObject({
+			mode: "benchmark",
+			timing_mode: "observe",
+			status: "passed",
+			pass: true,
+		});
+	}, 120_000);
+
 	test("supports select, run, benchmark save, and argument failures", () => {
 		const root = createFixtureRoot();
 		try {
@@ -1872,6 +3796,40 @@ describe("validation command entrypoint", () => {
 			expect(
 				runTextPayload.command_results[0]?.reported_status,
 			).toBeUndefined();
+
+			const cliKernelPaths = getCliKernelPaths(root);
+			const scenarioDir = dirname(cliKernelPaths.scenarioPath);
+			for (const name of readdirSync(scenarioDir)) {
+				if (!name.endsWith(".json")) {
+					continue;
+				}
+				const scenarioPath = join(scenarioDir, name);
+				const scenario = readJson(scenarioPath);
+				writeFileSync(
+					scenarioPath,
+					`${JSON.stringify(
+						{
+							...scenario,
+							thresholds: {
+								...(scenario.thresholds as Record<string, unknown>),
+								max_duration_ms: 10_000,
+								max_p95_ms: 10_000,
+							},
+						},
+						null,
+						2,
+					)}\n`,
+					"utf8",
+				);
+			}
+			const baseline = readJson(cliKernelPaths.baselinePath);
+			baseline.timing_p50_ms = 10_000;
+			baseline.timing_p95_ms = 10_000;
+			writeFileSync(
+				cliKernelPaths.baselinePath,
+				`${JSON.stringify(baseline, null, 2)}\n`,
+				"utf8",
+			);
 
 			const benchmarkSave = withCapturedStdout(() =>
 				runValidationCommand(root, [
@@ -1930,6 +3888,20 @@ describe("validation command entrypoint", () => {
 				"Unknown --pack value: not-a-pack",
 			);
 
+			const observedPerformancePack = withCapturedConsoleError(() =>
+				runValidationCommand(root, [
+					"bench",
+					"--pack",
+					"workbench-parity",
+					"--timing-mode",
+					"observe",
+				]),
+			);
+			expect(observedPerformancePack.result).toBe(2);
+			expect(observedPerformancePack.stderr[0]).toContain(
+				"--timing-mode observe is limited to the governance-history pack",
+			);
+
 			const unknownArg = withCapturedConsoleError(() =>
 				runValidationCommand(root, ["select", "--broken"]),
 			);
@@ -1940,7 +3912,7 @@ describe("validation command entrypoint", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, 180_000);
 
 	test("fails JSON-reporting packs when the child emits malformed JSON", () => {
 		const root = createFixtureRoot();
@@ -2189,5 +4161,5 @@ describe("validation command entrypoint", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, 120_000);
 });

@@ -5,7 +5,10 @@ import {
 	parseNewArgs,
 	parseSessionTaskArgs,
 } from "../commands/workbench/args";
-import { runVerification } from "../commands/workbench/verify";
+import {
+	runVerification,
+	runVerificationAsync,
+} from "../commands/workbench/verify";
 
 describe("workbench parseNewArgs", () => {
 	test("preserves repeated --task values in order", () => {
@@ -130,6 +133,106 @@ describe("workbench parseSessionTaskArgs", () => {
 });
 
 describe("parseDoneArgs", () => {
+	test("preserves repeated --test values in order", () => {
+		const parsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test",
+				"bun run typecheck",
+				"--test",
+				"bun test",
+			],
+			process.cwd(),
+		);
+
+		expect(parsed.testCommands).toEqual(["bun run typecheck", "bun test"]);
+		expect(parsed.verifications).toEqual([
+			{ mode: "argv", executable: "bun", args: ["run", "typecheck"] },
+			{ mode: "argv", executable: "bun", args: ["test"] },
+		]);
+	});
+
+	test("rejects static sequential verification limits before execution", () => {
+		const base = ["--session", "260530_2256_cli-native", "T-01"];
+		const nineTests = Array.from({ length: 9 }, () => [
+			"--test",
+			"true",
+		]).flat();
+		expect(() => parseDoneArgs([...base, ...nineTests], process.cwd())).toThrow(
+			"at most 8",
+		);
+		expect(() =>
+			parseDoneArgs(
+				[...base, "--test", `bun ${"x".repeat(4097)}`],
+				process.cwd(),
+			),
+		).toThrow("4,096");
+		expect(() =>
+			parseDoneArgs(
+				[
+					...base,
+					"--test",
+					`bun ${"x".repeat(2100)}`,
+					"--test",
+					`bun ${"y".repeat(2100)}`,
+				],
+				process.cwd(),
+			),
+		).toThrow("aggregate limit");
+		expect(() =>
+			parseDoneArgs(
+				[...base, "--test", `bun ${"😀".repeat(1100)}`],
+				process.cwd(),
+			),
+		).toThrow("UTF-8 bytes");
+		const tooManyArgv = ["bun", ...Array.from({ length: 128 }, () => "x")];
+		expect(() =>
+			parseDoneArgs([...base, "--", ...tooManyArgv], process.cwd()),
+		).toThrow("128 argv entries");
+	});
+
+	test("rejects logically empty verification commands before execution", () => {
+		const base = ["--session", "260530_2256_cli-native", "T-01"];
+		for (const value of ["   ", '""', "''"]) {
+			expect(() =>
+				parseDoneArgs([...base, "--test", value], process.cwd()),
+			).toThrow("Empty --test command");
+		}
+		expect(() =>
+			parseDoneArgs([...base, "--test-shell", "   "], process.cwd()),
+		).toThrow("Empty --test-shell command");
+		expect(() => parseDoneArgs([...base, "--", "   "], process.cwd())).toThrow(
+			"Empty positional command",
+		);
+	});
+
+	test("does not tokenize shell syntax while checking --test-shell", () => {
+		const parsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test-shell",
+				"true # 'valid shell comment",
+			],
+			process.cwd(),
+		);
+		expect(parsed.testShellCommand).toBe("true # 'valid shell comment");
+		const commentOnly = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test-shell",
+				"# comment",
+			],
+			process.cwd(),
+		);
+		expect(commentOnly.testShellCommand).toBe("# comment");
+	});
+
 	test("supports --test-shell", () => {
 		const parsed = parseDoneArgs(
 			[
@@ -143,7 +246,7 @@ describe("parseDoneArgs", () => {
 			process.cwd(),
 		);
 
-		expect(parsed.testCommand).toBeNull();
+		expect(parsed.testCommands).toEqual([]);
 		expect(parsed.testShellCommand).toBe("npm run lint && npm run test");
 		expect(parsed.taskId).toBe("T-01");
 		expect(parsed.session).toBe("260530_2256_cli-native");
@@ -167,6 +270,37 @@ describe("parseDoneArgs", () => {
 		).toThrow("Cannot use both --test and --test-shell in done.");
 	});
 
+	test("rejects duplicate --test-shell and positional mixtures", () => {
+		expect(() =>
+			parseDoneArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"T-01",
+					"--test-shell",
+					"true",
+					"--test-shell",
+					"false",
+				],
+				process.cwd(),
+			),
+		).toThrow("only one --test-shell");
+		expect(() =>
+			parseDoneArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"T-01",
+					"--test",
+					"true",
+					"--",
+					"false",
+				],
+				process.cwd(),
+			),
+		).toThrow("Cannot combine positional verification");
+	});
+
 	test("captures positional argv verification after -- without normalization", () => {
 		const parsed = parseDoneArgs(
 			[
@@ -181,13 +315,15 @@ describe("parseDoneArgs", () => {
 			process.cwd(),
 		);
 
-		expect(parsed.testCommand).toBeNull();
+		expect(parsed.testCommands).toEqual([]);
 		expect(parsed.testShellCommand).toBeNull();
-		expect(parsed.verification).toEqual({
-			mode: "argv",
-			executable: "bun",
-			args: ["-e", "console.log('--test -x')"],
-		});
+		expect(parsed.verifications).toEqual([
+			{
+				mode: "argv",
+				executable: "bun",
+				args: ["-e", "console.log('--test -x')"],
+			},
+		]);
 	});
 
 	test("runs VerificationSpec argv without reparsing positional tokens", () => {
@@ -197,5 +333,53 @@ describe("parseDoneArgs", () => {
 			args: ["-e", "process.exit(0)"],
 		});
 		expect(result).toEqual({ exitCode: 0 });
+	});
+
+	test("terminates async verification on timeout without returning raw output", async () => {
+		const result = await runVerificationAsync(
+			process.cwd(),
+			{
+				mode: "argv",
+				executable: process.execPath,
+				args: ["-e", "setTimeout(() => {}, 1000)"],
+			},
+			{ timeoutMs: 20 },
+		);
+		expect(result.status).toBe("timed_out");
+		expect(result.exitCode).not.toBe(0);
+		expect(result).not.toHaveProperty("stdout");
+		expect(result).not.toHaveProperty("stderr");
+	});
+
+	test("terminates the verification process tree on timeout", async () => {
+		const startedAt = Date.now();
+		const result = await runVerificationAsync(
+			process.cwd(),
+			{
+				mode: "argv",
+				executable: process.execPath,
+				args: [
+					"-e",
+					`require("node:child_process").spawn(${JSON.stringify(process.execPath)}, ["-e", "setTimeout(() => {}, 1000)"], { stdio: "inherit" }); setTimeout(() => {}, 1000);`,
+				],
+			},
+			{ timeoutMs: 20 },
+		);
+		expect(result.status).toBe("timed_out");
+		expect(Date.now() - startedAt).toBeLessThan(500);
+	});
+
+	test("terminates async verification at the streaming output limit", async () => {
+		const result = await runVerificationAsync(
+			process.cwd(),
+			{
+				mode: "argv",
+				executable: process.execPath,
+				args: ["-e", "process.stdout.write('x'.repeat(2048))"],
+			},
+			{ maxOutputBytes: 128 },
+		);
+		expect(result.status).toBe("output_limit");
+		expect(result.exitCode).not.toBe(0);
 	});
 });

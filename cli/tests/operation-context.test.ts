@@ -18,6 +18,18 @@ describe("operation-context", () => {
 		expect(requiresApproval(ctx)).toBe(false);
 	});
 
+	test("non-interactive local CLI context cannot apply evolution mutations", () => {
+		const { ctx } = resolveOperationContext([], {}, false);
+		expect(ctx).toMatchObject({
+			callerType: "local",
+			interactive: false,
+			trustLevel: "trusted",
+		});
+		expect(
+			isActionAllowed(ctx, { action: "evolve.apply", sideEffect: "write" }),
+		).toBe(false);
+	});
+
 	test("agent context requires approval", () => {
 		const ctx = agentOperationContext();
 		expect(ctx.callerType).toBe("agent");
@@ -78,6 +90,17 @@ describe("operation-context", () => {
 		).toBe(true);
 	});
 
+	test("evolve observe resolves as a write action and is denied when restricted", () => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "observe",
+			args: ["--session", "S-01"],
+		});
+		expect(policy).toEqual({ action: "evolve.observe", sideEffect: "write" });
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
+	});
+
 	test.each([
 		["note", "annotate"],
 		["clear", "purge"],
@@ -99,6 +122,49 @@ describe("operation-context", () => {
 		defaultOperationContext(),
 	])("undefined policy is allowed regardless of context", (ctx) => {
 		expect(isActionAllowed(ctx, undefined)).toBe(true);
+	});
+
+	test.each([
+		"status",
+		"analyze",
+		"weekly",
+		"after-merge",
+		"review",
+	])("evolve %s is explicitly read-only", (action) => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action,
+			args: [],
+		});
+		expect(policy).toEqual({
+			action: `evolve.${action}`,
+			sideEffect: "read",
+		});
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(true);
+		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(true);
+	});
+
+	test.each([
+		"apply",
+		"rollback",
+	] as const)("evolve %s is local-interactive only", (action) => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action,
+			args: ["EVO-1", "--json"],
+		});
+		expect(policy).toEqual({
+			action: `evolve.${action}`,
+			sideEffect: "write",
+		});
+		expect(isActionAllowed(defaultOperationContext(), policy)).toBe(false);
+		expect(
+			isActionAllowed(resolveOperationContext([], {}, true).ctx, policy),
+		).toBe(true);
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
+		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(false);
 	});
 
 	test("resolveOperationContext defaults to local", () => {

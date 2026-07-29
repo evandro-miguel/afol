@@ -20,7 +20,10 @@ import {
 	resolveRuleInjectionShape,
 } from "../rules/injection";
 import { loadSessionState, validateState } from "../state";
-import { buildSectionIndexSnapshot, getSectionIndex } from "./section-index";
+import {
+	requireSectionIndexCache,
+	SectionIndexTrustError,
+} from "./section-index";
 import type {
 	ContextBundle,
 	ContextExpandedSection,
@@ -43,9 +46,19 @@ type BuildOptions = {
 };
 
 export class ContextTrustError extends Error {
-	constructor(message: string) {
+	readonly code = "CTX_TRUST_ERROR";
+	readonly reason: string;
+	readonly remediation: string | null;
+
+	constructor(
+		message: string,
+		reason = "untrusted-context",
+		remediation: string | null = null,
+	) {
 		super(message);
 		this.name = "ContextTrustError";
+		this.reason = reason;
+		this.remediation = remediation;
 	}
 }
 
@@ -202,15 +215,34 @@ function selectSections(
 	root: string,
 	task: TaskRecord | null,
 	surface: string,
-): SectionEntry[] {
-	const index = getSectionIndex(root) ?? buildSectionIndexSnapshot(root);
+): {
+	sections: SectionEntry[];
+	verifiedSources: ReadonlyMap<string, string>;
+} {
+	let trusted: ReturnType<typeof requireSectionIndexCache>;
+	try {
+		trusted = requireSectionIndexCache(root);
+	} catch (error) {
+		if (error instanceof SectionIndexTrustError) {
+			throw new ContextTrustError(
+				error.message,
+				error.status,
+				error.remediation,
+			);
+		}
+		throw error;
+	}
+	const index = trusted.index;
 	if (task?.featureId) {
-		const needle = `spec:${task.featureId.trim().toLowerCase()}`;
+		const needle = `spec:${task.featureId.trim().toLowerCase()}/`;
 		const matches = index.sections.filter((section) =>
 			section.ref.toLowerCase().startsWith(needle),
 		);
 		if (matches.length > 0) {
-			return matches.slice(0, 3);
+			return {
+				sections: matches.slice(0, 3),
+				verifiedSources: trusted.verified_sources,
+			};
 		}
 	}
 	const surfaceMatches = index.sections
@@ -218,23 +250,25 @@ function selectSections(
 			section.ref.toLowerCase().includes(surface.toLowerCase()),
 		)
 		.slice(0, 3);
-	return surfaceMatches.length > 0
-		? surfaceMatches
-		: index.sections.slice(0, 3);
+	return {
+		sections:
+			surfaceMatches.length > 0 ? surfaceMatches : index.sections.slice(0, 3),
+		verifiedSources: trusted.verified_sources,
+	};
 }
 
 function selectExpandedSections(
-	root: string,
 	sections: SectionEntry[],
 	mode: ContextRetrievalMode,
+	verifiedSources: ReadonlyMap<string, string>,
 ): ContextExpandedSection[] {
 	const full = mode === "tokenmax";
 	return sections.slice(0, 3).flatMap((section) => {
-		const filePath = join(root, section.source_path);
-		if (!existsSync(filePath)) {
+		const content = verifiedSources.get(section.source_path);
+		if (content === undefined) {
 			return [];
 		}
-		const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+		const lines = content.split(/\r?\n/);
 		const snippetLines = lines.slice(section.line_start - 1, section.line_end);
 		const snippet = full
 			? snippetLines.join("\n")
@@ -609,7 +643,8 @@ export function buildContextBundle(
 	}
 	const task = session && taskId ? findTaskRecord(root, session, taskId) : null;
 	const state = session ? loadSessionState(root, session) : null;
-	const sections = selectSections(root, task, surface);
+	const selection = selectSections(root, task, surface);
+	const sections = selection.sections;
 	const compact = mode === "compact";
 	const rules = compact
 		? []
@@ -654,7 +689,7 @@ export function buildContextBundle(
 	const hookDoNotLoad = hookContributions.flatMap((hook) => hook.do_not_load);
 	const expandedSections =
 		mode === "deep" || mode === "tokenmax"
-			? selectExpandedSections(root, sections, mode)
+			? selectExpandedSections(sections, mode, selection.verifiedSources)
 			: undefined;
 	const bundle: ContextBundle = {
 		task_id: taskId,

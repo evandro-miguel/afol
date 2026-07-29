@@ -2,12 +2,6 @@
   "schema_version": "1.0.0",
   "baseline_id": "mutation-safety-v1",
   "pack_id": "mutation-safety",
-  "host_profile_id": "ci-linux-x64",
-  "sample_count": 3,
-  "warmup_count": 1,
-  "timing_p50_ms": 200,
-  "timing_p95_ms": 300,
-  "tokenizer_id": "tiktoken-o200k-base",
-  "tokenizer_version": "recorded",
-  "git_commit": "baseline-fixture"
+  "calibration_status": "pending",
+  "calibration_reason": "controlled-release-host-required"
 }

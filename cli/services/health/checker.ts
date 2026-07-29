@@ -1,7 +1,15 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { getSectionIndex } from "../context";
+import {
+	inspectSectionIndexCache,
+	type SectionIndexCacheInspection,
+} from "../context";
 import { runDriftCheck } from "../drift";
+import {
+	checkEvolutionDbHealth,
+	evolutionDbPath,
+	resolveEvolutionConfig,
+} from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import { getTopic, listTopics } from "../library";
 import {
@@ -10,7 +18,7 @@ import {
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { readMemory } from "../memory";
-import { resolveProjectPaths } from "../project/paths";
+import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { checkPstrStale, validatePstrIndex } from "../pstr";
 import { readMaintenanceReviewSummary } from "./maintenance-review";
 import type { HealthArea, HealthFinding, HealthReport } from "./types";
@@ -23,6 +31,7 @@ const HEALTH_AREAS: readonly HealthArea[] = [
 	"library",
 	"state",
 	"ctx",
+	"evolution",
 	"token_budget",
 ];
 const CORE_HEALTH_AREAS: readonly HealthArea[] = ["wb"];
@@ -93,50 +102,53 @@ function walkMarkdownFiles(root: string): string[] {
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
-function latestSourceMtime(root: string): number {
-	const docsRoot = join(root, "docs", "arc");
-	let latest = 0;
-	for (const file of walkMarkdownFiles(join(docsRoot, "SPECS"))) {
-		latest = Math.max(latest, statSync(file).mtimeMs);
-	}
-	for (const file of walkMarkdownFiles(join(docsRoot, "DECISIONS"))) {
-		latest = Math.max(latest, statSync(file).mtimeMs);
-	}
-	return latest;
-}
-
 function sectionIndexPath(root: string): string {
 	return join(resolveProjectPaths(root).abs.dataIndexDir, "sections.json");
 }
 
-function estimateSectionTokens(
-	sections: readonly { ref: string; title: string; source_path: string }[],
+function estimateSelectableSectionTokens(
+	sections: readonly {
+		ref: string;
+		title: string;
+		level: number;
+		line_start: number;
+		line_end: number;
+		source_path: string;
+	}[],
 ): number {
-	return sections.reduce(
-		(total, section) =>
-			total +
-			Math.max(
+	return sections
+		.map((section) => {
+			const domain = section.ref.startsWith("adr:") ? "adr" : "spec";
+			const selectableMetadata = [
+				domain,
+				section.source_path,
+				section.ref,
+				section.title,
+				section.level,
+				section.line_start,
+				section.line_end,
+			].join(":");
+			return Math.max(
 				1,
-				Math.ceil(
-					(section.ref.length +
-						section.title.length +
-						section.source_path.length) /
-						4,
-				),
-			),
-		0,
-	);
+				Math.ceil(new TextEncoder().encode(selectableMetadata).byteLength / 4),
+			);
+		})
+		.sort((left, right) => right - left)
+		.slice(0, 3)
+		.reduce((total, tokens) => total + tokens, 0);
 }
 
 function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 	const findings: HealthFinding[] = [];
-	const admRoot = join(root, ".afol", "adm");
+	const projectPaths = resolveProjectPaths(root);
+	const admRoot = projectPaths.abs.admDir;
+	const admLabel = projectPaths.admDir;
 	if (!existsSync(admRoot)) {
 		return [
 			makeFinding(
 				"adm",
 				"fail",
-				"missing .afol/adm directory",
+				`missing ${admLabel} directory`,
 				"restore AFOL administration files or run the project bootstrap/update flow",
 			),
 		];
@@ -150,8 +162,8 @@ function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 				makeFinding(
 					"adm",
 					"warn",
-					`missing .afol/adm/${dir} directory`,
-					`create .afol/adm/${dir} or update project administration layout`,
+					`missing ${admLabel}/${dir} directory`,
+					`create ${admLabel}/${dir} or update project administration layout`,
 				),
 			);
 		}
@@ -243,14 +255,16 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 			);
 			continue;
 		}
-		findings.push(
-			makeFinding(
-				"wb",
-				"warn",
-				warning.message,
-				"dedupe or rename the sessions",
-			),
-		);
+		if (warning.type === "invalid_event_ledger") {
+			findings.push(
+				makeFinding(
+					"wb",
+					"fail",
+					warning.message,
+					"repair the shared event ledger explicitly before rebuilding state",
+				),
+			);
+		}
 	}
 
 	if (deep && findings.length === 0) {
@@ -407,41 +421,23 @@ function checkStateHealth(root: string, deep: boolean): HealthFinding[] {
 	return findings;
 }
 
-function checkCtxHealth(root: string, deep: boolean): HealthFinding[] {
-	const index = getSectionIndex(root);
-	if (!index) {
+function checkCtxHealth(
+	root: string,
+	deep: boolean,
+	inspection?: SectionIndexCacheInspection,
+): HealthFinding[] {
+	const inspected = inspection ?? inspectSectionIndexCache(root);
+	if (inspected.status !== "current" || !inspected.index) {
 		return [
 			makeFinding(
 				"ctx",
 				"fail",
-				`missing section index: ${sectionIndexPath(root)}`,
+				`${inspected.status} section index: ${sectionIndexPath(root)} (${inspected.detail})`,
 				"rebuild the section index",
 			),
 		];
 	}
-
-	const latestSource = latestSourceMtime(root);
-	const generatedAt = parseIsoDate(index.generated_at);
-	if (generatedAt === null) {
-		return [
-			makeFinding(
-				"ctx",
-				"fail",
-				`invalid section index generated_at: ${index.generated_at}`,
-				"rebuild the section index",
-			),
-		];
-	}
-	if (latestSource > 0 && generatedAt < latestSource) {
-		return [
-			makeFinding(
-				"ctx",
-				"fail",
-				`stale section index: ${sectionIndexPath(root)}`,
-				"rebuild the section index",
-			),
-		];
-	}
+	const index = inspected.index;
 	return deep
 		? [
 				makeFinding(
@@ -453,20 +449,25 @@ function checkCtxHealth(root: string, deep: boolean): HealthFinding[] {
 		: [];
 }
 
-function checkTokenHealth(root: string, deep: boolean): HealthFinding[] {
-	const index = getSectionIndex(root);
-	if (!index) {
+function checkTokenHealth(
+	root: string,
+	deep: boolean,
+	inspection?: SectionIndexCacheInspection,
+): HealthFinding[] {
+	const inspected = inspection ?? inspectSectionIndexCache(root);
+	if (inspected.status !== "current" || !inspected.index) {
 		return [
 			makeFinding(
 				"token_budget",
 				"fail",
-				`missing section index: ${sectionIndexPath(root)}`,
+				`${inspected.status} section index: ${sectionIndexPath(root)} (${inspected.detail})`,
 				"rebuild the section index",
 			),
 		];
 	}
+	const index = inspected.index;
 
-	const usedTokens = estimateSectionTokens(index.sections);
+	const usedTokens = estimateSelectableSectionTokens(index.sections);
 	if (usedTokens >= TOKEN_FAIL_AT) {
 		return [
 			makeFinding(
@@ -498,6 +499,87 @@ function checkTokenHealth(root: string, deep: boolean): HealthFinding[] {
 		: [];
 }
 
+function checkEvolutionHealth(root: string, deep: boolean): HealthFinding[] {
+	try {
+		const config = resolveEvolutionConfig(readProjectConfig(root));
+		if (!config.configured) {
+			return deep
+				? [
+						makeFinding(
+							"evolution",
+							"info",
+							"legacy project config uses in-memory evolution defaults",
+							"add project.id, project.timezone, evolution paths, and evolution config through an approved config change",
+						),
+					]
+				: [];
+		}
+		if (!config.enabled) {
+			return deep
+				? [makeFinding("evolution", "info", "evolution is disabled")]
+				: [];
+		}
+		if (!config.projectId) {
+			return [
+				makeFinding(
+					"evolution",
+					"warn",
+					"evolution requires a stable project UUID",
+					"add project.id through an approved config change",
+				),
+			];
+		}
+		const dbPath = evolutionDbPath(root, config.paths.evolutionDb);
+		if (!existsSync(dbPath)) {
+			return deep
+				? [
+						makeFinding(
+							"evolution",
+							"info",
+							"evolution derived database is not initialized",
+							"it will be created when a qualifying production event is projected",
+						),
+					]
+				: [];
+		}
+		const health = checkEvolutionDbHealth(dbPath, config.projectId, {
+			root,
+			projectId: config.projectId,
+			timezone: config.timezone,
+			evolutionEventsDir: config.paths.evolutionEventsDir,
+		});
+		const findings = health.findings.map((finding) =>
+			makeFinding(
+				"evolution",
+				finding.severity,
+				finding.message,
+				finding.severity === "fail"
+					? "rebuild the derived evolution database from canonical journal events"
+					: undefined,
+			),
+		);
+		if (deep && health.ok) {
+			findings.push(
+				makeFinding(
+					"evolution",
+					"info",
+					`evolution schema current at version ${health.migration_version}`,
+				),
+			);
+		}
+		return findings;
+	} catch (error) {
+		return [
+			makeFinding(
+				"evolution",
+				"fail",
+				`invalid evolution configuration: ${(error as Error).message}`,
+				"run afol validate project --json and correct the approved project config",
+			),
+		];
+	}
+}
+
 const CHECKERS: Record<
 	HealthArea,
 	(root: string, deep: boolean) => HealthFinding[]
@@ -509,6 +591,7 @@ const CHECKERS: Record<
 	library: checkLibraryHealth,
 	state: checkStateHealth,
 	ctx: checkCtxHealth,
+	evolution: checkEvolutionHealth,
 	token_budget: checkTokenHealth,
 };
 
@@ -547,9 +630,21 @@ export function checkHealth(
 		: opts?.deep || opts?.includeAuxiliary
 			? [...HEALTH_AREAS]
 			: [...CORE_HEALTH_AREAS];
-	const findings = areas.flatMap((area) =>
-		checkAreaHealth(root, area, opts?.deep ?? false),
-	);
+	const deep = opts?.deep ?? false;
+	const sectionInspection = areas.some(
+		(area) => area === "ctx" || area === "token_budget",
+	)
+		? inspectSectionIndexCache(root)
+		: undefined;
+	const findings = areas.flatMap((area) => {
+		if (area === "ctx") {
+			return checkCtxHealth(root, deep, sectionInspection);
+		}
+		if (area === "token_budget") {
+			return checkTokenHealth(root, deep, sectionInspection);
+		}
+		return checkAreaHealth(root, area, deep);
+	});
 	if (areas.includes("wb")) {
 		const openPendingSpecs = listOpenPendingSpecs(root);
 		if (openPendingSpecs.length > 0) {

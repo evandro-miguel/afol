@@ -25,6 +25,7 @@ export type CommandKind =
 	| "hydrate"
 	| "library"
 	| "memory"
+	| "evolve"
 	| "adm"
 	| "governance"
 	| "spec"
@@ -66,6 +67,7 @@ export type CommandSpec = {
 	kind: CommandKind;
 	sideEffect: CommandSideEffect;
 	description: string;
+	capabilities?: readonly string[];
 	category?: CommandCategory;
 	guidance?: readonly string[];
 	subcommands?: readonly CommandSubcommandSpec[];
@@ -181,6 +183,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Run one benchmark pack with its configured gates",
 			},
 			{
+				usage: "bench --pack governance-history --timing-mode observe --json",
+				sideEffect: "read",
+				description: "Observe timing; non-timing gates block",
+			},
+			{
 				usage: "select --changed-path <path>",
 				sideEffect: "read",
 				description: "Show which benchmark packs match changed paths",
@@ -245,7 +252,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Complete a task session",
 		category: "workflow",
 		guidance: [
-			"Record authorizing evidence before done, or use --test to execute verification while closing.",
+			"Record evidence first, or repeat --test for up to eight ordered fail-fast checks.",
 		],
 		subcommands: [
 			{
@@ -257,7 +264,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: '--test "<cmd>"',
 				sideEffect: "write",
 				description:
-					"Run a verification command, record evidence, then complete",
+					"Run ordered argv-only verification steps, record each result, then complete",
 			},
 			{
 				usage: "-- <argv...>",
@@ -790,6 +797,98 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect memory entries",
 		category: "inspect",
+	},
+	{
+		command: "evolve",
+		aliases: [],
+		kind: "evolve",
+		sideEffect: "read",
+		description: "Analyze project evolution state and proposals",
+		capabilities: ["evolution.suggest.first-session/v1"],
+		category: "inspect",
+		guidance: [
+			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",
+		],
+		subcommands: [
+			{
+				usage: "evaluate <id> [--record] [--superseded-by <id>] [-j]",
+				sideEffect: "preview",
+				description: "Evaluate one proposal deterministically",
+			},
+			{
+				usage: "analyze [--json]",
+				sideEffect: "read",
+				description: "Analyze recurrence, scorecard, and proposal previews",
+			},
+			{
+				usage: "weekly [--json]",
+				sideEffect: "read",
+				description: "Run the bounded weekly analysis mode",
+			},
+			{
+				usage: "after-merge <base>..<head> [--json]",
+				sideEffect: "read",
+				description: "Analyze with a validated local commit range",
+			},
+			{
+				usage: "review <proposal-id> [--json]",
+				sideEffect: "read",
+				description: "Re-derive one proposal preview by deterministic id",
+			},
+			{
+				usage: "apply <proposal-id> [--json]",
+				sideEffect: "write",
+				description:
+					"Apply one re-derived proposal in the active workbench task",
+			},
+			{
+				usage: "rollback <proposal-id> [--json]",
+				sideEffect: "write",
+				description:
+					"Roll back one applied proposal in the active workbench task",
+			},
+			{
+				usage: "status [--json]",
+				sideEffect: "read",
+				description:
+					"Inspect evolution config, migration, and production-day state",
+			},
+			{
+				usage: "suggest --first-session [--claimed-by <provider>] [--json]",
+				sideEffect: "write",
+				description: "Show one daily suggestion",
+			},
+			{
+				usage: "skip <suggestion-id> [--json]",
+				sideEffect: "write",
+				description: "Skip shown suggestion",
+			},
+			{
+				usage: "accept <suggestion-id> [--json]",
+				sideEffect: "write",
+				description: "Accept shown suggestion",
+			},
+			{
+				usage: "reject <suggestion-id> --reason <reason> [--json]",
+				sideEffect: "write",
+				description: "Reject shown suggestion",
+			},
+			{
+				usage: "repair [--json]",
+				sideEffect: "write",
+				description: "Repair evolution derived state",
+			},
+			{
+				usage: "import <codex|pi> --source <path> [--confirm] [--json]",
+				sideEffect: "preview",
+				description: "Preview or confirm a redacted import",
+			},
+			{
+				usage: "external list [--json]",
+				sideEffect: "read",
+				description: "List accepted external imports without raw records",
+			},
+		],
 	},
 	{
 		command: "adm",

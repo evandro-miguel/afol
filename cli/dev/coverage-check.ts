@@ -51,8 +51,24 @@ if (parsedArgs.verbose) {
 
 if (result.status !== 0) {
 	if (!parsedArgs.verbose) {
-		process.stdout.write(result.stdout ?? "");
-		process.stderr.write(result.stderr ?? "");
+		const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+		const lines = output.split(/\r?\n/);
+		const failureLines = lines.filter(
+			(line) =>
+				line.includes("(fail)") ||
+				/\btests? failed\b/i.test(line) ||
+				/^error: script /.test(line),
+		);
+		const summary =
+			failureLines.length > 0
+				? failureLines.slice(0, 100)
+				: lines.filter(Boolean).slice(-40);
+		process.stderr.write(`${summary.join("\n")}\n`);
+	}
+	if (result.signal) {
+		console.error(`coverage: bun test terminated by signal ${result.signal}`);
+	} else if (result.status === null) {
+		console.error("coverage: bun test exited without a status");
 	}
 	process.exit(result.status ?? 1);
 }
@@ -186,7 +202,11 @@ function parseBunTextCoverage(output: string): CoverageTotals[] {
 			if (!Number.isFinite(functions) || !Number.isFinite(lines)) {
 				return null;
 			}
-			return { file: columns[0], functions, lines };
+			return {
+				file: normalizeCoverageFile(columns[0] ?? ""),
+				functions,
+				lines,
+			};
 		})
 		.filter((row): row is CoverageTotals & { file: string } => row !== null);
 	if (!rows.some((row) => row.file === "All files")) {
@@ -285,18 +305,25 @@ function percent(covered: number, total: number): number {
 }
 
 function normalizeCoverageFile(file: string): string {
-	if (!isAbsolute(file)) {
-		return file;
+	const normalizedFile = normalizePathSeparators(file);
+	if (!isAbsolute(file) && !isAbsolute(normalizedFile)) {
+		return normalizedFile;
 	}
-	const relativeFile = relative(process.cwd(), file);
+	const relativeFile = normalizePathSeparators(
+		relative(process.cwd(), normalizedFile),
+	);
 	if (
-		relativeFile.startsWith(`.${sep}`) ||
+		relativeFile.startsWith(`.${normalizePathSeparators(sep)}`) ||
 		relativeFile.startsWith("..") ||
 		isAbsolute(relativeFile)
 	) {
-		return file;
+		return normalizedFile;
 	}
 	return relativeFile;
+}
+
+function normalizePathSeparators(path: string): string {
+	return path.replaceAll("\\", "/");
 }
 
 function selectCoverageRows(
@@ -312,19 +339,26 @@ function selectCoverageRows(
 		return [{ functions: allFiles.functions, lines: allFiles.lines }];
 	}
 
+	const normalizedPrefixes = includePrefixes.map(normalizePathSeparators);
 	const fileRows = rows.filter((row) => row.file !== "All files");
-	const selected = fileRows.filter((row) =>
-		includePrefixes.some(
-			(prefix) => row.file === prefix || row.file?.startsWith(`${prefix}/`),
+	const matchesPrefix = (row: CoverageTotals, prefix: string) =>
+		row.file === prefix || row.file?.startsWith(`${prefix}/`);
+	const missingPrefixes = [
+		...new Set(
+			normalizedPrefixes.filter(
+				(prefix) => !fileRows.some((row) => matchesPrefix(row, prefix)),
+			),
 		),
-	);
-	if (selected.length === 0) {
+	];
+	if (missingPrefixes.length > 0) {
 		console.error(
-			`coverage: no files matched include prefix: ${includePrefixes.join(", ")}`,
+			`coverage: missing include prefixes: ${missingPrefixes.join(", ")}`,
 		);
 		process.exit(1);
 	}
-	return selected;
+	return fileRows.filter((row) =>
+		normalizedPrefixes.some((prefix) => matchesPrefix(row, prefix)),
+	);
 }
 
 function formatPercent(value: number): string {

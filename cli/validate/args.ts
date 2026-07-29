@@ -1,7 +1,10 @@
 import { type PackId, REQUIRED_PACKS, type ValidationScope } from "./types";
 
+export type TimingMode = "enforce" | "observe";
+
 export interface ParsedValidationArgs {
 	mode: "run" | "select" | "bench";
+	timingMode: TimingMode;
 	scope: ValidationScope;
 	changedPaths: string[];
 	explicitPacks: PackId[];
@@ -79,6 +82,15 @@ function consumeValidationArg(
 			}
 			state.outputPath = nextArg;
 			return 2;
+		case "--timing-mode":
+			if (!nextArg) {
+				throw new Error("Missing value for --timing-mode");
+			}
+			if (nextArg !== "enforce" && nextArg !== "observe") {
+				throw new Error(`Unknown --timing-mode value: ${nextArg}`);
+			}
+			state.timingMode = nextArg;
+			return 2;
 		default:
 			return undefined;
 	}
@@ -87,6 +99,7 @@ function consumeValidationArg(
 export function parseValidationArgs(args: string[]): ParsedValidationArgs {
 	const parsed: ParsedValidationArgs = {
 		mode: "run",
+		timingMode: "enforce",
 		scope: "default",
 		changedPaths: [],
 		explicitPacks: [],
@@ -123,6 +136,9 @@ export function parseValidationArgs(args: string[]): ParsedValidationArgs {
 			continue;
 		}
 		throw new Error(`Unknown validation argument: ${token}`);
+	}
+	if (parsed.mode !== "bench" && args.includes("--timing-mode")) {
+		throw new Error("--timing-mode requires bench mode");
 	}
 
 	return parsed;

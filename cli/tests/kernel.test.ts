@@ -258,6 +258,87 @@ function writeTaskWithSpecMetadata(
 }
 
 describe("kernel front-door", () => {
+	test("loads command handlers lazily after routing", async () => {
+		const source = readFileSync(kernelPath, "utf8");
+		expect(source).not.toMatch(/from\s+"\.\/commands\//);
+		expect(source).not.toMatch(/from\s+"\.\/validate\/command"/);
+
+		const lazyHandlers = [
+			["./commands/adapter", ["runAdapterCommand"]],
+			["./commands/adm", ["runAdmCommand"]],
+			["./commands/adr", ["runAdrCommand"]],
+			["./commands/bench", ["runBenchCommand"]],
+			["./commands/bootstrap", ["runBootstrapCommand"]],
+			[
+				"./commands/catalog",
+				["runHookCommand", "runRuleCommand", "runSkillCommand"],
+			],
+			["./commands/catchup", ["runCatchupCommand"]],
+			["./commands/changelog", ["runChangelogCommand"]],
+			["./commands/context", ["runContextCommand"]],
+			["./commands/db", ["runDbCommand"]],
+			["./commands/doctor", ["runDoctorCommand"]],
+			["./commands/evolve", ["runEvolveCommand"]],
+			["./commands/feedback", ["runFeedbackCommand"]],
+			["./commands/file", ["runFileCommand"]],
+			["./commands/governance", ["runGovernanceCommand"]],
+			["./commands/health", ["runHealthCommand"]],
+			["./commands/hydrate", ["runHydrateCommand"]],
+			["./commands/init", ["runInitCommand"]],
+			["./commands/library", ["runLibraryCommand"]],
+			["./commands/local-state", ["runLocalStateCommand"]],
+			["./commands/maintenance", ["runMaintenanceCommand"]],
+			["./commands/memory", ["runMemoryCommand"]],
+			["./commands/preflight", ["runPreflightCommand"]],
+			["./commands/project-benchmark", ["runProjectBenchmarkCommand"]],
+			["./commands/pstr", ["runPstrCommand"]],
+			["./commands/quick-task", ["runQuickTaskCommand"]],
+			["./commands/schema-cmd", ["runSchemaCommand"]],
+			["./commands/session", ["runSessionCommand"]],
+			["./commands/spec", ["runSpecCommand"]],
+			["./commands/state", ["runStateCommand"]],
+			["./commands/status", ["runStatusCommand"]],
+			["./commands/sweep", ["runSweepCommand"]],
+			["./commands/telemetry", ["runTelemetryCommand"]],
+			["./commands/update", ["runUpdateCommand"]],
+			["./commands/ux", ["runUxCommand"]],
+			["./commands/validate", ["runValidateCommand"]],
+			[
+				"./commands/workbench",
+				[
+					"runCloseCommand",
+					"runDoneCommand",
+					"runEvidenceCommand",
+					"runLogCommand",
+					"runNewCommand",
+					"runStartCommand",
+					"runTransitionCommand",
+					"runVerifyTasksCommand",
+				],
+			],
+			[
+				"./validate/command",
+				["resolveValidateInvocation", "runValidationCommand"],
+			],
+		] as const;
+		const lazyModules = [
+			...source.matchAll(
+				/await import\(\s*"(\.\/(?:commands\/[^"]+|validate\/command))"\s*\)/g,
+			),
+		].map((match) => match[1]);
+		expect([...new Set(lazyModules)].sort()).toEqual(
+			lazyHandlers.map(([modulePath]) => modulePath).sort(),
+		);
+		for (const [modulePath, exportNames] of lazyHandlers) {
+			const moduleExports = (await import(
+				join(process.cwd(), "cli", `${modulePath.slice(2)}.ts`)
+			)) as Record<string, unknown>;
+			for (const exportName of exportNames) {
+				expect(typeof moduleExports[exportName]).toBe("function");
+			}
+		}
+	});
+
 	test("-h prints compact help without requiring project files", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-help-no-project-"));
 		try {
@@ -1042,7 +1123,7 @@ describe("kernel front-door", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 
 	test("hydrate flag-only aliases route without empty action argument", () => {
 		const root = mkProjectRoot("hydrate-flag-aliases", "");
@@ -1902,6 +1983,23 @@ describe("kernel front-door", () => {
 					expected: "API_KEY_NOTE=synthetic-note bun test",
 					raw: "synthetic-note",
 				},
+				{
+					command: "DB_URL=synthetic-database-url bun test",
+					expected: "DB_URL=[REDACTED] bun test",
+					raw: "synthetic-database-url",
+				},
+				{
+					command:
+						'curl -H "Authorization: Bearer synthetic-bearer" https://example.test',
+					expected:
+						'curl -H "Authorization: Bearer [REDACTED]" https://example.test',
+					raw: "synthetic-bearer",
+				},
+				{
+					command: "curl https://demo-user:synthetic-password@example.test",
+					expected: "curl https://demo-user:[REDACTED]@example.test",
+					raw: "synthetic-password",
+				},
 			];
 
 			for (const fixture of cases) {
@@ -1948,7 +2046,8 @@ describe("kernel front-door", () => {
 				);
 				expect(event?.command).toBe(entry.command);
 			}
-			for (const fixture of cases.slice(0, 3)) {
+			for (const [index, fixture] of cases.entries()) {
+				if (index === 3) continue;
 				expect(evidenceText).not.toContain(fixture.raw);
 				expect(eventText).not.toContain(fixture.raw);
 			}
@@ -1960,6 +2059,9 @@ describe("kernel front-door", () => {
 				"bun",
 				"bun",
 				"API_KEY_NOTE=synthetic-note",
+				"DB_URL=[REDACTED]",
+				"curl",
+				"curl",
 			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

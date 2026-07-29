@@ -5,6 +5,7 @@
   "pack_id": "mutation-safety",
   "command": "afol f ud --session sb-undo --task-id T-01 --reason revert --json",
   "sandbox": true,
+  "compiled_binary": true,
   "setup": [
     [
       "node",

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "migration_id": "260726_f29-afol-only-active-canon",
+  "created_at": "2026-07-26T17:44:04Z",
+  "classification": "archive-legacy",
+  "reason": "Retire duplicate active factory configuration while preserving explicit legacy fallback provenance.",
+  "replacement": ".afol/config.json",
+  "retention_review_at": "2026-08-02T17:44:04Z",
+  "deletion_approved": false,
+  "artifacts": [
+    {
+      "source": ".agents/config.json",
+      "destination": ".afol/data/migrations/260726_f29-afol-only-active-canon/originals/.agents/config.json",
+      "sha256": "1b85aba68cb1e25f73a0ea07ecb800e9a67a070c7425e2333f138e108068a178",
+      "size": 1041,
+      "source_mode": "100644",
+      "source_timestamp": "2026-06-26T16:54:44-03:00",
+      "source_commit": "c3a5a0b6eaff27102bec58202902d2d7cdc27a6d",
+      "detected_schema_version": 1,
+      "classification": "archive-legacy",
+      "reason": "The root file is a legacy fallback duplicate; active AFOL authority is .afol/config.json.",
+      "replacement": ".afol/config.json",
+      "migration_target": ".afol/config.json",
+      "migration_status": "archived-verified",
+      "retention_review_at": "2026-08-02T17:44:04Z",
+      "deletion_approved": false
+    }
+  ]
+}

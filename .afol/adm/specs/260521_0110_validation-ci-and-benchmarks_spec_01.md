@@ -16,12 +16,10 @@ links:
 scope:
   repo_areas:
   - cli/validate
-  - tests
+  - cli/tests
   - .github/workflows
   - src/project-template
   - .afol/data/benchmarks
-  packages:
-  - agentic-cli
 risk_level: high
 ---
 
@@ -29,168 +27,132 @@ risk_level: high
 
 ## 1) Feature Intent
 
-Create validation gates that make the universal agent operating layer
-trustworthy.
+Create deterministic validation gates that make the AFOL operating layer
+trustworthy across correctness, latency, quality, safety, command parity,
+update safety, release provenance, and token economy.
 
-The validation system must prove correctness, **speed/latency**, quality,
-safety, command parity, update safety, and **token economy on both axes**:
+Token gates cover both:
 
-1. **Forced output tokens** — CLI stdout agents must read (compact default;
-   >5k warn, >10k fail per project rule).
-2. **Write tokens** — argv / command strings agents must author (short
-   lifecycle path, omit-able session, collapsed `d -x`; see F-03 child
-   `260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01`).
+1. **Forced output tokens** — compact default output warns above 5,000 tokens
+   and fails above 10,000.
+2. **Write tokens** — short lifecycle commands avoid repeated session IDs and
+   collapse verification into `afol d T-01 -x "<check>"` where appropriate.
 
-Gates should fail when agents are forced into giant commands or giant default
-output, not only when functional tests break.
+## Current AFOL Contract
 
-2026-05-31 DR addendum:
+- Projects invoke the external `afol` operator. The root `./afol` is only the
+  factory development/package entrypoint and is not exported downstream.
+- Bun/TypeScript under `cli/**` owns validation commands, selectors, scenario
+  execution, coverage orchestration, security orchestration, and result
+  contracts.
+- `.afol/config.json` is canonical project configuration; benchmark catalog,
+  scenarios, baselines, and results live under `.afol/data/benchmarks/**`.
+- Retired command routing is absent from the active runtime.
+- Explicit resolver compatibility fixtures are boundary tests only; they do
+  not select or execute a retired command system.
+- Historical migration material is retained under
+  `.afol/data/migrations/**`; it is outside current gate selection.
+- Required Bun/AFOL gates include `bun run typecheck`,
+  `./afol validate project --check-drift --json`, focused tests, manifest and
+  template checks, deterministic build/smoke, coverage, provenance, and strict
+  security checks when release readiness is claimed.
 
-- Release/security gate set for F-11 includes build determinism, static analysis,
-  and dependency-risk checks.
-- The active compiler is TypeScript 7 and `bun run typecheck` is a required
-  release gate, not an informative future lane.
-- Security floor adds Biome/Oxlint/Knip and dependency/runtime checks with OSV and
-  Gitleaks (or modern equivalent) in the release-quality path.
-- `bun run validate:security` drives the release security lane through
-  `security:scan:informative`; with `osv-scanner` v2 installed it scans
-  `bun.lock`, and with `gitleaks` installed it scans project content using
-  `.gitleaks.toml`.
-- This spec does not require OSV/Gitleaks to be installed everywhere; scripts
-  still skip safely when tooling is unavailable, but this factory checkout has
-  both tools installed and validated locally.
-- Build validation uses Bun standalone executable smoke tests and clean-room
-  install checks. `bun install --frozen-lockfile` is required in release-quality
-  validation so `bun.lock` cannot change during the gate.
-- Cross-target binaries require per-target smoke evidence before they count as
-  supported. Linux-built macOS or Windows artifacts are build candidates until
-  native or VM-backed smoke validates them.
+## 2) Release and Security Policy
 
-### 1.1) Release policy for MVP
-
-MVP hardening treats the release lane as:
-
-- `bun run validate:release` as the required release gate equivalent in CI.
-- Hard checks inside that lane: toolchain, template, bootstrap, deterministic
-  build, smoke, checksum/provenance generation, and security scan orchestration.
-- `bun run validate:security` remains informative for local diagnosis. The
-  release lane is strict: missing OSV/Gitleaks, scanner failures, findings, or
-  unsupported lockfiles fail `validate:release`.
-- MCP full/native adapters, runtime-live-agent transport, and broad cross-platform
-  claims remain deferred until explicit evidence packs pass for those lanes.
-
-## 2) Problem
-
-Agent systems drift easily across docs, commands, templates, runtime adapters,
-workbench files, and tool behavior.
-
-Static tests are necessary but insufficient. Runtime-flow benchmarks are a
-selective development-time regression check for changes that affect how agents
-choose commands, tools, rules, skills, or mutation paths.
+- `bun run validate:release` is the required release-quality gate.
+- The active compiler gate is TypeScript 7 through `bun run typecheck`.
+- Release validation includes toolchain, template, bootstrap, deterministic
+  build, standalone smoke, checksum/provenance, coverage, and security
+  orchestration.
+- Release security fails closed on missing scanners, scanner failure,
+  findings, or unsupported lock input.
+- Local `bun run validate:security` remains a diagnostic lane and cannot by
+  itself prove release readiness.
+- Gitleaks scans history and the current worktree with redaction.
+- OSV Scanner evaluates dependency inputs; any lock-format limitation is
+  reported explicitly with the narrowest safe fallback.
+- `bun install --frozen-lockfile` is required in release-quality clean-room
+  validation.
+- A cross-target build is only a candidate until native or VM-backed smoke
+  evidence proves the target.
 
 ## 3) Validation Layers
 
 ### CLI kernel
 
-- Type check.
-- Unit tests.
-- Parser and alias snapshot tests.
-- Output envelope tests.
-- Project-root and loader tests.
-- Delegation parity tests.
+- Typecheck and unit tests.
+- Parser, alias, registry, and output-envelope tests.
+- Project-root and canonical-loader tests.
+- Short/long semantic parity tests.
 
 ### Template export
 
-- Required file checks.
-- Forbidden factory-noise checks.
-- Manifest ownership checks.
-- Downstream bootstrap fixture.
-- Wrapper smoke checks.
-- Standalone build checks (`bun run build` and `bun run smoke:dist`).
+- Required-file and forbidden-factory-noise checks.
+- Manifest ownership and source/generated payload parity.
+- Downstream bootstrap fixtures.
+- Repo-local development and standalone `dist/afol` smoke checks.
 
 ### Workbench
 
-- Task state validation.
-- Evidence-required closure.
-- Log and sidecar shape validation.
-- Spec-to-roadmap links.
-- Strict close validation.
+- Canonical State Board transitions.
+- Evidence-required completion and closure.
+- Spec/roadmap/session linkage.
+- Strict task verification.
 
 ### Rules and skills
 
-- Routing accuracy tests.
-- Surface detection tests.
-- Compact output tests.
-- Relevance threshold checks.
+- Routing accuracy and relevance tests.
+- Surface detection and compact-output checks.
+- Prompt/body token-budget checks.
 
 ### File mutation and update
 
-- Dry-run zero-write tests.
-- Protected path tests.
-- Journal record tests.
-- Undo tests.
-- Update conflict tests.
-- Managed vs project-owned preservation tests.
+- Dry-run zero-write checks.
+- Protected-path, journal, and undo checks.
+- Managed/project-owned conflict preservation.
+- Update preview, apply, and rollback checks.
 
-### Runtime and MCP
+### Optional adapter and pack harnesses
 
-- CLI/MCP parity tests.
-- MCP request/response schema tests.
-- Tool registration smoke tests.
-- Runtime adapter health checks.
+- Schema and normalized-envelope fixture tests.
+- Registration and error-boundary tests.
+- Pack IDs such as `mcp-parity` and `runtime-live-agent` remain catalog
+  contracts; their presence does not claim a project-local adapter runtime.
 
-### Coverage Gate Strategy
+### Coverage
 
-- Program coverage minimum: **>= 80%** before implementation promotion.
-- The active Bun/TypeScript implementation has a mandatory **>=80%** lines and
-  functions gate enforced by `bun run coverage:check` inside
+- Program coverage is at least 80% lines and functions before implementation
+  promotion.
+- `bun run coverage:check` enforces the active Bun/TypeScript threshold inside
   `bun run validate:release`.
-- `.agents/scripts` coverage is historical only; that runtime is retired and
-  is not a current baseline or fallback.
-- The earlier observed release session
-  `.afol/wb/260713_0733_final-observed-release/` proves product commit
-  `af160f8`. Current observed release evidence for product commit `81a3a34` is
-  retained under
-  `.afol/wb/260713_0753_documentation-and-template-freshness/` with
-  `validate-release-clean.log` as the task artifact. Current observed
-  short-path benchmark evidence is under
-  `.afol/wb/260713_0724_final-observed-workbench-benchmark/`.
+- Retained earlier release evidence is historical proof for its recorded
+  product commit, not evidence for a later checkout.
 
-## 4) Test Matrix By Tool And Scenario
+## 4) Current Tool and Scenario Matrix
 
-| Surface | Scenario | Metrics | Required threshold |
-| --- | --- | --- | --- |
-| `afol -h` | compact help | quality, tokens | <= 25 lines and <= ~550 est. output tokens |
-| `afol s` | status success | accuracy, speed | 100% pass, p50 <= 100 ms warm local, p95 <= 300 ms |
-| `afol st T-01` / `afol d -x` / `afol c` | agent fast-path lifecycle | write tokens, reliability, speed | works without repeated session id when active session resolves; p95 <= 300 ms |
-| `afol st -S … -T …` | explicit multi-agent lifecycle | reliability | required when session ambiguous or CI fallback disabled |
-| `afol status` | long alias parity | parity | semantic equality with `s` |
-| `afol -j s` | JSON output | contract | valid JSON, required keys |
-| invalid root | safety error | safety, quality | non-zero, actionable hint |
-| missing config | loader failure | safety | non-zero before mutation |
-| unsupported command | router failure | quality | next command hint |
-| delegated command | legacy fallback | parity | exit/stdout/stderr contract |
-| `afol t d` | task closure | correctness | evidence required |
-| `afol e a` | evidence add | correctness | ledger append validated |
-| `afol r g` | rule route | accuracy | expected rules returned |
-| `afol sk g` | skill route | accuracy | expected skills returned |
-| `afol f pt` | patch mutation | safety | journal + protected path gate |
-| `afol u` | undo | safety | supported rollback succeeds |
-| `afol up ck` | update check | safety | read-only, no writes |
-| `afol up ap` | update apply | safety | local edits preserved/flagged |
-| `bun run build` | standalone build | release safety | deterministic artifact produced |
-| `bun run smoke:dist` | standalone smoke | safety + tokens | `./dist/afol --help` succeeds |
-| MCP `status` | tool parity | parity | same semantic envelope as CLI |
-| MCP mutation tools | safe mutation | safety | journal + protected paths |
-| benchmark runner | result schema | quality | stable JSON schema |
-| clean install | reproducibility | release safety | `bun install --frozen-lockfile` exits without lock changes |
-| cross-target binary | platform support | release safety | each claimed target has native/VM smoke evidence |
+| Surface | Scenario | Required result |
+| --- | --- | --- |
+| `afol -h` | compact help | <=25 lines and <=~550 estimated output tokens |
+| `afol s` | status | 100% pass; p50 <=100 ms and p95 <=300 ms on matching local profile |
+| `afol st T-01` / `afol d T-01 -x` / `afol c` | fast lifecycle | no repeated session ID when context is unambiguous |
+| explicit `-S` / `-T` | concurrent lifecycle | deterministic selected session/task |
+| `afol -j s` | structured output | valid JSON with required envelope fields |
+| invalid root/config | safety | non-zero before mutation with actionable hint |
+| `afol d T-01 -x "<check>"` | task completion | verification evidence required |
+| `afol e T-01 -c "<check>" -o passed` | evidence | validated ledger append |
+| `afol rule list\|show\|resolve` | rule routing | expected governed rules |
+| `afol skill list\|show\|search` | skill routing | expected provider skills |
+| `afol file patch` | mutation | journal plus protected-path gate |
+| `afol file undo --mutation-id <id>` | undo | supported rollback succeeds |
+| `afol up check` | update | read-only and compact |
+| `afol up apply --dry-run` | update preview | no writes and conflicts reported |
+| `bun run build` / `bun run smoke:dist` | standalone artifact | deterministic build and smoke |
+| benchmark runner | result contract | stable schema and bounded output |
+| clean install | reproducibility | frozen lock exits without lock changes |
 
 ## 5) Benchmark Result Schema
 
-Benchmark results should record token-aware data, not only bytes.
-
-Required fields:
+Required result fields:
 
 ```text
 run_id
@@ -233,33 +195,19 @@ semantic_diff
 notes
 ```
 
-Bytes stay useful for local fixture size. Token fields are the primary token
-cost metric and must identify tokenizer, counting method, source, and status.
+Bytes remain useful for fixture size. Token fields are the primary token-cost
+measure and identify tokenizer, counting method, source, and status.
 
 ## 6) Scenario Registry
 
-Every pack must have scenario definitions under:
+Scenario definitions live under:
 
 ```text
 .afol/data/benchmarks/scenarios/<pack-id>/<scenario-id>.json
 ```
 
-Each scenario definition must include:
-
-- `scenario_id`,
-- `pack_id`,
-- command or MCP tool under test,
-- fixture path or fixture generator,
-- expected result envelope fields,
-- side-effect oracle,
-- metric thresholds,
-- baseline id when comparing,
-- required tags for CI selection.
-
-Minimum registry:
-
-The first implementation must create concrete scenario ids matching the F-11
-spec-test. Pack-level names alone are not enough.
+Each definition includes its command or harness action, fixture, expected
+envelope fields, side-effect oracle, thresholds, baseline ID, and CI tags.
 
 | Pack | Minimum scenarios | Required coverage |
 | --- | ---: | --- |
@@ -268,72 +216,52 @@ spec-test. Pack-level names alone are not enough.
 | `routing-accuracy` | 4 | file, task, surface, unknown route |
 | `mutation-safety` | 5 | dry-run, patch, move, protected, undo |
 | `update-safety` | 4 | check, preview, conflict, local edit |
-| `mcp-parity` | 5 | status, evidence, rule, mutation, error |
-| `runtime-live-agent` | 3 | status, governed flow, MCP smoke |
-| `token-economy` | 4+ | help, status, routing, noisy **output**; extend with **input argv** / short-lifecycle scenarios per F-03 child |
+| `mcp-parity` | 5 | normalized harness contract and error cases |
+| `runtime-live-agent` | 3 | explicit live-runner contract states |
+| `token-economy` | 4+ | compact output and authored argv |
 
-Completeness gate: if a changed path selects a pack, CI fails when the pack has
-fewer registered scenarios than the minimum or when any scenario lacks an
-oracle, threshold, or result-schema mapping.
+If a changed path selects a pack, CI fails when the pack is incomplete or a
+scenario lacks an oracle, threshold, or result mapping.
 
 ## 7) Measurement Protocol
 
-Baseline artifacts live under:
+Baselines live under:
 
 ```text
 .afol/data/benchmarks/baselines/<pack-id>/<baseline-id>.json
 ```
 
-Protocol:
+1. Record host profile, OS, CPU class, Bun version, runtime version, model,
+   tokenizer, and Git commit.
+2. Run one warmup and at least three measured samples for deterministic local
+   packs.
+3. Compare p50 and p95 instead of a single duration.
+4. Run live packs only with fixed prompt, model tier, fixture, and persisted
+   result.
+5. Treat a missing baseline as `baseline-missing`.
+6. Reject incomparable scenario, tokenizer, or host profiles unless a
+   compatible normalized baseline is declared.
+7. Require a written, evidence-backed reason for any threshold override.
 
-1. Record `host_profile_id`, OS, CPU class, Bun version, runtime version,
-   model id, tokenizer id, and git commit.
-2. Run one warmup for local deterministic packs.
-3. Run at least three measured samples for local deterministic packs.
-4. Compare local timing using p50 and p95, not a single run.
-5. Run live packs only with fixed prompt, fixed model tier, fixed fixture, and
-   saved result JSON.
-6. Treat missing baselines as `baseline-missing`, not pass.
-7. Store sample count, warmup count, p50, p95, host profile, runtime versions,
-   scenario versions, tokenizer id, and git commit in the baseline artifact.
-8. Reject comparison when scenario id, tokenizer id, or host profile differs
-   unless a compatible normalized baseline id is declared.
-9. Allow threshold override only with a written reason in benchmark evidence.
+For F-03 input-token measurement, `argv_chars` is the number of Unicode code
+points in the trimmed authored `scenario.command`. Setup commands, process argv
+expansion, and generated arguments are excluded.
 
-For F-03 input-token measurements, `argv_chars` is the number of Unicode code
-points in the trimmed authored `scenario.command` (`Array.from(command.trim()).length`).
-Scenario setup commands, tokenized process argv, wrappers, and generated
-arguments are excluded.
+## 8) Safety and Semantic Oracles
 
-Early thresholds are provisional until baseline artifacts exist. Once a baseline
-exists, comparisons use that versioned baseline.
+Mutating scenarios capture pre/post tree hashes, allowed and forbidden diffs,
+event/journal records, protected-path blocks, normalized errors, and undo
+results where supported.
 
-## 8) Side-Effect Oracle
+Safety passes only when:
 
-Mutating scenarios must capture:
+- no write escapes the allowed diff list;
+- protected resources remain unchanged;
+- every accepted mutation has a journal record;
+- invalid-root and loader failures make zero writes;
+- supported undo restores the fixture.
 
-- pre-run file tree hash,
-- post-run file tree hash,
-- allowed path diff list,
-- forbidden path diff list,
-- event records,
-- mutation journal records,
-- undo result when supported,
-- normalized error envelope for blocked operations.
-
-Safety pass requires:
-
-- no writes outside the allowed diff list,
-- no protected path mutation,
-- journal record for every accepted mutation,
-- zero writes for invalid-root and loader-failure paths,
-- undo restores the fixture for supported mutations.
-
-## 9) Semantic Parity Oracle
-
-CLI, MCP, and legacy delegation compare normalized envelopes.
-
-Canonical parity fields:
+Normalized semantic comparison covers:
 
 ```text
 ok
@@ -352,52 +280,27 @@ hint
 metrics
 ```
 
-Fields ignored by parity unless explicitly tested:
+Timestamps, durations, ordering of unordered lists, and transport-only metadata
+are ignored unless a scenario explicitly tests them.
 
-- timestamp,
-- duration,
-- ordering of unordered lists,
-- runtime-specific transport metadata.
-
-A shared diff helper must report:
-
-- missing fields,
-- extra semantic fields,
-- mismatched values,
-- ignored transport-only fields.
-
-## 10) TDD Strategy
+## 9) TDD and CI Strategy
 
 Implementation order:
 
-1. Write spec-test artifacts for the behavior contract.
-2. Write type/schema tests.
-3. Write parser, alias, and result-envelope unit tests.
-4. Write fixture integration tests for `afol`.
-5. Write delegation parity tests against legacy commands.
-6. Write template export negative tests before shrinking the template.
-7. Write MCP parity tests before exposing new MCP tools.
-8. Write deterministic benchmark-runner tests.
-9. Run live benchmark packs only for risky runtime/tool-routing changes.
+1. Create or update the linked spec-test.
+2. Write type/schema and negative safety tests.
+3. Add parser, alias, registry, and result-envelope tests.
+4. Add isolated filesystem integration tests.
+5. Add source/generated template negative checks.
+6. Add optional adapter harness checks before enabling an adapter.
+7. Add deterministic benchmark-runner tests.
+8. Run live packs only for risky routing or tool-choice changes.
 
-## 11) CI Strategy
+Default CI runs typecheck, focused/full tests as configured, lint, deterministic
+build/smoke, template validation, workbench validation, coverage, provenance,
+and strict security orchestration for release claims.
 
-Default CI runs:
-
-- `bun run typecheck`.
-- `bun test`.
-- lint.
-- `bun run build` + `bun run smoke:dist`.
-- template export validation.
-- focused integration tests.
-- workbench validation where applicable.
-- Smoke benchmark runs are acceptable for early continuity checks, but they are
-  not a daily production gate. Global closure requires full artifacts persisted
-  for selected packs (`.afol/data/benchmarks/results/...`) and evidence that
-  all F-11 required pack scenarios were executed or explicitly waived with
-  artifact-backed reasoning.
-
-Selective CI maps paths to packs:
+Selective mapping:
 
 | Changed path | Required pack |
 | --- | --- |
@@ -406,27 +309,23 @@ Selective CI maps paths to packs:
 | `cli/skills/**` | `routing-accuracy` |
 | `cli/files/**` | `mutation-safety` |
 | `cli/update/**` | `update-safety` |
-| `cli/mcp/**` | `mcp-parity` |
-| `.agents/runtime/**` | `runtime-live-agent` |
+| `cli/mcp/**` | `mcp-parity` when that optional surface exists |
 | `src/project-template/**` | template export checks |
 | prompt/context docs | `token-economy` |
 
-## 12) Acceptance
+## 10) Acceptance
 
-- Type checks and unit tests exist for the CLI kernel.
-- Template export checks catch forbidden content.
-- Workbench validation catches missing evidence.
-- CLI/MCP parity tests use one normalized envelope and diff helper.
-- Benchmark registry defines required scenarios by pack.
-- Benchmark results capture tokens, bytes, baseline id, and runtime profile.
-- Release-quality validation includes deterministic standalone build smoke and
-  security/toolchain checks where configured.
-- Public release claims include clean install evidence, binary provenance,
-  checksums, and notarization status where relevant.
-- Risky runtime changes have a clear, selective benchmark trigger.
-- CI catches schema, command, and template drift before release.
+- Type and behavior checks cover the CLI kernel.
+- Template checks catch forbidden downstream content.
+- Workbench validation catches missing evidence and governance drift.
+- Benchmark registry defines required scenarios and stable result fields.
+- Results capture tokens, bytes, baseline, host, and runtime profile.
+- Release validation includes clean install, deterministic smoke, coverage,
+  security, provenance, and checksums.
+- Risky changes have a selective benchmark trigger.
+- CI catches schema, command, template, and index drift before release.
 
-## 13) Closeout
+## 11) Closeout and Historical Provenance
 
 - Status: final.
 - Accepted session-backed artifacts:
@@ -452,12 +351,10 @@ Selective CI maps paths to packs:
   - `.afol/data/benchmarks/results/20260529_142633_mcp-parity.json`
   - `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
   - `.afol/data/benchmarks/results/20260529_142633_token-economy.json`
-- Waiver (artifact-backed):
-  - `runtime-live-agent` is explicitly recorded as
-    `status=skipped` with note
-    `all-scenarios-skipped:not-implemented-live-runner`
-    in `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
-- Current benchmark matrix:
+- Historical artifact-backed waiver: `runtime-live-agent` was recorded as
+  `status=skipped` with note
+  `all-scenarios-skipped:not-implemented-live-runner` in its accepted result.
+- Current benchmark catalog retains:
   - `cli-kernel-local`
   - `workbench-parity`
   - `routing-accuracy`
@@ -466,3 +363,6 @@ Selective CI maps paths to packs:
   - `mcp-parity`
   - `runtime-live-agent`
   - `token-economy`
+- The exact pre-reconciliation spec is retained under
+  `.afol/data/migrations/260726_f29-governance-contract-reconciliation/`,
+  with verified source commit, bytes, and retention metadata.

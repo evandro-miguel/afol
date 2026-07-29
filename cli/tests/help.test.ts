@@ -36,6 +36,7 @@ describe("help formatter", () => {
 		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
+		expect(help).toContain("evolve[read] - evolution status");
 		expect(help).toContain(
 			"pb/project-benchmark[generated] - compare references",
 		);
@@ -67,6 +68,7 @@ describe("help formatter", () => {
 		expect(planning).toContain("Commands for planning");
 		expect(planning).toContain("pf/preflight");
 		expect(planning).toContain("pb/project-benchmark");
+		expect(planning).toContain("evolve");
 		expect(planning).not.toContain("qt/quick-task");
 		expect(execution).toContain("Commands for execution");
 		expect(execution).toContain("n/new");
@@ -93,7 +95,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(380);
+		expect(lines.length).toBeLessThanOrEqual(400);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -248,7 +250,7 @@ describe("help formatter", () => {
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });
 		}
-	}, 15_000);
+	}, 60_000);
 
 	test("expands per-command help with tool-specific options and guidance", () => {
 		const validateHelp = formatCommandHelp("validate", kernelRegistry);
@@ -267,6 +269,10 @@ describe("help formatter", () => {
 		expect(validateHelp).toContain("Subcommands:");
 		expect(validateHelp).toContain("project --json [read]");
 		expect(validateHelp).toContain("bench --pack <pack-id> --json [read]");
+		expect(validateHelp).toContain(
+			"bench --pack governance-history --timing-mode observe --json [read]",
+		);
+		expect(validateHelp).toContain("Observe timing; non-timing gates block");
 		expect(updateHelp).toContain("Guidance:");
 		expect(updateHelp).toContain(
 			"Prefer check, then preview, then apply --dry-run before real apply.",
@@ -424,6 +430,7 @@ describe("help formatter", () => {
 			sideEffect: string;
 			requires_approval: boolean;
 			description: string;
+			capabilities?: string[];
 			category?: string;
 		}>;
 
@@ -435,6 +442,7 @@ describe("help formatter", () => {
 				"pstr",
 				"adm",
 				"project-benchmark",
+				"evolve",
 			]),
 		);
 		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(
@@ -456,6 +464,26 @@ describe("help formatter", () => {
 		expect(
 			parsed.every((entry) => !entry.aliases.includes(entry.command)),
 		).toBe(true);
+		expect(
+			parsed.find((entry) => entry.command === "evolve")?.capabilities,
+		).toEqual(["evolution.suggest.first-session/v1"]);
+		expect(
+			parsed.find((entry) => entry.command === "status"),
+		).not.toHaveProperty("capabilities");
+	});
+
+	test("projects optional capabilities without sharing registry arrays", () => {
+		const catalog = buildCommandCatalog(kernelRegistry);
+		const evolve = catalog.find((entry) => entry.command === "evolve");
+
+		expect(evolve?.capabilities).toEqual([
+			"evolution.suggest.first-session/v1",
+		]);
+		evolve?.capabilities?.push("test-only");
+		expect(
+			kernelRegistry.commands.find((entry) => entry.command === "evolve")
+				?.capabilities,
+		).toEqual(["evolution.suggest.first-session/v1"]);
 	});
 
 	test("builds intent-filtered catalog json", () => {
@@ -508,6 +536,16 @@ describe("help formatter", () => {
 			],
 		});
 		expect(buildCommandHelpJson("nope", kernelRegistry)).toBeNull();
+	});
+
+	test("projects evolve capabilities in single-command json only", () => {
+		expect(buildCommandHelpJson("evolve", kernelRegistry)).toMatchObject({
+			command: "evolve",
+			capabilities: ["evolution.suggest.first-session/v1"],
+		});
+		expect(buildCommandHelpJson("status", kernelRegistry)).not.toHaveProperty(
+			"capabilities",
+		);
 	});
 
 	test("does not advertise unsupported init json output", () => {

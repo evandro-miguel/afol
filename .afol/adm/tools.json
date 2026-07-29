@@ -1,6 +1,6 @@
 {
   "version": "2.1.0",
-  "updated_at": "2026-06-27T00:00:00Z",
+  "updated_at": "2026-07-17T02:55:22Z",
   "description": "Static AFOL-only command catalog derived from the registry-backed afol help surface.",
   "generated_from": "afol help --json",
   "tools": [
@@ -65,6 +65,11 @@
           "usage": "bench --pack <pack-id> --json",
           "side_effect": "read",
           "description": "Run one benchmark pack with its configured gates"
+        },
+        {
+          "usage": "bench --pack governance-history --timing-mode observe --json",
+          "side_effect": "read",
+          "description": "Observe timing; non-timing gates block"
         },
         {
           "usage": "select --changed-path <path>",
@@ -667,6 +672,25 @@
       "subcommands": []
     },
     {
+      "id": "evolve",
+      "name": "AFOL Evolve",
+      "tool": "afol",
+      "wrapper_command": "afol evolve",
+      "aliases": [],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect project evolution state",
+      "subcommands": [
+        {
+          "usage": "status [--json]",
+          "side_effect": "read",
+          "description": "Inspect evolution config, migration, and production-day state"
+        }
+      ]
+    },
+    {
       "id": "adm",
       "name": "AFOL Adm",
       "tool": "afol",
@@ -1187,6 +1211,7 @@
       "render",
       "library",
       "memory",
+      "evolve",
       "adm",
       "spec",
       "adr",
