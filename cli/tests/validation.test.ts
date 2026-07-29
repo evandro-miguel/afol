@@ -731,8 +731,7 @@ describe("validation command family", () => {
 				expect(
 					results.every(
 						(entry) =>
-							entry.pack_id === "mutation-safety" &&
-							entry.status === "passed",
+							entry.pack_id === "mutation-safety" && entry.status === "passed",
 					),
 				).toBe(true);
 				expect(
