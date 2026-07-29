@@ -3222,7 +3222,22 @@ describe("workbench lifecycle service", () => {
 			doneTask(root, { session: created.session, taskId: "T-02" });
 
 			const result = closeSession(root, created.session);
+			const report = readFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"utf8",
+			);
 			expect(result.report.status).toBe("created");
+			expect(report).toContain(
+				"closed: 2 tasks; evidence: 2 observed, 0 failed",
+			);
+			expect(report).not.toContain("first task");
+			expect(report).not.toContain("second task");
 			expect(
 				existsSync(
 					join(
@@ -3267,7 +3282,9 @@ describe("workbench lifecycle service", () => {
 				path: `.afol/wb/${created.session}/${created.session}_report_01.md`,
 				summary_source: "flag",
 			});
-			expect(readFileSync(reportPath, "utf8")).toContain("close verified");
+			const report = readFileSync(reportPath, "utf8");
+			expect(report).toContain("declared: close verified");
+			expect(report).not.toContain("close auto report");
 			expect(
 				readFileSync(created.logPath, "utf8").match(/^## Summary$/gm) ?? [],
 			).toHaveLength(1);
@@ -3323,10 +3340,62 @@ describe("workbench lifecycle service", () => {
 				"closed: 1 task; evidence: 1 observed, 0 failed",
 			);
 			expect(report).toContain("- T-01: done");
-			expect(report).toContain("- T-01: passed (true; exit=0)");
+			expect(report).toContain("- T-01: passed (true; exit_code=0)");
 			expect(Math.ceil(reportBytes / 4)).toBeLessThanOrEqual(
 				Math.ceil(legacyBytes / 4) * 0.6,
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession reports observed failures without claiming closure proof", () => {
+		const root = mkRoot("close-factual-failure-count");
+		try {
+			const created = newWorkstream(root, "close factual failure count");
+			recordRawEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "manual review",
+				result: "passed",
+				provenance: "declared",
+			});
+			recordRawEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "blocked",
+				exitCode: 0,
+				provenance: "observed",
+			});
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			closeSession(root, created.session);
+			const report = readFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"utf8",
+			);
+
+			expect(report).toContain(
+				"closed: 1 task; evidence: 2 observed, 1 failed",
+			);
+			expect(report).toContain(
+				"- T-01: declared passed (manual review; exit_code=n/a)",
+			);
+			expect(report).toContain("- T-01: blocked (bun test; exit_code=0)");
+			expect(report).not.toContain("verified");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -3547,17 +3616,6 @@ describe("workbench lifecycle service", () => {
 				),
 				"# Log\n\n## Summary\n\n- done\n",
 			);
-			writeFileSync(
-				join(
-					root,
-					".afol",
-					"wb",
-					created.session,
-					`${created.session}_report_01.md`,
-				),
-				"# Report\n",
-			);
-
 			startTask(root, { session: created.session, taskId: "T-01" });
 			recordObservedCompletion(root, {
 				session: created.session,
@@ -3567,7 +3625,23 @@ describe("workbench lifecycle service", () => {
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
 
-			expect(closeSession(root, created.session)).toHaveLength(0);
+			const result = closeSession(root, created.session);
+			const report = readFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"utf8",
+			);
+			expect(result).toHaveLength(0);
+			expect(result.report).toMatchObject({
+				status: "created",
+				summary_source: "log",
+			});
+			expect(report).toContain("declared: - done");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

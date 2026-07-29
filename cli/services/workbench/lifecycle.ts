@@ -54,6 +54,7 @@ import {
 	completionPolicyFromNotes,
 	evidenceCompletionAuthorization,
 	evidenceCompletionStatus,
+	evidenceResultIsFailure,
 	verifyWorkbenchTasks,
 } from "./verify";
 
@@ -495,7 +496,7 @@ function renderCloseReport(
 		"## Evidence",
 		...evidence.map(
 			(entry) =>
-				`- ${entry.task_id}: ${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit=${entry.exit_code ?? "n/a"})`,
+				`- ${entry.task_id}: ${entry.provenance === "observed" ? "" : "declared "}${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
 		),
 	];
 	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
@@ -505,14 +506,17 @@ function factualCloseSummary(
 	taskRows: TaskRow[],
 	evidence: EvidenceEntry[],
 ): string {
-	const observed = evidence.filter(
-		(entry) => entry.provenance === "observed",
-	).length;
-	const failed = evidence.filter(
-		(entry) =>
-			entry.result === "failed" ||
-			(typeof entry.exit_code === "number" && entry.exit_code !== 0),
-	).length;
+	let observed = 0;
+	let failed = 0;
+	for (const entry of evidence) {
+		if (entry.provenance === "observed") observed += 1;
+		if (
+			evidenceResultIsFailure(entry.result) ||
+			(typeof entry.exit_code === "number" && entry.exit_code !== 0)
+		) {
+			failed += 1;
+		}
+	}
 	return `closed: ${taskRows.length} task${taskRows.length === 1 ? "" : "s"}; evidence: ${observed} observed, ${failed} failed`;
 }
 
@@ -2375,7 +2379,11 @@ export function closeSession(
 					);
 				}
 			}
-			const reportEvidence = loadEvidenceEntries(paths.evidencePath);
+			let reportEvidence: EvidenceEntry[] | undefined;
+			const getReportEvidence = () => {
+				reportEvidence ??= loadEvidenceEntries(paths.evidencePath);
+				return reportEvidence;
+			};
 			if (summary) {
 				summarySource = "flag";
 			} else if (reportStatus === "waived") {
@@ -2385,10 +2393,14 @@ export function closeSession(
 				summary = logSummary;
 				summarySource = "log";
 			} else {
-				summary = factualCloseSummary(taskRows, reportEvidence);
+				summary = factualCloseSummary(taskRows, getReportEvidence());
 				summarySource = "state";
 			}
 			const summaryText = closeMarkdownText(summary);
+			const reportSummary =
+				summarySource === "flag" || summarySource === "log"
+					? `declared: ${summaryText}`
+					: summaryText;
 			const nextLog = canonicalizeLogSummary(originalLog, summaryText);
 			const reportWasPresent = existsSync(reportPath);
 			let reportCreated = false;
@@ -2397,7 +2409,12 @@ export function closeSession(
 				if (reportStatus === "created") {
 					atomicWriteText(
 						reportPath,
-						renderCloseReport(session, taskRows, reportEvidence, summaryText),
+						renderCloseReport(
+							session,
+							taskRows,
+							getReportEvidence(),
+							reportSummary,
+						),
 						{ syncDirectory: false },
 					);
 					reportCreated = !reportWasPresent;
