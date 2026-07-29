@@ -1198,6 +1198,16 @@ function isSessionSnapshotFresh(
 	if (persistedSession.task_count !== persistedTasks.length) {
 		return false;
 	}
+	const currentSnapshot = buildSessionsSnapshot(root, [session]);
+	const currentSession = currentSnapshot.sessions[0];
+	if (
+		!currentSession ||
+		JSON.stringify(currentSession) !== JSON.stringify(persistedSession) ||
+		JSON.stringify(currentSnapshot.tasks) !==
+			JSON.stringify([...persistedTasks].sort(sortTasks))
+	) {
+		return false;
+	}
 
 	const sessionDir = resolve(resolveWorkbenchRoot(root), session);
 	const taskFileRead = readSessionTaskFiles(sessionDir);
