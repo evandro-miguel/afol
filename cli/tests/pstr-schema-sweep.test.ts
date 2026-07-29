@@ -7,6 +7,7 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	utimesSync,
 	writeFileSync,
 } from "node:fs";
@@ -21,6 +22,7 @@ import {
 	getPstrAffectedAreas,
 	PSTR_AREAS,
 	rebuildPstrIndex,
+	resolvePstrAreas,
 } from "../services/pstr/builder";
 import { getPstrWatchTargets } from "../services/pstr/watch";
 import {
@@ -924,6 +926,259 @@ describe("pstr command", () => {
 });
 
 describe("pstr service helpers", () => {
+	test("template config exposes additive PSTR areas while preserving defaults", () => {
+		const templateConfig = JSON.parse(
+			readFileSync(
+				join(
+					import.meta.dir,
+					"..",
+					"..",
+					"src",
+					"project-template",
+					".afol",
+					"config.json",
+				),
+				"utf8",
+			),
+		) as { pstr?: { areas?: unknown } };
+		expect(templateConfig.pstr?.areas).toEqual([]);
+	});
+
+	test("resolves additive configured areas after the four defaults", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					pstr: {
+						areas: [
+							{
+								id: "zeta",
+								scope: "zeta.scope",
+								source_roots: ["docs", "docs/", "./docs"],
+								tags: ["custom", "custom"],
+							},
+							{
+								id: "alpha",
+								scope: "alpha",
+								source_roots: ["cli"],
+								tags: ["alpha"],
+							},
+						],
+					},
+				}),
+			);
+			expect(resolvePstrAreas(root).map((area) => area.id)).toEqual([
+				"cli",
+				"template",
+				"docs",
+				"config",
+				"alpha",
+				"zeta",
+			]);
+			expect(resolvePstrAreas(root).at(-1)?.source_roots).toEqual(["docs/"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("rejects unsafe or colliding configured areas", () => {
+		const root = createFixture();
+		try {
+			for (const area of [
+				{ id: "cli", scope: "extra", source_roots: ["docs"], tags: ["test"] },
+				{ id: "extra", scope: "cli", source_roots: ["docs"], tags: ["test"] },
+				{
+					id: "extra",
+					scope: "extra",
+					source_roots: ["../outside"],
+					tags: ["test"],
+				},
+				{
+					id: "bad/id",
+					scope: "extra",
+					source_roots: ["docs"],
+					tags: ["test"],
+				},
+				{
+					id: "extra",
+					scope: "extra",
+					source_roots: [".afol/pstr"],
+					tags: ["test"],
+				},
+			]) {
+				writeFileSync(
+					join(root, ".agents", "config.json"),
+					JSON.stringify({ pstr: { areas: [area] } }),
+				);
+				expect(() => resolvePstrAreas(root)).toThrow();
+			}
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("only an absent pstr key uses defaults", () => {
+		const root = createFixture();
+		try {
+			for (const value of [null, [], "invalid", 1, {}]) {
+				writeFileSync(
+					join(root, ".agents", "config.json"),
+					JSON.stringify({ pstr: value }),
+				);
+				expect(() => resolvePstrAreas(root)).toThrow(/Invalid pstr/);
+			}
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({ version: "0.1.0" }),
+			);
+			expect(resolvePstrAreas(root).map((area) => area.id)).toEqual([
+				"cli",
+				"template",
+				"docs",
+				"config",
+			]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("requires at least one safe tag for configured areas", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "custom",
+								scope: "custom",
+								source_roots: ["docs"],
+								tags: [],
+							},
+						],
+					},
+				}),
+			);
+			expect(() => resolvePstrAreas(root)).toThrow(/tags/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("fails when the canonical project config contains invalid JSON", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(join(root, ".afol", "config.json"), "{invalid", "utf8");
+			expect(() => resolvePstrAreas(root)).toThrow(/Invalid JSON/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("rejects .afol source roots case-insensitively", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "private",
+								scope: "private",
+								source_roots: [".AFOL/pstr"],
+								tags: ["test"],
+							},
+						],
+					},
+				}),
+			);
+			expect(() => resolvePstrAreas(root)).toThrow(/source root/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("materializes configured areas alongside defaults", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, "os", "kernel"), { recursive: true });
+			mkdirSync(join(root, "os", "userland"), { recursive: true });
+			writeFileSync(join(root, "os", "kernel", "README.md"), "kernel\n");
+			writeFileSync(join(root, "os", "userland", "README.md"), "userland\n");
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "kernel",
+								scope: "os.kernel",
+								source_roots: ["os/kernel"],
+								tags: ["os"],
+							},
+							{
+								id: "userland",
+								scope: "os.userland",
+								source_roots: ["os/userland"],
+								tags: ["os"],
+							},
+						],
+					},
+				}),
+			);
+			const snapshot = rebuildPstrIndex(root);
+			expect(snapshot.maps.map((entry) => entry.id)).toEqual([
+				"cli",
+				"template",
+				"docs",
+				"config",
+				"kernel",
+				"userland",
+			]);
+			expect(existsSync(join(root, ".afol", "pstr", "kernel.md"))).toBe(true);
+			expect(existsSync(join(root, ".afol", "pstr", "userland.md"))).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("watch rejects configured roots whose symlink leaves the project", () => {
+		const root = createFixture();
+		const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));
+		try {
+			mkdirSync(join(outside, "secret"), { recursive: true });
+			try {
+				symlinkSync(join(outside, "secret"), join(root, "outside-link"));
+			} catch {
+				return;
+			}
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "outside",
+								scope: "outside",
+								source_roots: ["outside-link"],
+								tags: ["test"],
+							},
+						],
+					},
+				}),
+			);
+			expect(() => resolvePstrAreas(root)).toThrow(/symlink|escapes/);
+			expect(getPstrWatchTargets(root, ["outside-link"])).toEqual([]);
+		} finally {
+			cleanup(root);
+			cleanup(outside);
+		}
+	});
+
 	test("registry and affected-area matching stay stable", () => {
 		const root = createFixture();
 		try {

@@ -120,6 +120,9 @@ agent context.
 ## State Ownership
 
 - `.afol/config.json`: static AFOL project configuration and root detection input.
+- `pstr.areas`: optional additive PSTR area registry. An empty array preserves
+  the four built-in areas; configured entries must use safe IDs/scopes/tags and
+  project-contained relative source roots.
 - `.agents/lock.json`, `.agents/manifest.json`: static scaffold metadata.
 - `.afol/adm/hooks/**`: static provider-neutral hook catalog.
 - `.afol/adm/rules/**`: static local contracts.
@@ -142,6 +145,28 @@ agent context.
   projection with explicit `PRAGMA user_version` migrations.
 - `.afol/tmp/**`: temporary AFOL-owned files.
 - `.afol/library/**` and `.afol/memory/**`: local knowledge and memory surfaces.
+
+PSTR keeps four built-in maps by default. Projects may add observed maps
+through the optional `pstr.areas` registry:
+
+```json
+{
+  "pstr": {
+    "areas": [
+      {
+        "id": "os",
+        "scope": "os",
+        "source_roots": ["src/os/"],
+        "tags": ["os"]
+      }
+    ]
+  }
+}
+```
+
+Entries are additive and sorted by ID after the defaults. IDs, scopes, and tags
+must be safe tokens; source roots must be relative, project-contained, and
+outside `.afol/**`.
 
 `.afol/state/afol.db` is the SQLite v1 surface. It materializes workbench
 sessions, task rows, source hashes, and evidence only. Broader

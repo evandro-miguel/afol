@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+	chmodSync,
 	cpSync,
 	existsSync,
 	lstatSync,
@@ -8,6 +9,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	symlinkSync,
 	unlinkSync,
@@ -800,7 +802,23 @@ describe("validate registry", () => {
 			expect(snapshot.schema_version).toBe("1.0.0");
 			expect(snapshot.packs).toHaveLength(16);
 			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(4);
-			expect(snapshot.scenariosByPack["pstr-integrity"]).toHaveLength(4);
+			expect(
+				snapshot.scenariosByPack["pstr-integrity"]
+					?.map((scenario) => scenario.scenario_id)
+					.sort(),
+			).toEqual([
+				"pstr-detect",
+				"pstr-diff",
+				"pstr-rebuild",
+				"pstr-review",
+				"pstr-review-apply",
+				"pstr-section",
+				"pstr-show",
+				"pstr-stale",
+				"pstr-suggest",
+				"pstr-validate",
+				"pstr-watch-once",
+			]);
 			expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["state-projection"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["memory-governance"]).toHaveLength(4);
@@ -2184,8 +2202,16 @@ describe("scenario benchmark execution", () => {
 				scenario_version: "1.0.0",
 				pack_id: "pstr-integrity",
 				command:
-					'node -e \'process.exit(require("node:fs").existsSync(".afol/tmp/afol-bench-release-sentinel/afol") ? 9 : 0)\'',
+					'node -e \'process.exit(require("node:fs").existsSync(".afol/tmp/afol-bench-release-sentinel/afol") ? 9 : 1)\'',
 				sandbox: true,
+				expected_exit: 1,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const fs=require('node:fs'); fs.mkdirSync('unreadable-fixture',{recursive:true}); fs.writeFileSync('unreadable-fixture/file','fixture'); fs.chmodSync('unreadable-fixture/file',0o000); fs.chmodSync('unreadable-fixture',0o000);",
+					],
+				],
 				result_schema: "1.0.0",
 				oracle: "fixture",
 				thresholds: { max_p95_ms: 10_000 },
@@ -2200,6 +2226,217 @@ describe("scenario benchmark execution", () => {
 					entry.startsWith("afol-bench-sandbox-"),
 				),
 			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("does not follow a sandbox symlink swap to an external target", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-symlink-swap",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					"node -e \"const fs=require('node:fs'); fs.rmSync('swap-target',{recursive:true,force:true}); fs.symlinkSync('../external-target','swap-target','dir');\"",
+				sandbox: true,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const fs=require('node:fs'); fs.mkdirSync('../external-target',{recursive:true}); fs.writeFileSync('../external-target/keep','keep'); fs.mkdirSync('swap-target',{recursive:true});",
+					],
+				],
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			expect(runScenarioCommand(root, scenario).passed).toBe(true);
+			expect(
+				readFileSync(
+					join(root, ".afol", "tmp", "external-target", "keep"),
+					"utf8",
+				),
+			).toBe("keep");
+			expect(
+				readdirSync(join(root, ".afol", "tmp")).filter((entry) =>
+					entry.startsWith("afol-bench-sandbox-"),
+				),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed when a sandbox root is replaced before cleanup", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-root-replacement",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					"node -e \"require('node:fs').writeFileSync('command-ran','bad')\"",
+				sandbox: true,
+				setup: [
+					[
+						"node",
+						"-e",
+						"const fs=require('node:fs'); const path=require('node:path'); const root=process.cwd(); const parent=path.dirname(root); const external=path.join(parent,'external-replacement'); fs.rmSync(external,{recursive:true,force:true}); fs.renameSync(root,external); fs.mkdirSync(root); fs.writeFileSync(path.join(root,'replacement-sentinel'),'replacement'); fs.chmodSync(path.join(root,'replacement-sentinel'),0o444); fs.writeFileSync(path.join(external,'external-sentinel'),'external'); fs.chmodSync(path.join(external,'external-sentinel'),0o555);",
+					],
+				],
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario);
+			expect(result.passed).toBe(false);
+			expect(
+				result.notes.every((note) => note === "sandbox-root-replaced"),
+			).toBe(true);
+			const externalSentinel = join(
+				root,
+				".afol",
+				"tmp",
+				"external-replacement",
+				"external-sentinel",
+			);
+			const replacementSentinels = readdirSync(
+				join(root, ".afol", "tmp"),
+			).flatMap((entry) => {
+				const candidate = join(
+					root,
+					".afol",
+					"tmp",
+					entry,
+					"replacement-sentinel",
+				);
+				return existsSync(candidate) ? [candidate] : [];
+			});
+			expect(readFileSync(externalSentinel, "utf8")).toBe("external");
+			expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			expect(replacementSentinels.length).toBeGreaterThan(0);
+			for (const replacementSentinel of replacementSentinels) {
+				expect(readFileSync(replacementSentinel, "utf8")).toBe("replacement");
+				expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+				expect(
+					existsSync(join(dirname(replacementSentinel), "command-ran")),
+				).toBe(false);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails when sandbox cleanup detects a replaced root", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-cleanup-replacement",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: 'node -e "process.exit(0)"',
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: 1,
+				warmupCount: 0,
+				seams: {
+					createSandboxRoot: () => {
+						const sandbox = join(
+							root,
+							".afol",
+							"tmp",
+							"afol-bench-sandbox-cleanup-replacement",
+						);
+						mkdirSync(sandbox, { recursive: true });
+						return sandbox;
+					},
+					cleanupSandboxRoot: (sandbox) => {
+						const parent = dirname(sandbox);
+						const external = join(parent, "cleanup-external");
+						rmSync(external, { recursive: true, force: true });
+						renameSync(sandbox, external);
+						mkdirSync(sandbox);
+						const replacementSentinel = join(sandbox, "replacement-sentinel");
+						writeFileSync(replacementSentinel, "replacement");
+						chmodSync(replacementSentinel, 0o444);
+						const externalSentinel = join(external, "external-sentinel");
+						writeFileSync(externalSentinel, "external");
+						chmodSync(externalSentinel, 0o555);
+					},
+				},
+			});
+			expect(result.passed).toBe(false);
+			expect(result.notes).toContain("sandbox-root-replaced");
+			const externalSentinel = join(
+				root,
+				".afol",
+				"tmp",
+				"cleanup-external",
+				"external-sentinel",
+			);
+			const replacementSentinel = join(
+				root,
+				".afol",
+				"tmp",
+				"afol-bench-sandbox-cleanup-replacement",
+				"replacement-sentinel",
+			);
+			expect(readFileSync(externalSentinel, "utf8")).toBe("external");
+			expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			expect(readFileSync(replacementSentinel, "utf8")).toBe("replacement");
+			expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails when a command renames the sandbox root without replacement", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "sandbox-root-rename-only",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command:
+					"node -e \"const fs=require('node:fs'); const path=require('node:path'); const root=process.cwd(); const target=path.join(path.dirname(root),'rename-only-target'); fs.rmSync(target,{recursive:true,force:true}); fs.renameSync(root,target); fs.writeFileSync(path.join(target,'rename-sentinel'),'renamed'); fs.chmodSync(path.join(target,'rename-sentinel'),0o555); process.exit(0)\"",
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: 1,
+				warmupCount: 0,
+			});
+			expect(result.passed).toBe(false);
+			expect(result.notes).toContain("sandbox-root-replaced");
+			const sentinel = join(
+				root,
+				".afol",
+				"tmp",
+				"rename-only-target",
+				"rename-sentinel",
+			);
+			expect(readFileSync(sentinel, "utf8")).toBe("renamed");
+			expect(lstatSync(sentinel).mode & 0o777).toBe(0o555);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

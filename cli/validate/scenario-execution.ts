@@ -3,12 +3,15 @@ import type { Stats } from "node:fs";
 import {
 	accessSync,
 	chmodSync,
+	closeSync,
 	copyFileSync,
 	existsSync,
 	constants as fsConstants,
+	fstatSync,
 	lstatSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
 	readdirSync,
 	readFileSync,
 	readlinkSync,
@@ -58,6 +61,17 @@ const RUNTIME_STATE_GUARD_PATHS = [
 	".afol/wb/.active_session",
 	".afol/wb/session-context.json",
 ] as const;
+// Linux exposes O_PATH to open unreadable directories by descriptor; Bun does
+// not currently publish it through fs.constants.
+const LINUX_O_PATH = 0x200000;
+
+type SandboxRootIdentity = {
+	basename: string;
+	rootDev: number;
+	rootIno: number;
+	parentDev: number;
+	parentIno: number;
+};
 
 export function resolveScenarioSampleCount(
 	scenario: Pick<Scenario, "pack_id">,
@@ -429,6 +443,7 @@ function createSandboxRoot(projectRoot: string): string {
 	const sandboxRoot = mkdtempSync(
 		join(ensureBenchmarkTempRoot(projectRoot), "afol-bench-sandbox-"),
 	);
+	const sandboxIdentity = captureSandboxRootIdentity(sandboxRoot);
 	const excludeFlags = SANDBOX_COPY_EXCLUDES.map(
 		(entry) => `--exclude ${shellQuote(entry)}`,
 	).join(" ");
@@ -440,7 +455,7 @@ function createSandboxRoot(projectRoot: string): string {
 		timeoutMs: 120_000,
 	});
 	if (!exportResult.ok) {
-		rmSync(sandboxRoot, { recursive: true, force: true });
+		removeSandboxRoot(sandboxRoot, sandboxIdentity);
 		throw new Error(
 			`Sandbox copy export failed: ${outputTail(spawnFailureDetail(exportResult))}`,
 		);
@@ -450,6 +465,178 @@ function createSandboxRoot(projectRoot: string): string {
 		symlinkSync(projectNodeModules, join(sandboxRoot, "node_modules"), "dir");
 	}
 	return sandboxRoot;
+}
+
+function captureSandboxRootIdentity(sandboxRoot: string): SandboxRootIdentity {
+	const rootStat = lstatSync(sandboxRoot);
+	const parentPath = dirname(sandboxRoot);
+	const parentStat = lstatSync(parentPath);
+	if (!rootStat.isDirectory() || !parentStat.isDirectory()) {
+		throw new Error(`Invalid benchmark sandbox root: ${sandboxRoot}`);
+	}
+	return {
+		basename: sandboxRoot.slice(parentPath.length + 1),
+		rootDev: rootStat.dev,
+		rootIno: rootStat.ino,
+		parentDev: parentStat.dev,
+		parentIno: parentStat.ino,
+	};
+}
+
+function sandboxRootIdentityMatches(
+	sandboxRoot: string,
+	identity: SandboxRootIdentity,
+): boolean {
+	const parentPath = dirname(sandboxRoot);
+	if (sandboxRoot.slice(parentPath.length + 1) !== identity.basename) {
+		return false;
+	}
+	try {
+		const rootStat = lstatSync(sandboxRoot);
+		const parentStat = lstatSync(parentPath);
+		return (
+			rootStat.isDirectory() &&
+			parentStat.isDirectory() &&
+			rootStat.dev === identity.rootDev &&
+			rootStat.ino === identity.rootIno &&
+			parentStat.dev === identity.parentDev &&
+			parentStat.ino === identity.parentIno
+		);
+	} catch {
+		return false;
+	}
+}
+
+function sandboxRootDescriptorMatches(
+	sandboxRoot: string,
+	identity: SandboxRootIdentity,
+): boolean {
+	if (
+		process.platform !== "linux" ||
+		fsConstants.O_DIRECTORY === undefined ||
+		fsConstants.O_NOFOLLOW === undefined
+	) {
+		return false;
+	}
+	let pathFd: number | null = null;
+	try {
+		pathFd = openSync(
+			sandboxRoot,
+			LINUX_O_PATH | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW,
+		);
+		const rootStat = fstatSync(pathFd);
+		return (
+			rootStat.isDirectory() &&
+			rootStat.dev === identity.rootDev &&
+			rootStat.ino === identity.rootIno
+		);
+	} catch {
+		return false;
+	} finally {
+		if (pathFd !== null) closeSync(pathFd);
+	}
+}
+
+function restoreSandboxDirectoryModes(
+	sandboxRoot: string,
+	identity: SandboxRootIdentity,
+): boolean {
+	if (
+		process.platform !== "linux" ||
+		fsConstants.O_DIRECTORY === undefined ||
+		fsConstants.O_NOFOLLOW === undefined
+	) {
+		return false;
+	}
+	if (!sandboxRootIdentityMatches(sandboxRoot, identity)) {
+		return false;
+	}
+	const pathFlags =
+		LINUX_O_PATH | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW;
+	const walk = (directoryPath: string, expectedRoot = false): boolean => {
+		let pathFd: number;
+		try {
+			pathFd = openSync(directoryPath, pathFlags);
+		} catch {
+			return !expectedRoot;
+		}
+		try {
+			const directoryStat = fstatSync(pathFd);
+			if (!directoryStat.isDirectory()) {
+				return !expectedRoot;
+			}
+			if (
+				expectedRoot &&
+				(directoryStat.dev !== identity.rootDev ||
+					directoryStat.ino !== identity.rootIno)
+			) {
+				return false;
+			}
+			chmodSync(`/proc/self/fd/${pathFd}`, 0o700);
+			const stablePath = `/proc/self/fd/${pathFd}`;
+			for (const entry of readdirSync(stablePath)) {
+				walk(join(stablePath, entry));
+			}
+			return true;
+		} catch {
+			// Leave removal to the caller if the descriptor cannot be reopened.
+			return !expectedRoot;
+		} finally {
+			closeSync(pathFd);
+		}
+	};
+	try {
+		if (!walk(sandboxRoot, true)) {
+			return false;
+		}
+	} catch {
+		return false;
+	}
+	return sandboxRootIdentityMatches(sandboxRoot, identity);
+}
+
+type SandboxRootRemovalStatus = "removed" | "absent" | "replaced" | "error";
+
+function removeSandboxRoot(
+	sandboxRoot: string,
+	identity: SandboxRootIdentity,
+): SandboxRootRemovalStatus {
+	try {
+		lstatSync(sandboxRoot);
+	} catch {
+		return "absent";
+	}
+	if (
+		!sandboxRootIdentityMatches(sandboxRoot, identity) ||
+		!sandboxRootDescriptorMatches(sandboxRoot, identity)
+	) {
+		return "replaced";
+	}
+	try {
+		rmSync(sandboxRoot, { recursive: true, force: true });
+		return "removed";
+	} catch {
+		if (
+			!sandboxRootIdentityMatches(sandboxRoot, identity) ||
+			!restoreSandboxDirectoryModes(sandboxRoot, identity)
+		) {
+			return sandboxRootIdentityMatches(sandboxRoot, identity)
+				? "error"
+				: "replaced";
+		}
+	}
+	if (
+		!sandboxRootIdentityMatches(sandboxRoot, identity) ||
+		!sandboxRootDescriptorMatches(sandboxRoot, identity)
+	) {
+		return "replaced";
+	}
+	try {
+		rmSync(sandboxRoot, { recursive: true, force: true });
+		return "removed";
+	} catch {
+		return "error";
+	}
 }
 
 function createWorkbenchSandboxRoot(projectRoot: string): string {
@@ -1203,12 +1390,16 @@ function runSandboxScenarioSample(
 	seams?: ScenarioExecutionSeams,
 ): SandboxScenarioSampleResult {
 	let sandboxRoot: string | null = null;
+	let sandboxIdentity: SandboxRootIdentity | null = null;
+	let result: SandboxScenarioSampleResult | null = null;
+	let executionError: unknown = null;
 	try {
 		sandboxRoot = seams?.createSandboxRoot
 			? seams.createSandboxRoot(projectRoot)
 			: scenario.pack_id === "workbench-parity"
 				? createWorkbenchSandboxRoot(projectRoot)
 				: createSandboxRoot(projectRoot);
+		sandboxIdentity = captureSandboxRootIdentity(sandboxRoot);
 		for (const [index, setupCommand] of (scenario.setup ?? []).entries()) {
 			if (setupCommand.length === 0) {
 				throw new Error("Empty setup command");
@@ -1227,32 +1418,82 @@ function runSandboxScenarioSample(
 				seams,
 			);
 			if (!isCommandSuccess(setupSample)) {
-				return {
+				result = {
 					sample: null,
 					note: `setup-failed:${index}:${setupSample.exit_code ?? "null"}`,
 				};
+				break;
 			}
 		}
-		const invocation = resolveScenarioInvocation(
-			REAL_REPO_ROOT,
-			sandboxRoot,
-			command,
-			false,
-			trustedAfolBinary,
-		);
-		return {
-			sample: runScenarioSample(sandboxRoot, invocation, phase, seams),
-			note: null,
-		};
-	} finally {
-		if (sandboxRoot) {
+		if (result === null) {
+			if (
+				!sandboxRootIdentityMatches(sandboxRoot, sandboxIdentity) ||
+				!sandboxRootDescriptorMatches(sandboxRoot, sandboxIdentity)
+			) {
+				result = { sample: null, note: "sandbox-root-replaced" };
+			} else {
+				const invocation = resolveScenarioInvocation(
+					REAL_REPO_ROOT,
+					sandboxRoot,
+					command,
+					false,
+					trustedAfolBinary,
+				);
+				result = {
+					sample: runScenarioSample(sandboxRoot, invocation, phase, seams),
+					note: null,
+				};
+			}
+		}
+	} catch (error) {
+		executionError = error;
+	}
+	let cleanupError: Error | null = null;
+	if (sandboxRoot) {
+		try {
+			let cleanupSucceeded = true;
 			if (seams?.cleanupSandboxRoot) {
 				seams.cleanupSandboxRoot(sandboxRoot);
-			} else {
-				rmSync(sandboxRoot, { recursive: true, force: true });
+				try {
+					lstatSync(sandboxRoot);
+					cleanupSucceeded =
+						sandboxIdentity !== null &&
+						sandboxRootIdentityMatches(sandboxRoot, sandboxIdentity) &&
+						sandboxRootDescriptorMatches(sandboxRoot, sandboxIdentity);
+				} catch {
+					cleanupSucceeded = true;
+				}
+			} else if (sandboxIdentity) {
+				const removalStatus = removeSandboxRoot(sandboxRoot, sandboxIdentity);
+				cleanupSucceeded = removalStatus === "removed";
+				if (removalStatus === "absent" || removalStatus === "replaced") {
+					cleanupError = new Error("sandbox-root-replaced");
+				} else if (removalStatus === "error") {
+					cleanupError = new Error("sandbox-cleanup-failed");
+				}
 			}
+			if (!cleanupSucceeded && cleanupError === null) {
+				cleanupError = new Error("sandbox-root-replaced");
+			}
+		} catch (error) {
+			cleanupError = error instanceof Error ? error : new Error(String(error));
 		}
 	}
+	if (cleanupError) {
+		if (result) {
+			result.sample = null;
+			result.note =
+				cleanupError.message === "sandbox-root-replaced"
+					? cleanupError.message
+					: cleanupError.message.startsWith("sandbox-cleanup-failed")
+						? cleanupError.message
+						: `sandbox-cleanup-failed:${cleanupError.message}`;
+		} else {
+			executionError ??= cleanupError;
+		}
+	}
+	if (executionError) throw executionError;
+	return result ?? { sample: null, note: "sandbox-execution-failed" };
 }
 
 function runSandboxScenarioCommand(
