@@ -1212,6 +1212,44 @@ describe("pstr service helpers", () => {
 		}
 	});
 
+	test("preserves explicit directory intent after a configured root is removed", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, "packages", "app"), { recursive: true });
+			writeFileSync(join(root, "packages", "app", "index.ts"), "export {};\n");
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					pstr: {
+						areas: [
+							{
+								id: "removed-app",
+								scope: "packages.removed-app",
+								source_roots: ["packages/app/"],
+								tags: ["packages"],
+							},
+						],
+					},
+				}),
+			);
+			rebuildPstrIndex(root);
+			rmSync(join(root, "packages", "app"), { recursive: true });
+
+			const snapshot = rebuildPstrIndex(root, {
+				changedPaths: ["packages/app/index.ts"],
+			});
+
+			expect(snapshot.maps.some((entry) => entry.id === "removed-app")).toBe(
+				false,
+			);
+			expect(existsSync(join(root, ".afol", "pstr", "removed-app.md"))).toBe(
+				false,
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	test("watch rejects configured roots whose symlink leaves the project", () => {
 		const root = createFixture();
 		const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));

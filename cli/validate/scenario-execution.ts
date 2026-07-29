@@ -171,6 +171,7 @@ export interface ScenarioExecutionSeams {
 	) => ScenarioSampleRun;
 	createSandboxRoot?: (projectRoot: string) => string;
 	cleanupSandboxRoot?: (sandboxRoot: string) => void;
+	platform?: NodeJS.Platform;
 }
 
 interface PorcelainStateEntry {
@@ -510,9 +511,12 @@ function sandboxRootIdentityMatches(
 function sandboxRootDescriptorMatches(
 	sandboxRoot: string,
 	identity: SandboxRootIdentity,
+	platform = process.platform,
 ): boolean {
+	if (platform !== "linux") {
+		return true;
+	}
 	if (
-		process.platform !== "linux" ||
 		fsConstants.O_DIRECTORY === undefined ||
 		fsConstants.O_NOFOLLOW === undefined
 	) {
@@ -1428,7 +1432,11 @@ function runSandboxScenarioSample(
 		if (result === null) {
 			if (
 				!sandboxRootIdentityMatches(sandboxRoot, sandboxIdentity) ||
-				!sandboxRootDescriptorMatches(sandboxRoot, sandboxIdentity)
+				!sandboxRootDescriptorMatches(
+					sandboxRoot,
+					sandboxIdentity,
+					seams?.platform,
+				)
 			) {
 				result = { sample: null, note: "sandbox-root-replaced" };
 			} else {
