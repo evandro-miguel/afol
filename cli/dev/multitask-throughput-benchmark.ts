@@ -1,11 +1,14 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
+	assertValidMultitaskBenchmarkBaseline,
 	evaluateMultitaskBenchmark,
 	formatBenchmarkSummary,
 	type MultitaskBenchmarkBaseline,
 	type MultitaskBenchmarkResult,
 	type RepeatedSummary,
+	repeatedPairOrder,
 	type ScenarioResult,
 } from "./multitask-throughput-contract";
 
@@ -46,15 +49,29 @@ function loadBaseline(path: string): MultitaskBenchmarkBaseline {
 	const baseline = JSON.parse(
 		readFileSync(path, "utf8"),
 	) as MultitaskBenchmarkBaseline;
-	if (
-		baseline.schema !== "afol.multitask-throughput-baseline/v1" ||
-		baseline.timing_mode !== "paired-relative" ||
-		!Number.isInteger(baseline.sample_count_min) ||
-		baseline.sample_count_min < 1
-	) {
-		throw new Error(`Invalid multitask benchmark baseline: ${path}`);
-	}
+	assertValidMultitaskBenchmarkBaseline(baseline, path);
 	return baseline;
+}
+
+function baselineSha256(path: string): string {
+	return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function gitOutput(args: string[]): string {
+	const process = Bun.spawnSync(["git", ...args], { cwd: sourceRoot });
+	if (process.exitCode !== 0) {
+		throw new Error(
+			`git ${args.join(" ")} failed (${process.exitCode}): ${process.stderr.toString().trim()}`,
+		);
+	}
+	return process.stdout.toString().trim();
+}
+
+function sourceProvenance(): { commit: string; dirty: boolean } {
+	return {
+		commit: gitOutput(["rev-parse", "HEAD"]),
+		dirty: gitOutput(["status", "--porcelain"]).length > 0,
+	};
 }
 
 function parseOptions(args: string[]): Options {
@@ -220,6 +237,8 @@ function summarize(values: ScenarioResult[]): RepeatedSummary {
 async function main(): Promise<void> {
 	const options = parseOptions(Bun.argv.slice(2));
 	const baseline = loadBaseline(options.baselinePath);
+	const provenance = sourceProvenance();
+	const baselineHash = baselineSha256(options.baselinePath);
 	const fixtureRoot = join(
 		sourceRoot,
 		".afol",
@@ -252,17 +271,16 @@ async function main(): Promise<void> {
 			"boundary-batch-100",
 		);
 		for (let index = 0; index < options.runs; index += 1) {
-			sequential.push(
-				executeScenario(
+			for (const mode of repeatedPairOrder(index)) {
+				const measurement = executeScenario(
 					fixtureRoot,
-					"sequential",
+					mode,
 					10,
-					`repeat-${index}-sequential`,
-				),
-			);
-			batch.push(
-				executeScenario(fixtureRoot, "batch", 10, `repeat-${index}-batch`),
-			);
+					`repeat-${index}-${mode}`,
+				);
+				if (mode === "sequential") sequential.push(measurement);
+				else batch.push(measurement);
+			}
 		}
 		const result: MultitaskBenchmarkResult = {
 			schema: "afol.multitask-throughput/v2",
@@ -272,6 +290,10 @@ async function main(): Promise<void> {
 				arch: process.arch,
 				bun_version: Bun.version,
 				timing_mode: "paired-relative",
+				pair_order: "alternating",
+				source_commit: provenance.commit,
+				source_dirty: provenance.dirty,
+				baseline_sha256: baselineHash,
 			},
 			runs: options.runs,
 			first_attempt_success: true,

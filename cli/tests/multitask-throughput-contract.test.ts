@@ -1,11 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
+	assertValidMultitaskBenchmarkBaseline,
 	evaluateMultitaskBenchmark,
 	formatBenchmarkSummary,
 	type MultitaskBenchmarkBaseline,
 	type MultitaskBenchmarkResult,
+	repeatedPairOrder,
 } from "../dev/multitask-throughput-contract";
 
 const baseline = JSON.parse(
@@ -45,6 +54,10 @@ function result(): MultitaskBenchmarkResult {
 			arch: "x64",
 			bun_version: "fixture",
 			timing_mode: "paired-relative",
+			pair_order: "alternating",
+			source_commit: "0".repeat(40),
+			source_dirty: false,
+			baseline_sha256: "0".repeat(64),
 		},
 		runs: 12,
 		first_attempt_success: true,
@@ -62,6 +75,62 @@ function result(): MultitaskBenchmarkResult {
 }
 
 describe("multitask throughput benchmark contract", () => {
+	test("rejects incomplete baselines before measurement", () => {
+		const invalid = structuredClone(baseline);
+		delete invalid.gates.batch_100_duration_ms_max;
+		expect(() =>
+			assertValidMultitaskBenchmarkBaseline(invalid, "fixture"),
+		).toThrow("missing finite gate batch_100_duration_ms_max");
+	});
+
+	test("rejects a baseline without an identity", () => {
+		const invalid = structuredClone(baseline);
+		invalid.baseline_id = "";
+		expect(() =>
+			assertValidMultitaskBenchmarkBaseline(invalid, "fixture"),
+		).toThrow("Invalid multitask benchmark baseline");
+	});
+
+	test("exits 2 without saving when the baseline is malformed", () => {
+		const scratchRoot = join(process.cwd(), ".tmp");
+		mkdirSync(scratchRoot, { recursive: true });
+		const fixtureRoot = mkdtempSync(
+			join(scratchRoot, "bad-benchmark-baseline-"),
+		);
+		const baselinePath = join(fixtureRoot, "invalid.json");
+		const resultsRoot = join(process.cwd(), ".afol/data/benchmarks/results");
+		const before = readdirSync(resultsRoot).sort();
+		const invalid = structuredClone(baseline);
+		delete invalid.gates.batch_100_duration_ms_max;
+		writeFileSync(baselinePath, `${JSON.stringify(invalid)}\n`);
+		try {
+			const spawned = Bun.spawnSync(
+				[
+					"bun",
+					"run",
+					"cli/dev/multitask-throughput-benchmark.ts",
+					"--baseline",
+					baselinePath,
+					"--save",
+				],
+				{ cwd: process.cwd() },
+			);
+			expect(spawned.exitCode).toBe(2);
+			expect(spawned.stderr.toString()).toContain(
+				"missing finite gate batch_100_duration_ms_max",
+			);
+			expect(readdirSync(resultsRoot).sort()).toEqual(before);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("counterbalances repeated pair order", () => {
+		expect(repeatedPairOrder(0)).toEqual(["sequential", "batch"]);
+		expect(repeatedPairOrder(1)).toEqual(["batch", "sequential"]);
+		expect(repeatedPairOrder(2)).toEqual(["sequential", "batch"]);
+	});
+
 	test("passes every relative and 100-task quality gate", () => {
 		const comparison = evaluateMultitaskBenchmark(result(), baseline);
 		expect(comparison.status).toBe("passed");
@@ -94,6 +163,8 @@ describe("multitask throughput benchmark contract", () => {
 		const summary = formatBenchmarkSummary(benchmark, comparison);
 		expect(summary).toContain("multitask benchmark: PASSED");
 		expect(summary).toContain("10 tasks: calls 22->4");
+		expect(summary).toContain("economy: argv");
+		expect(summary).not.toContain("tokens:");
 		expect(summary).toContain("100 tasks: calls=4");
 		expect(Buffer.byteLength(summary, "utf8")).toBeLessThan(600);
 	});
