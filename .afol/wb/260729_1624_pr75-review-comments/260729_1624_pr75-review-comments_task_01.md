@@ -3,9 +3,9 @@ doc_type: "workbench_task"
 id: "260729_1624_pr75-review-comments_task_01"
 session_id: "260729_1624_pr75-review-comments"
 theme: "pr75-review-comments"
-status: "active"
+status: "closed"
 created_at: "2026-07-29T21:24:39.655Z"
-updated_at: "2026-07-29T21:24:39.655Z"
+updated_at: "2026-07-29T22:26:42.445Z"
 roadmap_feature: "F-29"
 feature_id: "F-29"
 parent_spec: "260715_afol-1-0-linux-wsl-finalization_spec_01"
@@ -17,6 +17,7 @@ pending_spec_status: "none"
 pending_spec_missing: ""
 pending_spec_resolution_hint: "linked to roadmap feature and parent spec"
 spec_waiver_reason: ""
+closed_at: "2026-07-29T22:26:42.445Z"
 ---
 
 # Tasks: pr75-review-comments
@@ -29,4 +30,4 @@ spec_waiver_reason: ""
 | T-02 | done | worker | Fence batch completion on every lease and task attempt attempt=1 |
 | T-03 | done | worker | Rebuild PSTR registry changes correctly attempt=1 |
 | T-04 | done | worker | Traverse configured dotted directories correctly attempt=1 |
-| T-05 | in_progress | worker | Validate, obtain reviewer GO, and merge PR 75 attempt=1 |
+| T-05 | done | worker | Validate, obtain reviewer GO, and merge PR 75 attempt=1 |
