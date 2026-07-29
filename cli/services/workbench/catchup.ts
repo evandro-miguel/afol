@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { boundedSpawn } from "../../core/subprocess";
 import { collectSessionIds } from "../local-state/workbench-index";
 import { readActiveSession, sessionPaths } from "./lifecycle";
+import { defaultAllowGlobalFallback, resolveSession } from "./session-context";
 
 export type ArtifactState = {
 	present: boolean;
@@ -228,10 +229,14 @@ export function computeCatchup(
 ): CatchupReport {
 	const explicitSession = opts.session?.trim() || null;
 	const activeSession = readActiveSession(root);
+	const effectiveSession = resolveSession(root, {
+		...(explicitSession ? { explicit: explicitSession } : {}),
+		allowGlobalFallback: defaultAllowGlobalFallback(),
+	});
 	const gitAvailable = gitProbeOk(root);
 	const branch = gitAvailable ? readGitBranch(root) : null;
 	const git = readGitChangedFiles(root);
-	const session = explicitSession ?? activeSession;
+	const session = effectiveSession?.session ?? null;
 	if (!session) {
 		const recent = recentSessionsHint(root);
 		const notes = [`recent sessions: ${recent}`];

@@ -3,6 +3,7 @@ import type { Stats } from "node:fs";
 import {
 	accessSync,
 	chmodSync,
+	copyFileSync,
 	existsSync,
 	constants as fsConstants,
 	lstatSync,
@@ -18,7 +19,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { cpus, arch as osArch, platform } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { outputTail } from "./output";
@@ -28,6 +29,10 @@ const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
 export const RELEASE_BENCH_SAMPLES = 20;
 export const RELEASE_BENCH_WARMUP_SAMPLES = 1;
+const HIGH_CONFIDENCE_TIMING_PACKS = new Set([
+	"mutation-safety",
+	"workbench-parity",
+]);
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const SANDBOX_COPY_EXCLUDES = [
 	".git",
@@ -37,6 +42,11 @@ const SANDBOX_COPY_EXCLUDES = [
 	".coverage",
 	".afol/tmp",
 ];
+const WORKBENCH_SANDBOX_CONTRACT_FILES = [
+	".afol/config.json",
+	".agents/lock.json",
+	".agents/manifest.json",
+] as const;
 const COMPLETION_LOCKS_ROOT = ".afol/wb/.locks";
 const COMPLETION_LOCK_FILE_RE = /^completion-[a-f0-9]{64}\.lock(?:\.fence)?$/;
 const RUNTIME_STATE_GUARD_PATHS = [
@@ -53,18 +63,19 @@ export function resolveScenarioSampleCount(
 	scenario: Pick<Scenario, "pack_id">,
 	requested?: number,
 ): number {
+	const requiresHighConfidenceTiming = HIGH_CONFIDENCE_TIMING_PACKS.has(
+		scenario.pack_id,
+	);
 	const resolved =
 		requested ??
-		(scenario.pack_id === "mutation-safety"
-			? RELEASE_BENCH_SAMPLES
-			: BENCH_SAMPLES);
+		(requiresHighConfidenceTiming ? RELEASE_BENCH_SAMPLES : BENCH_SAMPLES);
 	if (
 		!Number.isInteger(resolved) ||
 		resolved < 1 ||
-		(scenario.pack_id === "mutation-safety" && resolved < RELEASE_BENCH_SAMPLES)
+		(requiresHighConfidenceTiming && resolved < RELEASE_BENCH_SAMPLES)
 	) {
 		throw new Error(
-			scenario.pack_id === "mutation-safety"
+			requiresHighConfidenceTiming
 				? `release-benchmark-sample-count-required:${RELEASE_BENCH_SAMPLES}`
 				: "benchmark-sample-count-invalid",
 		);
@@ -115,6 +126,8 @@ export interface ScenarioExecutionResult {
 	profile: BenchmarkExecutionProfile;
 	timestamp: string;
 	git_commit: string;
+	source_state_sha256?: string;
+	source_dirty?: boolean | null;
 }
 
 export interface PreparedCompiledReleaseArtifact {
@@ -122,6 +135,8 @@ export interface PreparedCompiledReleaseArtifact {
 	profile: BenchmarkExecutionProfile;
 	timestamp: string;
 	git_commit: string;
+	source_state_sha256: string;
+	source_dirty: boolean | null;
 	cleanup: () => void;
 }
 
@@ -274,8 +289,9 @@ function resolveCommandInvocation(
 	}
 	const args = tokens.slice(1);
 	if (program === "afol" || program === "a") {
-		if (trustedAfolBinary) {
-			return { command: trustedAfolBinary, args };
+		const executable = resolveAfolExecutable(trustedAfolBinary);
+		if (executable) {
+			return { command: executable, args };
 		}
 		if (!preferLocalWrapper) {
 			return {
@@ -311,6 +327,8 @@ export function compiledReleaseBuildArgs(targetBinary: string): string[] {
 	return [
 		"build",
 		"--compile",
+		"--bytecode",
+		"--format=esm",
 		"--no-compile-autoload-dotenv",
 		"--no-compile-autoload-bunfig",
 		join(REAL_REPO_ROOT, "cli", "main.ts"),
@@ -324,6 +342,9 @@ export function writeBenchmarkArtifactProvenance(
 	artifactSha256: string,
 	commitSha: string,
 	generatedAt: string,
+	sourceStateSha256: string,
+	sourceDirty: boolean | null,
+	buildCommand = `bun ${compiledReleaseBuildArgs(targetBinary).join(" ")}`,
 ): string {
 	const provenancePath = `${targetBinary}.provenance.json`;
 	writeFileSync(
@@ -336,10 +357,14 @@ export function writeBenchmarkArtifactProvenance(
 				sha256: artifactSha256,
 				generated_at: generatedAt,
 				commit_sha: commitSha,
-				build_command: `bun ${compiledReleaseBuildArgs(targetBinary).join(" ")}`,
+				source_state_sha256: sourceStateSha256,
+				source_dirty: sourceDirty,
+				build_command: buildCommand,
 				platform: process.platform,
 				arch: process.arch,
 				build_target: `bun-${process.platform}-${process.arch}`,
+				compile_bytecode: true,
+				module_format: "esm",
 				compile_autoload_dotenv: false,
 				compile_autoload_bunfig: false,
 			},
@@ -349,6 +374,55 @@ export function writeBenchmarkArtifactProvenance(
 		"utf8",
 	);
 	return provenancePath;
+}
+
+const BENCHMARK_SOURCE_PATHS = [
+	"cli",
+	"package.json",
+	"bun.lock",
+	"tsconfig.json",
+	".afol/data/benchmarks/catalog",
+] as const;
+
+function benchmarkSourceState(projectRoot: string): {
+	sha256: string;
+	dirty: boolean | null;
+} {
+	const hash = createHash("sha256");
+	const visit = (path: string): void => {
+		if (!existsSync(path)) return;
+		const stat = lstatSync(path);
+		if (stat.isSymbolicLink()) return;
+		if (stat.isDirectory()) {
+			for (const entry of readdirSync(path).sort()) {
+				visit(join(path, entry));
+			}
+			return;
+		}
+		if (!stat.isFile()) return;
+		hash.update(relative(projectRoot, path).replaceAll("\\", "/"));
+		hash.update("\0");
+		hash.update(readFileSync(path));
+		hash.update("\0");
+	};
+	for (const sourcePath of BENCHMARK_SOURCE_PATHS) {
+		visit(join(projectRoot, sourcePath));
+	}
+	const status = boundedSpawn(
+		"git",
+		[
+			"status",
+			"--porcelain",
+			"--untracked-files=all",
+			"--",
+			...BENCHMARK_SOURCE_PATHS,
+		],
+		{ cwd: projectRoot, timeoutMs: 15_000 },
+	);
+	return {
+		sha256: hash.digest("hex"),
+		dirty: status.ok ? status.stdout.trim().length > 0 : null,
+	};
 }
 
 function createSandboxRoot(projectRoot: string): string {
@@ -374,6 +448,20 @@ function createSandboxRoot(projectRoot: string): string {
 	const projectNodeModules = join(projectRoot, "node_modules");
 	if (existsSync(projectNodeModules)) {
 		symlinkSync(projectNodeModules, join(sandboxRoot, "node_modules"), "dir");
+	}
+	return sandboxRoot;
+}
+
+function createWorkbenchSandboxRoot(projectRoot: string): string {
+	const sandboxRoot = mkdtempSync(
+		join(ensureBenchmarkTempRoot(projectRoot), "afol-bench-sandbox-"),
+	);
+	for (const relativePath of WORKBENCH_SANDBOX_CONTRACT_FILES) {
+		const source = join(projectRoot, relativePath);
+		if (!existsSync(source)) continue;
+		const target = join(sandboxRoot, relativePath);
+		mkdirSync(dirname(target), { recursive: true });
+		copyFileSync(source, target);
 	}
 	return sandboxRoot;
 }
@@ -419,6 +507,19 @@ function executionProfile(
 	};
 }
 
+export function isCompiledBunRuntime(mainPath = Bun.main): boolean {
+	return mainPath.includes("$bunfs");
+}
+
+export function resolveAfolExecutable(
+	trustedAfolBinary?: string,
+	mainPath = Bun.main,
+	execPath = process.execPath,
+): string | null {
+	if (trustedAfolBinary) return trustedAfolBinary;
+	return isCompiledBunRuntime(mainPath) ? execPath : null;
+}
+
 export function prepareCompiledReleaseArtifact(
 	projectRoot: string,
 ): PreparedCompiledReleaseArtifact {
@@ -426,6 +527,36 @@ export function prepareCompiledReleaseArtifact(
 	const artifactRoot = mkdtempSync(join(artifactParent, "afol-bench-release-"));
 	const targetBinary = join(artifactRoot, "afol");
 	try {
+		if (isCompiledBunRuntime()) {
+			const sourceState = benchmarkSourceState(projectRoot);
+			copyFileSync(process.execPath, targetBinary);
+			chmodSync(targetBinary, 0o755);
+			const artifactSha256 = hashFile(targetBinary);
+			const timestamp = new Date().toISOString();
+			const commit = gitCommit(projectRoot);
+			writeBenchmarkArtifactProvenance(
+				targetBinary,
+				artifactSha256,
+				commit,
+				timestamp,
+				sourceState.sha256,
+				sourceState.dirty,
+				"copy current compiled executable for self-benchmark",
+			);
+			return {
+				binaryPath: targetBinary,
+				profile: executionProfile(
+					"compiled-release",
+					"bun-compile",
+					artifactSha256,
+				),
+				timestamp,
+				git_commit: commit,
+				source_state_sha256: sourceState.sha256,
+				source_dirty: sourceState.dirty,
+				cleanup: () => rmSync(artifactRoot, { recursive: true, force: true }),
+			};
+		}
 		const versionResult = boundedSpawn("bun", ["run", "version:generate"], {
 			cwd: REAL_REPO_ROOT,
 			timeoutMs: 60_000,
@@ -435,6 +566,7 @@ export function prepareCompiledReleaseArtifact(
 				`compiled-release-version:${outputTail(spawnFailureDetail(versionResult))}`,
 			);
 		}
+		const sourceState = benchmarkSourceState(projectRoot);
 		const result = boundedSpawn("bun", compiledReleaseBuildArgs(targetBinary), {
 			cwd: REAL_REPO_ROOT,
 			timeoutMs: 300_000,
@@ -453,6 +585,8 @@ export function prepareCompiledReleaseArtifact(
 			artifactSha256,
 			commit,
 			timestamp,
+			sourceState.sha256,
+			sourceState.dirty,
 		);
 		return {
 			binaryPath: targetBinary,
@@ -463,6 +597,8 @@ export function prepareCompiledReleaseArtifact(
 			),
 			timestamp,
 			git_commit: commit,
+			source_state_sha256: sourceState.sha256,
+			source_dirty: sourceState.dirty,
 			cleanup: () => rmSync(artifactRoot, { recursive: true, force: true }),
 		};
 	} catch (error) {
@@ -714,7 +850,13 @@ function completionLockChangedPaths(
 	after: CompletionLockState,
 ): string[] {
 	const changed = new Set<string>();
-	if (before.rootType !== after.rootType) changed.add(COMPLETION_LOCKS_ROOT);
+	const benignEmptyRootCreation =
+		before.rootType === "missing" &&
+		after.rootType === "directory" &&
+		after.entries.length === 0;
+	if (before.rootType !== after.rootType && !benignEmptyRootCreation) {
+		changed.add(COMPLETION_LOCKS_ROOT);
+	}
 	if (
 		before.rootType === "directory" &&
 		after.rootType === "directory" &&
@@ -1064,7 +1206,9 @@ function runSandboxScenarioSample(
 	try {
 		sandboxRoot = seams?.createSandboxRoot
 			? seams.createSandboxRoot(projectRoot)
-			: createSandboxRoot(projectRoot);
+			: scenario.pack_id === "workbench-parity"
+				? createWorkbenchSandboxRoot(projectRoot)
+				: createSandboxRoot(projectRoot);
 		for (const [index, setupCommand] of (scenario.setup ?? []).entries()) {
 			if (setupCommand.length === 0) {
 				throw new Error("Empty setup command");
@@ -1167,6 +1311,12 @@ function runSandboxScenarioCommand(
 			profile: options.artifact?.profile ?? sourceProfile,
 			timestamp: options.artifact?.timestamp ?? new Date().toISOString(),
 			git_commit: options.artifact?.git_commit ?? gitCommit(projectRoot),
+			...(options.artifact
+				? {
+						source_state_sha256: options.artifact.source_state_sha256,
+						source_dirty: options.artifact.source_dirty,
+					}
+				: {}),
 		};
 	}
 	const warmupNotes = warmups.flatMap((warmup, index) =>
@@ -1228,6 +1378,12 @@ function runSandboxScenarioCommand(
 			executionProfile("source", "source", "source"),
 		timestamp: options.artifact?.timestamp ?? new Date().toISOString(),
 		git_commit: options.artifact?.git_commit ?? gitCommit(projectRoot),
+		...(options.artifact
+			? {
+					source_state_sha256: options.artifact.source_state_sha256,
+					source_dirty: options.artifact.source_dirty,
+				}
+			: {}),
 	};
 }
 
@@ -1414,5 +1570,11 @@ export function runScenarioCommand(
 			executionProfile("source", "source", "source"),
 		timestamp: options.artifact?.timestamp ?? new Date().toISOString(),
 		git_commit: options.artifact?.git_commit ?? gitCommit(projectRoot),
+		...(options.artifact
+			? {
+					source_state_sha256: options.artifact.source_state_sha256,
+					source_dirty: options.artifact.source_dirty,
+				}
+			: {}),
 	};
 }

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import {
 	firstToken,
-	readBoundedTelemetryEvents,
+	readBoundedSessionTelemetryEvents,
 	type TelemetryEvent,
 } from "../events/telemetry";
 import { type FeedbackReport, feedbackMode, getFeedback } from "../feedback";
@@ -19,7 +19,10 @@ import {
 import { verifyTaskText } from "../workbench/verify";
 import { validateEvolutionIdentity } from "./config";
 import { evolutionDbPath, openEvolutionDb } from "./db";
-import { appendProductionDayAllocation } from "./journal";
+import {
+	appendProductionDayAllocation,
+	resolveProductionDayReceipt,
+} from "./journal";
 import {
 	appendObservationJournalEventWithStatus,
 	observationJournalPath,
@@ -65,6 +68,7 @@ export type IngestObservationsInput = {
 	projectId: string;
 	session: string;
 	feedbackId?: string;
+	mode?: "full" | "production-day";
 	now?: Date;
 };
 
@@ -164,41 +168,6 @@ export function ingestObservationsForSession(
 	const paths = sessionPaths(root, session);
 	if (!existsSync(paths.sessionDir))
 		throw new Error(`Session folder not found: ${session}`);
-
-	// Complete all source validation before opening the mutable database or
-	// allocating a production day. Explicit feedback remains the user's
-	// deliberate association and is preserved by observationFromFeedback.
-	const taskText = readBoundedSourceFile(
-		paths.taskPath,
-		"session task file",
-		OBSERVE_TASK_LIMITS,
-	);
-	// Preflight all ledgers before parsing any candidate or opening the mutable DB.
-	const evidenceText = readBoundedSourceFile(
-		paths.evidencePath,
-		"session evidence ledger",
-		OBSERVE_EVIDENCE_LIMITS,
-	);
-	const telemetryEvents = readBoundedTelemetryEvents(
-		root,
-		OBSERVE_TELEMETRY_LIMITS,
-	);
-	readBoundedSourceFile(
-		observationJournalPath(root),
-		"observation journal",
-		OBSERVE_JOURNAL_LIMITS,
-	);
-	const evidenceEntries =
-		evidenceText === null ? [] : parseEvidenceEntries(evidenceText);
-	const ownershipByEvidenceId = new Map<string, string>();
-	for (const entry of evidenceEntries) {
-		const ownership = `${entry.project_id ?? ""}/${entry.session_id ?? ""}`;
-		const previous = ownershipByEvidenceId.get(entry.id);
-		if (previous && previous !== ownership)
-			throw new Error("evidence id has conflicting ownership");
-		ownershipByEvidenceId.set(entry.id, ownership);
-	}
-
 	let feedback: FeedbackReport | null = null;
 	if (feedbackId !== undefined) {
 		if (feedbackMode() !== "local")
@@ -212,11 +181,18 @@ export function ingestObservationsForSession(
 			);
 	}
 
+	// Complete all source validation before opening the mutable database or
+	// allocating a production day. Explicit feedback remains the user's
+	// deliberate association and is preserved by observationFromFeedback.
+	const taskText = readBoundedSourceFile(
+		paths.taskPath,
+		"session task file",
+		OBSERVE_TASK_LIMITS,
+	);
 	const sessionComplete =
 		taskText !== null && verifyTaskText(taskText, paths.taskPath).allCompleted;
-	// Fail-closed: missing task file / State Board is incomplete, and no
-	// failed observation or production day may be ingested from incomplete
-	// work. Zero-mutation return when the session is not fully complete.
+	// Missing task state is incomplete. No other source needs to be opened
+	// because this path cannot allocate or append anything.
 	if (!sessionComplete) {
 		return {
 			appended: 0,
@@ -227,6 +203,22 @@ export function ingestObservationsForSession(
 		};
 	}
 
+	const evidenceText = readBoundedSourceFile(
+		paths.evidencePath,
+		"session evidence ledger",
+		OBSERVE_EVIDENCE_LIMITS,
+	);
+	const evidenceEntries =
+		evidenceText === null ? [] : parseEvidenceEntries(evidenceText);
+	const ownershipByEvidenceId = new Map<string, string>();
+	for (const entry of evidenceEntries) {
+		const ownership = `${entry.project_id ?? ""}/${entry.session_id ?? ""}`;
+		const previous = ownershipByEvidenceId.get(entry.id);
+		if (previous && previous !== ownership)
+			throw new Error("evidence id has conflicting ownership");
+		ownershipByEvidenceId.set(entry.id, ownership);
+	}
+
 	const ownsCompletion = (entry: EvidenceEntry): boolean =>
 		isOwnedObservedCompletion(entry, projectId, session);
 	const qualifyingEvidence = evidenceEntries.find(
@@ -235,21 +227,42 @@ export function ingestObservationsForSession(
 			entry.result === "passed" &&
 			entry.exit_code === 0,
 	);
-
-	const sessionTelemetryEvents = telemetryEvents.filter(
-		(event) => event.session_id === session,
-	);
-	const existingEvents = readObservationJournal(root, projectId);
-	const existingOccurrenceIds = new Set<string>();
-	for (const event of existingEvents) {
-		if (event.event_type !== "observation") continue;
-		const identity = String(
-			(event.payload.observation as Record<string, unknown>)
-				?.occurrence_identity ?? "",
-		);
-		if (identity) existingOccurrenceIds.add(identity);
+	if (input.mode === "production-day") {
+		if (qualifyingEvidence) {
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				appendProductionDayAllocation({
+					root,
+					db,
+					projectId,
+					timezone,
+					sessionId: session,
+					evidenceId: qualifyingEvidence.id,
+					now,
+				});
+			} finally {
+				db.close();
+			}
+		}
+		return {
+			appended: 0,
+			duplicates: 0,
+			skipped: 0,
+			warnings: [],
+			observation_ids: [],
+		};
 	}
 
+	const sessionTelemetryEvents = readBoundedSessionTelemetryEvents(
+		root,
+		session,
+		OBSERVE_TELEMETRY_LIMITS,
+	);
+	readBoundedSourceFile(
+		observationJournalPath(root),
+		"observation journal",
+		OBSERVE_JOURNAL_LIMITS,
+	);
 	const failedEvidenceEntries = evidenceEntries.filter(
 		(entry) =>
 			ownsCompletion(entry) &&
@@ -309,6 +322,61 @@ export function ingestObservationsForSession(
 	// production-day journal behind.
 	for (const candidate of allCandidates) normalizeObservationRecord(candidate);
 
+	const warnings: string[] = [];
+	const observationIds: string[] = [];
+	let appended = 0;
+	let skipped = 0;
+	let productionDaySequence = 0;
+	if (qualifyingEvidence) {
+		const receipt = resolveProductionDayReceipt({
+			root,
+			projectId,
+			timezone,
+			evidenceId: qualifyingEvidence.id,
+		});
+		if (receipt) {
+			productionDaySequence = receipt.ordinal_sequence;
+		} else {
+			const recoveryDb = openEvolutionDb(evolutionDbPath(root));
+			try {
+				productionDaySequence = appendProductionDayAllocation({
+					root,
+					db: recoveryDb,
+					projectId,
+					timezone,
+					sessionId: session,
+					evidenceId: qualifyingEvidence.id,
+					now,
+				}).ordinal_sequence;
+			} finally {
+				recoveryDb.close();
+			}
+		}
+		if (productionDaySequence <= 0)
+			throw new Error("qualifying evidence did not produce a production day");
+	}
+
+	if (allCandidates.length === 0) {
+		return {
+			appended,
+			duplicates: 0,
+			skipped,
+			warnings,
+			observation_ids: observationIds,
+		};
+	}
+
+	const existingEvents = readObservationJournal(root, projectId);
+	const existingOccurrenceIds = new Set<string>();
+	for (const event of existingEvents) {
+		if (event.event_type !== "observation") continue;
+		const identity = String(
+			(event.payload.observation as Record<string, unknown>)
+				?.occurrence_identity ?? "",
+		);
+		if (identity) existingOccurrenceIds.add(identity);
+	}
+
 	let duplicates = 0;
 	const deduped = new Map<string, ObservationInput>();
 	for (const candidate of allCandidates) {
@@ -328,27 +396,18 @@ export function ingestObservationsForSession(
 		}
 		deduped.set(key, candidate);
 	}
+	if (deduped.size === 0) {
+		return {
+			appended,
+			duplicates,
+			skipped,
+			warnings,
+			observation_ids: observationIds,
+		};
+	}
 
-	const warnings: string[] = [];
-	const observationIds: string[] = [];
-	let appended = 0;
-	let skipped = 0;
 	const db = openEvolutionDb(evolutionDbPath(root));
 	try {
-		const productionDaySequence = qualifyingEvidence
-			? appendProductionDayAllocation({
-					root,
-					db,
-					projectId,
-					timezone,
-					sessionId: session,
-					evidenceId: qualifyingEvidence.id,
-					now,
-				}).ordinal_sequence
-			: 0;
-		if (qualifyingEvidence && productionDaySequence <= 0)
-			throw new Error("qualifying evidence did not produce a production day");
-
 		for (const candidate of deduped.values()) {
 			try {
 				const record = normalizeObservationRecord({

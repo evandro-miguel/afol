@@ -1,10 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
-import { readActiveSession } from "./lifecycle";
+import {
+	readActiveSession,
+	sessionLifecycleState,
+	sessionPaths,
+} from "./lifecycle";
 
 export type SessionBinding = {
 	session: string;
@@ -27,6 +31,8 @@ export type ResolveSessionOptions = {
 	explicit?: string;
 	allowGlobalFallback?: boolean;
 };
+
+export type ImplicitSessionState = "open" | "closed" | "missing" | "corrupt";
 
 type SessionBindingInput = {
 	session: string;
@@ -88,39 +94,34 @@ function parseContext(input: unknown): SessionContext {
 	return { bindings };
 }
 
-function currentGitBranch(root: string): string | null {
-	const result = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-		cwd: root,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-	if (result.status !== 0) {
-		return null;
-	}
-	const branch = result.stdout.trim();
-	return branch.length > 0 && branch !== "HEAD" ? branch : null;
-}
-
-function currentGitWorktree(root: string): string | null {
-	const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-		cwd: root,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-	if (result.status !== 0) {
-		return null;
-	}
-	const worktree = result.stdout.trim();
-	return worktree.length > 0 ? worktree : null;
-}
-
 function currentContext(root: string): {
 	branch: string | null;
 	worktree: string | null;
 } {
+	const result = spawnSync(
+		"git",
+		["rev-parse", "--git-dir", "--show-toplevel"],
+		{
+			cwd: root,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		},
+	);
+	if (result.status !== 0) {
+		return { branch: null, worktree: null };
+	}
+	const [gitDir = "", worktree = ""] = result.stdout.trim().split(/\r?\n/, 2);
+	let branch: string | null = null;
+	try {
+		const head = readFileSync(resolve(root, gitDir, "HEAD"), "utf8").trim();
+		const prefix = "ref: refs/heads/";
+		branch = head.startsWith(prefix) ? head.slice(prefix.length) || null : null;
+	} catch {
+		branch = null;
+	}
 	return {
-		branch: currentGitBranch(root),
-		worktree: currentGitWorktree(root),
+		branch,
+		worktree: worktree || null,
 	};
 }
 
@@ -227,9 +228,16 @@ export function writeSessionContext(root: string, ctx: SessionContext): void {
 export function bindSession(
 	root: string,
 	input: SessionBindingInput,
+	options: { resetInvalid?: boolean } = {},
 ): SessionBinding {
 	return withSessionContextLock(root, () => {
-		const context = readSessionContext(root);
+		let context: SessionContext;
+		try {
+			context = readSessionContext(root);
+		} catch (error) {
+			if (!options.resetInvalid) throw error;
+			context = EMPTY_CONTEXT;
+		}
 		const nextContext = upsertBinding(context, input);
 		writeContext(root, nextContext);
 		const session = normalizeText(input.session);
@@ -244,12 +252,41 @@ export function bindSession(
 	});
 }
 
+export function bindCurrentContextSession(
+	root: string,
+	session: string,
+	actor?: string | null,
+): SessionBinding | null {
+	const context = currentContext(root);
+	if (context.branch === null && context.worktree === null) {
+		return null;
+	}
+	return bindSession(
+		root,
+		{
+			session,
+			branch: context.branch,
+			worktree: context.worktree,
+			...(actor !== undefined ? { actor } : {}),
+		},
+		{ resetInvalid: true },
+	);
+}
+
 export function resolveContextSession(root: string): string | null {
+	let bindings: SessionBinding[];
+	try {
+		bindings = readSessionContext(root).bindings;
+	} catch {
+		return null;
+	}
+	if (bindings.length === 0) {
+		return null;
+	}
 	const { branch, worktree } = currentContext(root);
 	if (branch === null && worktree === null) {
 		return null;
 	}
-	const bindings = readSessionContext(root).bindings;
 	let best: SessionBinding | null = null;
 	let bestScore = 0;
 	let bestTouched = 0;
@@ -306,18 +343,40 @@ export function resolveSession(
 	}
 
 	const contextSession = resolveContextSession(root);
-	if (contextSession) {
+	if (contextSession && isUsableImplicitSession(root, contextSession)) {
 		return { session: contextSession, source: "context" };
 	}
 
 	if (allowGlobalFallback) {
 		const active = readActiveSession(root);
-		if (active) {
+		if (active && isUsableImplicitSession(root, active)) {
 			return { session: active, source: "global" };
 		}
 	}
 
 	return null;
+}
+
+export function inspectImplicitSessionState(
+	root: string,
+	session: string,
+): ImplicitSessionState {
+	const paths = sessionPaths(root, session);
+	if (!existsSync(paths.sessionDir)) {
+		return "missing";
+	}
+	if (!existsSync(paths.taskPath)) {
+		return "corrupt";
+	}
+	try {
+		return sessionLifecycleState(root, session);
+	} catch {
+		return "corrupt";
+	}
+}
+
+function isUsableImplicitSession(root: string, session: string): boolean {
+	return inspectImplicitSessionState(root, session) === "open";
 }
 
 export function isCiMode(): boolean {

@@ -754,6 +754,12 @@ Follow-on slices under this direction:
 - Status: final
 - Governing spec:
   .afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md
+- Reliability residual:
+  .afol/adm/specs/260728_2359_session-resolution-reliability_spec-child_01.md
+- Residual state: delivered on `dev` (2026-07-29). Invalid implicit selectors
+  fall through safely, `new` and `session switch` repair malformed generated
+  context, close unbinds after durable commit, and context-only release
+  benchmarks pass with 20 measured samples and independent critic approval.
 - Why: concurrent local, remote, and CI agents need isolated workbench session
   context. A single mutable global active-session pointer is unsafe when
   several agents produce plans, tasks, evidence, and reviews in parallel.

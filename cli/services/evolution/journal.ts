@@ -87,6 +87,13 @@ export type EvolutionJournalContext = {
 	timezone: string;
 	evolutionEventsDir?: string;
 };
+
+export type ProductionDayReceipt = {
+	evidence_id: string;
+	local_date: string;
+	ordinal_sequence: number;
+	journal_event_id: string;
+};
 function stableJson(value: unknown): string {
 	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
 	if (value && typeof value === "object") {
@@ -296,6 +303,35 @@ export function readProductionDayJournal(
 	}
 	throw lastError;
 }
+
+export function resolveProductionDayReceipt(
+	context: EvolutionJournalContext & { evidenceId: string },
+): ProductionDayReceipt | null {
+	return withSessionLock(context.root, JOURNAL_LOCK, () => {
+		const events = readProductionDayJournal(
+			context.root,
+			context.projectId,
+			context.timezone,
+			context.evolutionEventsDir,
+		);
+		const ordinalByDate = new Map<string, number>();
+		for (const event of events) {
+			if (!ordinalByDate.has(event.payload.local_date)) {
+				ordinalByDate.set(event.payload.local_date, ordinalByDate.size + 1);
+			}
+			if (event.payload.evidence.id === context.evidenceId) {
+				return {
+					evidence_id: context.evidenceId,
+					local_date: event.payload.local_date,
+					ordinal_sequence: ordinalByDate.get(event.payload.local_date) ?? 0,
+					journal_event_id: event.event_id,
+				};
+			}
+		}
+		return null;
+	});
+}
+
 function projectEvents(
 	db: Database,
 	events: readonly ProductionDayJournalEvent[],

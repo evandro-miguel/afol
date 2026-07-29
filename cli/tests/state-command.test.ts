@@ -593,6 +593,7 @@ describe("state commands", () => {
 	test("afol state defaults to active session when session is omitted", async () => {
 		const root = createFixture();
 		try {
+			seedGeneratedTaskFiles(root);
 			const hydrated = captureIo();
 			expect(
 				await runHydrateCommand(
@@ -622,9 +623,9 @@ describe("state commands", () => {
 			const captured = captureIo();
 			expect(await runStateCommand("", [], root, captured.io)).toBe(2);
 			expect(captured.stderr.join("\n")).toContain(
-				"Missing --session for state and no active session found",
+				"Missing usable session for state",
 			);
-			expect(captured.stderr.join("\n")).toContain("afol session list");
+			expect(captured.stderr.join("\n")).toContain("afol ss list");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

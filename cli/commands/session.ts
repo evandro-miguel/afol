@@ -22,9 +22,12 @@ import {
 } from "../services/workbench/lifecycle";
 import {
 	bindSession,
+	defaultAllowGlobalFallback,
+	inspectImplicitSessionState,
 	listBindings,
 	removeBinding,
 	resolveContextSession,
+	resolveSession as resolveEffectiveSession,
 	withSessionContextLock,
 } from "../services/workbench/session-context";
 import { type CommandIo, DEFAULT_IO } from "./io";
@@ -446,12 +449,28 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 	const currentWorktree = currentGitWorktree(projectRoot);
 	const globalActiveSession = readActiveSession(projectRoot);
 	const contextSession = resolveContextSession(projectRoot);
+	const contextSessionState = contextSession
+		? inspectImplicitSessionState(projectRoot, contextSession)
+		: null;
+	const globalActiveState = globalActiveSession
+		? inspectImplicitSessionState(projectRoot, globalActiveSession)
+		: null;
+	const effective = resolveEffectiveSession(projectRoot, {
+		allowGlobalFallback: defaultAllowGlobalFallback(),
+	});
 	const displayedCurrentWorktree = displayWorktreePath(
 		projectRoot,
 		currentWorktree,
 		debug,
 	);
-	const bindings = listBindings(projectRoot).map((binding) => ({
+	let contextFileState: "ok" | "corrupt" = "ok";
+	let rawBindings: ReturnType<typeof listBindings> = [];
+	try {
+		rawBindings = listBindings(projectRoot);
+	} catch {
+		contextFileState = "corrupt";
+	}
+	const bindings = rawBindings.map((binding) => ({
 		...binding,
 		worktree: displayWorktreePath(projectRoot, binding.worktree, debug),
 		matches_context:
@@ -464,15 +483,30 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			current_branch: currentBranch,
 			current_worktree: displayedCurrentWorktree,
 			global_active_session: globalActiveSession,
+			global_active_state: globalActiveState,
 			context_session: contextSession,
+			context_session_state: contextSessionState,
+			context_session_ignored:
+				contextSession && contextSessionState !== "open"
+					? contextSessionState
+					: null,
+			effective_session: effective?.session ?? null,
+			effective_source: effective?.source ?? null,
+			context_file_state: contextFileState,
 			bindings,
 		},
 		lines: [
 			"session list:",
 			`  current branch: ${currentBranch ?? "(none)"}`,
 			`  current worktree: ${displayedCurrentWorktree ?? "(none)"}`,
-			`  global active: ${globalActiveSession ?? "(none)"}`,
-			`  context session: ${contextSession ?? "(none)"}`,
+			`  global active: ${globalActiveSession ?? "(none)"}${globalActiveState && globalActiveState !== "open" ? ` (ignored: ${globalActiveState})` : ""}`,
+			`  context session: ${contextSession ?? "(none)"}${contextSessionState && contextSessionState !== "open" ? ` (ignored: ${contextSessionState})` : ""}`,
+			`  effective session: ${effective ? `${effective.session} (${effective.source})` : "(none)"}`,
+			...(contextFileState === "corrupt"
+				? [
+						"  context file: corrupt (bindings unavailable; switch repairs it, and new repairs it in a Git context)",
+					]
+				: []),
 			...(bindings.length > 0
 				? bindings.map((binding) => {
 						const flags = [
@@ -606,7 +640,11 @@ function switchSession(
 		try {
 			atomicWriteText(activePath, `${session}\n`);
 			runtime.beforeSwitchBinding?.();
-			return bindSession(projectRoot, { session, branch, worktree });
+			return bindSession(
+				projectRoot,
+				{ session, branch, worktree },
+				{ resetInvalid: true },
+			);
 		} catch (error) {
 			if (activeExisted) atomicWriteText(activePath, activeBefore);
 			else rmSync(activePath, { force: true });

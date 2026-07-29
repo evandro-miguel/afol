@@ -241,6 +241,8 @@ describe("session resolution contract", () => {
 			CI: process.env.CI,
 		};
 		try {
+			createSessionFixture(root, "CONTEXT");
+			createSessionFixture(root, "GLOBAL");
 			writeFileSync(
 				join(root, ".afol", "wb", ".active_session"),
 				"GLOBAL\n",
@@ -264,6 +266,117 @@ describe("session resolution contract", () => {
 			restoreEnv("AFOL_SESSION", saved.AFOL_SESSION);
 			restoreEnv("AFOL_CI", saved.AFOL_CI);
 			restoreEnv("CI", saved.CI);
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolveSession ignores closed context and falls through to open global", () => {
+		const root = createProjectRoot("closed-context-fallback");
+		initGitRepo(root);
+		try {
+			createClosedSession(root, "CLOSED");
+			createSessionFixture(root, "GLOBAL");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"GLOBAL\n",
+				"utf8",
+			);
+			bindSession(root, {
+				session: "CLOSED",
+				branch: currentGitBranch(root),
+				worktree: root,
+			});
+
+			expect(resolveSession(root, {})).toEqual({
+				session: "GLOBAL",
+				source: "global",
+			});
+			expect(resolveContextSession(root)).toBe("CLOSED");
+			expect(readSessionContext(root).bindings).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolveSession ignores missing or corrupt implicit targets", () => {
+		const root = createProjectRoot("invalid-implicit-targets");
+		initGitRepo(root);
+		try {
+			bindSession(root, {
+				session: "MISSING-CONTEXT",
+				branch: currentGitBranch(root),
+				worktree: root,
+			});
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"MISSING-GLOBAL\n",
+				"utf8",
+			);
+			expect(resolveSession(root, {})).toBeNull();
+
+			mkdirSync(join(root, ".afol", "wb", "CORRUPT-CONTEXT"), {
+				recursive: true,
+			});
+			removeBinding(root, "MISSING-CONTEXT");
+			bindSession(root, {
+				session: "CORRUPT-CONTEXT",
+				branch: currentGitBranch(root),
+				worktree: root,
+			});
+			expect(resolveSession(root, {})).toBeNull();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("malformed context falls through and switch repairs the binding", async () => {
+		const root = createProjectRoot("malformed-context-recovery");
+		initGitRepo(root);
+		try {
+			createSessionFixture(root, "GLOBAL");
+			createSessionFixture(root, "SWITCHED");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"GLOBAL\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", "session-context.json"),
+				"{broken",
+				"utf8",
+			);
+			expect(resolveSession(root, {})).toEqual({
+				session: "GLOBAL",
+				source: "global",
+			});
+
+			const io = captureIo();
+			expect(await runSessionCommand("switch", ["SWITCHED"], root, io.io)).toBe(
+				0,
+			);
+			expect(readActiveSession(root)).toBe("SWITCHED");
+			expect(resolveContextSession(root)).toBe("SWITCHED");
+			expect(readSessionContext(root).bindings).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolveSession preserves invalid explicit and environment targets", () => {
+		const root = createProjectRoot("invalid-explicit-env");
+		const saved = process.env.AFOL_SESSION;
+		try {
+			expect(resolveSession(root, { explicit: "MISSING-EXPLICIT" })).toEqual({
+				session: "MISSING-EXPLICIT",
+				source: "explicit",
+			});
+			process.env.AFOL_SESSION = "MISSING-ENV";
+			expect(resolveSession(root, {})).toEqual({
+				session: "MISSING-ENV",
+				source: "env",
+			});
+		} finally {
+			restoreEnv("AFOL_SESSION", saved);
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
@@ -373,6 +486,102 @@ describe("afol session command", () => {
 			};
 			expect(debugParsed.data.current_worktree).toBe(root);
 			expect(debugParsed.data.bindings[0]?.worktree).toBe(root);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("list remains diagnostic when the context file is malformed", async () => {
+		const root = createProjectRoot("list-malformed-context");
+		initGitRepo(root);
+		try {
+			createSessionFixture(root, "GLOBAL");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"GLOBAL\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", "session-context.json"),
+				"{broken",
+				"utf8",
+			);
+
+			const text = captureIo();
+			expect(await runSessionCommand("list", [], root, text.io)).toBe(0);
+			expect(text.stdout.join("\n")).toContain(
+				"effective session: GLOBAL (global)",
+			);
+			expect(text.stdout.join("\n")).toContain("context file: corrupt");
+
+			const json = captureIo();
+			expect(await runSessionCommand("list", ["--json"], root, json.io)).toBe(
+				0,
+			);
+			const parsed = JSON.parse(json.stdout.join("\n")) as {
+				data: {
+					context_file_state: string;
+					effective_session: string;
+					effective_source: string;
+					bindings: unknown[];
+				};
+			};
+			expect(parsed.data.context_file_state).toBe("corrupt");
+			expect(parsed.data.effective_session).toBe("GLOBAL");
+			expect(parsed.data.effective_source).toBe("global");
+			expect(parsed.data.bindings).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("list distinguishes raw stale context from the effective session", async () => {
+		const root = createProjectRoot("list-effective");
+		initGitRepo(root);
+		try {
+			createClosedSession(root, "CLOSED");
+			createSessionFixture(root, "GLOBAL");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"GLOBAL\n",
+				"utf8",
+			);
+			bindSession(root, {
+				session: "CLOSED",
+				branch: currentGitBranch(root),
+				worktree: root,
+			});
+
+			const json = captureIo();
+			expect(await runSessionCommand("list", ["--json"], root, json.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				data: {
+					context_session: string;
+					context_session_state: string;
+					context_session_ignored: string;
+					effective_session: string;
+					effective_source: string;
+				};
+			};
+			expect(payload.data).toMatchObject({
+				context_session: "CLOSED",
+				context_session_state: "closed",
+				context_session_ignored: "closed",
+				effective_session: "GLOBAL",
+				effective_source: "global",
+			});
+
+			const text = captureIo();
+			expect(await runSessionCommand("list", [], root, text.io)).toBe(0);
+			expect(text.stdout.join("\n")).toContain(
+				"context session: CLOSED (ignored: closed)",
+			);
+			expect(text.stdout.join("\n")).toContain(
+				"effective session: GLOBAL (global)",
+			);
+			expect(text.stdout.join("\n")).not.toContain(root);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

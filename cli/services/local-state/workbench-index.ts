@@ -9,10 +9,12 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import {
+	appendValidatedEventLedgerRecords,
 	assertValidEventLedger,
+	type EventLedgerInspection,
 	EventLedgerValidationError,
+	inspectEventLedger,
 	readEventLedgerRecords,
-	validateEventLedger,
 } from "../events/ledger";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
@@ -77,6 +79,7 @@ const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
 const NESTED_LIST_ITEM_RE = /^\s{2,}[-*]\s+(.+?)\s*$/;
 const GLOB_TOKEN_RE = /[*?[\]{}]/;
 const WORKBENCH_INDEX_LOCK_SESSION = "workbench-index";
+const LEDGER_VALIDATION_CAPABILITY = Symbol("ledger-validation-capability");
 const WORKBENCH_AUXILIARY_DIRS = new Set(["_archive", "screenshots"]);
 
 const ZERO_TIME = new Date(0).toISOString();
@@ -270,6 +273,7 @@ function sessionHasArchiveDir(root: string, session: string): boolean {
 
 function collectSessionLifecycleEvents(
 	root: string,
+	validatedRecords?: readonly Record<string, unknown>[],
 ): Map<string, { started: boolean; closed: boolean }> {
 	const eventLog = resolveWorkbenchEventLogPath(root);
 	const lifecycle = new Map<string, { started: boolean; closed: boolean }>();
@@ -277,7 +281,7 @@ function collectSessionLifecycleEvents(
 		return lifecycle;
 	}
 
-	for (const raw of readEventLedgerRecords(root)) {
+	for (const raw of validatedRecords ?? readEventLedgerRecords(root)) {
 		const workbenchType = typeof raw.type === "string" ? raw.type : "";
 		const telemetryType =
 			typeof raw.event_type === "string" ? raw.event_type : "";
@@ -325,6 +329,7 @@ type ParsedTaskClaims = {
 
 type WorkbenchIndexRebuildOptions = {
 	beforeWrite?: (sessionScope?: string) => void;
+	ledgerValidationCapability?: typeof LEDGER_VALIDATION_CAPABILITY;
 };
 
 type FileClaimField = keyof ParsedTaskClaims;
@@ -845,19 +850,12 @@ function buildSessionsSnapshot(
 		const sessionTasks: WorkbenchIndexTask[] = [];
 		const taskFileRead = readSessionTaskFiles(sessionDir);
 		const taskFiles = taskFileRead.files;
-		let readError = taskFileRead.readFailed;
+		const readError = taskFileRead.readFailed;
 		let parseError = false;
 		let duplicateTaskId = false;
 		const seenTaskIds = new Set<string>();
 
 		for (const file of taskFiles) {
-			// Pre-check readability to surface I/O errors as degraded state.
-			try {
-				readFileSync(file, "utf8");
-			} catch {
-				readError = true;
-				continue;
-			}
 			const parsed = parseTaskRows(session, file);
 			parseError ||= parsed.malformed;
 			for (const task of parsed.tasks) {
@@ -1132,7 +1130,7 @@ function sessionSourceLatestTime(root: string, session: string): number {
 	return latest;
 }
 
-function latestSourceMtime(root: string): number {
+function latestAuxiliarySourceMtime(root: string): number {
 	const wbRoot = resolveWorkbenchRoot(root);
 	if (!existsSync(wbRoot)) {
 		return 0;
@@ -1154,10 +1152,6 @@ function latestSourceMtime(root: string): number {
 		}
 	}
 
-	for (const session of collectSessionIds(root)) {
-		latest = Math.max(latest, sessionSourceLatestTime(root, session));
-	}
-
 	const eventLog = resolveWorkbenchEventLogPath(root);
 	if (existsSync(eventLog)) {
 		try {
@@ -1165,6 +1159,14 @@ function latestSourceMtime(root: string): number {
 		} catch {
 			// no-op
 		}
+	}
+	return latest;
+}
+
+function latestSourceMtime(root: string): number {
+	let latest = latestAuxiliarySourceMtime(root);
+	for (const session of collectSessionIds(root)) {
+		latest = Math.max(latest, sessionSourceLatestTime(root, session));
 	}
 	return latest;
 }
@@ -1185,33 +1187,24 @@ function normalizedMtime(path: string): number | null {
 
 function isSessionSnapshotFresh(
 	root: string,
-	snapshot: WorkbenchIndexSnapshot,
 	session: string,
+	persistedSession: WorkbenchIndexSession | undefined,
+	persistedTasks: readonly WorkbenchIndexTask[],
+	generatedAt: number,
 ): boolean {
-	const persistedSessions = snapshot.sessions.filter(
-		(entry) => entry.session === session,
-	);
-	if (persistedSessions.length !== 1 || !sessionDirExists(root, session)) {
-		return false;
-	}
-
-	const persistedSession = persistedSessions[0];
 	if (!persistedSession) {
 		return false;
 	}
-	const persistedTasks = snapshot.tasks.filter(
-		(task) => task.session === session,
-	);
 	if (persistedSession.task_count !== persistedTasks.length) {
 		return false;
 	}
 
 	const sessionDir = resolve(resolveWorkbenchRoot(root), session);
-	const taskFiles = sessionTaskFiles(sessionDir);
-	const generatedAt = Date.parse(snapshot.generated_at);
-	if (!Number.isFinite(generatedAt)) {
+	const taskFileRead = readSessionTaskFiles(sessionDir);
+	if (taskFileRead.readFailed) {
 		return false;
 	}
+	const taskFiles = taskFileRead.files;
 
 	if (persistedTasks.length === 0) {
 		if (persistedSession.touched_at !== ZERO_TIME) {
@@ -1262,44 +1255,15 @@ function isSessionSnapshotFresh(
 	return Date.parse(persistedSession.touched_at) === latestTaskMtime;
 }
 
-function canMergeScopedWorkbenchSnapshot(
-	root: string,
-	snapshot: WorkbenchIndexSnapshot,
-	sessionScope: string,
-): boolean {
-	const diskSessions = new Set(collectSessionIds(root));
-	const snapshotSessions = new Set(
-		snapshot.sessions.map((session) => session.session),
-	);
-
-	for (const session of diskSessions) {
-		if (session !== sessionScope && !snapshotSessions.has(session)) {
-			return false;
-		}
-	}
-	for (const session of snapshotSessions) {
-		if (session !== sessionScope && !diskSessions.has(session)) {
-			return false;
-		}
-	}
-	for (const session of diskSessions) {
-		if (
-			session !== sessionScope &&
-			!isSessionSnapshotFresh(root, snapshot, session)
-		) {
-			return false;
-		}
-	}
-	return true;
-}
-
 export function rebuildWorkBenchIndex(
 	root: string,
 	sessionScope?: string,
 	options: WorkbenchIndexRebuildOptions = {},
 ): WorkbenchIndexSnapshot {
 	return withSessionLock(root, WORKBENCH_INDEX_LOCK_SESSION, () => {
-		assertValidEventLedger(root);
+		if (options.ledgerValidationCapability !== LEDGER_VALIDATION_CAPABILITY) {
+			assertValidEventLedger(root);
+		}
 		options.beforeWrite?.(sessionScope);
 		const current = loadWorkBenchIndexSnapshot(root);
 
@@ -1307,11 +1271,6 @@ export function rebuildWorkBenchIndex(
 			if (!current) {
 				// Existing snapshot is missing or malformed — fall back to full rebuild
 				// to avoid silently dropping unaffected sessions.
-				return writeSnapshot(root, collectWorkBenchSnapshot(root));
-			}
-			if (!canMergeScopedWorkbenchSnapshot(root, current, sessionScope)) {
-				// An unaffected session changed since the persisted snapshot. Rebuild
-				// all sessions so the scoped write cannot mask that source change.
 				return writeSnapshot(root, collectWorkBenchSnapshot(root));
 			}
 			const targetSnapshot = buildSessionsSnapshot(root, [sessionScope]);
@@ -1323,7 +1282,7 @@ export function rebuildWorkBenchIndex(
 			if (!hasSession) {
 				const filtered = {
 					...(current ?? emptySnapshot(root)),
-					generated_at: formatFreshTimestamp(root),
+					generated_at: formatNow(),
 					sessions: existingSessions.filter(
 						(entry) => entry.session !== sessionScope,
 					),
@@ -1346,7 +1305,7 @@ export function rebuildWorkBenchIndex(
 			const next: WorkbenchIndexSnapshot = {
 				kind: "workbench_index_v1",
 				version: 1,
-				generated_at: formatFreshTimestamp(root),
+				generated_at: formatNow(),
 				source: {
 					...workbenchSource(root),
 				},
@@ -1360,11 +1319,27 @@ export function rebuildWorkBenchIndex(
 	});
 }
 
-export function validateWorkBenchIndex(root: string): {
+export function appendEventsAndRebuildWorkBenchIndex(
+	root: string,
+	sessionScope: string,
+	records: readonly Record<string, unknown>[],
+): WorkbenchIndexSnapshot {
+	return withSessionLock(root, WORKBENCH_INDEX_LOCK_SESSION, () => {
+		appendValidatedEventLedgerRecords(root, records);
+		return rebuildWorkBenchIndex(root, sessionScope, {
+			ledgerValidationCapability: LEDGER_VALIDATION_CAPABILITY,
+		});
+	});
+}
+
+export function validateWorkBenchIndex(
+	root: string,
+	options?: { eventLedger?: EventLedgerInspection },
+): {
 	ok: boolean;
 	message: string;
 } {
-	const ledger = validateEventLedger(root);
+	const ledger = options?.eventLedger ?? inspectEventLedger(root);
 	if (!ledger.ok) {
 		const first = ledger.issues.find((issue) => issue.severity === "error");
 		const location = first?.line ? ` line=${first.line}` : "";
@@ -1404,8 +1379,41 @@ export function validateWorkBenchIndex(root: string): {
 		};
 	}
 
+	const diskSessions = collectSessionIds(root);
+	const snapshotSessions = new Set(
+		snapshot.sessions.map((session) => session.session),
+	);
+	const sessionById = new Map(
+		snapshot.sessions.map((entry) => [entry.session, entry]),
+	);
+	const tasksBySession = new Map<string, WorkbenchIndexTask[]>();
+	for (const task of snapshot.tasks) {
+		const tasks = tasksBySession.get(task.session) ?? [];
+		tasks.push(task);
+		tasksBySession.set(task.session, tasks);
+	}
 	const generatedAt = Date.parse(snapshot.generated_at);
-	const sourceLatest = latestSourceMtime(root);
+	if (
+		diskSessions.length !== snapshotSessions.size ||
+		diskSessions.some((session) => !snapshotSessions.has(session)) ||
+		diskSessions.some(
+			(session) =>
+				!isSessionSnapshotFresh(
+					root,
+					session,
+					sessionById.get(session),
+					tasksBySession.get(session) ?? [],
+					generatedAt,
+				),
+		)
+	) {
+		return {
+			ok: false,
+			message: `stale workbench index snapshot: ${indexPath}`,
+		};
+	}
+
+	const sourceLatest = latestAuxiliarySourceMtime(root);
 	if (!Number.isFinite(sourceLatest)) {
 		return { ok: true, message: `ok workbench index: ${indexPath}` };
 	}
@@ -1429,17 +1437,18 @@ export type SessionHealthWarning = {
 	message: string;
 };
 
-export function detectSessionHealth(root: string): SessionHealthWarning[] {
+export function detectSessionHealth(
+	root: string,
+	options?: {
+		eventLedger?: EventLedgerInspection;
+		workbenchSnapshot?: WorkbenchIndexSnapshot;
+	},
+): SessionHealthWarning[] {
 	const warnings: SessionHealthWarning[] = [];
 	const allSessionIds = collectSessionIds(root);
-	let lifecycle: Map<string, { started: boolean; closed: boolean }>;
-	try {
-		lifecycle = collectSessionLifecycleEvents(root);
-	} catch (error) {
-		const message =
-			error instanceof EventLedgerValidationError
-				? error.message
-				: "EVENT_LEDGER_UNREADABLE: event ledger invalid; explicit repair required";
+	const eventLedger = options?.eventLedger ?? inspectEventLedger(root);
+	if (!eventLedger.ok) {
+		const message = new EventLedgerValidationError(eventLedger).message;
 		warnings.push({
 			type: "invalid_event_ledger",
 			session: "",
@@ -1447,52 +1456,78 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 		});
 		return warnings;
 	}
+	const lifecycle = collectSessionLifecycleEvents(root, eventLedger.records);
 	const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 	const now = Date.now();
+	const indexedSessions = options?.workbenchSnapshot
+		? new Map(
+				options.workbenchSnapshot.sessions.map((session) => [
+					session.session,
+					session,
+				]),
+			)
+		: null;
 
-	// Detect stale open tasks (>7 days since last touched)
-	const wbRoot = resolveWorkbenchRoot(root);
-	for (const session of allSessionIds) {
-		const sessionDir = resolve(wbRoot, session);
-		if (!existsSync(sessionDir)) {
-			continue;
+	// Detect stale open tasks (>7 days since last touched).
+	if (indexedSessions) {
+		for (const [session, indexed] of indexedSessions) {
+			const touchedAt = Date.parse(indexed.touched_at);
+			if (
+				indexed.open > 0 &&
+				Number.isFinite(touchedAt) &&
+				now - touchedAt > SEVEN_DAYS_MS
+			) {
+				warnings.push({
+					type: "stale_open_tasks",
+					session,
+					message: `Session "${session}" has open tasks untouched for >7 days`,
+				});
+			}
 		}
-		const taskFileRead = readSessionTaskFiles(sessionDir);
-		if (taskFileRead.readFailed) {
-			warnings.push({
-				type: "unreadable_session_directory",
-				session,
-				message: `unavailable: session directory unreadable: ${session}`,
-			});
-			continue;
-		}
-		const taskFiles = taskFileRead.files;
-		if (taskFiles.length === 0) {
-			continue;
-		}
+	} else {
+		const wbRoot = resolveWorkbenchRoot(root);
+		for (const session of allSessionIds) {
+			const sessionDir = resolve(wbRoot, session);
+			if (!existsSync(sessionDir)) {
+				continue;
+			}
+			const taskFileRead = readSessionTaskFiles(sessionDir);
+			if (taskFileRead.readFailed) {
+				warnings.push({
+					type: "unreadable_session_directory",
+					session,
+					message: `unavailable: session directory unreadable: ${session}`,
+				});
+				continue;
+			}
+			const taskFiles = taskFileRead.files;
+			if (taskFiles.length === 0) {
+				continue;
+			}
 
-		let hasOpen = false;
-		let touchedAt = 0;
-		for (const file of taskFiles) {
-			const tasks = parseTaskRows(session, file).tasks;
-			for (const task of tasks) {
-				if (task.state !== "done" && task.state !== "moved") {
-					hasOpen = true;
+			let hasOpen = false;
+			let touchedAt = 0;
+			for (const file of taskFiles) {
+				const tasks = parseTaskRows(session, file).tasks;
+				for (const task of tasks) {
+					if (task.state !== "done" && task.state !== "moved") {
+						hasOpen = true;
+					}
+				}
+				try {
+					touchedAt = Math.max(touchedAt, statSync(file).mtimeMs);
+				} catch {
+					// ignore
 				}
 			}
-			try {
-				touchedAt = Math.max(touchedAt, statSync(file).mtimeMs);
-			} catch {
-				// ignore
-			}
-		}
 
-		if (hasOpen && now - touchedAt > SEVEN_DAYS_MS) {
-			warnings.push({
-				type: "stale_open_tasks",
-				session,
-				message: `Session "${session}" has open tasks untouched for >7 days`,
-			});
+			if (hasOpen && now - touchedAt > SEVEN_DAYS_MS) {
+				warnings.push({
+					type: "stale_open_tasks",
+					session,
+					message: `Session "${session}" has open tasks untouched for >7 days`,
+				});
+			}
 		}
 	}
 

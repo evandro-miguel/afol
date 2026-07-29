@@ -675,9 +675,10 @@ export function verifyWorkbenchTasks(
 }
 
 export function formatVerifyReport(result: VerifyResult): string {
+	const sessionLabel = relative(process.cwd(), result.sessionPath) || ".";
 	const lines = [
 		"Task Verification Report",
-		`Session: ${result.sessionPath}`,
+		`Session: ${sessionLabel}`,
 		...(result.strict ? ["Mode: STRICT"] : []),
 		"",
 		"Summary:",

@@ -45,6 +45,8 @@ type ReleaseProvenance = {
 	platform: string;
 	arch: string;
 	build_target: string;
+	compile_bytecode: boolean;
+	module_format: "esm";
 	compile_autoload_dotenv: boolean;
 	compile_autoload_bunfig: boolean;
 	security_scanners: Array<{
@@ -252,6 +254,8 @@ function assertKnownReleaseFields(provenance: ReleaseProvenance): void {
 		"platform",
 		"arch",
 		"build_target",
+		"compile_bytecode",
+		"module_format",
 		"compile_autoload_dotenv",
 		"compile_autoload_bunfig",
 		"security_scanners",
@@ -552,6 +556,8 @@ export function buildReleaseProvenance(
 			process.platform && process.arch
 				? `bun-${process.platform}-${process.arch}`
 				: "unknown",
+		compile_bytecode: true,
+		module_format: "esm",
 		compile_autoload_dotenv: false,
 		compile_autoload_bunfig: false,
 		security_scanners: securityScanners,

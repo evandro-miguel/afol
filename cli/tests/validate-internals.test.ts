@@ -55,8 +55,10 @@ import {
 	compiledReleaseBuildArgs,
 	ensureBenchmarkTempRoot,
 	executeScenarioPackWithArtifact,
+	isCompiledBunRuntime,
 	type PreparedCompiledReleaseArtifact,
 	prepareCompiledReleaseArtifact,
+	resolveAfolExecutable,
 	resolveScenarioSampleCount,
 	runScenarioCommand,
 	type ScenarioExecutionResult,
@@ -829,6 +831,11 @@ describe("validate registry", () => {
 				expect(scenario.thresholds.max_argv_chars).toBeDefined();
 				expect(scenario.compiled_binary).toBe(true);
 			}
+			expect(
+				snapshot.scenariosByPack["workbench-parity"]?.every(
+					(scenario) => scenario.compiled_binary === true,
+				),
+			).toBe(true);
 			const mutationScenarios =
 				snapshot.scenariosByPack["mutation-safety"] ?? [];
 			expect(mutationScenarios).toHaveLength(5);
@@ -1785,6 +1792,8 @@ describe("scenario benchmark execution", () => {
 			[
 				"build",
 				"--compile",
+				"--bytecode",
+				"--format=esm",
 				"--no-compile-autoload-dotenv",
 				"--no-compile-autoload-bunfig",
 				join(process.cwd(), "cli", "main.ts"),
@@ -1792,6 +1801,37 @@ describe("scenario benchmark execution", () => {
 				"/fixture/.afol/tmp/release/afol",
 			],
 		);
+	});
+
+	test("detects Bun compiled virtual entrypoints", () => {
+		expect(isCompiledBunRuntime("/$bunfs/root/cli/main.ts")).toBe(true);
+		expect(isCompiledBunRuntime(join(process.cwd(), "cli", "main.ts"))).toBe(
+			false,
+		);
+	});
+
+	test("uses the running AFOL executable for compiled downstream benchmarks", () => {
+		expect(
+			resolveAfolExecutable(
+				undefined,
+				"/$bunfs/root/cli/main.ts",
+				"/home/operator/.local/bin/afol",
+			),
+		).toBe("/home/operator/.local/bin/afol");
+		expect(
+			resolveAfolExecutable(
+				"/fixture/trusted-afol",
+				"/$bunfs/root/cli/main.ts",
+				"/ignored/current-afol",
+			),
+		).toBe("/fixture/trusted-afol");
+		expect(
+			resolveAfolExecutable(
+				undefined,
+				join(process.cwd(), "cli", "main.ts"),
+				process.execPath,
+			),
+		).toBeNull();
 	});
 
 	test("prepares a registered sidecar and executes a compiled mutation", () => {
@@ -1820,6 +1860,8 @@ describe("scenario benchmark execution", () => {
 				package_name: "afol",
 				version: expect.any(String),
 				sha256: artifact.profile.artifact_sha256,
+				compile_bytecode: true,
+				module_format: "esm",
 				compile_autoload_dotenv: false,
 				compile_autoload_bunfig: false,
 			});
@@ -1885,6 +1927,8 @@ describe("scenario benchmark execution", () => {
 			},
 			timestamp: "2026-07-28T00:00:00.000Z",
 			git_commit: "b".repeat(40),
+			source_state_sha256: "c".repeat(64),
+			source_dirty: true,
 			cleanup: () => {
 				cleanupCount += 1;
 			},
@@ -1955,6 +1999,8 @@ describe("scenario benchmark execution", () => {
 				},
 				timestamp: "2026-07-28T00:00:00.000Z",
 				git_commit: "b".repeat(40),
+				source_state_sha256: "c".repeat(64),
+				source_dirty: true,
 				cleanup: () => {},
 			};
 			const phases: ScenarioSamplePhase[] = [];
@@ -2018,6 +2064,8 @@ describe("scenario benchmark execution", () => {
 			expect(result.metrics.warmup_count).toBe(1);
 			expect(result.metrics.timing_p50_ms).toBe(10);
 			expect(result.metrics.timing_p95_ms).toBe(10);
+			expect(result.source_state_sha256).toBe("c".repeat(64));
+			expect(result.source_dirty).toBe(true);
 			expect(phases.filter((phase) => phase === "setup")).toHaveLength(21);
 			expect(phases.filter((phase) => phase === "warmup")).toHaveLength(1);
 			expect(phases.filter((phase) => phase === "sample")).toHaveLength(20);
@@ -2079,13 +2127,51 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
-	test("rejects fewer than twenty mutation samples at the release gate", () => {
-		expect(() =>
-			resolveScenarioSampleCount({ pack_id: "mutation-safety" }, 19),
-		).toThrow("release-benchmark-sample-count-required:20");
-		expect(resolveScenarioSampleCount({ pack_id: "mutation-safety" }, 20)).toBe(
-			20,
-		);
+	test("isolates workbench benchmarks from source and mutable runtime history", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			cpSync(
+				join(process.cwd(), ".afol", "config.json"),
+				join(root, ".afol", "config.json"),
+			);
+			for (const relativePath of [
+				".afol/wb/history-sentinel",
+				".afol/data/events/history-sentinel",
+			]) {
+				const path = join(root, relativePath);
+				mkdirSync(dirname(path), { recursive: true });
+				writeFileSync(path, "must-not-copy\n");
+			}
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "workbench-clean-sandbox",
+				scenario_version: "1.0.0",
+				pack_id: "workbench-parity",
+				command:
+					'node -e \'const{existsSync:e}=require("node:fs");process.exit(!e(".afol/config.json")||e(".afol/wb/history-sentinel")||e(".afol/data/events/history-sentinel")?9:0)\'',
+				sandbox: true,
+				result_schema: "1.0.0",
+				oracle: "fixture",
+				thresholds: { max_p95_ms: 10_000 },
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario);
+			expect(result.passed).toBe(true);
+			expect(result.metrics.sample_count).toBe(20);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("requires stable samples for release and workbench timing packs", () => {
+		for (const packId of ["mutation-safety", "workbench-parity"] as const) {
+			expect(() => resolveScenarioSampleCount({ pack_id: packId }, 19)).toThrow(
+				"release-benchmark-sample-count-required:20",
+			);
+			expect(resolveScenarioSampleCount({ pack_id: packId })).toBe(20);
+		}
+		expect(resolveScenarioSampleCount({ pack_id: "token-economy" })).toBe(3);
 	});
 
 	test("does not require artifact hash equality for profile compatibility", () => {
@@ -2504,6 +2590,27 @@ describe("scenario benchmark execution", () => {
 				baseline_id: "bench-v1",
 				deterministic_metrics: {},
 			};
+
+			const emptyOperationalRoot = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					{
+						...scenario,
+						scenario_id: "bench-empty-lock-root",
+						command:
+							'node -e \'require("node:fs").mkdirSync(".afol/wb/.locks",{recursive:true})\'',
+					},
+					baselinePath,
+					baseline,
+				),
+			);
+			expect(emptyOperationalRoot.result.status).toBe("passed");
+			expect(
+				emptyOperationalRoot.result.notes.some((note) =>
+					note.startsWith("side-effect-leak:"),
+				),
+			).toBe(false);
+			expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(false);
 
 			await withTaskCompletionLock(
 				root,
@@ -3091,6 +3198,8 @@ describe("scenario benchmark execution", () => {
 				},
 				timestamp: "2026-07-28T00:00:00.000Z",
 				git_commit: "e".repeat(40),
+				source_state_sha256: "f".repeat(64),
+				source_dirty: true,
 				cleanup: () => {},
 			};
 			const baseline: Baseline = {

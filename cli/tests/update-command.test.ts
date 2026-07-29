@@ -771,8 +771,7 @@ describe("update command", () => {
 			expect(
 				payload.data?.operations?.find(
 					(operation) =>
-						operation.path ===
-						".afol/adm/rules/RULE-004-validation-linting.md",
+						operation.path === ".afol/adm/rules/RULE-004-validation-linting.md",
 				),
 			).toMatchObject({
 				kind: "preserve-project-owned",

@@ -16,10 +16,10 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 83 |
+| Total | 84 |
 | Draft | 0 |
 | Active | 8 |
-| Final | 57 |
+| Final | 58 |
 | Superseded | 18 |
 
 ## Index
@@ -105,6 +105,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260726_event-ledger-durability_spec-child_01 | event-ledger-durability | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260726_governance-contract-reconciliation_spec-child_01 | governance-contract-reconciliation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260727_release-benchmark-timing-and-baseline-contract_spec-child_01 | release-benchmark-timing-and-baseline-contract | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260728_2359_session-resolution-reliability_spec-child_01 | session-resolution-reliability | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md, related: .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md |
 | 260716_1234_agent-cli-sequential-verification-runs_spec-child_01 | agent-cli-sequential-verification-runs | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
 | 260717_agent-submission-and-batch-review_spec_01 | agent-submission-and-batch-review | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md, adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md, evolution_adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
 | 260716_2155_afol-evolution-system_spec_01 | afol-evolution-system | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |

@@ -13,7 +13,7 @@ import {
 import { resolveAdmPaths } from "../adm";
 import {
 	formatEventLedgerValidation,
-	validateEventLedger,
+	inspectEventLedger,
 } from "../events/ledger";
 import { validateEvolutionConfigExtension } from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
@@ -25,6 +25,7 @@ import {
 } from "../local-state/project-indexes";
 import {
 	detectSessionHealth,
+	loadWorkBenchIndexSnapshot,
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { verifyAllSessions } from "../workbench/verify";
@@ -228,9 +229,8 @@ function validateAgentsPayloadClean(
 }
 
 function validateSharedEventLedger(
-	projectRoot: string,
+	validation: ReturnType<typeof inspectEventLedger>,
 ): ProjectValidationCheck {
-	const validation = validateEventLedger(projectRoot);
 	return {
 		id: "event_ledger",
 		ok: validation.ok,
@@ -491,6 +491,11 @@ export async function validateProjectStructure(
 	options?: ProjectValidationOptions,
 ): Promise<ProjectValidationReport> {
 	const projectPaths = resolveProjectPaths(projectRoot);
+	const eventLedger = inspectEventLedger(projectRoot);
+	const workbenchIndex = validateWorkBenchIndex(projectRoot, { eventLedger });
+	const workbenchSnapshot = workbenchIndex.ok
+		? loadWorkBenchIndexSnapshot(projectRoot)
+		: null;
 	const checks: ProjectValidationCheck[] = [
 		validateConfig(projectRoot),
 		validateJsonFile("lock", projectPaths.abs.lockFile),
@@ -508,15 +513,12 @@ export async function validateProjectStructure(
 		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
 		validateAgentsPayloadClean(projectRoot),
 		validateAdapterConsistency(projectRoot),
-		validateSharedEventLedger(projectRoot),
-		(() => {
-			const result = validateWorkBenchIndex(projectRoot);
-			return {
-				id: "wb_local_state_index",
-				ok: result.ok,
-				message: result.message,
-			};
-		})(),
+		validateSharedEventLedger(eventLedger),
+		{
+			id: "wb_local_state_index",
+			ok: workbenchIndex.ok,
+			message: workbenchIndex.message,
+		},
 		(() => {
 			const result = validateRulesIndex(projectRoot);
 			return {
@@ -606,7 +608,10 @@ export async function validateProjectStructure(
 		})(),
 		(() => {
 			// Session health check
-			const warnings = detectSessionHealth(projectRoot);
+			const warnings = detectSessionHealth(projectRoot, {
+				eventLedger,
+				...(workbenchSnapshot ? { workbenchSnapshot } : {}),
+			});
 			if (warnings.length === 0) {
 				return {
 					id: "session_health" as const,

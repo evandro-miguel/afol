@@ -7,6 +7,7 @@ import {
 	EventLedgerValidationError,
 	inspectEventLedgerText,
 	readEventLedgerRecords,
+	readEventLedgerRecordsMatching,
 } from "./ledger";
 
 /**
@@ -94,6 +95,7 @@ export function firstToken(cmd: string): string {
 export function appendTelemetryEvent(
 	root: string,
 	event: Omit<TelemetryEvent, "id" | "ts" | "source" | "schema_version">,
+	deferredRecords?: Record<string, unknown>[],
 ): TelemetryEvent {
 	const now = new Date();
 	const fullEvent: TelemetryEvent = {
@@ -104,7 +106,11 @@ export function appendTelemetryEvent(
 		...event,
 	};
 
-	appendEventLedgerRecord(root, fullEvent);
+	if (deferredRecords) {
+		deferredRecords.push(fullEvent as unknown as Record<string, unknown>);
+	} else {
+		appendEventLedgerRecord(root, fullEvent);
+	}
 	return fullEvent;
 }
 
@@ -126,7 +132,33 @@ export function readBoundedTelemetryEvents(
 	root: string,
 	limits: BoundedSourceLimits,
 ): TelemetryEvent[] {
-	return telemetryRecords(readEventLedgerRecords(root, limits));
+	return telemetryRecords(
+		readEventLedgerRecordsMatching(
+			root,
+			(record) =>
+				record.schema_version === "1" &&
+				typeof record.event_type === "string" &&
+				typeof record.session_id === "string",
+			limits,
+		),
+	);
+}
+
+export function readBoundedSessionTelemetryEvents(
+	root: string,
+	session: string,
+	limits: BoundedSourceLimits,
+): TelemetryEvent[] {
+	return telemetryRecords(
+		readEventLedgerRecordsMatching(
+			root,
+			(record) =>
+				record.schema_version === "1" &&
+				typeof record.event_type === "string" &&
+				record.session_id === session,
+			limits,
+		),
+	);
 }
 
 function telemetryRecords(

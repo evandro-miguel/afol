@@ -7,12 +7,18 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { detectSessionHealth } from "../services/local-state/workbench-index";
+import { dirname, join, relative } from "node:path";
+import { inspectEventLedger } from "../services/events/ledger";
+import {
+	detectSessionHealth,
+	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import {
 	evidenceCompletionAuthorization,
 	formatVerifyReport,
 	verifyAllSessions,
+	verifyTaskText,
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
 
@@ -201,6 +207,37 @@ function seedDoneWorkbenchTask(
 }
 
 describe("verifyWorkbenchTasks", () => {
+	test("formats the session path relative to cwd in deeply nested checkouts", () => {
+		const sessionPath = join(
+			process.cwd(),
+			".tmp",
+			"deep",
+			"nested",
+			"checkout",
+			".afol",
+			"wb",
+			"sb-wb",
+		);
+		const result = verifyTaskText(
+			[
+				"## State Board",
+				"",
+				"| Task | State | Owner | Notes |",
+				"|------|-------|-------|-------|",
+				"| T-01 | done | worker | verified |",
+				"",
+			].join("\n"),
+			join(sessionPath, "sb-wb_task_01.md"),
+		);
+
+		const report = formatVerifyReport(result);
+
+		expect(report).toContain(
+			`Session: ${relative(process.cwd(), sessionPath)}`,
+		);
+		expect(report).not.toContain(`Session: ${process.cwd()}`);
+	});
+
 	test("strict root verification ignores documentation task examples/templates", () => {
 		const root = mkRoot("docs-ignore");
 		try {
@@ -913,6 +950,15 @@ describe("verifyWorkbenchTasks", () => {
 			const stale = warnings.filter((w) => w.type === "stale_open_tasks");
 			expect(stale.length).toBeGreaterThanOrEqual(1);
 			expect(stale[0]?.session).toBe(session);
+
+			const workbenchSnapshot = rebuildWorkBenchIndex(root);
+			const eventLedger = inspectEventLedger(root);
+			expect(validateWorkBenchIndex(root, { eventLedger })).toEqual(
+				validateWorkBenchIndex(root),
+			);
+			expect(
+				detectSessionHealth(root, { eventLedger, workbenchSnapshot }),
+			).toEqual(detectSessionHealth(root));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

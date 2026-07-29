@@ -423,6 +423,25 @@ export function ensureMigrationTable(db: Database): void {
 	`);
 }
 
+function assertMigrationChecksums(db: Database, targetVersion: number): void {
+	const rows = db
+		.query(
+			"SELECT version, checksum FROM evolution_migrations WHERE version <= ? ORDER BY version",
+		)
+		.all(targetVersion) as Array<{ version: number; checksum: string }>;
+	const checksumByVersion = new Map(
+		rows.map((row) => [row.version, row.checksum]),
+	);
+	for (const migration of EVOLUTION_MIGRATIONS) {
+		if (migration.version > targetVersion) break;
+		if (checksumByVersion.get(migration.version) !== migration.checksum) {
+			throw new Error(
+				`evolution migration checksum mismatch at version ${migration.version}`,
+			);
+		}
+	}
+}
+
 export function applyMigrations(
 	db: Database,
 	targetVersion = EVOLUTION_SCHEMA_VERSION,
@@ -433,19 +452,29 @@ export function applyMigrations(
 		targetVersion > EVOLUTION_SCHEMA_VERSION
 	)
 		throw new Error("invalid evolution migration target version");
-	for (const migration of MIGRATIONS) {
-		if (migration.version > targetVersion) break;
-		db.exec("BEGIN IMMEDIATE");
-		try {
-			// Re-read after acquiring the write lock. Another opener may have
-			// completed this migration while this connection was waiting.
-			const currentVersion = readUserVersion(db);
-			if (currentVersion > EVOLUTION_SCHEMA_VERSION) {
-				throw new Error(
-					`evolution db schema ${currentVersion} is newer than supported ${EVOLUTION_SCHEMA_VERSION}`,
-				);
-			}
-			ensureMigrationTable(db);
+	const initialVersion = readUserVersion(db);
+	if (initialVersion > EVOLUTION_SCHEMA_VERSION) {
+		throw new Error(
+			`evolution db schema ${initialVersion} is newer than supported ${EVOLUTION_SCHEMA_VERSION}`,
+		);
+	}
+	if (initialVersion === targetVersion) {
+		assertMigrationChecksums(db, targetVersion);
+		return;
+	}
+	db.exec("BEGIN IMMEDIATE");
+	try {
+		// Re-read after acquiring the write lock. Another opener may have
+		// completed the pending migrations while this connection was waiting.
+		const currentVersion = readUserVersion(db);
+		if (currentVersion > EVOLUTION_SCHEMA_VERSION) {
+			throw new Error(
+				`evolution db schema ${currentVersion} is newer than supported ${EVOLUTION_SCHEMA_VERSION}`,
+			);
+		}
+		ensureMigrationTable(db);
+		for (const migration of MIGRATIONS) {
+			if (migration.version > targetVersion) break;
 			if (migration.version <= currentVersion) {
 				const row = db
 					.query("SELECT checksum FROM evolution_migrations WHERE version = ?")
@@ -455,7 +484,6 @@ export function applyMigrations(
 						`evolution migration checksum mismatch at version ${migration.version}`,
 					);
 				}
-				db.exec("COMMIT");
 				continue;
 			}
 			db.exec(migration.sql);
@@ -467,14 +495,14 @@ export function applyMigrations(
 				new Date().toISOString(),
 			);
 			db.exec(`PRAGMA user_version = ${migration.version}`);
-			db.exec("COMMIT");
-		} catch (error) {
-			try {
-				db.exec("ROLLBACK");
-			} catch {
-				/* preserve migration failure */
-			}
-			throw error;
 		}
+		db.exec("COMMIT");
+	} catch (error) {
+		try {
+			db.exec("ROLLBACK");
+		} catch {
+			/* preserve migration failure */
+		}
+		throw error;
 	}
 }

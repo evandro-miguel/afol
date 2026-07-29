@@ -23,6 +23,7 @@ import {
 	readProductionDayJournal,
 	resolveEvolutionConfig,
 	resolveEvolutionIdentity,
+	resolveProductionDayReceipt,
 	validateEvolutionIdentity,
 } from "../services/evolution";
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
@@ -215,6 +216,18 @@ describe("Evolution Slice 1 persistence core", () => {
 				"America/Asuncion",
 			);
 			expect(journal).toHaveLength(2);
+			expect(
+				resolveProductionDayReceipt({
+					root,
+					projectId: PROJECT_ID,
+					timezone: "America/Asuncion",
+					evidenceId: "E-02",
+				}),
+			).toMatchObject({
+				evidence_id: "E-02",
+				ordinal_sequence: first.ordinal_sequence,
+				journal_event_id: journal[1]?.event_id,
+			});
 			expect(journal[0]?.payload.evidence.source_digest).toMatch(
 				/^[a-f0-9]{64}$/,
 			);

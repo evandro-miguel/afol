@@ -57,7 +57,7 @@ if (result.status !== 0) {
 			(line) =>
 				line.includes("(fail)") ||
 				/\btests? failed\b/i.test(line) ||
-				/^error: script /.test(line),
+				line.startsWith("error: script "),
 		);
 		const summary =
 			failureLines.length > 0

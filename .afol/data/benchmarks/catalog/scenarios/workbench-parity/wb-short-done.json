@@ -12,6 +12,8 @@
       "-e",
       "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-short-done'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'),session+'\\n','utf8'); writeFileSync(join(dir,session+'_plan_01.md'), '# Plan: short\\n\\n## Execution Plan\\n\\n- T-01: short\\n','utf8'); writeFileSync(join(dir,session+'_task_01.md'), '# Tasks: short\\n\\n## State Board\\n\\n| Task | State | Owner | Notes |\\n|------|-------|-------|-------|\\n| T-01 | pending | worker | short |\\n','utf8'); writeFileSync(join(dir,session+'_log_01.md'), '# Log\\n\\n## Timeline\\n\\n- seed\\n','utf8'); writeFileSync(join(dir,'.evidence.jsonl'),'','utf8');"
     ],
+    ["git", "init", "-q"],
+    ["node", "-e", "const{readFileSync:r,rmSync,writeFileSync:w}=require('node:fs');const{join}=require('node:path');const root=process.cwd(),session='sb-short-done',branch=r(join(root,'.git','HEAD'),'utf8').trim().replace('ref: refs/heads/','');w(join(root,'.afol','wb','session-context.json'),JSON.stringify({bindings:[{session,branch,worktree:root,actor:null,last_touched:new Date().toISOString()}]})+'\\n','utf8');rmSync(join(root,'.afol','wb','.active_session'));"],
     ["afol", "st", "T-01"],
     ["node", "-e", "const {rmSync}=require('node:fs'); for (const path of ['cli','src','docs','tests','.claude']) rmSync(path,{recursive:true,force:true});"]
   ],
