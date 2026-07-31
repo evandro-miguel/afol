@@ -41,6 +41,7 @@
 			"preflight",
 			"adapter",
 			"telemetry",
+			"receipt",
 			"session",
 			"transition",
 			"evolve"
@@ -154,6 +155,7 @@
 			"telemetry query --limit <n>",
 			"telemetry report --limit <n>",
 			"telemetry export --format jsonl",
+			"receipt ingest --file <path>",
 			"session list",
 			"session bind --session <id> --dry-run",
 			"session bind --session <id> --actor <name>",

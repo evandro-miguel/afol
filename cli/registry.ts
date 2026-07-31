@@ -44,6 +44,7 @@ export type CommandKind =
 	| "preflight"
 	| "adapter"
 	| "telemetry"
+	| "receipt"
 	| "session";
 export type CommandSideEffect =
 	| "read"
@@ -1302,6 +1303,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "export --format jsonl",
 				sideEffect: "read",
 				description: "Export filtered telemetry events",
+			},
+		],
+	},
+	{
+		command: "receipt",
+		aliases: [],
+		kind: "receipt",
+		sideEffect: "append",
+		description:
+			"Ingest a bounded external harness receipt as observed evidence",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "ingest --file <path>",
+				sideEffect: "append",
+				description:
+					"Validate one fixed-profile receipt and record observed evidence",
 			},
 		],
 	},

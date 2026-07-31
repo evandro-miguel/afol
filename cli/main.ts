@@ -110,6 +110,7 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"state",
 	"adapter",
 	"telemetry",
+	"receipt",
 	"hydrate",
 ]);
 
@@ -698,6 +699,14 @@ export async function main(argv: string[]): Promise<number> {
 		if (resolution.group === "telemetry") {
 			const { runTelemetryCommand } = await import("./commands/telemetry");
 			return runTelemetryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "receipt") {
+			const { runReceiptCommand } = await import("./commands/receipt");
+			return runReceiptCommand(
 				resolution.action,
 				resolution.args,
 				project.value.root,

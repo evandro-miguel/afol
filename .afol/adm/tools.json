@@ -57,6 +57,7 @@
           "preflight",
           "adapter",
           "telemetry",
+          "receipt",
           "session"
         ]
       },
@@ -134,6 +135,7 @@
           "verify",
           "verify-tasks",
           "ux",
+          "receipt",
           "session"
         ]
       },
@@ -1645,6 +1647,25 @@
           "usage": "export --format jsonl",
           "side_effect": "read",
           "description": "Export filtered telemetry events"
+        }
+      ]
+    },
+    {
+      "id": "receipt",
+      "name": "AFOL Receipt",
+      "tool": "afol",
+      "wrapper_command": "afol receipt",
+      "aliases": [],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "append",
+      "execution_mode": "on-demand",
+      "description": "Ingest a bounded external harness receipt as observed evidence",
+      "subcommands": [
+        {
+          "usage": "ingest --file <path>",
+          "side_effect": "append",
+          "description": "Validate one fixed-profile receipt and record observed evidence"
         }
       ]
     },
