@@ -1,0 +1,139 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpdi43y",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T20:11:07.961Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpdi43y",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "failed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T20:11:07.961Z",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cached_input": 0,
+        "reasoning_output": 0,
+        "total": 0
+      },
+      "timing": {
+        "wall_clock_ms": 74
+      },
+      "tools": {
+        "total_calls": 0,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 0,
+          "shell": 0,
+          "agent_message": 0
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": false,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 3,
+        "max_round_trips": 4
+      },
+      "pass": false,
+      "notes": [
+        "turn-not-completed",
+        "task-not-completed",
+        "expected-operation-missing:dispatch",
+        "expected-operation-missing:submit",
+        "expected-operation-missing:review",
+        "workbench-status-not-closed",
+        "codex-stderr:WARNING: proceeding, even though we could not create PATH aliases: Read-only file system (os error 30)\nReading additional input from stdin...\nError: failed to initialize in-process app-server client: Read-only file system (os error 30)",
+        "codex-exit:1"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpdi43y",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T20:11:07.961Z",
+    "summary": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "total_tokens": 0,
+      "total_time_ms": 74,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "failed",
+        "pass": false,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "cached_input": 0,
+          "reasoning_output": 0,
+          "total": 0
+        },
+        "timing": {
+          "wall_clock_ms": 74
+        },
+        "tools": {
+          "total_calls": 0,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 0,
+            "shell": 0,
+            "agent_message": 0
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": false,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": [
+          "turn-not-completed",
+          "task-not-completed",
+          "expected-operation-missing:dispatch",
+          "expected-operation-missing:submit",
+          "expected-operation-missing:review",
+          "workbench-status-not-closed",
+          "codex-stderr:WARNING: proceeding, even though we could not create PATH aliases: Read-only file system (os error 30)\nReading additional input from stdin...\nError: failed to initialize in-process app-server client: Read-only file system (os error 30)",
+          "codex-exit:1"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpdi43y\ntimestamp: 2026-07-17T20:11:07.961Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=0\ntime_ms: total=74\ntool_success: 1\nfailed orchestration-submission-review tokens=0 time_ms=74 tools=0"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpdi43y\ntimestamp: 2026-07-17T20:11:07.961Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=0\ntime_ms: total=74\ntool_success: 1\nfailed orchestration-submission-review tokens=0 time_ms=74 tools=0"
+}

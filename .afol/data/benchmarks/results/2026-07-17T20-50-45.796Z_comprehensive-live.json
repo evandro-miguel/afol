@@ -1,0 +1,169 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpewpat",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T20:50:45.796Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpewpat",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "failed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T20:50:45.796Z",
+      "tokens": {
+        "input": 45174,
+        "output": 524,
+        "cached_input": 24320,
+        "reasoning_output": 434,
+        "total": 70452
+      },
+      "timing": {
+        "wall_clock_ms": 17725
+      },
+      "tools": {
+        "total_calls": 2,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 1,
+          "afol_command": 0,
+          "shell": 0,
+          "agent_message": 1
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "execution": {
+        "phase_ms": {
+          "host_dispatch": 11,
+          "worker": 17713,
+          "host_review": 0,
+          "end_to_end": 17725
+        },
+        "worker_tokens": {
+          "input": 45174,
+          "output": 524,
+          "cached_input": 24320,
+          "reasoning_output": 434,
+          "total": 70452
+        },
+        "host_model_tokens": 0,
+        "protocol_calls": {
+          "host_dispatch": 1,
+          "worker_submit": 0,
+          "host_review": 0,
+          "total": 1
+        },
+        "attempts": {
+          "dispatch": 1,
+          "submit": 0,
+          "review": 0
+        },
+        "retries": {
+          "dispatch": 0,
+          "submit": 0,
+          "review": 0
+        }
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 1,
+        "max_round_trips": 1
+      },
+      "pass": false,
+      "notes": [
+        "token-scope:worker",
+        "expected-operation-missing:submit",
+        "invalid-submission-no-review",
+        "host-review-invariants-failed",
+        "host-protocol-not-pristine",
+        "codex-stderr:Reading additional input from stdin...",
+        "codex-exit:0"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpewpat",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T20:50:45.796Z",
+    "summary": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "total_tokens": 70452,
+      "total_time_ms": 17725,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "failed",
+        "pass": false,
+        "tokens": {
+          "input": 45174,
+          "output": 524,
+          "cached_input": 24320,
+          "reasoning_output": 434,
+          "total": 70452
+        },
+        "timing": {
+          "wall_clock_ms": 17725
+        },
+        "tools": {
+          "total_calls": 2,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 1,
+            "afol_command": 0,
+            "shell": 0,
+            "agent_message": 1
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": [
+          "token-scope:worker",
+          "expected-operation-missing:submit",
+          "invalid-submission-no-review",
+          "host-review-invariants-failed",
+          "host-protocol-not-pristine",
+          "codex-stderr:Reading additional input from stdin...",
+          "codex-exit:0"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpewpat\ntimestamp: 2026-07-17T20:50:45.796Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=70452\ntime_ms: total=17725\ntool_success: 1\nfailed orchestration-submission-review tokens=70452 time_ms=17725 tools=2"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpewpat\ntimestamp: 2026-07-17T20:50:45.796Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=70452\ntime_ms: total=17725\ntool_success: 1\nfailed orchestration-submission-review tokens=70452 time_ms=17725 tools=2"
+}

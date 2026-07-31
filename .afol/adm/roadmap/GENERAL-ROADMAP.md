@@ -1063,28 +1063,83 @@ Follow-on slices under this direction:
   slice must remain schema/governance-only, with no LLM call, external
   import, automatic application, or daemon. Do not combine F-30 slices with
   SQLite, memory, library, context, or maintenance rewrites.
+- Boundary with F-31: Agent Submission / review / integrate is **not** an
+  Evolution child. F-30 remains the learning-loop feature only. ADR-008 stays
+  the Evolution autonomy boundary. Submission authority lives under F-31 and
+  ADR-007.
 
-#### Agent Submission and Batch Review (F-30 child)
+### F-31 Agent Submission, Review, and Integration
 
-- Child status: active
+- Status: active
 - Governing spec:
   .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
-- Parent spec:
-  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
-- Intent: explore a bounded one-worker submission and review workflow that may
-  reduce lifecycle round trips while preserving AFOL's existing authority and
-  evidence boundaries.
 - Architectural decision:
   .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md
-- No public `dispatch`, `submit`, or F-30 benchmark pack exists in the current
-  registry. These names remain design vocabulary only until an implementation
-  slice is approved and shipped.
-- Backlog acceptance requires a governing child spec, registered commands and
-  scenarios, deterministic authority/integrity tests, and fresh observed
-  evidence. Planned intent is not production proof.
-- Governance: F-30 is the shared Evolution parent and submission/review child
-  lane. ADR-007 governs submission/review boundaries, while ADR-008 governs
-  Evolution autonomy and evidence boundaries; both decisions remain distinct.
+- Why: multi-agent work still drives the lifecycle as a cognitive API
+  (`new` → `start` → evidence → `done` → `close`). That multiplies model
+  decisions, round-trips, and internal effects. AFOL needs a delivery
+  protocol where workers declare assignment progress and an orchestrator
+  accepts only after observed verification, while the single-actor fast path
+  (`st` / `d -x` / `c`) remains canonical for solo work.
+- Relationship to prior features:
+  - Reuses F-03 command economy without replacing it.
+  - Reuses F-04 / F-22 workbench lifecycle, observed evidence, State Board,
+    session locks, and `completeObservedTask` / `completeObservedTasks`
+    (batch completion from PR #75) as the **projection** path only.
+  - Reuses F-20 session isolation as binding/context, not as ownership of
+    delivery.
+  - Distinct from F-30 Evolution (ADR-008). Do not fold submission runtime
+    into Evolution slices or renumber Evolution off F-30.
+- ID allocation note: a prior lesson preferred F-30 for Submission and F-31
+  for Evolution. Evolution already shipped on F-30 in this repository, so
+  Submission is allocated **F-31** to avoid a destructive renumber. Do not
+  invent a second F-30.
+- Core contract:
+  - Dual state axes: canonical lifecycle (`pending` / `in_progress` /
+    `problem` / `done` / `moved`) stays on the State Board; worker delivery
+    state (`assigned` / `claimed` / `submitted` / `blocked` / `rejected` /
+    `accepted` / …) lives outside the State Board.
+  - Worker: declarative delivery only (`dispatch` target claim/submit/block).
+  - Orchestrator: acceptance authority (`review` / `integrate`).
+  - AFOL: verification execution, authorizing observed evidence, lifecycle
+    projection, and index refresh.
+  - `submitted ≠ done`. Task `done` requires an `IntegrationReceipt` after
+    real checks on the integrated commit (or same-worktree equivalent in
+    Wave A).
+- Wave A (authorized first implementation slice):
+  1. Governance artifacts (this feature, ADR-007 accepted, this governing
+     spec authorizing implementation).
+  2. Pure assignment domain transitions (unit-tested, no filesystem).
+  3. One-worker **same-worktree** vertical slice behind feature flag
+     `orchestration.submission_v1` default **off**: public
+     `dispatch` / `submit` / `review` (or `integrate`) that call use cases;
+     submit never marks done; review/integrate builds IntegrationReceipt then
+     calls `completeObservedTask` / `completeObservedTasks`.
+  4. Deterministic authority/path/drift/idempotency/recovery tests plus a
+     **new** outcome-oriented bench scenario. Do not rewrite
+     `governed-task-lifecycle` ritual until the new path exists.
+- Explicit non-goals for Wave A:
+  multiworker leases, XDG/shared-runtime as source of truth, capability
+  matrices, daemon/broker, hostile multi-tenant auth, AGENTS/template parity
+  rewrites, reinventing batch lifecycle or multitask throughput gates already
+  landed on `dev`, global action-policy completeness, and claiming
+  multi-worktree isolation from same-worktree proof.
+- Storage for Wave A: project-local AFOL-owned operational files (not the
+  State Board as multiwriter inbox; not SQLite as orchestration authority).
+  Shared `$XDG_STATE_HOME` runtime is deferred until multi-worktree is an
+  explicit acceptance criterion.
+- Credential for Wave A: short-lived assignment token / hash for
+  anti-confusion, attempt binding, and expiry only. Not OS-level isolation
+  and not worker-supplied capability lists as authority.
+- Acceptance direction: flag-off has no side effects; worker cannot authorize
+  lifecycle; reject/resubmit and crash between receipt and projection recover
+  safely; refresh is bounded (no full project files-index rewrite assumed on
+  every lifecycle step); ROI claims use same fixture/model and comparable
+  token + interaction metrics, not mismatched snapshots.
+- Delivery policy: independent PRs; governance-first; runtime only after
+  ADR-007 accepted contracts below. Prefer rebase onto current `origin/dev`
+  (batch lifecycle + throughput gates) before implementation PRs. Closed
+  PR #58 is a test-idea reference, not a merge base.
 
 ## 6) Recommended Delivery Phases
 

@@ -1,0 +1,141 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpdixha",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T20:14:45.972Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpdixha",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "failed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T20:14:45.972Z",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cached_input": 0,
+        "reasoning_output": 0,
+        "total": 0
+      },
+      "timing": {
+        "wall_clock_ms": 180002
+      },
+      "tools": {
+        "total_calls": 42,
+        "success_rate": 0.931,
+        "by_type": {
+          "file_read": 23,
+          "afol_command": 4,
+          "shell": 2,
+          "agent_message": 13
+        },
+        "error_count": 2
+      },
+      "effectiveness": {
+        "task_completed": false,
+        "error_count": 2,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 3,
+        "max_round_trips": 4
+      },
+      "pass": false,
+      "notes": [
+        "turn-not-completed",
+        "duration-ms:180002>120000",
+        "afol-commands:4>3",
+        "round-trips:17>4",
+        "task-not-completed",
+        "workbench-status-not-closed",
+        "codex-stderr:Reading additional input from stdin...\n2026-07-17T20:13:07.689123Z ERROR codex_core::tools::router: error=Exit code: 2\nWall time: 0.4 seconds\nOutput:\nsed: can't read cli/services/orchestration.ts: No such file or directory\n\n2026-07-17T20:13:40.928182Z ERROR codex_core::tools::router: error=Exit code: 1\nWall time: 0.1 seconds\nOutput:\n{\"schema\":\"afol.result/v1\",\"ok\":false,\"exit_code\":1,\"error\":{\"code\":\"orchestration.rejected\",\"message\":\"focused check failed\"},\"action\":\"orchestration.review\"}",
+        "codex-timed-out",
+        "codex-exit:null"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpdixha",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T20:14:45.972Z",
+    "summary": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "total_tokens": 0,
+      "total_time_ms": 180002,
+      "avg_tool_success_rate": 0.931
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "failed",
+        "pass": false,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "cached_input": 0,
+          "reasoning_output": 0,
+          "total": 0
+        },
+        "timing": {
+          "wall_clock_ms": 180002
+        },
+        "tools": {
+          "total_calls": 42,
+          "success_rate": 0.931,
+          "by_type": {
+            "file_read": 23,
+            "afol_command": 4,
+            "shell": 2,
+            "agent_message": 13
+          },
+          "error_count": 2
+        },
+        "effectiveness": {
+          "task_completed": false,
+          "error_count": 2,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": [
+          "turn-not-completed",
+          "duration-ms:180002>120000",
+          "afol-commands:4>3",
+          "round-trips:17>4",
+          "task-not-completed",
+          "workbench-status-not-closed",
+          "codex-stderr:Reading additional input from stdin...\n2026-07-17T20:13:07.689123Z ERROR codex_core::tools::router: error=Exit code: 2\nWall time: 0.4 seconds\nOutput:\nsed: can't read cli/services/orchestration.ts: No such file or directory\n\n2026-07-17T20:13:40.928182Z ERROR codex_core::tools::router: error=Exit code: 1\nWall time: 0.1 seconds\nOutput:\n{\"schema\":\"afol.result/v1\",\"ok\":false,\"exit_code\":1,\"error\":{\"code\":\"orchestration.rejected\",\"message\":\"focused check failed\"},\"action\":\"orchestration.review\"}",
+          "codex-timed-out",
+          "codex-exit:null"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpdixha\ntimestamp: 2026-07-17T20:14:45.972Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=0\ntime_ms: total=180002\ntool_success: 0.931\nfailed orchestration-submission-review tokens=0 time_ms=180002 tools=42"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpdixha\ntimestamp: 2026-07-17T20:14:45.972Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=0\ntime_ms: total=180002\ntool_success: 0.931\nfailed orchestration-submission-review tokens=0 time_ms=180002 tools=42"
+}
