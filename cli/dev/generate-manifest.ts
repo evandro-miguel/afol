@@ -12,10 +12,16 @@ import { join, relative, resolve } from "node:path";
 
 import { kernelRegistry } from "../registry";
 import { buildManifestCommands } from "../services/manifest/commands";
+import { buildToolCatalog } from "../services/manifest/tools";
 
 const MANIFEST_PATHS = [
 	".agents/manifest.json",
 	"src/project-template/.agents/manifest.json",
+] as const;
+
+const TOOL_CATALOG_PATHS = [
+	".afol/adm/tools.json",
+	"src/project-template/.afol/adm/tools.json",
 ] as const;
 
 const MANAGED_HASH_PATHS = [
@@ -169,10 +175,30 @@ function refreshManifest(path: string): { changed: boolean; content: string } {
 	return { changed, content };
 }
 
+function refreshToolCatalog(path: string): {
+	changed: boolean;
+	content: string;
+} {
+	const content = formatJson(buildToolCatalog(kernelRegistry.commands));
+	return { changed: readFileSync(path, "utf8") !== content, content };
+}
+
 function main(): void {
 	const repoRoot = resolve(import.meta.dir, "..", "..");
 	const checkOnly = process.argv.includes("--check");
 	const changedPaths: string[] = [];
+
+	for (const toolCatalogPath of TOOL_CATALOG_PATHS) {
+		const absolutePath = join(repoRoot, toolCatalogPath);
+		const result = refreshToolCatalog(absolutePath);
+		if (!result.changed) {
+			continue;
+		}
+		changedPaths.push(toolCatalogPath);
+		if (!checkOnly) {
+			writeFileSync(absolutePath, result.content, "utf8");
+		}
+	}
 
 	for (const path of MANAGED_HASH_PATHS) {
 		const absolutePath = join(repoRoot, path);

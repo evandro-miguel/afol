@@ -356,7 +356,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "quickTask",
 		sideEffect: "write",
 		description:
-			"Run a single-task lifecycle after executing a verification command",
+			"Run one lifecycle; missing governance stays pending with a next step",
 		category: "workflow",
 		subcommands: [
 			{
@@ -369,6 +369,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--feature-id <F-id> --parent-spec <spec-id>",
 				sideEffect: "write",
 				description: "Create the quick task as a governed session",
+			},
+			{
+				usage: "--no-spec-required --reason <text>",
+				sideEffect: "write",
+				description: "Waive the spec requirement explicitly",
 			},
 		],
 	},

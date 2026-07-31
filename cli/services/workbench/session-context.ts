@@ -273,11 +273,15 @@ export function bindCurrentContextSession(
 	);
 }
 
-export function resolveContextSession(root: string): string | null {
+export function resolveContextSession(
+	root: string,
+	options: { failClosed?: boolean } = {},
+): string | null {
 	let bindings: SessionBinding[];
 	try {
 		bindings = readSessionContext(root).bindings;
-	} catch {
+	} catch (error) {
+		if (options.failClosed) throw error;
 		return null;
 	}
 	if (bindings.length === 0) {
@@ -342,9 +346,17 @@ export function resolveSession(
 		return { session: envSession, source: "env" };
 	}
 
-	const contextSession = resolveContextSession(root);
-	if (contextSession && isUsableImplicitSession(root, contextSession)) {
-		return { session: contextSession, source: "context" };
+	const contextSession = resolveContextSession(root, { failClosed: true });
+	if (contextSession) {
+		const state = inspectImplicitSessionState(root, contextSession);
+		if (state === "corrupt") {
+			throw new Error(
+				`Context session binding is corrupt: ${contextSession}. Repair it with afol session switch or unbind.`,
+			);
+		}
+		if (state === "open") {
+			return { session: contextSession, source: "context" };
+		}
 	}
 
 	if (allowGlobalFallback) {

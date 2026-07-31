@@ -738,7 +738,7 @@ describe("canonical administration section index", () => {
 			});
 
 			const bundle = buildContextBundle(root, {
-				surface: "general",
+				surface: "f-29",
 				mode: "deep",
 			});
 			expect(bundle.expanded_sections?.[0]?.snippet).toContain(

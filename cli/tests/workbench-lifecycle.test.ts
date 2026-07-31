@@ -905,7 +905,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("quick-task requires explicit governance and never creates pending_spec", () => {
+	test("quick-task permits a closed pending_spec lifecycle", () => {
 		const root = mkRoot("quick-task-pending-spec");
 		try {
 			writeCliProjectContract(root);
@@ -924,16 +924,32 @@ describe("workbench lifecycle service", () => {
 				"quick missing spec",
 				"--command",
 				"true",
-				"--no-spec-required",
-				"--reason",
-				"quick fixture waiver",
 				"--json",
 			]);
 			expect(quickTask.status).toBe(0);
 			const quickTaskEnvelope = parseEnvelope(quickTask.stdout as string);
 			const quickTaskData = quickTaskEnvelope.data as Record<string, unknown>;
-			expect(quickTaskData.governance_status).toBe("unbound");
-			expect(quickTaskData.pending_spec).toBe(false);
+			expect(quickTaskData.governance_status).toBe("pending_spec");
+			expect(quickTaskData.pending_spec).toBe(true);
+			expect(quickTaskData.pending_spec_question).toBe(
+				"Which roadmap feature and parent spec govern this closed session?",
+			);
+			expect(quickTaskData.next_command).toContain("governance resolve-spec");
+
+			const human = runKernel(root, [
+				"quick-task",
+				"human pending spec",
+				"--command",
+				"true",
+			]);
+			expect(human.status).toBe(0);
+			expect(human.stdout as string).toContain(
+				"question: Which roadmap feature and parent spec govern this closed session?",
+			);
+			expect(human.stdout as string).toContain(
+				"next: run afol governance resolve-spec",
+			);
+			expect(human.stdout as string).not.toContain('hint="');
 
 			const next = runKernel(root, [
 				"new",
@@ -1439,8 +1455,7 @@ describe("workbench lifecycle service", () => {
 					exitCode: 0,
 				},
 				{
-					observerSeam: ({ mode }) => {
-						expect(mode).toBe("production-day");
+					observerSeam: () => {
 						productionDayCalls += 1;
 						return {
 							appended: 0,
@@ -1454,7 +1469,7 @@ describe("workbench lifecycle service", () => {
 			);
 			// Task is still done.
 			expect(completion.done?.authorizingEvidenceId).toBeTruthy();
-			expect(productionDayCalls).toBe(1);
+			expect(productionDayCalls).toBe(0);
 			expect(readFileSync(created.taskPath, "utf8")).toContain(
 				"| T-01 | done |",
 			);
@@ -1501,10 +1516,43 @@ describe("workbench lifecycle service", () => {
 					},
 				},
 			);
-			expect(retryCalls).toBe(1);
+			expect(retryCalls).toBe(0);
 			expect(retryResult).not.toContain(
 				expect.stringContaining("observer failed"),
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("redacts every persisted caller-controlled evidence field", () => {
+		const root = mkRoot("evidence-full-redaction");
+		try {
+			const created = newWorkstream(root, "evidence full redaction", {
+				noSpecRequiredReason: "fixture",
+			});
+			const commandCanary = "REDACTION_COMMAND_CANARY_123456";
+			const resultCanary = "ghp_REDACTION_RESULT_CANARY_12345678901234567890";
+			const artifactCanary = "REDACTION_ARTIFACT_CANARY_123456";
+			const noteCanary = "REDACTION_NOTE_CANARY_123456";
+			recordEvidenceRaw(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: `tool '{"apiKey":"${commandCanary}"}'`,
+				result: `{"github_token":"${resultCanary}"}`,
+				artifact: `artifact?client_secret=${artifactCanary}`,
+				note: `Authorization: Bearer "${noteCanary}"`,
+			});
+			const persisted = readFileSync(created.evidencePath, "utf8");
+			for (const canary of [
+				commandCanary,
+				resultCanary,
+				artifactCanary,
+				noteCanary,
+			]) {
+				expect(persisted).not.toContain(canary);
+			}
+			expect(persisted).toContain("[REDACTED]");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

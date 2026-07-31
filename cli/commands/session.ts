@@ -455,9 +455,20 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 	const globalActiveState = globalActiveSession
 		? inspectImplicitSessionState(projectRoot, globalActiveSession)
 		: null;
-	const effective = resolveEffectiveSession(projectRoot, {
-		allowGlobalFallback: defaultAllowGlobalFallback(),
-	});
+	// Listing is diagnostic-only: a corrupt binding must block implicit
+	// lifecycle mutation, but it must not prevent operators from seeing a
+	// recoverable global selector and the corruption warning below.
+	let effective: ReturnType<typeof resolveEffectiveSession>;
+	try {
+		effective = resolveEffectiveSession(projectRoot, {
+			allowGlobalFallback: defaultAllowGlobalFallback(),
+		});
+	} catch {
+		effective =
+			globalActiveSession && globalActiveState === "open"
+				? { session: globalActiveSession, source: "global" }
+				: null;
+	}
 	const displayedCurrentWorktree = displayWorktreePath(
 		projectRoot,
 		currentWorktree,

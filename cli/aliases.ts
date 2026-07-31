@@ -264,7 +264,6 @@ export const FLAG_ALIASES = Object.freeze({
 		"-a": "--artifact",
 		"-c": "--command",
 		"-n": "--note",
-		"-o": "--result",
 		"-t": "--task",
 	}),
 	schema: Object.freeze({

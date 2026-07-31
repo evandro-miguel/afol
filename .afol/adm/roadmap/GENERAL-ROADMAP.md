@@ -1063,83 +1063,66 @@ Follow-on slices under this direction:
   slice must remain schema/governance-only, with no LLM call, external
   import, automatic application, or daemon. Do not combine F-30 slices with
   SQLite, memory, library, context, or maintenance rewrites.
-- Boundary with F-31: Agent Submission / review / integrate is **not** an
-  Evolution child. F-30 remains the learning-loop feature only. ADR-008 stays
-  the Evolution autonomy boundary. Submission authority lives under F-31 and
-  ADR-007.
+- Boundary with F-31: external receipts and fixed harness tool profiles are
+  **not** an Evolution child. F-30 remains the learning-loop feature only.
+  ADR-008 stays the Evolution autonomy boundary. F-31 and ADR-007 govern the
+  external evidence boundary without selecting or controlling model work.
 
-### F-31 Agent Submission, Review, and Integration
+### F-31 External Receipts and Fixed Harness Tool Profiles
 
 - Status: active
 - Governing spec:
   .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
 - Architectural decision:
   .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md
-- Why: multi-agent work still drives the lifecycle as a cognitive API
-  (`new` → `start` → evidence → `done` → `close`). That multiplies model
-  decisions, round-trips, and internal effects. AFOL needs a delivery
-  protocol where workers declare assignment progress and an orchestrator
-  accepts only after observed verification, while the single-actor fast path
-  (`st` / `d -x` / `c`) remains canonical for solo work.
+- Why: external harnesses already select providers/models, run tools, schedule
+  work, retry failures, and supervise execution. AFOL should consume a bounded
+  receipt from that run and validate the fixed tool profile, not become a second
+  model orchestrator. The single-actor AFOL fast path (`st` / `d -x` / `c`)
+  remains canonical for direct project work.
 - Relationship to prior features:
   - Reuses F-03 command economy without replacing it.
-  - Reuses F-04 / F-22 workbench lifecycle, observed evidence, State Board,
-    session locks, and `completeObservedTask` / `completeObservedTasks`
-    (batch completion from PR #75) as the **projection** path only.
-  - Reuses F-20 session isolation as binding/context, not as ownership of
-    delivery.
-  - Distinct from F-30 Evolution (ADR-008). Do not fold submission runtime
-    into Evolution slices or renumber Evolution off F-30.
-- ID allocation note: a prior lesson preferred F-30 for Submission and F-31
-  for Evolution. Evolution already shipped on F-30 in this repository, so
-  Submission is allocated **F-31** to avoid a destructive renumber. Do not
-  invent a second F-30.
+  - Reuses F-04 / F-22 lifecycle, observed evidence, State Board, and index
+    refresh as the projection path only.
+  - Reuses F-20 session isolation as binding/context, not model ownership.
+  - Distinct from F-30 Evolution (ADR-008); do not fold receipt/profile
+    ingestion into Evolution slices or renumber Evolution off F-30.
+- ID allocation: **F-30 + ADR-008 = Evolution** and **F-31 + ADR-007 = external
+  receipts/profiles**. The 20260719 collision lesson's earlier inverse
+  recommendation is superseded; do not invent a second F-30.
 - Core contract:
-  - Dual state axes: canonical lifecycle (`pending` / `in_progress` /
-    `problem` / `done` / `moved`) stays on the State Board; worker delivery
-    state (`assigned` / `claimed` / `submitted` / `blocked` / `rejected` /
-    `accepted` / …) lives outside the State Board.
-  - Worker: declarative delivery only (`dispatch` target claim/submit/block).
-  - Orchestrator: acceptance authority (`review` / `integrate`).
-  - AFOL: verification execution, authorizing observed evidence, lifecycle
-    projection, and index refresh.
-  - `submitted ≠ done`. Task `done` requires an `IntegrationReceipt` after
-    real checks on the integrated commit (or same-worktree equivalent in
-    Wave A).
-- Wave A (authorized first implementation slice):
-  1. Governance artifacts (this feature, ADR-007 accepted, this governing
-     spec authorizing implementation).
-  2. Pure assignment domain transitions (unit-tested, no filesystem).
-  3. One-worker **same-worktree** vertical slice behind feature flag
-     `orchestration.submission_v1` default **off**: public
-     `dispatch` / `submit` / `review` (or `integrate`) that call use cases;
-     submit never marks done; review/integrate builds IntegrationReceipt then
-     calls `completeObservedTask` / `completeObservedTasks`.
-  4. Deterministic authority/path/drift/idempotency/recovery tests plus a
-     **new** outcome-oriented bench scenario. Do not rewrite
-     `governed-task-lifecycle` ritual until the new path exists.
-- Explicit non-goals for Wave A:
-  multiworker leases, XDG/shared-runtime as source of truth, capability
-  matrices, daemon/broker, hostile multi-tenant auth, AGENTS/template parity
-  rewrites, reinventing batch lifecycle or multitask throughput gates already
-  landed on `dev`, global action-policy completeness, and claiming
-  multi-worktree isolation from same-worktree proof.
-- Storage for Wave A: project-local AFOL-owned operational files (not the
-  State Board as multiwriter inbox; not SQLite as orchestration authority).
-  Shared `$XDG_STATE_HOME` runtime is deferred until multi-worktree is an
-  explicit acceptance criterion.
-- Credential for Wave A: short-lived assignment token / hash for
-  anti-confusion, attempt binding, and expiry only. Not OS-level isolation
-  and not worker-supplied capability lists as authority.
-- Acceptance direction: flag-off has no side effects; worker cannot authorize
-  lifecycle; reject/resubmit and crash between receipt and projection recover
-  safely; refresh is bounded (no full project files-index rewrite assumed on
-  every lifecycle step); ROI claims use same fixture/model and comparable
-  token + interaction metrics, not mismatched snapshots.
-- Delivery policy: independent PRs; governance-first; runtime only after
-  ADR-007 accepted contracts below. Prefer rebase onto current `origin/dev`
-  (batch lifecycle + throughput gates) before implementation PRs. Closed
-  PR #58 is a test-idea reference, not a merge base.
+  - The State Board remains the only lifecycle state source:
+    `pending` / `in_progress` / `problem` / `done` / `moved`.
+  - An external harness emits a receipt containing project/session/task
+    binding, run identity, source/artifact identity, check result, tool-trace
+    digest, and the fixed profile id/digest.
+  - AFOL publishes a generated registry-backed catalog of fixed tool-profile
+    metadata. Profiles describe allowed AFOL tool ids; the external harness
+    pins and uses one for a run. They do not choose a provider or model, and
+    remain metadata-only until a separate enforcement decision.
+  - AFOL validates receipt/profile integrity, records observed evidence, and
+    projects normal lifecycle state. AFOL never selects, calls, schedules,
+    retries, or supervises models.
+- Authorized first implementation slice:
+  1. Governance artifacts (this feature, ADR-007, and the governing spec).
+  2. Deterministic generated fixed tool profiles with versioned, digestable
+     ids and allowed tool ids.
+  3. Bounded, redacted external receipt schema and validation with fail-closed
+     profile/provenance/path/duplicate checks.
+  4. Evidence and lifecycle projection after receipt validation, plus tests
+     proving no model orchestration is performed by AFOL.
+- Explicit non-goals:
+  AFOL provider/model selection or invocation; scheduler, retry loop,
+  supervisor, lease/assignment state machine, daemon/broker, hostile
+  multi-tenant auth, remote attestation, shared `$XDG_STATE_HOME` source of
+  truth, or changes to F-30 Evolution and ADR-008.
+- Acceptance direction: profile catalogs are deterministic and current;
+  invalid or mismatched receipts fail closed without lifecycle mutation; valid
+  receipts remain bounded, redacted, idempotent, and project-linked; and fresh
+  observed evidence proves the external boundary on a governed F-31 session.
+- Delivery policy: independent PRs; governance-first; do not revive closed
+  PR #58's dispatch/submit/review implementation or treat its assignment store
+  as a merge base. External harnesses own model execution and receipt emission.
 
 ## 6) Recommended Delivery Phases
 

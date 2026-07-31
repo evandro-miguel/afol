@@ -1,15 +1,15 @@
 ---
 doc_type: spec
 id: 260717_agent-submission-and-batch-review_spec_01
-theme: agent-submission-and-batch-review
+theme: external-receipts-and-harness-profiles
 status: active
-implementation_status: authorized_wave_a
+implementation_status: authorized_governance
 owners:
 - F-31 governance owner
-workstream_intent: Authorize the one-worker submission and review implementation slice.
-artifact_purpose: Governing parent for F-31; authorizes Wave A implementation under ADR-007.
+workstream_intent: Define external receipt ingestion and fixed harness tool-profile contracts.
+artifact_purpose: Governing parent for F-31; authorizes profile/receipt validation work under ADR-007.
 created_at: '2026-07-17T00:00:00-03:00'
-updated_at: '2026-07-29T00:00:00-03:00'
+updated_at: '2026-07-31T00:00:00-03:00'
 roadmap_feature: F-31
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -23,181 +23,176 @@ links:
   report: ''
 scope:
   repo_areas:
-  - cli/modules/orchestration or cli/services/orchestration
-  - cli/commands orchestration surface
-  - workbench lifecycle projection only via completeObservedTask(s)
-  - project-local assignment operational state
-  - benchmark and validation contracts for the new path
+  - cli registry and generated tool catalog
+  - external receipt/profile validation and evidence ingestion
+  - workbench lifecycle projection only via existing AFOL lifecycle APIs
+  - benchmark and validation contracts for fixed harness profiles
   packages:
   - AFOL CLI
 risk_level: high
 ---
 
-# SPEC: Agent Submission, Review, and Integration (F-31)
+# SPEC: External Receipts and Fixed Harness Tool Profiles (F-31)
 
 ## 1) Intent
 
-Define a governed **delivery protocol** for multi-agent work:
+Define a governed boundary for work performed by an external harness. The
+harness selects and runs models under a fixed tool profile, then emits an
+external receipt. AFOL validates that receipt, records observed evidence, and
+projects the existing lifecycle:
 
 ```text
-dispatch → submit → review/integrate → (internal) evidence → done → close
+external harness run → external receipt → AFOL validation → observed evidence
+                                                    → normal lifecycle projection
 ```
 
-Workers own **delivery state**. Orchestrators own **acceptance**. AFOL owns
-**verification and projection**. The existing lifecycle remains the projection
-engine; it stops being the multi-agent cognitive API.
+AFOL is not a model orchestrator. It never selects, calls, schedules, retries,
+or supervises models. This feature is **F-31**, distinct from the F-30
+Evolution system and ADR-008.
 
-This feature is **F-31**. It is not an Evolution (F-30) child. ADR-007 is the
-binding architectural decision.
+### Superseded scope
+
+Earlier revisions described a `dispatch` → `submit` → `review/integrate` path,
+worker assignments, and a second delivery-state axis. That design is retired;
+those terms are retained only in the historical inventory below and must not be
+implemented as active F-31 commands or states.
 
 ## 2) Authorization status
 
 | Item | Status |
 | --- | --- |
 | Product direction | authorized |
-| Wave A design (ADR-007) | accepted |
-| Wave A implementation | **authorized** |
-| Public commands in registry | not yet shipped |
-| Release / default-on for agents | not authorized until Wave A gates pass |
-
-Earlier revisions of this document were backlog-only and forbade implementation.
-That non-authority clause is **superseded for Wave A only** by this revision and
-ADR-007.
+| ADR-007 boundary | accepted |
+| Fixed tool-profile catalog | implementation slice authorized |
+| External receipt schema/validation | implementation slice authorized |
+| AFOL model orchestration | **forbidden** |
+| Default-on provider/model execution | not applicable; execution remains external |
+| Release proof | not authorized until gates pass |
 
 ## 3) Boundary (normative)
 
-### 3.1 Dual axes
+### 3.1 External harness
 
-- **Lifecycle (State Board):** `pending | in_progress | problem | done | moved`
-- **Delivery (assignment store):** at least
-  `assigned | claimed | submitted | blocked | rejected | accepted`
+The external harness owns provider/model choice, invocation, scheduling,
+retry policy, supervision, tool execution, and receipt emission. It pins one
+versioned tool profile for each run and includes that profile id and digest in
+the receipt. A profile describes the AFOL tool surface only; it is not a model
+selection or authentication contract.
 
-Never put `submitted` on the State Board as a lifecycle value.
+### 3.2 AFOL
 
-### 3.2 Authority
+AFOL provides governed context and lifecycle surfaces. It validates receipt
+shape, project/session/task binding, profile id and digest, source/artifact
+identity, checked paths, tool-trace digest, and any configured deterministic
+check result. AFOL may record observed evidence and refresh projections after
+validation. A receipt cannot mark a task done, close a session, grant a
+capability, or authorize governance by itself.
 
-- Worker submissions are declarative and **non-authorizing**.
-- Only review/integrate may create **observed authorizing evidence** and project
-  `done` through `completeObservedTask` / `completeObservedTasks`.
-- Actor labels, assignment metadata, and assignment tokens are **not** OS
-  authentication. They prevent accidental cross-assignment use (anti-confusion),
-  attempt replay, and unauthorized accept/done from the worker role.
-- Strong isolation remains an external launcher or OS boundary.
+### 3.3 Fixed harness tool profiles
 
-### 3.3 Integration receipt
+The generated registry-backed tool catalog is the source of truth for profile
+ids, versions, descriptions, and allowed AFOL tool ids. Profiles are static
+metadata with an explicit catalog version and `enforcement: none` until a
+future governed enforcement decision. A changed, missing, or unknown profile
+makes a receipt incomparable and fails closed.
 
-Acceptance requires an `IntegrationReceipt` binding assignment, attempt, base
-and head/integration commits, diff hash, paths, check command, and exit code.
-`submitted ≠ done` until that receipt exists and checks were executed by AFOL
-or the orchestrator path—not merely declared by the worker.
+AFOL publishes this metadata; the external harness pins and uses one profile
+for each run. AFOL does not execute, schedule, retry, or supervise a profile.
 
-## 4) Wave A — authorized implementation slice
+### 3.4 External receipt
 
-### 4.1 In scope
+Every accepted receipt binds, at minimum:
 
-1. **Domain:** pure Job / Assignment / DeliveryState / IntegrationDecision
-   transitions with unit tests; no filesystem in domain.
-2. **Ports + project-local store:** atomic per-assignment files; CAS/revision
-   as needed; no global multiwriter JSONL as authority.
-3. **CLI (flag default off):** `dispatch`, `submit`, `review` (name `integrate`
-   allowed as alias if registry prefers one verb). Handlers call use cases only.
-4. **Same-worktree one-worker path:**
-   - dispatch creates/reuses session + task(s), assignment, baseline, brief;
-   - submit records delivery (clean tree, committed head, reproducible diff);
-   - review/integrate revalidates scope/base/diff, runs check, writes receipt,
-     then projects via `completeObservedTask` (one task) or
-     `completeObservedTasks` (≥2 tasks, PR #75 API).
-5. **Failure paths:** reject/resubmit; duplicate submit idempotency; crash
-   between receipt and projection; path/base/attempt drift; flag-off inert.
-6. **Tests + new bench scenario** outcome-oriented for the new commands.
-   Do not rewrite `governed-task-lifecycle` ritual in the same PR as the first
-   runtime land.
+```text
+receipt_id
+project_id / session_id / task_id
+harness_id / run_id
+harness_profile_id / harness_profile_digest
+source_commit / head_commit (or equivalent artifact identity)
+diff_hash / checked_paths
+check_command / check_exit_code (when a check was run)
+tool_trace_digest
+started_at / finished_at
+result
+```
 
-### 4.2 Out of scope (Wave A)
+Receipts are append-only observations. Duplicate receipt ids are idempotent
+only when their canonical content and profile digest match; conflicting or
+secret-like payloads fail closed.
 
-- Multiworker leases, heartbeat as model command, verification pools
-- `$XDG_STATE_HOME` shared runtime as durable SoT
-- Capability matrices / multi-tenant auth claims
-- Daemon, broker, provider tool surface beyond CLI parity
-- AGENTS.md / project-template parity rewrite (later wave)
-- Reinventing batch lifecycle or multitask throughput gates already on `dev`
-- Global action-policy completeness of the entire registry
-- Evolution (F-30) runtime changes
+### 3.5 Lifecycle
 
-### 4.3 Prerequisites for implementation PRs
+The State Board remains the only lifecycle source of truth:
+`pending | in_progress | problem | done | moved`. There is no assignment,
+lease, claim, submission, or acceptance state axis. A validated receipt plus
+observed evidence may support the normal transition to `done` through existing
+AFOL lifecycle APIs; the external harness does not write State Board state.
 
-- Rebase onto current `origin/dev` including PR #75 batch lifecycle and
-  throughput gates (or equivalent).
-- Do not start from closed PR #58 tip as merge base.
-- Session governance: `roadmap_feature: F-31`, parent spec this document.
+## 4) Authorized implementation slice
 
-### 4.4 Acceptance gates (Wave A done)
+1. **Profile catalog:** generate deterministic fixed tool-profile metadata from
+   the registry-backed command catalog; expose version, profile ids, tool ids,
+   and digestable content without selecting a model.
+2. **Receipt contract:** define bounded, redacted, hash-addressed external
+   receipt input and project/session/task binding.
+3. **Validation:** fail closed for malformed receipts, unknown or mismatched
+   profiles, path/provenance drift, duplicate conflicts, and secret-like data.
+4. **Evidence projection:** link valid receipts to observed evidence and the
+   existing lifecycle/index refresh paths only after validation.
+5. **Tests and evidence:** deterministic tests cover profile drift, duplicate
+   and conflicting receipts, invalid provenance, redaction, and the invariant
+   that AFOL never starts or controls model work.
 
-- [ ] Flag `orchestration.submission_v1` default false; flag-off has zero
-      orchestration side effects.
-- [ ] Worker cannot mark done/close or write authorizing evidence.
-- [ ] Review/integrate refuses stale base, out-of-scope paths, failed checks,
-      wrong token/attempt.
-- [ ] Successful accept produces IntegrationReceipt fields on/with observed
-      evidence and State Board `done`.
-- [ ] Deterministic tests cover reject/resubmit, idempotent submit, recovery
-      after partial integrate.
-- [ ] New registry commands + help entries exist; catalogs updated if required.
-- [ ] New bench or focused e2e proves interaction shape
-      (orch ≤2 explicit AFOL calls, worker ≤1 submit) on the new path.
-- [ ] Fresh workbench evidence on an F-31 governed session.
+No implementation slice may add a model provider call, scheduler, retry loop,
+supervisor, or AFOL command whose purpose is to dispatch or submit model work.
 
-## 5) Later waves (not authorized by this revision)
+## 5) Out of scope
 
-| Wave | Theme |
-| --- | --- |
-| B | Multi-worktree shared runtime (only if acceptance requires it) |
-| C | Multiworker leases, conflicts, batch integrate |
-| D | Role-minimal context, provider tools, AGENTS/template defaults |
-| E | Dogfood, default-on rollout, deprecation of lifecycle from agent help |
+- AFOL provider/model selection or model invocation of any kind
+- AFOL scheduling, retries, supervision, leases, or a daemon/broker
+- `dispatch`, `submit`, `review`, or `integrate` as active F-31 commands
+- Assignment, claim, worker-delivery, or acceptance state machines
+- Remote attestation, hostile multi-tenant authentication, and OS isolation
+- Shared `$XDG_STATE_HOME` runtime as a source of truth
+- Changes to F-30 Evolution, its SQLite database, or ADR-008 receipt semantics
+- Rewriting the existing single-actor lifecycle fast path
 
-Each later wave needs its own authorizing update or child spec.
+## 6) Acceptance gates
 
-## 6) Closed PR #58 — reuse inventory (non-binding)
+- [ ] Generated profile catalog is deterministic, versioned, and derived from
+      the current registry.
+- [ ] Receipt validation requires a known profile id and matching digest.
+- [ ] Invalid, stale, out-of-scope, duplicate-conflict, or secret-like input
+      fails closed without lifecycle mutation.
+- [ ] Valid receipt evidence is bound to the correct project/session/task and
+      can support ordinary AFOL lifecycle projection.
+- [ ] Tests prove AFOL never selects, calls, schedules, retries, or supervises
+      a model.
+- [ ] Profile/receipt output remains bounded and redacted.
+- [ ] Fresh observed evidence exists on an F-31 governed session.
 
-Historical PR #58 (`feat/f30-orchestration-runtime`, closed, not merged)
-touched approximately:
+## 7) Historical implementation inventory (non-binding)
 
-| Path / area | Reuse stance |
-| --- | --- |
-| `cli/services/orchestration/index.ts` (~1k LOC) | redesign against current lifecycle; do not paste |
-| `cli/commands/orchestration.ts` | shape reference only |
-| `cli/tests/orchestration.test.ts` | mine adversarial cases |
-| Catalog scenarios `cli-dispatch/submit/review-structured-error` | recreate if still useful |
-| `live-submission-review` scenario | recreate with comparable token scope |
-| lifecycle helpers (task snapshot, evidence reuse, close refresh) | re-check what PR #75 already landed before reintroducing |
+Closed PR #58 and the former assignment/submission design are historical test
+ideas only. Do not revive its orchestration service, command handlers,
+assignment store, tokens, leases, or delivery-state transitions. Re-express
+only useful integrity cases against the external receipt/profile contract.
 
-Preferred adversarial cases to re-express on `origin/dev`:
+## 8) Non-goals forever (unless a future ADR says otherwise)
 
-- flag default off
-- path / symlink escape
-- base commit drift mid-review
-- diff change during validation
-- attempt fence / lease loss interaction with batch done
-- worker attempting done/close
-- duplicate submit / duplicate review idempotency
+- Restoring `.agents` runtime or project-local `afol` wrappers
+- Making AFOL an external-model scheduler, broker, or supervisor
+- Treating a harness receipt as OS authentication or model capability authority
+- Moving F-30 Evolution receipt/evidence logic under F-31
 
-## 7) Non-goals forever (unless a future ADR says otherwise)
+## 9) Lifecycle of this document
 
-- Restoring `.agents` runtime or project-local `afol` wrappers for workers
-- Workers editing the State Board as their inbox
-- Workers writing authorizing evidence
-- Daemonized orchestration broker as the default architecture
-- Removing lifecycle commands from the operator/debug surface in Wave A
-
-## 8) Lifecycle of this document
-
-- Planned backlog (historical) → **authorizing parent for F-31 Wave A** (this
-  revision).
-- Promote implementation_status to `implemented` only after Wave A gates and
-  observed evidence.
-- Child specs may decompose domain/runtime/bench later; they must not reopen
-  worker-authorized done.
+- Planned backlog (historical) → **authorizing parent for F-31 receipt/profile
+  validation** (this revision).
+- Promote `implementation_status` to `implemented` only after the gates and
+  observed evidence pass.
+- Child specs may decompose schema, catalog, validation, and ingestion; they
+  must not reintroduce AFOL model orchestration or assignment states.
 
 ---
 

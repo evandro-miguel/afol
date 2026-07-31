@@ -418,8 +418,8 @@ describe("release and toolchain contracts", () => {
 		);
 
 		expect(workflow).toContain("on:\n  workflow_dispatch:\n");
-		expect(workflow).not.toMatch(/\n  push:/);
-		expect(workflow).not.toMatch(/\n  pull_request:/);
+		expect(workflow).not.toMatch(/\n {2}push:/);
+		expect(workflow).not.toMatch(/\n {2}pull_request:/);
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {
@@ -547,9 +547,7 @@ describe("release and toolchain contracts", () => {
 		);
 		expect(workflow).toContain("retention-days: 3");
 		expect(workflow).toContain("compression-level: 9");
-		expect(workflow).toContain(
-			"github.event_name == 'workflow_dispatch'",
-		);
+		expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
 		expect(workflow).toContain("Install pinned security scanners");
 		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(osvInstallCommand);

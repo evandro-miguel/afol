@@ -533,7 +533,7 @@ describe("validate command", () => {
 		}
 	});
 
-	test("project readiness ignores missing outcomes for completed history", async () => {
+	test("project readiness rejects missing evidence for closed history", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_closed-history";
 		try {
@@ -542,6 +542,13 @@ describe("validate command", () => {
 			writeFileSync(
 				join(sessionDir, `${session}_task_01.md`),
 				[
+					"---",
+					'doc_type: "workbench_task"',
+					`session_id: "${session}"`,
+					'status: "closed"',
+					'closed_at: "2026-07-01T08:00:00.000Z"',
+					"---",
+					"",
 					"## State Board",
 					"",
 					"| Task | State | Owner | Notes |",
@@ -554,19 +561,13 @@ describe("validate command", () => {
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				checks?: Array<{ id: string; ok: boolean }>;
-			};
-			expect(
-				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
-			).toBe(true);
+			expect(code).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("project readiness ignores failed outcomes for completed history", async () => {
+	test("project readiness rejects failed evidence for closed history", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_failed-history";
 		try {
@@ -575,6 +576,13 @@ describe("validate command", () => {
 			writeFileSync(
 				join(sessionDir, `${session}_task_01.md`),
 				[
+					"---",
+					'doc_type: "workbench_task"',
+					`session_id: "${session}"`,
+					'status: "closed"',
+					'closed_at: "2026-07-01T08:00:00.000Z"',
+					"---",
+					"",
 					"## State Board",
 					"",
 					"| Task | State | Owner | Notes |",
@@ -592,7 +600,7 @@ describe("validate command", () => {
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(0);
+			expect(code).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

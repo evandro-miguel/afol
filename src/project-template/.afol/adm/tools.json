@@ -1,8 +1,184 @@
 {
-  "version": "2.1.0",
-  "updated_at": "2026-07-17T02:55:22Z",
-  "description": "Static AFOL-only command catalog derived from the registry-backed afol help surface.",
-  "generated_from": "afol help --json",
+  "version": "2.2.0",
+  "generated_from": "cli/registry.ts",
+  "description": "Static AFOL-only command catalog derived from the registry-backed help surface.",
+  "tool_profiles": {
+    "kind": "harness_metadata",
+    "enforcement": "none",
+    "profiles": [
+      {
+        "id": "orchestrator",
+        "description": "External harness-facing coordination toolset; AFOL does not orchestrate, select, invoke, retry, or supervise agents or models.",
+        "tool_ids": [
+          "status",
+          "feedback",
+          "validate",
+          "init",
+          "start",
+          "done",
+          "transition",
+          "new",
+          "log",
+          "quick-task",
+          "governance",
+          "evidence",
+          "hook",
+          "rule",
+          "skill",
+          "close",
+          "file",
+          "update",
+          "bootstrap",
+          "verify",
+          "verify-tasks",
+          "local-state",
+          "pstr",
+          "ctx",
+          "state",
+          "hydrate",
+          "render",
+          "library",
+          "memory",
+          "evolve",
+          "adm",
+          "spec",
+          "ux",
+          "adr",
+          "changelog",
+          "health",
+          "db",
+          "doctor",
+          "maintenance",
+          "sweep",
+          "schema",
+          "bench",
+          "project-benchmark",
+          "catchup",
+          "preflight",
+          "adapter",
+          "telemetry",
+          "session"
+        ]
+      },
+      {
+        "id": "planner",
+        "description": "Read-only orientation and planning; excludes commands with mutable subcommands.",
+        "tool_ids": [
+          "status",
+          "validate",
+          "hook",
+          "rule",
+          "skill",
+          "verify",
+          "verify-tasks",
+          "state",
+          "library",
+          "memory",
+          "adm",
+          "adr",
+          "changelog",
+          "health",
+          "db",
+          "doctor",
+          "sweep",
+          "bench",
+          "catchup",
+          "preflight",
+          "telemetry"
+        ]
+      },
+      {
+        "id": "researcher",
+        "description": "Read-only investigation; excludes commands with mutable subcommands.",
+        "tool_ids": [
+          "status",
+          "validate",
+          "hook",
+          "rule",
+          "skill",
+          "verify",
+          "verify-tasks",
+          "state",
+          "library",
+          "memory",
+          "adm",
+          "adr",
+          "changelog",
+          "health",
+          "db",
+          "doctor",
+          "sweep",
+          "bench",
+          "catchup",
+          "preflight",
+          "telemetry"
+        ]
+      },
+      {
+        "id": "coder",
+        "description": "Implement through core and workflow commands.",
+        "tool_ids": [
+          "status",
+          "validate",
+          "init",
+          "start",
+          "done",
+          "transition",
+          "new",
+          "log",
+          "quick-task",
+          "governance",
+          "evidence",
+          "close",
+          "bootstrap",
+          "verify",
+          "verify-tasks",
+          "ux",
+          "session"
+        ]
+      },
+      {
+        "id": "tester",
+        "description": "Run focused validation and verification commands.",
+        "tool_ids": [
+          "status",
+          "validate",
+          "verify-tasks",
+          "health",
+          "bench",
+          "project-benchmark",
+          "preflight"
+        ]
+      },
+      {
+        "id": "reviewer",
+        "description": "Read-only review; excludes commands with mutable subcommands.",
+        "tool_ids": [
+          "status",
+          "validate",
+          "hook",
+          "rule",
+          "skill",
+          "verify",
+          "verify-tasks",
+          "state",
+          "library",
+          "memory",
+          "adm",
+          "adr",
+          "changelog",
+          "health",
+          "db",
+          "doctor",
+          "sweep",
+          "bench",
+          "catchup",
+          "preflight",
+          "telemetry"
+        ]
+      }
+    ]
+  },
   "tools": [
     {
       "id": "status",
@@ -24,9 +200,70 @@
           "description": "Emit machine-readable project status"
         },
         {
+          "usage": "--health",
+          "side_effect": "read",
+          "description": "Include global health findings"
+        },
+        {
           "usage": "--session <session-id>",
           "side_effect": "read",
           "description": "Resolve status around a specific session"
+        },
+        {
+          "usage": "--task-id <task-id>",
+          "side_effect": "read",
+          "description": "Resolve a specific task in the selected session"
+        }
+      ]
+    },
+    {
+      "id": "feedback",
+      "name": "AFOL Feedback",
+      "tool": "afol",
+      "wrapper_command": "afol feedback",
+      "aliases": [
+        "fb"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "on-demand",
+      "description": "Inspect and manage local feedback reports",
+      "subcommands": [
+        {
+          "usage": "status",
+          "side_effect": "read",
+          "description": "Show feedback mode and count"
+        },
+        {
+          "usage": "list",
+          "side_effect": "read",
+          "description": "List feedback reports"
+        },
+        {
+          "usage": "show --id <report-id>",
+          "side_effect": "read",
+          "description": "Show one feedback report"
+        },
+        {
+          "usage": "preview",
+          "side_effect": "preview",
+          "description": "Preview redacted feedback"
+        },
+        {
+          "usage": "annotate --note <text>",
+          "side_effect": "write",
+          "description": "Annotate a feedback report"
+        },
+        {
+          "usage": "purge --confirm",
+          "side_effect": "write",
+          "description": "Purge feedback reports"
+        },
+        {
+          "usage": "last -m <text>",
+          "side_effect": "write",
+          "description": "Annotate the latest report"
         }
       ]
     },
@@ -132,6 +369,11 @@
           "usage": "--json",
           "side_effect": "write",
           "description": "Emit machine-readable start result"
+        },
+        {
+          "usage": "--brief [full]",
+          "side_effect": "write",
+          "description": "Emit project start briefing"
         }
       ]
     },
@@ -157,17 +399,41 @@
         {
           "usage": "--test \"<cmd>\"",
           "side_effect": "write",
-          "description": "Run a verification command, record evidence, then complete"
+          "description": "Run ordered argv-only verification steps, record each result, then complete"
         },
         {
-          "usage": "--command \"<cmd>\" --result passed",
+          "usage": "-- <argv...>",
           "side_effect": "write",
-          "description": "Record explicit evidence while completing the task"
+          "description": "Run positional argv verification without shell parsing"
         },
         {
           "usage": "--require-spec-check",
           "side_effect": "write",
           "description": "Block done when the linked spec check conflicts"
+        }
+      ]
+    },
+    {
+      "id": "transition",
+      "name": "AFOL Transition",
+      "tool": "afol",
+      "wrapper_command": "afol transition",
+      "aliases": [],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Transition a task through the lifecycle state machine",
+      "subcommands": [
+        {
+          "usage": "--session <session-id> --task-id <task-id> --state <state>",
+          "side_effect": "write",
+          "description": "Apply one validated task-state transition"
+        },
+        {
+          "usage": "--completion-policy execution|artifact|waiver",
+          "side_effect": "write",
+          "description": "Set typed completion authority in State Board Notes"
         }
       ]
     },
@@ -196,6 +462,11 @@
           "description": "Create a governed session linked to feature/spec"
         },
         {
+          "usage": "<theme> --no-spec-required --reason <text>",
+          "side_effect": "write",
+          "description": "Create a waived unbound session"
+        },
+        {
           "usage": "<theme> --intent <text>",
           "side_effect": "write",
           "description": "Attach explicit intent metadata to the session"
@@ -213,7 +484,7 @@
       "category": "workflow",
       "type": "workflow",
       "side_effect": "append",
-      "execution_mode": "append",
+      "execution_mode": "on-demand",
       "description": "Append a session log entry",
       "subcommands": [
         {
@@ -240,7 +511,7 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Run a single-task lifecycle after executing a verification command",
+      "description": "Run one lifecycle; missing governance stays pending with a next step",
       "subcommands": [
         {
           "usage": "<theme> --task <summary> --command \"<cmd>\"",
@@ -248,9 +519,50 @@
           "description": "Create, start, verify, record evidence, and close one task"
         },
         {
-          "usage": "--result passed --artifact <path> --note <text>",
+          "usage": "--feature-id <F-id> --parent-spec <spec-id>",
           "side_effect": "write",
-          "description": "Attach explicit evidence metadata to the quick task"
+          "description": "Create the quick task as a governed session"
+        },
+        {
+          "usage": "--no-spec-required --reason <text>",
+          "side_effect": "write",
+          "description": "Waive the spec requirement explicitly"
+        }
+      ]
+    },
+    {
+      "id": "governance",
+      "name": "AFOL Governance",
+      "tool": "afol",
+      "wrapper_command": "afol governance",
+      "aliases": [
+        "gov"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Resolve governance metadata gaps",
+      "subcommands": [
+        {
+          "usage": "pending [--all] [--json]",
+          "side_effect": "read",
+          "description": "List open pending_spec entries"
+        },
+        {
+          "usage": "resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+          "side_effect": "write",
+          "description": "Link roadmap feature/spec"
+        },
+        {
+          "usage": "resolve-spec --session <id> --no-spec-required --reason <text>",
+          "side_effect": "write",
+          "description": "Waive with an explicit reason"
+        },
+        {
+          "usage": "repair-index",
+          "side_effect": "write",
+          "description": "Rebuild the pending_spec index explicitly"
         }
       ]
     },
@@ -265,7 +577,7 @@
       "category": "workflow",
       "type": "workflow",
       "side_effect": "append",
-      "execution_mode": "append",
+      "execution_mode": "on-demand",
       "description": "Record task evidence",
       "subcommands": [
         {
@@ -282,6 +594,11 @@
           "usage": "--artifact <path> --note <text>",
           "side_effect": "append",
           "description": "Attach optional artifact and note metadata"
+        },
+        {
+          "usage": "--json",
+          "side_effect": "append",
+          "description": "Emit machine-readable evidence result"
         }
       ]
     },
@@ -298,7 +615,23 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Inspect hooks",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list [--json]",
+          "side_effect": "read",
+          "description": "List configured hooks"
+        },
+        {
+          "usage": "show <id> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one hook"
+        },
+        {
+          "usage": "resolve --event <event> [--json]",
+          "side_effect": "read",
+          "description": "Resolve hooks for a context/event profile"
+        }
+      ]
     },
     {
       "id": "rule",
@@ -313,7 +646,23 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Inspect rules",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list [--json]",
+          "side_effect": "read",
+          "description": "List configured rules"
+        },
+        {
+          "usage": "show <id> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one rule"
+        },
+        {
+          "usage": "resolve --surface <surface> --work-type <work-type> [--json]",
+          "side_effect": "read",
+          "description": "Resolve matching rules for a context profile"
+        }
+      ]
     },
     {
       "id": "skill",
@@ -328,7 +677,23 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Inspect skills",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list [--json] [--verbose]",
+          "side_effect": "read",
+          "description": "List local skills"
+        },
+        {
+          "usage": "show <name> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one skill"
+        },
+        {
+          "usage": "search <query> [--json]",
+          "side_effect": "read",
+          "description": "Search local skills by name"
+        }
+      ]
     },
     {
       "id": "close",
@@ -345,9 +710,14 @@
       "description": "Close the active session",
       "subcommands": [
         {
-          "usage": "--session <session-id>",
+          "usage": "--session <session-id> [-m|--summary <text>]",
           "side_effect": "write",
           "description": "Close a specific session after its tasks are complete"
+        },
+        {
+          "usage": "--allow-no-report --reason <text>",
+          "side_effect": "write",
+          "description": "Close without a report with an explicit waiver"
         },
         {
           "usage": "--json",
@@ -430,6 +800,11 @@
           "usage": "apply --session <id> --task-id <id> --reason <text>",
           "side_effect": "write",
           "description": "Apply managed updates and record mutation metadata"
+        },
+        {
+          "usage": "rollback --batch-id <id> --reason <text>",
+          "side_effect": "write",
+          "description": "Rollback a committed update batch after hash verification"
         }
       ]
     },
@@ -522,7 +897,7 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
-      "execution_mode": "generated-output",
+      "execution_mode": "on-demand",
       "description": "Inspect local project indexes",
       "subcommands": [
         {
@@ -553,9 +928,65 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect structure maps",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "show|sh --json",
+          "side_effect": "read",
+          "description": "Show the current PSTR index"
+        },
+        {
+          "usage": "rebuild|rb --json",
+          "side_effect": "generated",
+          "description": "Rebuild observed structure maps"
+        },
+        {
+          "usage": "validate|v --json",
+          "side_effect": "read",
+          "description": "Validate PSTR freshness and shape"
+        },
+        {
+          "usage": "stale|st --json",
+          "side_effect": "read",
+          "description": "List stale structure maps"
+        },
+        {
+          "usage": "section|sec <id> --json",
+          "side_effect": "read",
+          "description": "Read one structure map section"
+        },
+        {
+          "usage": "diff --json",
+          "side_effect": "read",
+          "description": "Compare live structure with the snapshot"
+        },
+        {
+          "usage": "watch --once --json",
+          "side_effect": "generated",
+          "description": "Watch and refresh structure maps"
+        },
+        {
+          "usage": "detect|det --json",
+          "side_effect": "read",
+          "description": "Detect materialized structure areas"
+        },
+        {
+          "usage": "suggest|sug --json",
+          "side_effect": "read",
+          "description": "Suggest structure map maintenance"
+        },
+        {
+          "usage": "review-candidates|review|rc --json",
+          "side_effect": "read",
+          "description": "Review map rebuild candidates"
+        },
+        {
+          "usage": "review-candidates --apply <id> --json",
+          "side_effect": "write",
+          "description": "Apply an approved map rebuild candidate"
+        }
+      ]
     },
     {
       "id": "ctx",
@@ -568,7 +999,7 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
-      "execution_mode": "generated-output",
+      "execution_mode": "on-demand",
       "description": "Inspect context bundles",
       "subcommands": [
         {
@@ -578,8 +1009,18 @@
         },
         {
           "usage": "bundle",
+          "side_effect": "read",
+          "description": "Build a context bundle; --json for compact output, --json --full for complete payload"
+        },
+        {
+          "usage": "bundle --json [--full]",
+          "side_effect": "read",
+          "description": "Return compact JSON; pass --full to include the complete bundle"
+        },
+        {
+          "usage": "bundle --persist-rule-injection",
           "side_effect": "generated",
-          "description": "Build a context bundle and refresh sections if needed"
+          "description": "Persist first-use rule injection state with local approval"
         },
         {
           "usage": "section --ref <ref>",
@@ -587,9 +1028,9 @@
           "description": "Read one section and refresh sections if needed"
         },
         {
-          "usage": "explain",
-          "side_effect": "generated",
-          "description": "Explain bundle inputs and refresh sections if needed"
+          "usage": "explain [--full]",
+          "side_effect": "read",
+          "description": "Explain bundle inputs; pass --full to include the complete bundle"
         },
         {
           "usage": "tools",
@@ -624,7 +1065,7 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
-      "execution_mode": "generated-output",
+      "execution_mode": "on-demand",
       "description": "Generate hydrated project state",
       "subcommands": []
     },
@@ -637,7 +1078,7 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
-      "execution_mode": "generated-output",
+      "execution_mode": "on-demand",
       "description": "Deprecated alias for memory render",
       "subcommands": []
     },
@@ -680,13 +1121,83 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
-      "description": "Inspect project evolution state",
+      "execution_mode": "on-demand",
+      "description": "Analyze project evolution state and proposals",
       "subcommands": [
+        {
+          "usage": "evaluate <id> [--record] [--superseded-by <id>] [-j]",
+          "side_effect": "preview",
+          "description": "Evaluate one proposal deterministically"
+        },
+        {
+          "usage": "analyze [--json]",
+          "side_effect": "read",
+          "description": "Analyze recurrence, scorecard, and proposal previews"
+        },
+        {
+          "usage": "weekly [--json]",
+          "side_effect": "read",
+          "description": "Run the bounded weekly analysis mode"
+        },
+        {
+          "usage": "after-merge <base>..<head> [--json]",
+          "side_effect": "read",
+          "description": "Analyze with a validated local commit range"
+        },
+        {
+          "usage": "review <proposal-id> [--json]",
+          "side_effect": "read",
+          "description": "Re-derive one proposal preview by deterministic id"
+        },
+        {
+          "usage": "apply <proposal-id> [--json]",
+          "side_effect": "write",
+          "description": "Apply one re-derived proposal in the active workbench task"
+        },
+        {
+          "usage": "rollback <proposal-id> [--json]",
+          "side_effect": "write",
+          "description": "Roll back one applied proposal in the active workbench task"
+        },
         {
           "usage": "status [--json]",
           "side_effect": "read",
           "description": "Inspect evolution config, migration, and production-day state"
+        },
+        {
+          "usage": "suggest --first-session [--claimed-by <provider>] [--json]",
+          "side_effect": "write",
+          "description": "Show one daily suggestion"
+        },
+        {
+          "usage": "skip <suggestion-id> [--json]",
+          "side_effect": "write",
+          "description": "Skip shown suggestion"
+        },
+        {
+          "usage": "accept <suggestion-id> [--json]",
+          "side_effect": "write",
+          "description": "Accept shown suggestion"
+        },
+        {
+          "usage": "reject <suggestion-id> --reason <reason> [--json]",
+          "side_effect": "write",
+          "description": "Reject shown suggestion"
+        },
+        {
+          "usage": "repair [--json]",
+          "side_effect": "write",
+          "description": "Repair evolution derived state"
+        },
+        {
+          "usage": "import <codex|pi> --source <path> [--confirm] [--json]",
+          "side_effect": "preview",
+          "description": "Preview or confirm a redacted import"
+        },
+        {
+          "usage": "external list [--json]",
+          "side_effect": "read",
+          "description": "List accepted external imports without raw records"
         }
       ]
     },
@@ -716,7 +1227,7 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect specs",
       "subcommands": [
         {
@@ -751,7 +1262,7 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Register and validate user journey coverage",
+      "description": "journey coverage",
       "subcommands": [
         {
           "usage": "list",
@@ -1005,7 +1516,7 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
-      "execution_mode": "generated-output",
+      "execution_mode": "on-demand",
       "description": "Compare AFOL against curated reference projects",
       "subcommands": [
         {
@@ -1072,7 +1583,7 @@
       "type": "inspect",
       "side_effect": "read",
       "execution_mode": "read-only",
-      "description": "Governance preflight: search specs, lessons, systems, and rules before planning",
+      "description": "Search governance context before planning",
       "subcommands": []
     },
     {
@@ -1157,6 +1668,11 @@
           "description": "Show active session, context session, and bindings"
         },
         {
+          "usage": "radar --json",
+          "side_effect": "read",
+          "description": "Show compact coordination warnings across open sessions"
+        },
+        {
           "usage": "bind --session <id> --dry-run",
           "side_effect": "read",
           "description": "Preview binding a session to current branch/worktree"
@@ -1178,66 +1694,5 @@
         }
       ]
     }
-  ],
-  "tool_categories": {
-    "core": [
-      "status",
-      "validate",
-      "init",
-      "new"
-    ],
-    "workflow": [
-      "start",
-      "done",
-      "log",
-      "quick-task",
-      "evidence",
-      "close",
-      "bootstrap",
-      "verify",
-      "verify-tasks",
-      "ux",
-      "session"
-    ],
-    "inspect": [
-      "hook",
-      "rule",
-      "skill",
-      "local-state",
-      "pstr",
-      "ctx",
-      "state",
-      "hydrate",
-      "render",
-      "library",
-      "memory",
-      "evolve",
-      "adm",
-      "spec",
-      "adr",
-      "changelog",
-      "bench",
-      "project-benchmark",
-      "catchup",
-      "preflight",
-      "telemetry"
-    ],
-    "ops": [
-      "file",
-      "update",
-      "health",
-      "db",
-      "doctor",
-      "maintenance",
-      "sweep",
-      "schema",
-      "adapter"
-    ]
-  },
-  "execution_modes": {
-    "read-only": "Reads project, registry, validation, or telemetry state without mutating files.",
-    "generated-output": "Generates derived state or bundles; inspect command help before assuming no files are written.",
-    "append": "Appends governed lifecycle evidence or logs.",
-    "on-demand": "Can write or mutate project state; prefer dry-run flags when available and use only for the active task."
-  }
+  ]
 }

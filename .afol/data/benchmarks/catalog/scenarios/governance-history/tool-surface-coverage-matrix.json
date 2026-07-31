@@ -74,6 +74,7 @@
 			"log --json",
 			"quick-task <theme> --task <summary> --command \"<cmd>\"",
 			"quick-task --feature-id <F-id> --parent-spec <spec-id>",
+			"quick-task --no-spec-required --reason <text>",
 			"governance pending [--all] [--json]",
 			"governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
 			"governance resolve-spec --session <id> --no-spec-required --reason <text>",

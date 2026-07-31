@@ -253,7 +253,7 @@ describe("router alias grammar", () => {
 			resolveCommand(["qt", "alias-smoke", "-t", "task", "-o", "passed"]),
 		).toEqual({
 			kind: "quickTask",
-			args: ["alias-smoke", "--task", "task", "--result", "passed"],
+			args: ["alias-smoke", "--task", "task", "-o", "passed"],
 		});
 
 		expect(

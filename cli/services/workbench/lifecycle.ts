@@ -144,9 +144,26 @@ const SENSITIVE_COMMAND_KEYS = new Set([
 	"DSN",
 	"AUTHORIZATION",
 ]);
+const GITHUB_TOKEN_PREFIXES = [
+	"ghp_",
+	"gho_",
+	"ghu_",
+	"ghs_",
+	"ghr_",
+	"github_pat_",
+] as const;
+const GITHUB_TOKEN_RE = new RegExp(
+	`\\b(?:${GITHUB_TOKEN_PREFIXES.map(
+		(prefix) => `${prefix}[A-Za-z0-9_]{20,}`,
+	).join("|")})\\b`,
+	"g",
+);
 
 function sensitiveAssignmentKey(key: string): boolean {
-	const normalized = key.toUpperCase();
+	const normalized = key
+		.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+		.replaceAll("-", "_")
+		.toUpperCase();
 	return [...SENSITIVE_COMMAND_KEYS].some(
 		(classifier) =>
 			normalized === classifier || normalized.endsWith(`_${classifier}`),
@@ -158,12 +175,40 @@ function sensitiveLongOption(option: string): boolean {
 	return SENSITIVE_COMMAND_KEYS.has(normalized);
 }
 
-/** Redact credential-shaped values while preserving command spelling. */
-export function sanitizeEvidenceCommand(command: string): string {
-	let sanitized = command.replace(
+/** Redact credential-shaped values before any evidence field is persisted. */
+export function sanitizeEvidenceText(value: string): string {
+	let sanitized = value.replace(
 		/(^|\s)([A-Za-z_][A-Za-z0-9_]*)(=)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]*)/g,
 		(match, prefix: string, key: string) =>
 			sensitiveAssignmentKey(key) ? `${prefix}${key}=[REDACTED]` : match,
+	);
+	sanitized = sanitized.replace(
+		/"(Authorization\s*:\s*[A-Za-z][A-Za-z0-9_-]*\s+)(?:\\.|[^"\\])*"/gi,
+		(_match: string, header: string) => `"${header}[REDACTED]"`,
+	);
+	sanitized = sanitized.replace(
+		/'(Authorization\s*:\s*[A-Za-z][A-Za-z0-9_-]*\s+)(?:\\.|[^'\\])*'/gi,
+		(_match: string, header: string) => `'${header}[REDACTED]'`,
+	);
+	sanitized = sanitized.replace(
+		/(\bAuthorization\s*:\s*(?:[A-Za-z][A-Za-z0-9_-]*\s+)?)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)/gi,
+		"$1[REDACTED]",
+	);
+	sanitized = sanitized.replace(
+		/(^|[\s{,;])(?:(['"])([A-Za-z_][A-Za-z0-9_-]*)\2|([A-Za-z_][A-Za-z0-9_-]*))(\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,}\]]+)/g,
+		(
+			match: string,
+			prefix: string,
+			quote: string | undefined,
+			quotedKey: string | undefined,
+			unquotedKey: string | undefined,
+			separator: string,
+		) => {
+			const key = quotedKey ?? unquotedKey;
+			if (!key || !sensitiveAssignmentKey(key)) return match;
+			const keyQuote = quote ?? "";
+			return `${prefix}${keyQuote}${key}${keyQuote}${separator}[REDACTED]`;
+		},
 	);
 	sanitized = sanitized.replace(
 		/(^|\s)(--[A-Za-z0-9-]+)(=|\s+)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+)/g,
@@ -173,14 +218,47 @@ export function sanitizeEvidenceCommand(command: string): string {
 				: match,
 	);
 	sanitized = sanitized.replace(
-		/(\bAuthorization\s*:\s*(?:Bearer|Basic)\s+)[^\s"']+/gi,
+		/((?:api[_ -]?key|access[_ -]?token|authorization|password|secret|token)\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;}]+)/gi,
+		(
+			match: string,
+			prefix: string,
+			_value: string,
+			offset: number,
+			whole: string,
+		) => {
+			const key = prefix
+				.replace(/\s*[:=]\s*$/, "")
+				.trim()
+				.toLowerCase();
+			if (
+				key === "authorization" &&
+				/^\s+\[REDACTED\]/.test(whole.slice(offset + match.length))
+			) {
+				return match;
+			}
+			return `${prefix}[REDACTED]`;
+		},
+	);
+	sanitized = sanitized.replace(
+		/(\b(?:bearer|basic|digest)\s+)[^\s,;}"']+/gi,
 		"$1[REDACTED]",
 	);
+	sanitized = sanitized.replace(
+		/([?&](?:api[_-]?key|access[_-]?token|authorization|password|secret|token)=)[^&#\s]+/gi,
+		"$1[REDACTED]",
+	);
+	sanitized = sanitized.replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "[REDACTED]");
+	sanitized = sanitized.replace(GITHUB_TOKEN_RE, "[REDACTED]");
 	sanitized = sanitized.replace(
 		/([A-Za-z][A-Za-z0-9+.-]*:\/\/[^:\s/@]+:)([^@\s/]+)(@)/g,
 		"$1[REDACTED]$3",
 	);
 	return sanitized;
+}
+
+/** Compatibility name for command-only callers. */
+export function sanitizeEvidenceCommand(command: string): string {
+	return sanitizeEvidenceText(command);
 }
 
 export type NewWorkstreamMetadata = {
@@ -1479,7 +1557,11 @@ export function recordEvidence(
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
 		const now = new Date();
-		const sanitizedCommand = sanitizeEvidenceCommand(input.command);
+		const sanitizedCommand = sanitizeEvidenceText(input.command);
+		const sanitizedResult = sanitizeEvidenceText(input.result);
+		const sanitizedNote = input.note
+			? sanitizeEvidenceText(input.note)
+			: undefined;
 		const provenance: EvidenceProvenance = input.provenance ?? "declared";
 		const taskRow = ensureTaskExists(
 			paths.taskPath,
@@ -1493,7 +1575,7 @@ export function recordEvidence(
 			task_id: input.taskId,
 			created_at: now.toISOString(),
 			command: sanitizedCommand,
-			result: input.result,
+			result: sanitizedResult,
 			provenance,
 			...(isTaskState(taskState ?? "")
 				? { task_state: taskState as TaskState }
@@ -1540,18 +1622,23 @@ export function recordEvidence(
 					`Artifact must be an existing repo-safe file: ${input.artifact}`,
 				);
 			}
-			evidence.artifact = relative(root, resolved.value.path).replaceAll(
+			const artifact = relative(root, resolved.value.path).replaceAll(
 				"\\",
 				"/",
 			);
+			const sanitizedArtifact = sanitizeEvidenceText(artifact);
+			if (sanitizedArtifact !== artifact) {
+				throw new Error("Artifact path contains redacted sensitive material.");
+			}
+			evidence.artifact = sanitizedArtifact;
 			evidence.artifact_sha256 = createHash("sha256")
 				.update(readFileSync(resolved.value.path))
 				.digest("hex");
 		} else if (input.artifact) {
-			evidence.artifact = input.artifact;
+			evidence.artifact = sanitizeEvidenceText(input.artifact);
 		}
-		if (input.note) {
-			evidence.note = input.note;
+		if (sanitizedNote) {
+			evidence.note = sanitizedNote;
 		}
 		if (completionPolicy === "waiver") {
 			const approval = input.approvalContext;
@@ -1563,11 +1650,11 @@ export function recordEvidence(
 				throw new Error(
 					"Waiver completion policy requires a trusted local context.",
 				);
-			if (!input.note?.trim())
+			if (!sanitizedNote?.trim())
 				throw new Error(
 					"Waiver completion policy requires a nonempty reason in --note.",
 				);
-			evidence.waiver_reason = input.note.trim();
+			evidence.waiver_reason = sanitizedNote.trim();
 			evidence.approved_by = "local:interactive";
 		}
 		runtime.fencingCheck?.();
@@ -1597,7 +1684,7 @@ export function recordEvidence(
 						session: input.session,
 						taskId: input.taskId,
 						command: sanitizedCommand,
-						result: input.result,
+						result: sanitizedResult,
 						detail: {
 							provenance,
 							evidence_id: evidence.id,
@@ -2406,14 +2493,6 @@ export function completeObservedTask(
 					authorizingEvidence: evidence,
 				});
 				warnings.push(...(done.warnings ?? []));
-				warnings.push(
-					...observeCompletedSession(
-						root,
-						input.session,
-						runtime,
-						"production-day",
-					),
-				);
 				result = { done, evidence, warnings };
 			} else {
 				result = { evidence, warnings };
@@ -2475,7 +2554,16 @@ export function completeObservedTasks(
 		const warnings: string[] = [];
 		const deferredEventRecords: Record<string, unknown>[] = [];
 		const { fencingCheck: _fencingCheck, ...commitRuntime } = runtime;
+		const paths = sessionPaths(root, input.session);
+		const originalTask = readFileSync(paths.taskPath, "utf8");
+		const hadEvidence = existsSync(paths.evidencePath);
+		const originalEvidence = hadEvidence
+			? readFileSync(paths.evidencePath, "utf8")
+			: "";
+		let committed = false;
 		try {
+			// Persist every observed result before any State Board transition so a
+			// partial batch can never mark a task done without its evidence.
 			for (const taskId of taskIds) {
 				const entry = recordEvidence(
 					root,
@@ -2494,7 +2582,15 @@ export function completeObservedTasks(
 				);
 				evidence.push(entry);
 				warnings.push(...(entry.warnings ?? []));
-				if (input.exitCode === 0) {
+			}
+			if (input.exitCode === 0) {
+				for (const taskId of taskIds) {
+					const entry = evidence.find(
+						(candidate) => candidate.task_id === taskId,
+					);
+					if (!entry) {
+						throw new Error(`Observed batch evidence missing for ${taskId}.`);
+					}
 					const completion = doneTask(
 						root,
 						{ session: input.session, taskId },
@@ -2511,18 +2607,17 @@ export function completeObservedTasks(
 					warnings.push(...(completion.warnings ?? []));
 				}
 			}
-			if (input.exitCode === 0) {
-				warnings.push(
-					...observeCompletedSession(
-						root,
-						input.session,
-						runtime,
-						"production-day",
-					),
-				);
+			committed = true;
+		} catch (error) {
+			atomicWriteText(paths.taskPath, originalTask);
+			if (hadEvidence) {
+				atomicWriteText(paths.evidencePath, originalEvidence);
+			} else if (existsSync(paths.evidencePath)) {
+				unlinkSync(paths.evidencePath);
 			}
+			throw error;
 		} finally {
-			if (evidence.length > 0) {
+			if (committed && evidence.length > 0) {
 				auxiliaryWarning(
 					warnings,
 					"local-state refresh",
@@ -2746,7 +2841,9 @@ export function closeSession(
 				"local-state refresh failed after the durable close commit; run afol local-state rebuild.",
 			);
 		}
-		warnings.push(...observeCompletedSession(root, session, runtime));
+		if (state.kind === "open") {
+			warnings.push(...observeCompletedSession(root, session, runtime));
+		}
 		const result = warnings as CloseSessionResult;
 		result.report = {
 			status: reportStatus,

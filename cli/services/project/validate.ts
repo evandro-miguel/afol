@@ -28,6 +28,7 @@ import {
 	loadWorkBenchIndexSnapshot,
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
+import { sessionLifecycleState } from "../workbench/lifecycle";
 import { verifyAllSessions } from "../workbench/verify";
 import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
 
@@ -566,18 +567,22 @@ export async function validateProjectStructure(
 		(() => {
 			// Session evidence check: run strict verify per session
 			const results = verifyAllSessions(projectRoot, true);
-			const totalIssues = results.reduce(
-				(sum, result) =>
+			const totalIssues = results.reduce((sum, result) => {
+				const session = result.sessionPath.split(/[\\/]/).pop() ?? "";
+				const closed =
+					result.taskFiles.length > 0 &&
+					sessionLifecycleState(projectRoot, session) === "closed";
+				return (
 					sum +
-					(result.openTasks.length === 0
-						? result.issues.filter(
+					(closed || result.openTasks.length > 0
+						? result.issues.length
+						: result.issues.filter(
 								(issue) =>
 									issue.type !== "missing_evidence" &&
 									issue.type !== "failed_evidence",
-							).length
-						: result.issues.length),
-				0,
-			);
+							).length)
+				);
+			}, 0);
 			const openTaskSessions = results.filter((r) => r.openTasks.length > 0);
 			if (results.length === 0) {
 				return {

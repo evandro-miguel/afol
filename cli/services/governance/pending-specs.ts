@@ -64,7 +64,9 @@ export type SessionGovernanceMetadata = {
 export type SessionPendingSpecNotice = {
 	session: string;
 	missing: GovernanceMissingField[];
+	question: string;
 	resolutionHint: string;
+	nextStep: string;
 	featureId: string;
 	parentSpec: string;
 };
@@ -74,6 +76,21 @@ const GOVERNANCE_LOCK = "__governance-pending-specs__";
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
 const DEFAULT_PENDING_SPEC_RESOLUTION_HINT =
 	'run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason "<reason>"';
+
+function pendingSpecQuestion(
+	missing: readonly GovernanceMissingField[],
+): string {
+	if (missing.length === 1) {
+		return missing[0] === "roadmap_feature"
+			? "Which roadmap feature governs this closed session?"
+			: "Which parent spec governs this closed session?";
+	}
+	return "Which roadmap feature and parent spec govern this closed session?";
+}
+
+function pendingSpecNextStep(session: string, resolutionHint: string): string {
+	return resolutionHint.replace("<session>", session);
+}
 
 function nowIso(): string {
 	return new Date().toISOString();
@@ -654,11 +671,14 @@ export function getSessionPendingSpecNotice(
 ): SessionPendingSpecNotice | null {
 	const entry = findPendingSpecEntry(root, session);
 	if (entry?.status === "open") {
+		const resolutionHint =
+			entry.resolution_hint || DEFAULT_PENDING_SPEC_RESOLUTION_HINT;
 		return {
 			session,
 			missing: entry.missing,
-			resolutionHint:
-				entry.resolution_hint || DEFAULT_PENDING_SPEC_RESOLUTION_HINT,
+			question: pendingSpecQuestion(entry.missing),
+			resolutionHint,
+			nextStep: pendingSpecNextStep(session, resolutionHint),
 			featureId: entry.feature_id ?? "",
 			parentSpec: entry.parent_spec ?? "",
 		};
@@ -677,7 +697,12 @@ export function getSessionPendingSpecNotice(
 	return {
 		session,
 		missing,
+		question: pendingSpecQuestion(missing),
 		resolutionHint: DEFAULT_PENDING_SPEC_RESOLUTION_HINT,
+		nextStep: pendingSpecNextStep(
+			session,
+			DEFAULT_PENDING_SPEC_RESOLUTION_HINT,
+		),
 		featureId: metadata.featureId,
 		parentSpec: metadata.parentSpec,
 	};
@@ -691,7 +716,8 @@ export function formatSessionPendingSpecWarning(
 	}
 	return [
 		`warning: pending_spec missing=${notice.missing.join(",") || "unknown"}`,
-		`hint: ${notice.resolutionHint.replace("<session>", notice.session)}`,
+		`question: ${notice.question}`,
+		`next: ${notice.nextStep}`,
 	];
 }
 

@@ -251,8 +251,7 @@ function selectSections(
 		)
 		.slice(0, 3);
 	return {
-		sections:
-			surfaceMatches.length > 0 ? surfaceMatches : index.sections.slice(0, 3),
+		sections: surfaceMatches,
 		verifiedSources: trusted.verified_sources,
 	};
 }
