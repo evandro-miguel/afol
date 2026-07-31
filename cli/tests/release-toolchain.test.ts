@@ -411,6 +411,17 @@ describe("release and toolchain contracts", () => {
 		);
 	});
 
+	test("CI runs only when manually dispatched", () => {
+		const workflow = readFileSync(
+			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			"utf8",
+		);
+
+		expect(workflow).toContain("on:\n  workflow_dispatch:\n");
+		expect(workflow).not.toMatch(/\n  push:/);
+		expect(workflow).not.toMatch(/\n  pull_request:/);
+	});
+
 	test("validate:release executes strict gates in order with stubbed steps", () => {
 		const pkg = JSON.parse(
 			readFileSync(join(repoRoot, "package.json"), "utf8"),
@@ -537,7 +548,7 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain("retention-days: 3");
 		expect(workflow).toContain("compression-level: 9");
 		expect(workflow).toContain(
-			"github.event_name == 'push' && github.ref == 'refs/heads/main'",
+			"github.event_name == 'workflow_dispatch'",
 		);
 		expect(workflow).toContain("Install pinned security scanners");
 		expect(workflow).toContain("continue-on-error: true");
