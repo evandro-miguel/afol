@@ -1,0 +1,129 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpe0d1j",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T20:26:12.441Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpe0d1j",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "failed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T20:26:12.441Z",
+      "tokens": {
+        "input": 169615,
+        "output": 2459,
+        "cached_input": 144000,
+        "reasoning_output": 1877,
+        "total": 317951
+      },
+      "timing": {
+        "wall_clock_ms": 53104
+      },
+      "tools": {
+        "total_calls": 9,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 1,
+          "afol_command": 2,
+          "shell": 1,
+          "agent_message": 5
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 3,
+        "max_round_trips": 4
+      },
+      "pass": false,
+      "notes": [
+        "total-tokens:317951>90000",
+        "codex-stderr:Reading additional input from stdin...\n2026-07-17T20:25:45.945787Z ERROR codex_core::tools::router: error=apply_patch verification failed: Failed to find expected lines in /tmp/afol-live-bench-lUrsuI/product.txt:\nafter",
+        "codex-exit:0"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpe0d1j",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T20:26:12.441Z",
+    "summary": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "total_tokens": 317951,
+      "total_time_ms": 53104,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "failed",
+        "pass": false,
+        "tokens": {
+          "input": 169615,
+          "output": 2459,
+          "cached_input": 144000,
+          "reasoning_output": 1877,
+          "total": 317951
+        },
+        "timing": {
+          "wall_clock_ms": 53104
+        },
+        "tools": {
+          "total_calls": 9,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 1,
+            "afol_command": 2,
+            "shell": 1,
+            "agent_message": 5
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": [
+          "total-tokens:317951>90000",
+          "codex-stderr:Reading additional input from stdin...\n2026-07-17T20:25:45.945787Z ERROR codex_core::tools::router: error=apply_patch verification failed: Failed to find expected lines in /tmp/afol-live-bench-lUrsuI/product.txt:\nafter",
+          "codex-exit:0"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpe0d1j\ntimestamp: 2026-07-17T20:26:12.441Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=317951\ntime_ms: total=53104\ntool_success: 1\nfailed orchestration-submission-review tokens=317951 time_ms=53104 tools=9"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpe0d1j\ntimestamp: 2026-07-17T20:26:12.441Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=317951\ntime_ms: total=53104\ntool_success: 1\nfailed orchestration-submission-review tokens=317951 time_ms=53104 tools=9"
+}

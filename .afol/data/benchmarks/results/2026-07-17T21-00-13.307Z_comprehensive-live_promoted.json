@@ -1,0 +1,599 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpf8x3r-promoted",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T21:00:13.307Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "governed-task-lifecycle-mridwz10",
+      "scenario_id": "governed-task-lifecycle",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "a5feab894f8a",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-12T22:48:33.054Z",
+      "tokens": {
+        "input": 96492,
+        "output": 523,
+        "cached_input": 84864,
+        "reasoning_output": 99,
+        "total": 181978
+      },
+      "timing": {
+        "wall_clock_ms": 15185
+      },
+      "tools": {
+        "total_calls": 9,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 4,
+          "shell": 0,
+          "agent_message": 5
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "file-inspection-vs-command-mridxau8",
+      "scenario_id": "file-inspection-vs-command",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "a5feab894f8a",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-12T22:48:43.939Z",
+      "tokens": {
+        "input": 57399,
+        "output": 343,
+        "cached_input": 46208,
+        "reasoning_output": 90,
+        "total": 104040
+      },
+      "timing": {
+        "wall_clock_ms": 10878
+      },
+      "tools": {
+        "total_calls": 5,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 2,
+          "shell": 0,
+          "agent_message": 3
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "validation-flow-mridxj8l",
+      "scenario_id": "validation-flow",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "a5feab894f8a",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-12T22:49:10.237Z",
+      "tokens": {
+        "input": 128869,
+        "output": 1242,
+        "cached_input": 113408,
+        "reasoning_output": 665,
+        "total": 244184
+      },
+      "timing": {
+        "wall_clock_ms": 26291
+      },
+      "tools": {
+        "total_calls": 9,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 3,
+          "afol_command": 2,
+          "shell": 0,
+          "agent_message": 4
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "plan-quality-check-mridy3j3",
+      "scenario_id": "plan-quality-check",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "a5feab894f8a",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-12T22:49:19.740Z",
+      "tokens": {
+        "input": 18868,
+        "output": 488,
+        "cached_input": 2432,
+        "reasoning_output": 182,
+        "total": 21970
+      },
+      "timing": {
+        "wall_clock_ms": 9495
+      },
+      "tools": {
+        "total_calls": 1,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 0,
+          "shell": 0,
+          "agent_message": 1
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "maintenance-cadence-review-mridyav2",
+      "scenario_id": "maintenance-cadence-review",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "a5feab894f8a",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-12T22:49:46.771Z",
+      "tokens": {
+        "input": 116425,
+        "output": 1060,
+        "cached_input": 98048,
+        "reasoning_output": 501,
+        "total": 216034
+      },
+      "timing": {
+        "wall_clock_ms": 27024
+      },
+      "tools": {
+        "total_calls": 7,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 5,
+          "shell": 0,
+          "agent_message": 2
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpf8x3r",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T21:00:13.307Z",
+      "tokens": {
+        "input": 45151,
+        "output": 313,
+        "cached_input": 24320,
+        "reasoning_output": 176,
+        "total": 69960
+      },
+      "timing": {
+        "wall_clock_ms": 15247
+      },
+      "tools": {
+        "total_calls": 3,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 1,
+          "shell": 0,
+          "agent_message": 2
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "execution": {
+        "phase_ms": {
+          "host_dispatch": 12,
+          "worker": 15195,
+          "host_review": 39,
+          "end_to_end": 15247
+        },
+        "worker_tokens": {
+          "input": 45151,
+          "output": 313,
+          "cached_input": 24320,
+          "reasoning_output": 176,
+          "total": 69960
+        },
+        "host_model_tokens": 0,
+        "protocol_calls": {
+          "host_dispatch": 1,
+          "worker_submit": 1,
+          "host_review": 1,
+          "total": 3
+        },
+        "attempts": {
+          "dispatch": 1,
+          "submit": 1,
+          "review": 1
+        },
+        "retries": {
+          "dispatch": 0,
+          "submit": 0,
+          "review": 0
+        },
+        "evidence_id": "E-20260717170013286-e44028"
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 1,
+        "max_round_trips": 1
+      },
+      "pass": true,
+      "notes": [
+        "token-scope:worker"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpf8x3r-promoted",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T21:00:13.307Z",
+    "summary": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "blocked": 0,
+      "total_tokens": 838166,
+      "total_time_ms": 104120,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "governed-task-lifecycle",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 96492,
+          "output": 523,
+          "cached_input": 84864,
+          "reasoning_output": 99,
+          "total": 181978
+        },
+        "timing": {
+          "wall_clock_ms": 15185
+        },
+        "tools": {
+          "total_calls": 9,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 4,
+            "shell": 0,
+            "agent_message": 5
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "file-inspection-vs-command",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 57399,
+          "output": 343,
+          "cached_input": 46208,
+          "reasoning_output": 90,
+          "total": 104040
+        },
+        "timing": {
+          "wall_clock_ms": 10878
+        },
+        "tools": {
+          "total_calls": 5,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 2,
+            "shell": 0,
+            "agent_message": 3
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "validation-flow",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 128869,
+          "output": 1242,
+          "cached_input": 113408,
+          "reasoning_output": 665,
+          "total": 244184
+        },
+        "timing": {
+          "wall_clock_ms": 26291
+        },
+        "tools": {
+          "total_calls": 9,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 3,
+            "afol_command": 2,
+            "shell": 0,
+            "agent_message": 4
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "plan-quality-check",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 18868,
+          "output": 488,
+          "cached_input": 2432,
+          "reasoning_output": 182,
+          "total": 21970
+        },
+        "timing": {
+          "wall_clock_ms": 9495
+        },
+        "tools": {
+          "total_calls": 1,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 0,
+            "shell": 0,
+            "agent_message": 1
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "maintenance-cadence-review",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 116425,
+          "output": 1060,
+          "cached_input": 98048,
+          "reasoning_output": 501,
+          "total": 216034
+        },
+        "timing": {
+          "wall_clock_ms": 27024
+        },
+        "tools": {
+          "total_calls": 7,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 5,
+            "shell": 0,
+            "agent_message": 2
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 45151,
+          "output": 313,
+          "cached_input": 24320,
+          "reasoning_output": 176,
+          "total": 69960
+        },
+        "timing": {
+          "wall_clock_ms": 15247
+        },
+        "tools": {
+          "total_calls": 3,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 1,
+            "shell": 0,
+            "agent_message": 2
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "execution": {
+          "phase_ms": {
+            "host_dispatch": 12,
+            "worker": 15195,
+            "host_review": 39,
+            "end_to_end": 15247
+          },
+          "worker_tokens": {
+            "input": 45151,
+            "output": 313,
+            "cached_input": 24320,
+            "reasoning_output": 176,
+            "total": 69960
+          },
+          "host_model_tokens": 0,
+          "protocol_calls": {
+            "host_dispatch": 1,
+            "worker_submit": 1,
+            "host_review": 1,
+            "total": 3
+          },
+          "attempts": {
+            "dispatch": 1,
+            "submit": 1,
+            "review": 1
+          },
+          "retries": {
+            "dispatch": 0,
+            "submit": 0,
+            "review": 0
+          },
+          "evidence_id": "E-20260717170013286-e44028"
+        },
+        "notes": [
+          "token-scope:worker"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpf8x3r-promoted\ntimestamp: 2026-07-17T21:00:13.307Z\nresults: 6 passed=6 failed=0 blocked=0\ntokens: total=838166\ntime_ms: total=104120\ntool_success: 1\npassed governed-task-lifecycle tokens=181978 time_ms=15185 tools=9\npassed file-inspection-vs-command tokens=104040 time_ms=10878 tools=5\npassed validation-flow tokens=244184 time_ms=26291 tools=9\npassed plan-quality-check tokens=21970 time_ms=9495 tools=1\npassed maintenance-cadence-review tokens=216034 time_ms=27024 tools=7\npassed orchestration-submission-review tokens=69960 time_ms=15247 tools=3"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpf8x3r-promoted\ntimestamp: 2026-07-17T21:00:13.307Z\nresults: 6 passed=6 failed=0 blocked=0\ntokens: total=838166\ntime_ms: total=104120\ntool_success: 1\npassed governed-task-lifecycle tokens=181978 time_ms=15185 tools=9\npassed file-inspection-vs-command tokens=104040 time_ms=10878 tools=5\npassed validation-flow tokens=244184 time_ms=26291 tools=9\npassed plan-quality-check tokens=21970 time_ms=9495 tools=1\npassed maintenance-cadence-review tokens=216034 time_ms=27024 tools=7\npassed orchestration-submission-review tokens=69960 time_ms=15247 tools=3"
+}
