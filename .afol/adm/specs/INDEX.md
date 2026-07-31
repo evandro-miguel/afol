@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-06-14T00:00:00+00:00"
+updated_at: "2026-07-31T00:00:00+00:00"
 ---
 
 # SPECS INDEX
@@ -16,9 +16,9 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 84 |
+| Total | 85 |
 | Draft | 0 |
-| Active | 8 |
+| Active | 9 |
 | Final | 58 |
 | Superseded | 18 |
 
@@ -110,8 +110,10 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260717_agent-submission-and-batch-review_spec_01 | external-receipts-and-harness-profiles | active | F-31 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md, related: F-30 Evolution remains separate under ADR-008 |
 | 260716_2155_afol-evolution-system_spec_01 | afol-evolution-system | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
 | 260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01 | memory-library-adoption-loop | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md, related: F-18.S10 |
+| 260731_hot-path-observability-and-derived-state-separation_spec_01 | hot-path-observability-and-derived-state-separation | active | F-32 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, f03_latency: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md, f07_state: .afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 
 ---
+
 *Index: `.afol/adm/specs/INDEX.md`*

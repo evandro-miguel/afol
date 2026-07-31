@@ -1124,6 +1124,54 @@ Follow-on slices under this direction:
   PR #58's dispatch/submit/review implementation or treat its assignment store
   as a merge base. External harnesses own model execution and receipt emission.
 
+### F-32 Hot-Path Observability and Derived-State Separation
+
+- Status: active
+- Governing spec:
+  .afol/adm/specs/260731_hot-path-observability-and-derived-state-separation_spec_01.md
+- Why: the compact `status` / lifecycle path must stay predictable under normal
+  agent use. Observability and derived projections currently compete with the
+  canonical workbench writes for latency and failure handling; F-32 makes those
+  boundaries explicit without weakening lifecycle integrity.
+- Relationship to prior features:
+  - Reuses F-03 latency and token-economy targets, F-04 lifecycle semantics,
+    F-07 local-state/event-log contracts, F-18 temporal health, and F-22
+    transaction-safety rules.
+  - F-32 changes execution ordering and measurement boundaries only. It does
+    not migrate the event log, replace the State Board, or create a second
+    source of truth.
+  - Distinct from F-30 Evolution and F-31 external receipts/profiles; neither
+    feature is expanded by this hot-path slice.
+- Core contract:
+  - `status`, `start`, `done`, and `close` may expose bounded timing/call
+    instrumentation, but they do not append telemetry records on the default
+    path.
+  - Default `status` reads canonical status only. Health, catchup, and other
+    derived/freshness work remain explicit through existing opt-in commands or
+    flags.
+  - Lifecycle commands commit canonical task/evidence/report/State Board
+    changes first. Telemetry, index refresh, health, and other derived work is
+    auxiliary and cannot precede or invalidate a durable canonical write.
+  - Derived rebuild and catchup are explicit, idempotent, recoverable
+    operations. A failed auxiliary step yields a bounded warning and a
+    concrete recovery command; it never silently rewrites canonical state.
+  - Evidence authorization, State Board state transitions, close-report
+    creation/waivers, strict verification, and existing event-log append
+    semantics remain unchanged.
+- Acceptance direction: focused tests prove no telemetry writes on the four
+  hot paths, default `status` skips health and derived work, canonical writes
+  precede auxiliary work, and explicit rebuild/catchup restores projections
+  without duplicate or conflicting evidence, State Board, or report records.
+  Recovery and benchmark gates must pass before implementation status changes.
+- Non-goals: event-log migration or schema replacement; F-30 Evolution,
+  observation, or autonomy changes; F-31 receipt/profile behavior; provider or
+  model selection, invocation, scheduling, retries, or supervision; a daemon
+  or always-on watcher.
+- Delivery policy: governance first, then independent implementation and
+  regression slices. Keep the canonical files recoverable, use explicit
+  `afol local-state rebuild` / `afol catchup` recovery, and benchmark default
+  versus opt-in derived paths separately on a compatible warm host.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
