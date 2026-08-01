@@ -10,6 +10,7 @@ import {
 	resolveGovernance,
 	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
+import { beginHotPathMeasurement } from "../services/hot-path/instrumentation";
 import {
 	TaskCompletionBusyError,
 	type TaskCompletionLease,
@@ -504,6 +505,21 @@ type DoneLockedFailure = {
 
 type DoneLockedResult = DoneLockedSuccess | DoneLockedFailure;
 
+type DoneOutput = {
+	stdout: (value: string) => void;
+	stderr: (value: string) => void;
+};
+
+function stringifyDoneJsonError(error: unknown, exitCode = 2): string {
+	const message = error instanceof Error ? error.message : String(error);
+	return stringifyEnvelope(
+		envelopeErr("workbench.error", message, {
+			action: "workbench.done",
+			exitCode,
+		}),
+	);
+}
+
 async function executeDoneLocked(
 	root: string,
 	parsed: DoneArgs,
@@ -774,6 +790,7 @@ async function runDoneBatch(
 	root: string,
 	parsed: DoneArgs,
 	ctx: OperationContext,
+	output: DoneOutput,
 ): Promise<number> {
 	if (parsed.evidenceCommand || parsed.evidenceResult) {
 		throw new Error(
@@ -842,7 +859,7 @@ async function runDoneBatch(
 			const warnings = completion.warnings;
 			if (observed.status !== "passed") {
 				if (parsed.json) {
-					console.log(
+					output.stdout(
 						stringifyEnvelope({
 							...envelopeErr(
 								"workbench.verification_failed",
@@ -860,14 +877,14 @@ async function runDoneBatch(
 						}),
 					);
 				} else {
-					console.error(
+					output.stderr(
 						`shared verification failed: ${formatTaskSelection(parsed.taskIds)} (exit=${observed.exitCode})`,
 					);
 				}
 				return 1;
 			}
 			if (parsed.json) {
-				console.log(
+				output.stdout(
 					stringifyEnvelope(
 						envelopeOk(
 							{
@@ -883,7 +900,7 @@ async function runDoneBatch(
 					),
 				);
 			} else {
-				console.log(
+				output.stdout(
 					[
 						`tasks done: ${parsed.taskIds.length} (${formatTaskSelection(parsed.taskIds)})`,
 						`authorizing evidence: ${evidenceIds.length}`,
@@ -901,11 +918,23 @@ export async function runDoneCommand(
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
+	const finishMeasurement = beginHotPathMeasurement("done");
+	const emitted: string[] = [];
+	const output: DoneOutput = {
+		stdout: (value) => {
+			emitted.push(value);
+			console.log(value);
+		},
+		stderr: (value) => {
+			emitted.push(value);
+			console.error(value);
+		},
+	};
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.done");
 		const parsed = parseDoneArgs(args, root);
 		if (parsed.taskIds.length > 1) {
-			return await runDoneBatch(root, parsed, ctx);
+			return await runDoneBatch(root, parsed, ctx, output);
 		}
 		const result = await withTaskCompletionLock(
 			root,
@@ -916,10 +945,8 @@ export async function runDoneCommand(
 		if (!result.ok) {
 			if (parsed.json) {
 				if (result.legacyError) {
-					writeJsonError(
-						"workbench.done",
-						new Error(result.message),
-						result.exitCode,
+					output.stdout(
+						stringifyDoneJsonError(new Error(result.message), result.exitCode),
 					);
 				} else {
 					const envelope = {
@@ -937,16 +964,16 @@ export async function runDoneCommand(
 							warnings: result.warnings ?? [],
 						},
 					};
-					console.log(stringifyEnvelope(envelope));
+					output.stdout(stringifyEnvelope(envelope));
 				}
 			} else {
-				console.error(result.message);
+				output.stderr(result.message);
 			}
 			return result.exitCode;
 		}
 		const completionWarnings = result.warnings;
 		if (parsed.json) {
-			console.log(
+			output.stdout(
 				stringifyEnvelope(
 					envelopeOk(
 						{
@@ -983,13 +1010,13 @@ export async function runDoneCommand(
 			}
 			lines.push(...completionWarnings.map((warning) => `warning: ${warning}`));
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
-			console.log(lines.join("\n"));
+			output.stdout(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {
 		if (hasJsonFlag(args)) {
 			if (error instanceof TaskCompletionBusyError) {
-				console.log(
+				output.stdout(
 					stringifyEnvelope(
 						envelopeErr("workbench.completion_busy", error.message, {
 							action: "workbench.done",
@@ -998,7 +1025,7 @@ export async function runDoneCommand(
 					),
 				);
 			} else if (error instanceof VerificationRunConflictError) {
-				console.log(
+				output.stdout(
 					stringifyEnvelope(
 						envelopeErr("workbench.stale_conflict", error.message, {
 							action: "workbench.done",
@@ -1007,12 +1034,14 @@ export async function runDoneCommand(
 					),
 				);
 			} else {
-				writeJsonError("workbench.done", error);
+				output.stdout(stringifyDoneJsonError(error));
 			}
 		} else {
-			console.error((error as Error).message);
+			output.stderr((error as Error).message);
 		}
 		return 2;
+	} finally {
+		finishMeasurement(emitted.join("\n"));
 	}
 }
 
