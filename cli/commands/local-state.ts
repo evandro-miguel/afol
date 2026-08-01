@@ -10,8 +10,8 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
-import { countHotPathOperation } from "../services/hot-path/instrumentation";
 import { assertValidEventLedger } from "../services/events/ledger";
+import { countHotPathOperation } from "../services/hot-path/instrumentation";
 import { withSessionLock } from "../services/io/session-lock";
 import {
 	rebuildProjectIndexes,

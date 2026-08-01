@@ -25,9 +25,9 @@ import { cpus, arch as osArch, platform } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
 import type { BenchmarkExecutionProfile, Scenario } from "./types";
-import { runHotPathScenario } from "./hot-path-benchmark";
 
 const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
@@ -1678,7 +1678,10 @@ export function runScenarioCommand(
 	// source-runner measurements even when the workbench catalog marks the
 	// scenario as compiled_binary for the release-contract completeness check.
 	if (scenario.runner === "hot-path") {
-		const sampleCount = resolveScenarioSampleCount(scenario, options.sampleCount);
+		const sampleCount = resolveScenarioSampleCount(
+			scenario,
+			options.sampleCount,
+		);
 		const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;
 		return runHotPathScenario(projectRoot, scenario, {
 			sampleCount,

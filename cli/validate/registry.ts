@@ -15,6 +15,10 @@ import {
 import {
 	type Baseline,
 	BENCHMARK_RESULT_SCHEMA_VERSION,
+	type HotPathDerivedPath,
+	type HotPathScenarioConfig,
+	type HotPathScenarioMode,
+	type HotPathScenarioOperation,
 	type PackId,
 	type PackMetadata,
 	REQUIRED_PACKS,
@@ -23,10 +27,6 @@ import {
 	type ScenarioBaseline,
 	type ScenarioCoverage,
 	type ScenarioMeasurement,
-	type HotPathScenarioConfig,
-	type HotPathScenarioMode,
-	type HotPathScenarioOperation,
-	type HotPathDerivedPath,
 	type ToolCoverageExemption,
 	type ToolCoveragePolicy,
 	type ToolSubcommandCoverageExemption,
@@ -165,7 +165,9 @@ function parseHotPathScenario(
 	const operation = asString(raw.operation, `${sourcePath}.hot_path.operation`);
 	const operations = ["status", "start", "done", "close"] as const;
 	if (!operations.includes(operation as HotPathScenarioOperation)) {
-		throw new Error(`Invalid hot-path operation: ${sourcePath}.hot_path.operation`);
+		throw new Error(
+			`Invalid hot-path operation: ${sourcePath}.hot_path.operation`,
+		);
 	}
 	const mode = asString(raw.mode, `${sourcePath}.hot_path.mode`);
 	const modes = ["default", "explicit-derived"] as const;
@@ -185,7 +187,9 @@ function parseHotPathScenario(
 		derivedPath !== undefined &&
 		!derivedPaths.includes(derivedPath as HotPathDerivedPath)
 	) {
-		throw new Error(`Invalid hot-path derived path: ${sourcePath}.hot_path.derived_path`);
+		throw new Error(
+			`Invalid hot-path derived path: ${sourcePath}.hot_path.derived_path`,
+		);
 	}
 	if (mode === "explicit-derived" && derivedPath === undefined) {
 		throw new Error(

@@ -520,9 +520,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		}
 		if (arg === "--verification-timeout-ms") {
 			if (!value) {
-				throw new Error(
-					"Missing value for --verification-timeout-ms in done.",
-				);
+				throw new Error("Missing value for --verification-timeout-ms in done.");
 			}
 			const parsedTimeout = Number(value);
 			if (!Number.isFinite(parsedTimeout)) {
