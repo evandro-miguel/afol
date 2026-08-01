@@ -1,9 +1,4 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { boundedSpawn } from "../core/subprocess";
@@ -12,17 +7,16 @@ import {
 	HOT_PATH_BENCHMARK_MARKER,
 } from "../services/hot-path/instrumentation";
 import {
-	closeSession,
 	completeObservedTask,
 	newWorkstream,
 	startTask,
 } from "../services/workbench/lifecycle";
+import type { ScenarioExecutionResult } from "./scenario-execution";
 import type {
 	BenchmarkExecutionProfile,
 	HotPathScenarioConfig,
 	Scenario,
 } from "./types";
-import type { ScenarioExecutionResult } from "./scenario-execution";
 
 type HotPathRunnerOptions = {
 	sampleCount: number;
@@ -77,6 +71,38 @@ type HotPathSample = {
 const HOT_PATH_OUTPUT_LIMIT_BYTES = 20_000;
 const HOT_PATH_MAIN_PATH = resolve(import.meta.dir, "../main.ts");
 
+/**
+ * Compiled-Bun detection used by the hot-path launcher.
+ *
+ * `import.meta.dir` is not a reliable discriminator: inside a
+ * `bun build --compile` binary it can resolve to a virtual `$bunfs` path or
+ * to the build-time source directory, so the external entrypoint may either
+ * not exist or still exist on disk. The compiled-runtime signal is the
+ * entrypoint itself being a virtual `$bunfs` path instead of an external
+ * file. This mirrors `isCompiledBunRuntime` in scenario-execution.ts.
+ */
+function isHotPathCompiledRuntime(mainPath: string = Bun.main): boolean {
+	return mainPath.includes("$bunfs");
+}
+
+/**
+ * Resolve the argv that launches the real AFOL CLI for a hot-path sample.
+ *
+ * Source runtime: the Bun runtime re-executes the external `main.ts`
+ * entrypoint. Compiled runtime: the running binary re-executes itself, so the
+ * embedded source path must not be passed to it.
+ */
+export function resolveHotPathLauncherArgv(
+	compiledRuntime: boolean,
+	execPath: string,
+	sourceMainPath: string,
+	args: string[],
+): string[] {
+	return compiledRuntime
+		? [execPath, ...args]
+		: [execPath, sourceMainPath, ...args];
+}
+
 function emptyInstrumentation(): HotPathInstrumentationSnapshot {
 	return {
 		counters: {
@@ -111,9 +137,11 @@ function addInstrumentation(
 		combined.measurements[key] = {
 			calls: left.measurements[key].calls + right.measurements[key].calls,
 			duration_ms:
-				left.measurements[key].duration_ms + right.measurements[key].duration_ms,
+				left.measurements[key].duration_ms +
+				right.measurements[key].duration_ms,
 			output_bytes:
-				left.measurements[key].output_bytes + right.measurements[key].output_bytes,
+				left.measurements[key].output_bytes +
+				right.measurements[key].output_bytes,
 		};
 	}
 	return combined;
@@ -135,7 +163,8 @@ function captureBenchmarkMarker(stderr: string): {
 			note: "hot-path-instrumentation-missing",
 		};
 	}
-	const marker = lines[markerIndex]?.slice(HOT_PATH_BENCHMARK_MARKER.length) ?? "";
+	const marker =
+		lines[markerIndex]?.slice(HOT_PATH_BENCHMARK_MARKER.length) ?? "";
 	try {
 		const parsed = JSON.parse(marker) as HotPathInstrumentationSnapshot;
 		return {
@@ -165,9 +194,12 @@ function runDeclaredCli(
 			// through the same implicit-session mechanism as the fast path. This
 			// also keeps the benchmark valid when CI disables global fallback.
 			`AFOL_SESSION=${session}`,
-			"bun",
-			HOT_PATH_MAIN_PATH,
-			...args,
+			...resolveHotPathLauncherArgv(
+				isHotPathCompiledRuntime(),
+				process.execPath,
+				HOT_PATH_MAIN_PATH,
+				args,
+			),
 		],
 		{
 			cwd: root,
@@ -194,7 +226,9 @@ function percentile(values: number[], ratio: number): number {
 	const upper = Math.ceil(position);
 	const lowerValue = sorted[lower] ?? 0;
 	const upperValue = sorted[upper] ?? lowerValue;
-	return Math.round(lowerValue + (upperValue - lowerValue) * (position - lower));
+	return Math.round(
+		lowerValue + (upperValue - lowerValue) * (position - lower),
+	);
 }
 
 function gitCommit(projectRoot: string): string {
@@ -252,7 +286,11 @@ function prepareProjectRoot(root: string): void {
 function prepareFixture(
 	root: string,
 	operation: HotPathScenarioConfig["operation"],
-): { session: string; fixture_creation_duration_ms: number; setup_duration_ms: number } {
+): {
+	session: string;
+	fixture_creation_duration_ms: number;
+	setup_duration_ms: number;
+} {
 	const fixtureStarted = performance.now();
 	prepareProjectRoot(root);
 	const setupStarted = performance.now();
@@ -276,7 +314,10 @@ function prepareFixture(
 			1,
 			Math.round(performance.now() - fixtureStarted),
 		),
-		setup_duration_ms: Math.max(1, Math.round(performance.now() - setupStarted)),
+		setup_duration_ms: Math.max(
+			1,
+			Math.round(performance.now() - setupStarted),
+		),
 	};
 }
 
@@ -317,7 +358,7 @@ function invokeHotPath(
 	scenario: HotPathScenarioConfig,
 	session: string,
 	command: string,
-	): {
+): {
 	exitCode: number;
 	duration_ms: number;
 	output: CapturedOutput;
@@ -344,7 +385,8 @@ function invokeHotPath(
 			session,
 		);
 		recoveryDuration = recovery.duration_ms;
-		recoveryOutput = `${recovery.output.stdout}\n${recovery.output.stderr}`.trim();
+		recoveryOutput =
+			`${recovery.output.stdout}\n${recovery.output.stderr}`.trim();
 		recoveryInstrumentation = recovery.instrumentation;
 		if (recovery.note) notes.push(`recovery-${recovery.note}`);
 		if (recovery.exitCode !== 0) {
@@ -359,11 +401,7 @@ function invokeHotPath(
 		.join("\n");
 	return {
 		exitCode:
-			primary.exitCode !== 0
-				? primary.exitCode
-				: notes.length > 0
-					? 1
-					: 0,
+			primary.exitCode !== 0 ? primary.exitCode : notes.length > 0 ? 1 : 0,
 		duration_ms: primary.duration_ms,
 		output: { stdout: combinedOutput, stderr: "" },
 		recovery_duration_ms: recoveryDuration,
@@ -381,7 +419,9 @@ function runSample(
 	command: string,
 ): HotPathSample {
 	mkdirSync(join(projectRoot, ".afol", "tmp"), { recursive: true });
-	const fixtureRoot = mkdtempSync(join(projectRoot, ".afol", "tmp", "f32-hot-path-"));
+	const fixtureRoot = mkdtempSync(
+		join(projectRoot, ".afol", "tmp", "f32-hot-path-"),
+	);
 	try {
 		const fixture = prepareFixture(fixtureRoot, scenario.operation);
 		const invocation = invokeHotPath(
@@ -390,10 +430,12 @@ function runSample(
 			fixture.session,
 			command,
 		);
-		const output = `${invocation.output.stdout}\n${invocation.output.stderr}`.trim();
+		const output =
+			`${invocation.output.stdout}\n${invocation.output.stderr}`.trim();
 		const outputBytes = Buffer.byteLength(output, "utf8");
 		const counters = invocation.instrumentation.counters;
-		const measurement = invocation.instrumentation.measurements[scenario.operation];
+		const measurement =
+			invocation.instrumentation.measurements[scenario.operation];
 		const derivedWorkCalls =
 			counters["status.health"] +
 			counters["status.catchup"] +
@@ -401,7 +443,9 @@ function runSample(
 		const notes: string[] = [];
 		notes.push(...invocation.notes);
 		if (outputBytes > HOT_PATH_OUTPUT_LIMIT_BYTES) {
-			notes.push(`hot-path-output-bytes:${outputBytes}>${HOT_PATH_OUTPUT_LIMIT_BYTES}`);
+			notes.push(
+				`hot-path-output-bytes:${outputBytes}>${HOT_PATH_OUTPUT_LIMIT_BYTES}`,
+			);
 		}
 		if (invocation.exitCode !== 0) {
 			notes.push(`hot-path-exit:${invocation.exitCode}`);
@@ -409,10 +453,7 @@ function runSample(
 		if (counters["workbench.telemetry"] > 0) {
 			notes.push(`hot-path-telemetry:${counters["workbench.telemetry"]}`);
 		}
-		if (
-			scenario.mode === "default" &&
-			derivedWorkCalls > 0
-		) {
+		if (scenario.mode === "default" && derivedWorkCalls > 0) {
 			notes.push(`hot-path-derived-work:${derivedWorkCalls}`);
 		}
 		if (scenario.mode === "explicit-derived" && derivedWorkCalls === 0) {
@@ -449,7 +490,9 @@ export function runHotPathScenario(
 	options: HotPathRunnerOptions,
 ): ScenarioExecutionResult {
 	if (!scenario.hot_path) {
-		throw new Error(`Hot-path scenario is missing configuration: ${scenario.scenario_id}`);
+		throw new Error(
+			`Hot-path scenario is missing configuration: ${scenario.scenario_id}`,
+		);
 	}
 	const samples: HotPathSample[] = [];
 	const warmupNotes: string[] = [];
@@ -493,11 +536,10 @@ export function runHotPathScenario(
 	}
 	const durations = samples.map((sample) => sample.duration_ms);
 	const outputBytes = samples.map((sample) => sample.output_bytes);
-	const successful = samples.filter((sample) => sample.exit_code === 0 && sample.notes.length === 0).length;
-	const notes = [
-		...warmupNotes,
-		...samples.flatMap((sample) => sample.notes),
-	];
+	const successful = samples.filter(
+		(sample) => sample.exit_code === 0 && sample.notes.length === 0,
+	).length;
+	const notes = [...warmupNotes, ...samples.flatMap((sample) => sample.notes)];
 	const profile = executionProfile();
 	return {
 		metrics: {
@@ -529,12 +571,16 @@ export function runHotPathScenario(
 				0,
 			),
 			instrumented_duration_ms: Math.round(
-				samples.reduce((total, sample) => total + sample.instrumented_duration_ms, 0) /
-					Math.max(1, samples.length),
+				samples.reduce(
+					(total, sample) => total + sample.instrumented_duration_ms,
+					0,
+				) / Math.max(1, samples.length),
 			),
 			instrumented_output_bytes: Math.round(
-				samples.reduce((total, sample) => total + sample.instrumented_output_bytes, 0) /
-					Math.max(1, samples.length),
+				samples.reduce(
+					(total, sample) => total + sample.instrumented_output_bytes,
+					0,
+				) / Math.max(1, samples.length),
 			),
 			fixture_creation_duration_ms: percentile(
 				samples.map((sample) => sample.fixture_creation_duration_ms),
