@@ -952,6 +952,7 @@ function markTaskMetadataClosed(
 		taskPath,
 		`---${newline}${lines.join(newline)}${newline}---${suffix}`,
 	);
+	countHotPathOperation("workbench.canonical_write");
 }
 
 export type SessionLifecycleState = "open" | "closed" | "corrupt";
@@ -1104,6 +1105,7 @@ function transitionTaskStateChains(
 		throw new Error(`Task ${missing.join(", ")} not found in ${taskPath}`);
 	}
 	atomicWriteText(taskPath, `${nextLines.join("\n").replace(/\n*$/g, "")}\n`);
+	countHotPathOperation("workbench.canonical_write");
 }
 
 function evidenceId(now: Date): string {
@@ -1683,6 +1685,7 @@ export function recordEvidence(
 				flag: "a",
 			});
 		}
+		countHotPathOperation("workbench.canonical_write");
 		const warnings: string[] = [];
 		auxiliaryWarning(
 			warnings,
@@ -2710,12 +2713,14 @@ export function closeSession(
 						),
 						{ syncDirectory: false },
 					);
+					countHotPathOperation("workbench.canonical_write");
 					reportCreated = !reportWasPresent;
 				}
 				if (nextLog !== originalLog) {
 					atomicWriteText(paths.logPath, nextLog, {
 						syncDirectory: false,
 					});
+					countHotPathOperation("workbench.canonical_write");
 					logWritten = true;
 				}
 				markTaskMetadataClosed(

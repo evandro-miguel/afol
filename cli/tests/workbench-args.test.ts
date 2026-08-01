@@ -6,6 +6,8 @@ import {
 	parseSessionTaskArgs,
 } from "../commands/workbench/args";
 import {
+	MAX_VERIFICATION_TIMEOUT_MS,
+	resolveVerificationTimeoutMs,
 	runVerification,
 	runVerificationAsync,
 } from "../commands/workbench/verify";
@@ -210,6 +212,37 @@ describe("parseDoneArgs", () => {
 		]);
 	});
 
+	test("accepts a bounded verification timeout above the legacy two-minute cap", () => {
+		const parsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test",
+				"bun test --only-failures",
+				"--verification-timeout-ms",
+				"120001",
+			],
+			process.cwd(),
+		);
+
+		expect(parsed.verificationTimeoutMs).toBe(120001);
+		expect(() =>
+			parseDoneArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"T-01",
+					"--test",
+					"true",
+					"--verification-timeout-ms",
+					String(MAX_VERIFICATION_TIMEOUT_MS + 1),
+				],
+				process.cwd(),
+			),
+		).toThrow("between 1 and");
+	});
+
 	test("rejects static sequential verification limits before execution", () => {
 		const base = ["--session", "260530_2256_cli-native", "T-01"];
 		const nineTests = Array.from({ length: 9 }, () => [
@@ -389,6 +422,24 @@ describe("parseDoneArgs", () => {
 			args: ["-e", "process.exit(0)"],
 		});
 		expect(result).toEqual({ exitCode: 0 });
+	});
+
+	test("runs a verification configured above 120 seconds and rejects an unsafe maximum", async () => {
+		const timeoutMs = resolveVerificationTimeoutMs(120_001);
+		expect(timeoutMs).toBe(120_001);
+		const result = await runVerificationAsync(
+			process.cwd(),
+			{
+				mode: "argv",
+				executable: process.execPath,
+				args: ["-e", "process.exit(0)"],
+			},
+			{ timeoutMs },
+		);
+		expect(result.status).toBe("passed");
+		expect(() =>
+			resolveVerificationTimeoutMs(MAX_VERIFICATION_TIMEOUT_MS + 1),
+		).toThrow("between 1 and");
 	});
 
 	test("terminates async verification on timeout without returning raw output", async () => {

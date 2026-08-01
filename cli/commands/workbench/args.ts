@@ -12,7 +12,9 @@ import type {
 	VerifyArgs,
 } from "./types";
 import {
+	DEFAULT_VERIFICATION_TIMEOUT_MS,
 	resolveSession,
+	resolveVerificationTimeoutMs,
 	resolveVerifySessionPath,
 	resolveVerifyTargetPath,
 	splitCommandLine,
@@ -452,6 +454,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let artifact = "";
 	let note = "";
 	let json = false;
+	let verificationTimeoutMs = DEFAULT_VERIFICATION_TIMEOUT_MS;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
@@ -512,6 +515,22 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			testCommands.push(value);
 			verifications.push(verification);
 			assertDoneVerificationLimits(verifications);
+			i += 1;
+			continue;
+		}
+		if (arg === "--verification-timeout-ms") {
+			if (!value) {
+				throw new Error(
+					"Missing value for --verification-timeout-ms in done.",
+				);
+			}
+			const parsedTimeout = Number(value);
+			if (!Number.isFinite(parsedTimeout)) {
+				throw new Error(
+					"Invalid --verification-timeout-ms in done: expected a finite integer.",
+				);
+			}
+			verificationTimeoutMs = resolveVerificationTimeoutMs(parsedTimeout);
 			i += 1;
 			continue;
 		}
@@ -591,6 +610,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		testCommands,
 		testShellCommand,
 		verifications,
+		verificationTimeoutMs,
 		evidenceCommand,
 		evidenceResult,
 		...(artifact ? { artifact } : {}),

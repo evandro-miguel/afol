@@ -66,6 +66,7 @@
 			"start --brief [full]",
 			"done --session <session-id> --task-id <task-id>",
 			"done --test \"<cmd>\"",
+			"done --verification-timeout-ms <milliseconds>",
 			"done --require-spec-check",
 			"new <theme> --task <summary>",
 			"new <theme> --feature-id <F-id> --parent-spec <spec-id>",

@@ -41,6 +41,17 @@ export interface ScenarioMeasurement {
 	timestamp?: string;
 }
 
+export type HotPathScenarioOperation = "status" | "start" | "done" | "close";
+export type HotPathScenarioMode = "default" | "explicit-derived";
+export type HotPathDerivedPath = "health" | "catchup" | "rebuild";
+
+export interface HotPathScenarioConfig {
+	operation: HotPathScenarioOperation;
+	mode: HotPathScenarioMode;
+	derived_path?: HotPathDerivedPath;
+	recovery_command?: string;
+}
+
 export interface BenchmarkExecutionProfile {
 	host_profile_id: string;
 	os: string;
@@ -72,6 +83,8 @@ export interface Scenario {
 	live_runner_scenario_id?: string;
 	compiled_binary?: boolean;
 	measurement?: ScenarioMeasurement;
+	runner?: "hot-path";
+	hot_path?: HotPathScenarioConfig;
 }
 
 export interface ToolCoverageExemption {
@@ -188,6 +201,14 @@ export interface BenchmarkResult {
 	output_tokens: number;
 	context_bytes: number;
 	output_bytes: number;
+	canonical_write_count?: number;
+	telemetry_append_count?: number;
+	derived_work_calls?: number;
+	instrumented_duration_ms?: number;
+	instrumented_output_bytes?: number;
+	fixture_creation_duration_ms?: number;
+	setup_duration_ms?: number;
+	recovery_duration_ms?: number;
 	argv_chars?: number;
 	tool_call_count: number;
 	tool_success_rate: number;

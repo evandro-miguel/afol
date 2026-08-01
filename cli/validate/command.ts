@@ -431,6 +431,30 @@ export function buildResult(
 		output_tokens: metrics.output_tokens ?? 0,
 		context_bytes: metrics.context_bytes ?? 0,
 		output_bytes: metrics.output_bytes ?? 0,
+		...(typeof metrics.canonical_write_count === "number"
+			? { canonical_write_count: metrics.canonical_write_count }
+			: {}),
+		...(typeof metrics.telemetry_append_count === "number"
+			? { telemetry_append_count: metrics.telemetry_append_count }
+			: {}),
+		...(typeof metrics.derived_work_calls === "number"
+			? { derived_work_calls: metrics.derived_work_calls }
+			: {}),
+		...(typeof metrics.instrumented_duration_ms === "number"
+			? { instrumented_duration_ms: metrics.instrumented_duration_ms }
+			: {}),
+		...(typeof metrics.instrumented_output_bytes === "number"
+			? { instrumented_output_bytes: metrics.instrumented_output_bytes }
+			: {}),
+		...(typeof metrics.fixture_creation_duration_ms === "number"
+			? { fixture_creation_duration_ms: metrics.fixture_creation_duration_ms }
+			: {}),
+		...(typeof metrics.setup_duration_ms === "number"
+			? { setup_duration_ms: metrics.setup_duration_ms }
+			: {}),
+		...(typeof metrics.recovery_duration_ms === "number"
+			? { recovery_duration_ms: metrics.recovery_duration_ms }
+			: {}),
 		...(typeof metrics.argv_chars === "number"
 			? { argv_chars: metrics.argv_chars }
 			: {}),

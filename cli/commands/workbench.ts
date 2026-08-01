@@ -573,6 +573,7 @@ async function executeDoneLocked(
 		for (const [index, verificationSpec] of parsed.verifications.entries()) {
 			const verification = await runVerificationAsync(root, verificationSpec, {
 				signal: lease.signal,
+				timeoutMs: parsed.verificationTimeoutMs,
 			});
 			try {
 				lease.assertOwned();
@@ -678,6 +679,7 @@ async function executeDoneLocked(
 			parsed.testCommands[0] ?? formatVerificationCommand(verificationSpec);
 		const verification = await runVerificationAsync(root, verificationSpec, {
 			signal: lease.signal,
+			timeoutMs: parsed.verificationTimeoutMs,
 		});
 		lease.assertOwned();
 		observedCompletion = completeObservedTask(
@@ -708,7 +710,10 @@ async function executeDoneLocked(
 		const verification = await runVerificationAsync(
 			root,
 			{ mode: "shell", command: parsed.testShellCommand },
-			{ signal: lease.signal },
+			{
+				signal: lease.signal,
+				timeoutMs: parsed.verificationTimeoutMs,
+			},
 		);
 		lease.assertOwned();
 		observedCompletion = completeObservedTask(
@@ -833,8 +838,13 @@ async function runDoneBatch(
 			const signals = leases.map((lease) => lease.signal);
 			const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
 			const observed = signal
-				? await runVerificationAsync(root, verification, { signal })
-				: await runVerificationAsync(root, verification);
+				? await runVerificationAsync(root, verification, {
+						signal,
+						timeoutMs: parsed.verificationTimeoutMs,
+					})
+				: await runVerificationAsync(root, verification, {
+						timeoutMs: parsed.verificationTimeoutMs,
+					});
 			assertOwned();
 			const command =
 				parsed.testShellCommand ??

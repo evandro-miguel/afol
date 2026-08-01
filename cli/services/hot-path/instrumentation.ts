@@ -2,9 +2,14 @@ export type HotPathCounter =
 	| "status.health"
 	| "status.catchup"
 	| "workbench.local_state_refresh"
-	| "workbench.telemetry";
+	| "workbench.telemetry"
+	| "workbench.canonical_write";
 
 export type HotPathOperation = "status" | "start" | "done" | "close";
+
+/** Explicit benchmark side-channel used when a scenario runs the real CLI. */
+export const HOT_PATH_BENCHMARK_ENV = "AFOL_HOT_PATH_BENCHMARK";
+export const HOT_PATH_BENCHMARK_MARKER = "AFOL_HOT_PATH_BENCHMARK_RESULT:";
 
 export const HOT_PATH_COUNTER_CAP = 1_024;
 export const HOT_PATH_DURATION_MS_CAP = 60_000;
@@ -15,6 +20,7 @@ const counters: Record<HotPathCounter, number> = {
 	"status.catchup": 0,
 	"workbench.local_state_refresh": 0,
 	"workbench.telemetry": 0,
+	"workbench.canonical_write": 0,
 };
 
 type HotPathMeasurement = {
@@ -82,4 +88,15 @@ export function resetHotPathCountersForTests(): void {
 	for (const operation of Object.keys(measurements) as HotPathOperation[]) {
 		measurements[operation] = { calls: 0, duration_ms: 0, output_bytes: 0 };
 	}
+}
+
+function emitHotPathBenchmarkResult(): void {
+	if (process.env[HOT_PATH_BENCHMARK_ENV] !== "1") return;
+	process.stderr.write(
+		`${HOT_PATH_BENCHMARK_MARKER}${JSON.stringify({ counters, measurements })}\n`,
+	);
+}
+
+if (process.env[HOT_PATH_BENCHMARK_ENV] === "1") {
+	process.once("exit", emitHotPathBenchmarkResult);
 }

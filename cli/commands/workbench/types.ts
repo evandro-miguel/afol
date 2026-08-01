@@ -32,6 +32,7 @@ export type DoneArgs = SessionTaskBatchArgs & {
 	testCommands: string[];
 	testShellCommand: string | null;
 	verifications: VerificationSpec[];
+	verificationTimeoutMs: number;
 	evidenceCommand: string | null;
 	evidenceResult: string | null;
 	requireSpecCheck: boolean;
