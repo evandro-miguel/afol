@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { sha256 } from "../services/evolution/imports/digest";
 import {
 	declaredHotPathArgs,
+	executionProfile,
 	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
@@ -74,6 +76,37 @@ describe("F-32 hot-path benchmark runner", () => {
 		).toEqual(["/opt/afol/bin/afol", "status", "--json"]);
 	});
 
+	test("source runtime reports the source execution profile unchanged", () => {
+		const profile = executionProfile("/repo/cli/main.ts");
+		expect(profile.execution_mode).toBe("source");
+		expect(profile.artifact_mode).toBe("source");
+		expect(profile.artifact_sha256).toBe("source");
+		expect(profile.runtime_version).toBe(Bun.version);
+	});
+
+	test("compiled runtime reports compiled-release provenance with a real artifact SHA-256", () => {
+		const root = mkdtempSync(join(tmpdir(), "f32-hot-path-profile-"));
+		try {
+			const artifactPath = join(root, "afol");
+			writeFileSync(artifactPath, "compiled benchmark binary bytes");
+			const profile = executionProfile("/$bunfs/root/cli/main.ts", artifactPath);
+			expect(profile.execution_mode).toBe("compiled-release");
+			expect(profile.artifact_mode).toBe("bun-compile");
+			expect(profile.artifact_sha256).toMatch(/^[a-f0-9]{64}$/);
+			expect(profile.artifact_sha256).toBe(
+				sha256(readFileSync(artifactPath)),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("compiled runtime fails closed when the running executable cannot be hashed", () => {
+		expect(() =>
+			executionProfile("/$bunfs/root/cli/main.ts", "/nonexistent/afol"),
+		).toThrow(/compiled-runtime-artifact-hash-failed/);
+	});
+
 	test("executes lifecycle catalog argv without synthesizing --session", () => {
 		const session = "fixture-session";
 		expect(
@@ -110,6 +143,9 @@ describe("F-32 hot-path benchmark runner", () => {
 		expect(result.metrics.derived_work_calls).toBe(0);
 		expect(result.metrics.telemetry_append_count).toBe(0);
 		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+		expect(result.profile.execution_mode).toBe("source");
+		expect(result.profile.artifact_mode).toBe("source");
+		expect(result.profile.artifact_sha256).toBe("source");
 		if (operation !== "status") {
 			expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
 		}
