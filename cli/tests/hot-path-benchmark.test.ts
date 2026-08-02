@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	declaredHotPathArgs,
+	hotPathExecutionProfile,
 	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
@@ -72,6 +74,37 @@ describe("F-32 hot-path benchmark runner", () => {
 				["status", "--json"],
 			),
 		).toEqual(["/opt/afol/bin/afol", "status", "--json"]);
+	});
+
+	test("source profile preserves source provenance", () => {
+		const profile = hotPathExecutionProfile(false, "/usr/local/bin/bun");
+		expect(profile.execution_mode).toBe("source");
+		expect(profile.artifact_mode).toBe("source");
+		expect(profile.artifact_sha256).toBe("source");
+	});
+
+	test("compiled profile reports bun-compile provenance with the real binary hash", () => {
+		const dir = mkdtempSync(join(tmpdir(), "f32-hot-path-compiled-"));
+		try {
+			const binaryPath = join(dir, "afol");
+			const payload = "known compiled artifact payload";
+			writeFileSync(binaryPath, payload);
+			const expectedHash = createHash("sha256")
+				.update(payload)
+				.digest("hex");
+			const profile = hotPathExecutionProfile(true, binaryPath);
+			expect(profile.execution_mode).toBe("compiled-release");
+			expect(profile.artifact_mode).toBe("bun-compile");
+			expect(profile.artifact_sha256).toBe(expectedHash);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("compiled profile fails closed when the binary cannot be hashed", () => {
+		expect(() =>
+			hotPathExecutionProfile(true, join(tmpdir(), "missing-hot-path-binary")),
+		).toThrow(/compiled-hot-path-artifact-unhashable/);
 	});
 
 	test("executes lifecycle catalog argv without synthesizing --session", () => {

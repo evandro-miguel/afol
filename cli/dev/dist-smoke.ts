@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { HOT_PATH_BENCHMARK_MARKER } from "../services/hot-path/instrumentation";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const distPath = join(repoRoot, "dist", "afol");
@@ -221,6 +222,23 @@ try {
 		"TASK: T-01",
 		"SESSIONS: 1",
 	]);
+
+	// Compiled hot-path smoke: the dist binary is a Bun-compiled executable, so
+	// the benchmark side-channel must emit its instrumentation marker on exit.
+	const hotPathStatus = runDist(
+		lifecycleTarget,
+		["status", "--json"],
+		{ AFOL_HOT_PATH_BENCHMARK: "1", AFOL_SESSION: session },
+	);
+	assertOk(hotPathStatus, "dist hot-path status");
+	if (!(hotPathStatus.stderr as string).includes(HOT_PATH_BENCHMARK_MARKER)) {
+		throw new Error(
+			[
+				"dist hot-path status missing instrumentation marker",
+				`stderr=${(hotPathStatus.stderr as string).trim()}`,
+			].join("\n"),
+		);
+	}
 
 	const radarAfterNew = runDist(lifecycleTarget, ["session", "radar"]);
 	assertOk(radarAfterNew, "dist session radar");

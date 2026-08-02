@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { boundedSpawn } from "../core/subprocess";
@@ -71,16 +78,6 @@ type HotPathSample = {
 const HOT_PATH_OUTPUT_LIMIT_BYTES = 20_000;
 const HOT_PATH_MAIN_PATH = resolve(import.meta.dir, "../main.ts");
 
-/**
- * Compiled-Bun detection used by the hot-path launcher.
- *
- * `import.meta.dir` is not a reliable discriminator: inside a
- * `bun build --compile` binary it can resolve to a virtual `$bunfs` path or
- * to the build-time source directory, so the external entrypoint may either
- * not exist or still exist on disk. The compiled-runtime signal is the
- * entrypoint itself being a virtual `$bunfs` path instead of an external
- * file. This mirrors `isCompiledBunRuntime` in scenario-execution.ts.
- */
 function isHotPathCompiledRuntime(mainPath: string = Bun.main): boolean {
 	return mainPath.includes("$bunfs");
 }
@@ -91,6 +88,12 @@ function isHotPathCompiledRuntime(mainPath: string = Bun.main): boolean {
  * Source runtime: the Bun runtime re-executes the external `main.ts`
  * entrypoint. Compiled runtime: the running binary re-executes itself, so the
  * embedded source path must not be passed to it.
+ *
+ * The compiled-runtime signal is the entrypoint being a virtual `$bunfs` path
+ * instead of an external file, reusing the canonical detection from
+ * scenario-execution.ts. `import.meta.dir` is not a reliable discriminator:
+ * inside a `bun build --compile` binary it can resolve to a virtual `$bunfs`
+ * path or to the build-time source directory.
  */
 export function resolveHotPathLauncherArgv(
 	compiledRuntime: boolean,
@@ -239,17 +242,49 @@ function gitCommit(projectRoot: string): string {
 	return result.ok ? result.stdout.trim() || "unknown" : "unknown";
 }
 
-function executionProfile(): BenchmarkExecutionProfile {
-	return {
+/**
+ * Execution provenance for a hot-path scenario.
+ *
+ * Source runtime keeps the `source`/`source`/`source` markers. Compiled
+ * runtime reports `compiled-release`/`bun-compile` and the real SHA-256 of
+ * the running executable, failing closed when that artifact cannot be
+ * hashed. Never claim source provenance in a compiled runtime.
+ */
+export function hotPathExecutionProfile(
+	compiledRuntime: boolean = isHotPathCompiledRuntime(),
+	execPath: string = process.execPath,
+): BenchmarkExecutionProfile {
+	const base = {
 		host_profile_id: `hot-path-${process.platform}-${process.arch}`,
 		os: process.platform,
 		arch: process.arch,
 		cpu_class: `${cpus().length}-cpu`,
 		bun_version: Bun.version,
 		runtime_version: Bun.version,
-		execution_mode: "source",
-		artifact_mode: "source",
-		artifact_sha256: "source",
+	};
+	if (!compiledRuntime) {
+		return {
+			...base,
+			execution_mode: "source",
+			artifact_mode: "source",
+			artifact_sha256: "source",
+		};
+	}
+	let artifactSha256: string;
+	try {
+		artifactSha256 = createHash("sha256")
+			.update(readFileSync(execPath))
+			.digest("hex");
+	} catch (error) {
+		throw new Error(
+			`compiled-hot-path-artifact-unhashable:${execPath}:${(error as Error).message}`,
+		);
+	}
+	return {
+		...base,
+		execution_mode: "compiled-release",
+		artifact_mode: "bun-compile",
+		artifact_sha256: artifactSha256,
 	};
 }
 
@@ -540,7 +575,7 @@ export function runHotPathScenario(
 		(sample) => sample.exit_code === 0 && sample.notes.length === 0,
 	).length;
 	const notes = [...warmupNotes, ...samples.flatMap((sample) => sample.notes)];
-	const profile = executionProfile();
+	const profile = hotPathExecutionProfile();
 	return {
 		metrics: {
 			duration_ms: percentile(durations, 0.5),
