@@ -2,13 +2,13 @@
 doc_type: spec
 id: 260715_afol-1-0-linux-wsl-finalization_spec_01
 theme: afol-1-0-linux-wsl-finalization
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
 artifact_purpose: Define the collision-safe AFOL 1.0 Linux/WSL finalization contract.
 created_at: '2026-07-15T20:40:00Z'
-updated_at: '2026-07-15T20:40:00Z'
+updated_at: '2026-08-02T00:00:00Z'
 roadmap_feature: F-29
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -22,6 +22,7 @@ links:
   - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
   - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
   - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
+  - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
 risk_level: high
 ---
 
@@ -54,6 +55,11 @@ AFOL-only downstream boundary.
   reconciliation of final F-01, F-11, F-13, and F-15 contracts with the
   AFOL-only TypeScript runtime while preserving their exact prior text in a
   verified retention archive.
+- `260727_release-benchmark-timing-and-baseline-contract_spec-child_01` owns the
+  mutation-safety release timing contract: one compiled release artifact per
+  pack run, cold processes on a warm host, real provenance, and
+  scenario-specific baselines that fail closed as incomparable when profiles
+  do not match.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -146,8 +152,40 @@ session `260726_1553_governance-contract-reconciliation` after exact archive
 verification, focused regressions, local-state/context rebuild, project drift
 validation, typecheck, formatting, manifest, redacted Gitleaks history/worktree,
 and OSV dependency scans. These bounded results do not create a new full-suite,
-build, release, deployment, or global-install claim; F-29 remains active until
-its broader cross-child release gates are refreshed.
+build, release, deployment, or global-install claim.
+
+The release-benchmark timing child is final in session
+`260727_2142_release-benchmark-reliability`: mutation-safety scenarios execute
+the compiled release artifact with cold processes on a warm host, the synthetic
+`baseline-fixture` identity is removed, incomparable profiles fail closed
+without regression claims, and focused tests plus a diagnostic `mutation-safety`
+pack run passed (`E-20260729113712841-720b1e`). Within the F-29
+`release-benchmark-reliability` track, the last persisted `bun run
+validate:release` evidence row (`E-20260727234711023-db9f84`) recorded a
+failed result, blocked by the pending controlled-host calibration and by absent
+OSV Scanner and Gitleaks binaries; this child therefore makes no passing
+full-release-gate claim.
+
+F-29 finalizes in session `260801_1641_project-finalization` with observed
+closure evidence: the F-32 `workbench-parity` benchmark was repaired and passed
+(`E-20260801220611985-6a3c8b`); the release and security closure chain passed —
+typecheck, manifest, template, `bun test`, `bun run validate:security:release`,
+pstr rebuild, local-state rebuild, and `afol validate project --check-drift
+--json` (`E-20260801224617598-39ff6c`); and the governance, context, health,
+and benchmark reconciliation chain passed (`E-20260801224926997-12ce2d`). A
+separate later PR-review session (`260729_1624_pr75-review-comments`) recorded
+a declared `validate:release` pass on a different commit (`5acd495`,
+`E-20260729171716177-62a1e1`) followed by observed SIGTERM failures
+(`E-20260729171922573-732e0d`, `E-20260729172612411-ebbe3f`); that session
+and commit do not authorize the final HEAD and are not used as final release
+evidence. Because no passing evidence row exists for the complete `bun run
+validate:release` gate at the finalization HEAD — and the `aa6892c`
+validate:release statement is an unverified pre-close historical assertion
+with no persisted formal validate:release evidence row or artifact and is
+intentionally excluded from release/provenance claims — this closure claims no
+artifact/release gate pass; a fresh `bun run validate:release` on the final
+HEAD remains a required post-close release verification before any
+release/provenance claim.
 
 ## Verification Plan
 

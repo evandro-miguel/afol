@@ -2,13 +2,13 @@
 doc_type: spec-child
 id: 260727_release-benchmark-timing-and-baseline-contract_spec-child_01
 theme: release-benchmark-timing-and-baseline-contract
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: remediation
 artifact_purpose: Make mutation-safety release timing reproducible, profile-compatible, and artifact-backed.
 created_at: '2026-07-28T00:52:05.000Z'
-updated_at: '2026-07-28T00:52:05.000Z'
+updated_at: '2026-08-02T00:00:00.000Z'
 roadmap_feature: F-29
 spec_role: child
 parent_spec: 260715_afol-1-0-linux-wsl-finalization_spec_01
@@ -139,3 +139,26 @@ Out of scope:
       independently blocking.
 - [x] Focused tests, typecheck, template/manifest checks, and a diagnostic
       `mutation-safety` pack run pass.
+
+## Closure
+
+This child is final in session `260727_2142_release-benchmark-reliability`.
+Observed evidence covers the compiled-artifact `mutation-safety` runs with the
+synthetic `baseline-fixture` identity removed and incompatible profiles failing
+closed; focused tests and the diagnostic pack run passed
+(`E-20260729113712841-720b1e`). Within the F-29 `release-benchmark-reliability`
+track, the last persisted `bun run validate:release` evidence row
+(`E-20260727234711023-db9f84`) recorded a failed result, blocked by the
+pending controlled-host calibration and by absent OSV Scanner and Gitleaks
+binaries. A separate later PR-review session
+(`260729_1624_pr75-review-comments`) recorded a declared `validate:release`
+pass on a different commit (`5acd495`, `E-20260729171716177-62a1e1`) followed
+by observed SIGTERM failures (`E-20260729171922573-732e0d`,
+`E-20260729172612411-ebbe3f`); that session and commit do not authorize the
+final HEAD and are not used as final release evidence. The `aa6892c`
+validate:release statement is an unverified pre-close historical assertion
+with no persisted formal validate:release evidence row or artifact and is
+intentionally excluded from release/provenance claims. This closure claims no
+passing full-release-gate result; a fresh `bun run validate:release` on the
+final HEAD remains a required post-close release verification before any
+release/provenance claim.

@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-07-12T21:20:00Z'
+updated_at: '2026-08-02T00:00:00Z'
 ---
 
 # GENERAL ROADMAP
@@ -904,7 +904,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -920,6 +920,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
     - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
     - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
+    - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -996,6 +997,39 @@ Follow-on slices under this direction:
   manifest, Gitleaks history/worktree, and OSV dependency scans passed. This
   bounded remediation makes no new full-suite, build, release, deployment, or
   global-install claim.
+- Release benchmark timing: the bounded child
+  `260727_release-benchmark-timing-and-baseline-contract_spec-child_01` is
+  final in session `260727_2142_release-benchmark-reliability`. The
+  mutation-safety scenarios execute the compiled release artifact with cold
+  processes on a warm host, the synthetic `baseline-fixture` identity is
+  removed, and incompatible profiles fail closed as incomparable without
+  regression claims; focused tests and a diagnostic pack run passed
+  (`E-20260729113712841-720b1e`). No passing full-release-gate result is
+  claimed: within the F-29 `release-benchmark-reliability` track, the last
+  persisted `bun run validate:release` evidence row
+  (`E-20260727234711023-db9f84`) recorded a failed result, blocked by pending
+  controlled-host calibration and absent OSV Scanner and Gitleaks binaries.
+- Finalization: F-29 parent and all children are final after session
+  `260801_1641_project-finalization`. Observed closure evidence covers the
+  repaired `workbench-parity` benchmark (`E-20260801220611985-6a3c8b`), the
+  release and security closure chain — typecheck, manifest, template,
+  `bun test`, `bun run validate:security:release`, pstr rebuild, local-state
+  rebuild, and `afol validate project --check-drift --json`
+  (`E-20260801224617598-39ff6c`) — and the governance, context, health, and
+  benchmark reconciliation chain (`E-20260801224926997-12ce2d`). A separate
+  later PR-review session (`260729_1624_pr75-review-comments`) recorded a
+  declared `validate:release` pass on a different commit (`5acd495`,
+  `E-20260729171716177-62a1e1`) followed by observed SIGTERM failures
+  (`E-20260729171922573-732e0d`, `E-20260729172612411-ebbe3f`); that session
+  and commit do not authorize the final HEAD and are not used as final release
+  evidence. Because no passing evidence row exists for the complete `bun run
+  validate:release` gate at the finalization HEAD — and the `aa6892c`
+  validate:release statement is an unverified pre-close historical assertion
+  with no persisted formal validate:release evidence row or artifact and is
+  intentionally excluded from release/provenance claims — the closure claims
+  no artifact/release gate pass; a fresh `bun run
+  validate:release` on the final HEAD remains a required post-close release
+  verification before any release/provenance claim.
 
 ### F-30 AFOL Evolution System
 
