@@ -2,8 +2,8 @@
 doc_type: spec
 id: 260731_hot-path-observability-and-derived-state-separation_spec_01
 theme: hot-path-observability-and-derived-state-separation
-status: active
-implementation_status: authorized_governance
+status: final
+implementation_status: implemented
 owners:
 - F-32 governance owner
 workstream_intent: feature
@@ -163,63 +163,63 @@ F-31 receipts/profiles, or select, call, schedule, retry, or supervise models.
 
 ## 6) Acceptance gates
 
-- [ ] Focused tests prove the four hot paths emit no default telemetry writes,
+- [x] Focused tests prove the four hot paths emit no default telemetry writes,
       including retries or error branches that follow a successful canonical
       write.
-- [ ] status default does not call health, catchup, Git freshness, index
+- [x] status default does not call health, catchup, Git freshness, index
       rebuild, hydration, or equivalent derived work; explicit flags/commands
       still exercise their documented behavior.
-- [ ] Tests prove canonical task/evidence/report/State Board writes occur
+- [x] Tests prove canonical task/evidence/report/State Board writes occur
       before auxiliary diagnostics or derived projection work.
-- [ ] Evidence remains the only completion authorization; State Board states
+- [x] Evidence remains the only completion authorization; State Board states
       remain pending / in_progress / problem / done / moved and no parallel
       lifecycle state axis is introduced.
-- [ ] close preserves strict verification, report creation/waiver behavior,
+- [x] close preserves strict verification, report creation/waiver behavior,
       summary provenance, and recoverable log/task metadata.
-- [ ] Explicit rebuild/catchup is idempotent, bounded, and does not duplicate
+- [x] Explicit rebuild/catchup is idempotent, bounded, and does not duplicate
       or mutate canonical evidence, State Board, or report records.
-- [ ] Event-log and telemetry schemas remain compatible, with no migration or
+- [x] Event-log and telemetry schemas remain compatible, with no migration or
       replacement append path added by F-32.
-- [ ] Focused typecheck/tests, manifest/project validation, security scans, and
+- [x] Focused typecheck/tests, manifest/project validation, security scans, and
       fresh observed evidence pass for the governed F-32 implementation slice.
 
 ## 7) Recovery and rollback gates
 
-- [ ] Injected auxiliary failure after start, done, or close leaves the
+- [x] Injected auxiliary failure after start, done, or close leaves the
       canonical write durable, returns a bounded warning, and names the
       explicit recovery command; it does not retry or rewrite the lifecycle.
-- [ ] Injected canonical-write failure fails closed and leaves no misleading
+- [x] Injected canonical-write failure fails closed and leaves no misleading
       done/closed State Board or report claim. Existing atomic file and
       session-lock guarantees remain intact.
-- [ ] A failed or interrupted derived rebuild can be rerun safely from the
+- [x] A failed or interrupted derived rebuild can be rerun safely from the
       canonical workbench/evidence files, with stale/degraded state reported
       explicitly until recovery succeeds.
-- [ ] Rollback removes only the F-32 instrumentation/order change and restores
+- [x] Rollback removes only the F-32 instrumentation/order change and restores
       the previous command implementation without deleting evidence, reports,
       State Board history, or event-log records.
-- [ ] Recovery evidence includes afol verify-tasks SESSION_PATH --strict
+- [x] Recovery evidence includes afol verify-tasks SESSION_PATH --strict
       where lifecycle completion is involved, followed by explicit
       afol local-state rebuild --json or afol catchup as applicable.
 
 ## 8) Benchmark and performance gates
 
-- [ ] Benchmark status, start, done, and close on the same warm host, runtime,
+- [x] Benchmark status, start, done, and close on the same warm host, runtime,
       source/release artifact, and profile; collect at least 20 measured
       samples per scenario after declared warmups.
-- [ ] Record p50/p95 duration, authored argv characters, forced output bytes,
+- [x] Record p50/p95 duration, authored argv characters, forced output bytes,
       telemetry append count, canonical-write count, and derived-work calls.
       Setup, fixture creation, and explicit recovery are measured separately.
-- [ ] Default status and lifecycle scenarios meet the F-03 local targets
+- [x] Default status and lifecycle scenarios meet the F-03 local targets
       (p50 ≤ 100 ms and p95 ≤ 300 ms) unless a versioned compatible baseline
       records a stricter target; opt-in health/catchup runs are separate
       scenarios and never hide default-path regressions.
-- [ ] Every scenario remains within AFOL's output budget: default output is
+- [x] Every scenario remains within AFOL's output budget: default output is
       compact, no scenario exceeds 5,000 forced output tokens, and none reaches
       the 10,000-token hard ceiling.
-- [ ] A benchmark fails closed when default status performs derived work, when
+- [x] A benchmark fails closed when default status performs derived work, when
       a lifecycle path appends telemetry, or when provenance/host/runtime
       compatibility is missing. A smoke run is not release proof.
-- [ ] Results and baselines carry scenario/version, Git SHA, timestamp, host
+- [x] Results and baselines carry scenario/version, Git SHA, timestamp, host
       profile, runtime, artifact mode/hash, sample and warmup counts, and the
       measured default/opt-in mode.
 

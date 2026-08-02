@@ -281,10 +281,7 @@ export function runVerificationAsync(
 		child.stderr?.on("data", countOutput);
 		const abortHandler = (): void => terminate("lock_lost");
 		options.signal?.addEventListener("abort", abortHandler, { once: true });
-		const timeout = setTimeout(
-			() => terminate("timed_out"),
-			timeoutMs,
-		);
+		const timeout = setTimeout(() => terminate("timed_out"), timeoutMs);
 		timeout.unref();
 		child.once("error", () => {
 			finish({

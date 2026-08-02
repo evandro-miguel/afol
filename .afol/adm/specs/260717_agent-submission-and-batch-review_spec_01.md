@@ -2,8 +2,8 @@
 doc_type: spec
 id: 260717_agent-submission-and-batch-review_spec_01
 theme: external-receipts-and-harness-profiles
-status: active
-implementation_status: authorized_governance
+status: final
+implementation_status: implemented
 owners:
 - F-31 governance owner
 workstream_intent: Define external receipt ingestion and fixed harness tool-profile contracts.
@@ -159,17 +159,17 @@ supervisor, or AFOL command whose purpose is to dispatch or submit model work.
 
 ## 6) Acceptance gates
 
-- [ ] Generated profile catalog is deterministic, versioned, and derived from
+- [x] Generated profile catalog is deterministic, versioned, and derived from
       the current registry.
-- [ ] Receipt validation requires a known profile id and matching digest.
-- [ ] Invalid, stale, out-of-scope, duplicate-conflict, or secret-like input
+- [x] Receipt validation requires a known profile id and matching digest.
+- [x] Invalid, stale, out-of-scope, duplicate-conflict, or secret-like input
       fails closed without lifecycle mutation.
-- [ ] Valid receipt evidence is bound to the correct project/session/task and
+- [x] Valid receipt evidence is bound to the correct project/session/task and
       can support ordinary AFOL lifecycle projection.
-- [ ] Tests prove AFOL never selects, calls, schedules, retries, or supervises
+- [x] Tests prove AFOL never selects, calls, schedules, retries, or supervises
       a model.
-- [ ] Profile/receipt output remains bounded and redacted.
-- [ ] Fresh observed evidence exists on an F-31 governed session.
+- [x] Profile/receipt output remains bounded and redacted.
+- [x] Fresh observed evidence exists on an F-31 governed session.
 
 ## 7) Historical implementation inventory (non-binding)
 

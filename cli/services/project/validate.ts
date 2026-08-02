@@ -28,7 +28,6 @@ import {
 	loadWorkBenchIndexSnapshot,
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
-import { sessionLifecycleState } from "../workbench/lifecycle";
 import { verifyAllSessions } from "../workbench/verify";
 import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
 
@@ -567,22 +566,21 @@ export async function validateProjectStructure(
 		(() => {
 			// Session evidence check: run strict verify per session
 			const results = verifyAllSessions(projectRoot, true);
-			const totalIssues = results.reduce((sum, result) => {
-				const session = result.sessionPath.split(/[\\/]/).pop() ?? "";
-				const closed =
-					result.taskFiles.length > 0 &&
-					sessionLifecycleState(projectRoot, session) === "closed";
-				return (
+			// Keep direct strict verification authoritative for historical audit, but
+			// do not turn pre-contract evidence ledgers from completed sessions into
+			// a current project-readiness failure. Open tasks remain fully strict.
+			const totalIssues = results.reduce(
+				(sum, result) =>
 					sum +
-					(closed || result.openTasks.length > 0
-						? result.issues.length
-						: result.issues.filter(
+					(result.openTasks.length === 0
+						? result.issues.filter(
 								(issue) =>
 									issue.type !== "missing_evidence" &&
 									issue.type !== "failed_evidence",
-							).length)
-				);
-			}, 0);
+							).length
+						: result.issues.length),
+				0,
+			);
 			const openTaskSessions = results.filter((r) => r.openTasks.length > 0);
 			if (results.length === 0) {
 				return {

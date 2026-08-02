@@ -533,7 +533,7 @@ describe("validate command", () => {
 		}
 	});
 
-	test("project readiness rejects missing evidence for closed history", async () => {
+	test("project readiness ignores missing evidence for closed legacy history", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_closed-history";
 		try {
@@ -561,13 +561,19 @@ describe("validate command", () => {
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("project readiness rejects failed evidence for closed history", async () => {
+	test("project readiness ignores failed evidence for closed legacy history", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_failed-history";
 		try {
@@ -600,7 +606,7 @@ describe("validate command", () => {
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -1070,7 +1070,7 @@ Follow-on slices under this direction:
 
 ### F-31 External Receipts and Fixed Harness Tool Profiles
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
 - Architectural decision:
@@ -1120,13 +1120,17 @@ Follow-on slices under this direction:
   invalid or mismatched receipts fail closed without lifecycle mutation; valid
   receipts remain bounded, redacted, idempotent, and project-linked; and fresh
   observed evidence proves the external boundary on a governed F-31 session.
+- Closure note: implementation is final in governed session
+  `260731_1534_external-receipts-profiles`; observed evidence includes profile,
+  receipt, lifecycle, manifest, template, and typecheck gates. AFOL remains an
+  external-receipt consumer and does not execute or supervise models.
 - Delivery policy: independent PRs; governance-first; do not revive closed
   PR #58's dispatch/submit/review implementation or treat its assignment store
   as a merge base. External harnesses own model execution and receipt emission.
 
 ### F-32 Hot-Path Observability and Derived-State Separation
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260731_hot-path-observability-and-derived-state-separation_spec_01.md
 - Why: the compact `status` / lifecycle path must stay predictable under normal
@@ -1163,6 +1167,10 @@ Follow-on slices under this direction:
   precede auxiliary work, and explicit rebuild/catchup restores projections
   without duplicate or conflicting evidence, State Board, or report records.
   Recovery and benchmark gates must pass before implementation status changes.
+- Closure note: implementation is final after the real `workbench-parity`
+  benchmark recorded 20 samples per scenario and passed all 19 scenarios;
+  finalization evidence is retained in session
+  `260801_1641_project-finalization`.
 - Non-goals: event-log migration or schema replacement; F-30 Evolution,
   observation, or autonomy changes; F-31 receipt/profile behavior; provider or
   model selection, invocation, scheduling, retries, or supervision; a daemon

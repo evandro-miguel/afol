@@ -1,15 +1,13 @@
+import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
 import {
 	declaredHotPathArgs,
+	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
-import type {
-	HotPathScenarioConfig,
-	Scenario,
-} from "../validate/types";
+import type { HotPathScenarioConfig, Scenario } from "../validate/types";
 
 function runScenario(config: HotPathScenarioConfig) {
 	const root = mkdtempSync(join(tmpdir(), "f32-hot-path-test-"));
@@ -54,6 +52,28 @@ function runScenario(config: HotPathScenarioConfig) {
 }
 
 describe("F-32 hot-path benchmark runner", () => {
+	test("source runtime launches the Bun runtime with the external entrypoint", () => {
+		expect(
+			resolveHotPathLauncherArgv(
+				false,
+				"/usr/local/bin/bun",
+				"/repo/cli/main.ts",
+				["status", "--json"],
+			),
+		).toEqual(["/usr/local/bin/bun", "/repo/cli/main.ts", "status", "--json"]);
+	});
+
+	test("compiled runtime re-executes the current binary without the embedded entrypoint", () => {
+		expect(
+			resolveHotPathLauncherArgv(
+				true,
+				"/opt/afol/bin/afol",
+				"/repo/cli/main.ts",
+				["status", "--json"],
+			),
+		).toEqual(["/opt/afol/bin/afol", "status", "--json"]);
+	});
+
 	test("executes lifecycle catalog argv without synthesizing --session", () => {
 		const session = "fixture-session";
 		expect(
@@ -79,33 +99,37 @@ describe("F-32 hot-path benchmark runner", () => {
 		).toEqual(["close", "--json"]);
 	});
 
-	test.each(["status", "start", "done", "close"] as const)(
-		"default %s records no derived work or telemetry",
-		(operation) => {
-			const result = runScenario({ operation, mode: "default" });
-			expect(result.passed).toBe(true);
-			expect(result.metrics.derived_work_calls).toBe(0);
-			expect(result.metrics.telemetry_append_count).toBe(0);
-			expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
-			if (operation !== "status") {
-				expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
-			}
-		},
-	);
+	test.each([
+		"status",
+		"start",
+		"done",
+		"close",
+	] as const)("default %s records no derived work or telemetry", (operation) => {
+		const result = runScenario({ operation, mode: "default" });
+		expect(result.passed).toBe(true);
+		expect(result.metrics.derived_work_calls).toBe(0);
+		expect(result.metrics.telemetry_append_count).toBe(0);
+		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+		if (operation !== "status") {
+			expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
+		}
+	});
 
-	test.each(["status", "start", "done", "close"] as const)(
-		"explicit-derived %s reports derived work",
-		(operation) => {
-			const derived_path = operation === "status" ? "health" : "rebuild";
-			const result = runScenario({
-				operation,
-				mode: "explicit-derived",
-				derived_path,
-			});
-			expect(result.passed).toBe(true);
-			expect(result.metrics.derived_work_calls).toBeGreaterThan(0);
-			expect(result.metrics.telemetry_append_count).toBe(0);
-			expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
-		},
-	);
+	test.each([
+		"status",
+		"start",
+		"done",
+		"close",
+	] as const)("explicit-derived %s reports derived work", (operation) => {
+		const derived_path = operation === "status" ? "health" : "rebuild";
+		const result = runScenario({
+			operation,
+			mode: "explicit-derived",
+			derived_path,
+		});
+		expect(result.passed).toBe(true);
+		expect(result.metrics.derived_work_calls).toBeGreaterThan(0);
+		expect(result.metrics.telemetry_append_count).toBe(0);
+		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+	});
 });
