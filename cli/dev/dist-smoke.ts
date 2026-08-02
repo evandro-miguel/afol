@@ -225,11 +225,10 @@ try {
 
 	// Compiled hot-path smoke: the dist binary is a Bun-compiled executable, so
 	// the benchmark side-channel must emit its instrumentation marker on exit.
-	const hotPathStatus = runDist(
-		lifecycleTarget,
-		["status", "--json"],
-		{ AFOL_HOT_PATH_BENCHMARK: "1", AFOL_SESSION: session },
-	);
+	const hotPathStatus = runDist(lifecycleTarget, ["status", "--json"], {
+		AFOL_HOT_PATH_BENCHMARK: "1",
+		AFOL_SESSION: session,
+	});
 	assertOk(hotPathStatus, "dist hot-path status");
 	if (!(hotPathStatus.stderr as string).includes(HOT_PATH_BENCHMARK_MARKER)) {
 		throw new Error(

@@ -89,9 +89,7 @@ describe("F-32 hot-path benchmark runner", () => {
 			const binaryPath = join(dir, "afol");
 			const payload = "known compiled artifact payload";
 			writeFileSync(binaryPath, payload);
-			const expectedHash = createHash("sha256")
-				.update(payload)
-				.digest("hex");
+			const expectedHash = createHash("sha256").update(payload).digest("hex");
 			const profile = hotPathExecutionProfile(true, binaryPath);
 			expect(profile.execution_mode).toBe("compiled-release");
 			expect(profile.artifact_mode).toBe("bun-compile");
