@@ -26,4 +26,4 @@ closed_at: "2026-08-01T22:23:11.930Z"
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | moved | worker | close resolve test completion_policy=waiver attempt=0 |
+| T-01 | moved | worker | close resolve test completion_policy=waiver destination=closed-without-continuation reason=abandoned-fixture attempt=0 |

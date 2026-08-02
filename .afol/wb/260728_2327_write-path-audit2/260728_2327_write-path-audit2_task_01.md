@@ -26,4 +26,4 @@ closed_at: "2026-08-01T22:23:16.631Z"
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | moved | worker | write token audit 2 completion_policy=waiver attempt=0 |
+| T-01 | moved | worker | write token audit 2 completion_policy=waiver destination=closed-without-continuation reason=duplicate-abandoned-audit-fixture attempt=0 |
