@@ -7,6 +7,7 @@ import {
 	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
+import { runScenarioCommand } from "../validate/scenario-execution";
 import type { HotPathScenarioConfig, Scenario } from "../validate/types";
 
 function runScenario(config: HotPathScenarioConfig) {
@@ -73,6 +74,35 @@ describe("F-32 hot-path benchmark runner", () => {
 			),
 		).toEqual(["/opt/afol/bin/afol", "status", "--json"]);
 	});
+
+	test("compiled hot-path scenarios execute and report the prepared release artifact", () => {
+		const scenario: Scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "f32-compiled-status-default",
+			scenario_version: "1.0.0",
+			pack_id: "cli-kernel-local",
+			command: "afol status --json",
+			compiled_binary: true,
+			result_schema: "1.0.0",
+			oracle: "f32-hot-path-compiled-artifact",
+			thresholds: {},
+			baseline_id: "cli-kernel-local-v1",
+			deterministic_metrics: { duration_ms: 0 },
+			implementation_status: "implemented",
+			runner: "hot-path",
+			hot_path: { operation: "status", mode: "default" },
+		};
+
+		const result = runScenarioCommand(process.cwd(), scenario, {
+			sampleCount: 1,
+			warmupCount: 0,
+		});
+
+		expect(result.passed).toBe(true);
+		expect(result.profile.execution_mode).toBe("compiled-release");
+		expect(result.profile.artifact_mode).toBe("bun-compile");
+		expect(result.profile.artifact_sha256).not.toBe("source");
+	}, 30_000);
 
 	test("executes lifecycle catalog argv without synthesizing --session", () => {
 		const session = "fixture-session";

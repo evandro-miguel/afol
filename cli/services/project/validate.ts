@@ -31,6 +31,15 @@ import {
 import { verifyAllSessions } from "../workbench/verify";
 import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
 
+const LEGACY_EVIDENCE_SESSION_CUTOFF = "260712_0000";
+
+function isLegacyEvidenceSession(sessionPath: string): boolean {
+	const session = sessionPath.split(/[\\/]/).pop() ?? "";
+	return (
+		/^\d{6}_\d{4}_/.test(session) && session < LEGACY_EVIDENCE_SESSION_CUTOFF
+	);
+}
+
 export type ProjectValidationCheck = {
 	id:
 		| "config"
@@ -567,12 +576,14 @@ export async function validateProjectStructure(
 			// Session evidence check: run strict verify per session
 			const results = verifyAllSessions(projectRoot, true);
 			// Keep direct strict verification authoritative for historical audit, but
-			// do not turn pre-contract evidence ledgers from completed sessions into
-			// a current project-readiness failure. Open tasks remain fully strict.
+			// do not turn pre-contract evidence ledgers into a current readiness
+			// failure. Sessions created after the compatibility cutoff remain strict
+			// even when every task is already marked done.
 			const totalIssues = results.reduce(
 				(sum, result) =>
 					sum +
-					(result.openTasks.length === 0
+					(result.openTasks.length === 0 &&
+					isLegacyEvidenceSession(result.sessionPath)
 						? result.issues.filter(
 								(issue) =>
 									issue.type !== "missing_evidence" &&

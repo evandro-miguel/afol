@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260727_release-benchmark-timing-and-baseline-contract_spec-child_01
 theme: release-benchmark-timing-and-baseline-contract
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: remediation

@@ -904,7 +904,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -996,6 +996,24 @@ Follow-on slices under this direction:
   manifest, Gitleaks history/worktree, and OSV dependency scans passed. This
   bounded remediation makes no new full-suite, build, release, deployment, or
   global-install claim.
+- Final closure: session `260801_1641_project-finalization` completed the
+  remaining F-29/F-31/F-32 reconciliation. The full local suite, typecheck,
+  generated-contract checks, project validation, security scans, governance
+  benchmarks, and Linux x64 `validate:release` passed on clean candidate
+  `aa6892c`. Project RAG refresh was attempted through its supported snapshot
+  flow and remains explicitly blocked by `REVIEW_REQUIRED` approval; no RAG
+  mutation or unsupported platform/deployment claim is included in this closure.
+- Reopened after the final audit found that F-32 hot-path scenarios declared as
+  compiled binaries were measured through the source runner and that project
+  readiness suppressed failed evidence for every session without open tasks.
+  Final status requires regression coverage for both contracts and a clean
+  `validate:release` result on the eventual final commit.
+- Final audit remediation: session `260803_1315_final-audit-remediation`
+  propagated the compiled release artifact through all F-32 hot-path samples,
+  limited legacy evidence compatibility to pre-contract sessions, and recorded
+  authorizing evidence `E-20260803132802745-747009`. Development validation
+  remains repo-local; global promotion is permitted only from `main` after an
+  explicit user request.
 
 ### F-30 AFOL Evolution System
 

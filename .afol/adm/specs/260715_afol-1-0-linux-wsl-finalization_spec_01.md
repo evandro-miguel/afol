@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260715_afol-1-0-linux-wsl-finalization_spec_01
 theme: afol-1-0-linux-wsl-finalization
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: feature
@@ -146,8 +146,29 @@ session `260726_1553_governance-contract-reconciliation` after exact archive
 verification, focused regressions, local-state/context rebuild, project drift
 validation, typecheck, formatting, manifest, redacted Gitleaks history/worktree,
 and OSV dependency scans. These bounded results do not create a new full-suite,
-build, release, deployment, or global-install claim; F-29 remains active until
-its broader cross-child release gates are refreshed.
+build, release, deployment, or global-install claim.
+
+The finalization session `260801_1641_project-finalization` reconciled the F-29
+parent with F-31/F-32, refreshed PSTR and local-state indexes, and recorded the
+current full-suite, security, benchmark, and project-validation evidence. The
+Linux x64 release gate passed on candidate commit `aa6892c` in a clean checkout;
+unsupported platforms, global installation, deployment, and remote CI remain
+unclaimed.
+
+F-29 is reopened after the final audit found two release-contract defects: F-32
+hot-path scenarios marked `compiled_binary` were executed as source, and
+project readiness suppressed missing or failed evidence for every session with
+no open tasks. Final status requires focused regression evidence and a clean
+release gate on the final commit. Development branches must never install or
+promote an AFOL binary globally; global installation is allowed only from code
+already integrated into `main`.
+
+Session `260803_1315_final-audit-remediation` resolved both defects with focused
+RED/GREEN tests and observed compiled-artifact benchmark evidence
+`E-20260803132802745-747009`. All F-32 hot-path scenarios now execute with
+`compiled-release` / `bun-compile` provenance, and current closed sessions
+remain strict when evidence is missing or failed. The global binary was not
+installed or changed from `dev`.
 
 ## Verification Plan
 

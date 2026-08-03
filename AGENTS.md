@@ -34,6 +34,13 @@ repository. The installed command must be a real executable in the system bin
 folder; validate with `command -v afol`, `test ! -L "$(command -v afol)"`,
 `afol --version`, and a smoke command outside the repository.
 
+Global installation or promotion is allowed only from code already integrated
+into `main` and only when the user explicitly requests the install. Never
+install, replace, copy, or promote `$HOME/.local/bin/afol` from `dev`, a feature
+branch, or an unmerged worktree. The global binary may intentionally lag `dev`;
+that difference is not development drift. Validate development changes through
+the repo-local kernel or a repo-local build artifact.
+
 Development and test workflows may still call AFOL from this source repository,
 for example through `./afol`, `bun run kernel`, `bun run build && ./dist/afol`,
 or a differently named local helper. Label that as repo-local development
@@ -231,6 +238,9 @@ Task state source of truth:
 
 - Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
+- `dev` never installs or promotes the global AFOL binary. Global promotion is
+  a separate, explicitly requested operation performed only after the code is
+  integrated into `main`.
 - `main` -> never direct-push.
 - Updating `main` -> merge from `dev` through normal Git merge or PR path.
 - Production deploy -> forbidden unless the user explicitly asks in the current

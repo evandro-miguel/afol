@@ -1674,20 +1674,6 @@ export function runScenarioCommand(
 	scenario: Scenario,
 	options: ScenarioExecutionOptions = {},
 ): ScenarioExecutionResult {
-	// Hot-path scenarios own their invocation and fixture binding. They remain
-	// source-runner measurements even when the workbench catalog marks the
-	// scenario as compiled_binary for the release-contract completeness check.
-	if (scenario.runner === "hot-path") {
-		const sampleCount = resolveScenarioSampleCount(
-			scenario,
-			options.sampleCount,
-		);
-		const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;
-		return runHotPathScenario(projectRoot, scenario, {
-			sampleCount,
-			warmupCount,
-		});
-	}
 	if (scenario.compiled_binary === true && options.artifact === undefined) {
 		const artifact = prepareCompiledReleaseArtifact(projectRoot);
 		try {
@@ -1698,6 +1684,18 @@ export function runScenarioCommand(
 		} finally {
 			artifact.cleanup();
 		}
+	}
+	if (scenario.runner === "hot-path") {
+		const sampleCount = resolveScenarioSampleCount(
+			scenario,
+			options.sampleCount,
+		);
+		const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;
+		return runHotPathScenario(projectRoot, scenario, {
+			sampleCount,
+			warmupCount,
+			...(options.artifact ? { artifact: options.artifact } : {}),
+		});
 	}
 	const sampleCount = resolveScenarioSampleCount(scenario, options.sampleCount);
 	const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;

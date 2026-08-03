@@ -11,7 +11,10 @@ import {
 	newWorkstream,
 	startTask,
 } from "../services/workbench/lifecycle";
-import type { ScenarioExecutionResult } from "./scenario-execution";
+import type {
+	PreparedCompiledReleaseArtifact,
+	ScenarioExecutionResult,
+} from "./scenario-execution";
 import type {
 	BenchmarkExecutionProfile,
 	HotPathScenarioConfig,
@@ -21,6 +24,7 @@ import type {
 type HotPathRunnerOptions = {
 	sampleCount: number;
 	warmupCount: number;
+	artifact?: PreparedCompiledReleaseArtifact;
 };
 
 type CapturedOutput = {
@@ -184,6 +188,7 @@ function runDeclaredCli(
 	root: string,
 	args: string[],
 	session: string,
+	artifact?: PreparedCompiledReleaseArtifact,
 ): CliInvocation {
 	const started = performance.now();
 	const result = boundedSpawn(
@@ -195,8 +200,8 @@ function runDeclaredCli(
 			// also keeps the benchmark valid when CI disables global fallback.
 			`AFOL_SESSION=${session}`,
 			...resolveHotPathLauncherArgv(
-				isHotPathCompiledRuntime(),
-				process.execPath,
+				artifact !== undefined || isHotPathCompiledRuntime(),
+				artifact?.binaryPath ?? process.execPath,
 				HOT_PATH_MAIN_PATH,
 				args,
 			),
@@ -358,6 +363,7 @@ function invokeHotPath(
 	scenario: HotPathScenarioConfig,
 	session: string,
 	command: string,
+	artifact?: PreparedCompiledReleaseArtifact,
 ): {
 	exitCode: number;
 	duration_ms: number;
@@ -367,7 +373,7 @@ function invokeHotPath(
 	notes: string[];
 } {
 	const primaryArgs = declaredHotPathArgs(scenario, command, session);
-	const primary = runDeclaredCli(root, primaryArgs, session);
+	const primary = runDeclaredCli(root, primaryArgs, session, artifact);
 	let recoveryDuration = 0;
 	let recoveryOutput = "";
 	let recoveryInstrumentation = emptyInstrumentation();
@@ -383,6 +389,7 @@ function invokeHotPath(
 			root,
 			["local-state", "rebuild", "--json"],
 			session,
+			artifact,
 		);
 		recoveryDuration = recovery.duration_ms;
 		recoveryOutput =
@@ -417,6 +424,7 @@ function runSample(
 	projectRoot: string,
 	scenario: HotPathScenarioConfig,
 	command: string,
+	artifact?: PreparedCompiledReleaseArtifact,
 ): HotPathSample {
 	mkdirSync(join(projectRoot, ".afol", "tmp"), { recursive: true });
 	const fixtureRoot = mkdtempSync(
@@ -429,6 +437,7 @@ function runSample(
 			scenario,
 			fixture.session,
 			command,
+			artifact,
 		);
 		const output =
 			`${invocation.output.stdout}\n${invocation.output.stderr}`.trim();
@@ -502,6 +511,7 @@ export function runHotPathScenario(
 				projectRoot,
 				scenario.hot_path,
 				scenario.command ?? "",
+				options.artifact,
 			);
 			// The warmup is intentionally not part of reported aggregates, but a
 			// failed contract still fails closed rather than hiding a regression.
@@ -515,7 +525,12 @@ export function runHotPathScenario(
 	for (let index = 0; index < options.sampleCount; index += 1) {
 		try {
 			samples.push(
-				runSample(projectRoot, scenario.hot_path, scenario.command ?? ""),
+				runSample(
+					projectRoot,
+					scenario.hot_path,
+					scenario.command ?? "",
+					options.artifact,
+				),
 			);
 		} catch (error) {
 			samples.push({
@@ -540,7 +555,7 @@ export function runHotPathScenario(
 		(sample) => sample.exit_code === 0 && sample.notes.length === 0,
 	).length;
 	const notes = [...warmupNotes, ...samples.flatMap((sample) => sample.notes)];
-	const profile = executionProfile();
+	const profile = options.artifact?.profile ?? executionProfile();
 	return {
 		metrics: {
 			duration_ms: percentile(durations, 0.5),
@@ -598,7 +613,13 @@ export function runHotPathScenario(
 		notes,
 		passed: notes.length === 0 && successful === options.sampleCount,
 		profile,
-		timestamp: new Date().toISOString(),
-		git_commit: gitCommit(projectRoot),
+		timestamp: options.artifact?.timestamp ?? new Date().toISOString(),
+		git_commit: options.artifact?.git_commit ?? gitCommit(projectRoot),
+		...(options.artifact
+			? {
+					source_state_sha256: options.artifact.source_state_sha256,
+					source_dirty: options.artifact.source_dirty,
+				}
+			: {}),
 	};
 }
