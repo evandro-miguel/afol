@@ -56,7 +56,8 @@
       "F-21",
       "F-22",
       "F-29",
-      "F-30"
+      "F-30",
+      "F-31"
     ],
     "specs": [
       "260710_core-integrity-and-transaction-safety_spec_01",
@@ -135,8 +136,10 @@
       "260715_afol-1-0-linux-wsl-release-hardening_spec-child_01",
       "260715_afol-1-0-local-diagnostics_spec-child_01",
       "260716_2155_afol-evolution-system_spec_01",
+      "260717_agent-submission-and-batch-review_spec_01",
       "260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01",
-      "260726_governance-contract-reconciliation_spec-child_01"
+      "260726_governance-contract-reconciliation_spec-child_01",
+      "260727_release-benchmark-timing-and-baseline-contract_spec-child_01"
     ]
   },
   "feature_scenarios": [
@@ -277,6 +280,12 @@
       "governing_spec": ".afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md",
       "expected_lane": "governance-history",
       "validation": "Evolution remains evidence-first, read-only by default, approval-gated on critical surfaces, and decomposed into independently governed slices."
+    },
+    {
+      "feature": "F-31",
+      "governing_spec": ".afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md",
+      "expected_lane": "governance-history",
+      "validation": "External receipts and fixed profiles remain bounded, redacted, profile-bound, and outside AFOL model execution."
     }
   ],
   "result_schema": "1.0.0",

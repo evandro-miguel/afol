@@ -87,6 +87,17 @@ describe("router alias grammar", () => {
 		});
 	});
 
+	test("routes receipt ingestion as a subcommand", () => {
+		expect(
+			resolveCommand(["receipt", "ingest", "--file", "receipt.json"]),
+		).toEqual({
+			kind: "subcommand",
+			group: "receipt",
+			action: "ingest",
+			args: ["--file", "receipt.json"],
+		});
+	});
+
 	test("stops done flag normalization at the positional verification delimiter", () => {
 		expect(
 			resolveCommand(["d", "T-01", "-x", "bun", "--", "-x", "--test"]),
@@ -253,7 +264,7 @@ describe("router alias grammar", () => {
 			resolveCommand(["qt", "alias-smoke", "-t", "task", "-o", "passed"]),
 		).toEqual({
 			kind: "quickTask",
-			args: ["alias-smoke", "--task", "task", "--result", "passed"],
+			args: ["alias-smoke", "--task", "task", "-o", "passed"],
 		});
 
 		expect(

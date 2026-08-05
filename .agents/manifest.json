@@ -187,6 +187,9 @@
       "tel",
       "telemetry"
     ],
+    "receipt": [
+      "receipt"
+    ],
     "session": [
       "ss",
       "session"

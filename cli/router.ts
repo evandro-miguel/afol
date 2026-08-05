@@ -59,6 +59,7 @@ export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
 	"projectBenchmark",
 	"adapter",
 	"telemetry",
+	"receipt",
 	"session",
 ]);
 

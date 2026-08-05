@@ -25,6 +25,7 @@ import { cpus, arch as osArch, platform } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
 import type { BenchmarkExecutionProfile, Scenario } from "./types";
 
@@ -127,6 +128,14 @@ interface ScenarioExecutionMetrics {
 	tool_success_rate: number;
 	sample_count: number;
 	warmup_count: number;
+	canonical_write_count?: number;
+	telemetry_append_count?: number;
+	derived_work_calls?: number;
+	instrumented_duration_ms?: number;
+	instrumented_output_bytes?: number;
+	fixture_creation_duration_ms?: number;
+	setup_duration_ms?: number;
+	recovery_duration_ms?: number;
 }
 
 function argvCharCount(command: string): number {
@@ -1373,6 +1382,30 @@ function coerceMetrics(
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 		sample_count: sampleCount,
 		warmup_count: warmupCount,
+		...(typeof metrics.canonical_write_count === "number"
+			? { canonical_write_count: metrics.canonical_write_count }
+			: {}),
+		...(typeof metrics.telemetry_append_count === "number"
+			? { telemetry_append_count: metrics.telemetry_append_count }
+			: {}),
+		...(typeof metrics.derived_work_calls === "number"
+			? { derived_work_calls: metrics.derived_work_calls }
+			: {}),
+		...(typeof metrics.instrumented_duration_ms === "number"
+			? { instrumented_duration_ms: metrics.instrumented_duration_ms }
+			: {}),
+		...(typeof metrics.instrumented_output_bytes === "number"
+			? { instrumented_output_bytes: metrics.instrumented_output_bytes }
+			: {}),
+		...(typeof metrics.fixture_creation_duration_ms === "number"
+			? { fixture_creation_duration_ms: metrics.fixture_creation_duration_ms }
+			: {}),
+		...(typeof metrics.setup_duration_ms === "number"
+			? { setup_duration_ms: metrics.setup_duration_ms }
+			: {}),
+		...(typeof metrics.recovery_duration_ms === "number"
+			? { recovery_duration_ms: metrics.recovery_duration_ms }
+			: {}),
 	};
 }
 
@@ -1651,6 +1684,18 @@ export function runScenarioCommand(
 		} finally {
 			artifact.cleanup();
 		}
+	}
+	if (scenario.runner === "hot-path") {
+		const sampleCount = resolveScenarioSampleCount(
+			scenario,
+			options.sampleCount,
+		);
+		const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;
+		return runHotPathScenario(projectRoot, scenario, {
+			sampleCount,
+			warmupCount,
+			...(options.artifact ? { artifact: options.artifact } : {}),
+		});
 	}
 	const sampleCount = resolveScenarioSampleCount(scenario, options.sampleCount);
 	const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;

@@ -122,11 +122,6 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	const hasBinding = Boolean(
 		metadata.featureId?.trim() && metadata.parentSpec?.trim(),
 	);
-	if (!hasBinding && !metadata.noSpecRequiredReason?.trim()) {
-		throw new Error(
-			"quick-task requires --feature-id and --parent-spec or --no-spec-required --reason.",
-		);
-	}
 	if (hasBinding && noSpecRequired)
 		throw new Error(
 			"quick-task governance binding and waiver are mutually exclusive.",
@@ -235,26 +230,32 @@ export async function runQuickTaskCommand(
 			...(pendingNotice
 				? {
 						pending_spec_missing: pendingNotice.missing,
+						pending_spec_question: pendingNotice.question,
 						pending_spec_resolution_hint: pendingNotice.resolutionHint.replace(
 							"<session>",
 							pendingNotice.session,
 						),
 					}
 				: {}),
-			next_command: hint,
+			next_command: pendingNotice?.nextStep ?? hint,
 		};
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(envelopeOk(payload, { action: "quick-task" })),
 			);
 		} else {
-			console.log(
-				renderSuccess(
-					`quick-task complete: ${created.session}`,
-					hint,
-					formatSessionPendingSpecWarning(pendingNotice),
-				),
-			);
+			if (pendingNotice) {
+				console.log(
+					[
+						`quick-task complete: ${created.session}`,
+						...formatSessionPendingSpecWarning(pendingNotice),
+					].join("\n"),
+				);
+			} else {
+				console.log(
+					renderSuccess(`quick-task complete: ${created.session}`, hint),
+				);
+			}
 		}
 		return 0;
 	} catch (error) {

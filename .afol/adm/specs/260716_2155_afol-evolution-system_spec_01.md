@@ -18,7 +18,6 @@ links:
   schema: .afol/adm/schema/evolution-v1.schema.json
   ux: .afol/adm/ux/260716_2155_afol-evolution-system_ux-journey_01.md
   adoption_child: .afol/adm/specs/260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01.md
-  submission_child: .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
   plan: ''
   task: ''
   report: ''

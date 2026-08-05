@@ -15,6 +15,11 @@ import {
 	setCatchupComputerForTests,
 	setHealthComputerForTests,
 } from "../commands/status";
+import {
+	readHotPathCountersForTests,
+	readHotPathMeasurementsForTests,
+	resetHotPathCountersForTests,
+} from "../services/hot-path/instrumentation";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { rebuildPstrIndex } from "../services/pstr/builder";
@@ -51,6 +56,7 @@ function captureIo(): CapturedIo {
 afterEach(() => {
 	setCatchupComputerForTests(null);
 	setHealthComputerForTests(null);
+	resetHotPathCountersForTests();
 });
 
 function runGit(root: string, args: string[]): void {
@@ -312,6 +318,23 @@ describe("status command", () => {
 			expect(text).toContain("NEXT:");
 			expect(text).toContain("TASK: T-01");
 			expect(text).toContain("STATUS: in_progress");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("default status reports the cached session count without health collection", () => {
+		const root = createNoSessionFixture();
+		try {
+			let healthCalls = 0;
+			setHealthComputerForTests(() => {
+				healthCalls += 1;
+				return { sessionCount: 99, sessionHealth: ["unexpected"] };
+			});
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("SESSIONS: 0");
+			expect(healthCalls).toBe(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -625,6 +648,7 @@ describe("status command", () => {
 	test("default status skips catchup for active session and --catchup enables it", () => {
 		const { root, session } = createFreshnessFixture("fresh");
 		try {
+			resetHotPathCountersForTests();
 			let catchupCalls = 0;
 			const report: CatchupReport = {
 				session,
@@ -655,6 +679,18 @@ describe("status command", () => {
 			const textCode = runStatusCommand(root, [], textCaptured.io);
 			expect(textCode).toBe(0);
 			expect(catchupCalls).toBe(0);
+			expect(readHotPathCountersForTests()).toMatchObject({
+				"status.health": 0,
+				"status.catchup": 0,
+			});
+			expect(readHotPathMeasurementsForTests().status).toMatchObject({
+				calls: 1,
+				duration_ms: expect.any(Number),
+				output_bytes: expect.any(Number),
+			});
+			expect(
+				readHotPathMeasurementsForTests().status.output_bytes,
+			).toBeGreaterThan(0);
 			expect(textCaptured.stdout.join("\n")).not.toContain("freshness:");
 
 			const jsonCaptured = captureIo();
@@ -673,6 +709,7 @@ describe("status command", () => {
 			);
 			expect(catchupTextCode).toBe(0);
 			expect(catchupCalls).toBe(1);
+			expect(readHotPathCountersForTests()["status.catchup"]).toBe(1);
 			expect(catchupText.stdout.join("\n")).toContain("freshness: ok");
 
 			const catchupJson = captureIo();

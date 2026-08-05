@@ -13,6 +13,7 @@ import { dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
 import {
 	appendEventLedgerRecords,
+	appendValidatedEventLedgerRecords,
 	assertValidEventLedger,
 	readEventLedgerRecords,
 } from "../events/ledger";
@@ -23,6 +24,10 @@ import {
 	buildGovernanceFrontmatter,
 	recordPendingSpecForSession,
 } from "../governance/pending-specs";
+import {
+	beginHotPathMeasurement,
+	countHotPathOperation,
+} from "../hot-path/instrumentation";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
@@ -144,9 +149,26 @@ const SENSITIVE_COMMAND_KEYS = new Set([
 	"DSN",
 	"AUTHORIZATION",
 ]);
+const GITHUB_TOKEN_PREFIXES = [
+	"ghp_",
+	"gho_",
+	"ghu_",
+	"ghs_",
+	"ghr_",
+	"github_pat_",
+] as const;
+const GITHUB_TOKEN_RE = new RegExp(
+	`\\b(?:${GITHUB_TOKEN_PREFIXES.map(
+		(prefix) => `${prefix}[A-Za-z0-9_]{20,}`,
+	).join("|")})\\b`,
+	"g",
+);
 
 function sensitiveAssignmentKey(key: string): boolean {
-	const normalized = key.toUpperCase();
+	const normalized = key
+		.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+		.replaceAll("-", "_")
+		.toUpperCase();
 	return [...SENSITIVE_COMMAND_KEYS].some(
 		(classifier) =>
 			normalized === classifier || normalized.endsWith(`_${classifier}`),
@@ -158,12 +180,40 @@ function sensitiveLongOption(option: string): boolean {
 	return SENSITIVE_COMMAND_KEYS.has(normalized);
 }
 
-/** Redact credential-shaped values while preserving command spelling. */
-export function sanitizeEvidenceCommand(command: string): string {
-	let sanitized = command.replace(
+/** Redact credential-shaped values before any evidence field is persisted. */
+export function sanitizeEvidenceText(value: string): string {
+	let sanitized = value.replace(
 		/(^|\s)([A-Za-z_][A-Za-z0-9_]*)(=)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]*)/g,
 		(match, prefix: string, key: string) =>
 			sensitiveAssignmentKey(key) ? `${prefix}${key}=[REDACTED]` : match,
+	);
+	sanitized = sanitized.replace(
+		/"(Authorization\s*:\s*[A-Za-z][A-Za-z0-9_-]*\s+)(?:\\.|[^"\\])*"/gi,
+		(_match: string, header: string) => `"${header}[REDACTED]"`,
+	);
+	sanitized = sanitized.replace(
+		/'(Authorization\s*:\s*[A-Za-z][A-Za-z0-9_-]*\s+)(?:\\.|[^'\\])*'/gi,
+		(_match: string, header: string) => `'${header}[REDACTED]'`,
+	);
+	sanitized = sanitized.replace(
+		/(\bAuthorization\s*:\s*(?:[A-Za-z][A-Za-z0-9_-]*\s+)?)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)/gi,
+		"$1[REDACTED]",
+	);
+	sanitized = sanitized.replace(
+		/(^|[\s{,;])(?:(['"])([A-Za-z_][A-Za-z0-9_-]*)\2|([A-Za-z_][A-Za-z0-9_-]*))(\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,}\]]+)/g,
+		(
+			match: string,
+			prefix: string,
+			quote: string | undefined,
+			quotedKey: string | undefined,
+			unquotedKey: string | undefined,
+			separator: string,
+		) => {
+			const key = quotedKey ?? unquotedKey;
+			if (!key || !sensitiveAssignmentKey(key)) return match;
+			const keyQuote = quote ?? "";
+			return `${prefix}${keyQuote}${key}${keyQuote}${separator}[REDACTED]`;
+		},
 	);
 	sanitized = sanitized.replace(
 		/(^|\s)(--[A-Za-z0-9-]+)(=|\s+)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+)/g,
@@ -173,14 +223,47 @@ export function sanitizeEvidenceCommand(command: string): string {
 				: match,
 	);
 	sanitized = sanitized.replace(
-		/(\bAuthorization\s*:\s*(?:Bearer|Basic)\s+)[^\s"']+/gi,
+		/((?:api[_ -]?key|access[_ -]?token|authorization|password|secret|token)\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;}]+)/gi,
+		(
+			match: string,
+			prefix: string,
+			_value: string,
+			offset: number,
+			whole: string,
+		) => {
+			const key = prefix
+				.replace(/\s*[:=]\s*$/, "")
+				.trim()
+				.toLowerCase();
+			if (
+				key === "authorization" &&
+				/^\s+\[REDACTED\]/.test(whole.slice(offset + match.length))
+			) {
+				return match;
+			}
+			return `${prefix}[REDACTED]`;
+		},
+	);
+	sanitized = sanitized.replace(
+		/(\b(?:bearer|basic|digest)\s+)[^\s,;}"']+/gi,
 		"$1[REDACTED]",
 	);
+	sanitized = sanitized.replace(
+		/([?&](?:api[_-]?key|access[_-]?token|authorization|password|secret|token)=)[^&#\s]+/gi,
+		"$1[REDACTED]",
+	);
+	sanitized = sanitized.replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "[REDACTED]");
+	sanitized = sanitized.replace(GITHUB_TOKEN_RE, "[REDACTED]");
 	sanitized = sanitized.replace(
 		/([A-Za-z][A-Za-z0-9+.-]*:\/\/[^:\s/@]+:)([^@\s/]+)(@)/g,
 		"$1[REDACTED]$3",
 	);
 	return sanitized;
+}
+
+/** Compatibility name for command-only callers. */
+export function sanitizeEvidenceCommand(command: string): string {
+	return sanitizeEvidenceText(command);
 }
 
 export type NewWorkstreamMetadata = {
@@ -234,6 +317,7 @@ export type LifecycleAuxiliaryRuntime = {
 
 type InternalLifecycleAuxiliaryRuntime = LifecycleAuxiliaryRuntime & {
 	deferLocalStateRefresh?: boolean;
+	skipDefaultTelemetry?: boolean;
 	deferredEventRecords?: Record<string, unknown>[];
 	completeObservedTransitionChain?: boolean;
 	sessionMutationValidated?: boolean;
@@ -552,11 +636,38 @@ function refreshWorkbenchLocalState(
 	session?: string,
 	deferredEventRecords: readonly Record<string, unknown>[] = [],
 ): void {
+	countHotPathOperation("workbench.local_state_refresh");
 	if (session && deferredEventRecords.length > 0) {
 		appendEventsAndRebuildWorkBenchIndex(root, session, deferredEventRecords);
 		return;
 	}
 	rebuildWorkBenchIndex(root, session);
+}
+
+function commitDeferredEventRecords(
+	root: string,
+	records: readonly Record<string, unknown>[],
+): void {
+	if (records.length > 0) {
+		appendValidatedEventLedgerRecords(root, records);
+	}
+}
+
+const EVENT_COMMIT_RECOVERY_WARNING =
+	"workbench event commit failed after durable commit; repair the event ledger, then run afol local-state rebuild.";
+
+function commitDeferredEventRecordsWithWarning(
+	warnings: string[],
+	root: string,
+	records: readonly Record<string, unknown>[],
+	runtime: LifecycleAuxiliaryRuntime,
+): void {
+	try {
+		runtime.beforeAuxiliary?.("workbench event commit");
+		commitDeferredEventRecords(root, records);
+	} catch {
+		warnings.push(EVENT_COMMIT_RECOVERY_WARNING);
+	}
 }
 
 export function readActiveSession(root: string): string | null {
@@ -841,6 +952,7 @@ function markTaskMetadataClosed(
 		taskPath,
 		`---${newline}${lines.join(newline)}${newline}---${suffix}`,
 	);
+	countHotPathOperation("workbench.canonical_write");
 }
 
 export type SessionLifecycleState = "open" | "closed" | "corrupt";
@@ -877,18 +989,12 @@ function ensureSessionOpenForMutation(root: string, session: string): void {
 	}
 }
 
-function closeDiagnosticState(
-	root: string,
-	session: string,
-): { workbench: boolean; telemetry: boolean } {
+function closeDiagnosticState(root: string, session: string): boolean {
 	let workbench = false;
-	let telemetry = false;
 	for (const event of readEventLedgerRecords(root)) {
 		workbench ||= event.type === "workbench.close" && event.session === session;
-		telemetry ||=
-			event.event_type === "session_end" && event.session_id === session;
 	}
-	return { workbench, telemetry };
+	return workbench;
 }
 
 function ensureTaskExists(
@@ -999,6 +1105,7 @@ function transitionTaskStateChains(
 		throw new Error(`Task ${missing.join(", ")} not found in ${taskPath}`);
 	}
 	atomicWriteText(taskPath, `${nextLines.join("\n").replace(/\n*$/g, "")}\n`);
+	countHotPathOperation("workbench.canonical_write");
 }
 
 function evidenceId(now: Date): string {
@@ -1297,7 +1404,8 @@ export function startTasks(
 	input: { session: string; taskIds: readonly string[] },
 	runtime: LifecycleAuxiliaryRuntime = {},
 ): string[] {
-	return withSessionLock(root, input.session, () => {
+	const finishMeasurement = beginHotPathMeasurement("start");
+	const warnings = withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
 		ensureSessionOpenForMutation(root, input.session);
 		const taskIds = [...new Set(input.taskIds)];
@@ -1324,28 +1432,11 @@ export function startTasks(
 					}),
 				runtime,
 			);
-			auxiliaryWarning(
-				warnings,
-				"task-start telemetry",
-				() =>
-					appendTelemetryEvent(root, {
-						event_type: "task_start",
-						session_id: input.session,
-						task_id: taskId,
-						cmd_type: "start",
-						outcome: "success",
-					}),
-				runtime,
-			);
 		}
-		auxiliaryWarning(
-			warnings,
-			"local-state refresh",
-			() => refreshWorkbenchLocalState(root, input.session),
-			runtime,
-		);
 		return warnings;
 	});
+	finishMeasurement(warnings.join("\n"));
+	return warnings;
 }
 
 export function transitionTask(
@@ -1479,7 +1570,11 @@ export function recordEvidence(
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
 		const now = new Date();
-		const sanitizedCommand = sanitizeEvidenceCommand(input.command);
+		const sanitizedCommand = sanitizeEvidenceText(input.command);
+		const sanitizedResult = sanitizeEvidenceText(input.result);
+		const sanitizedNote = input.note
+			? sanitizeEvidenceText(input.note)
+			: undefined;
 		const provenance: EvidenceProvenance = input.provenance ?? "declared";
 		const taskRow = ensureTaskExists(
 			paths.taskPath,
@@ -1493,7 +1588,7 @@ export function recordEvidence(
 			task_id: input.taskId,
 			created_at: now.toISOString(),
 			command: sanitizedCommand,
-			result: input.result,
+			result: sanitizedResult,
 			provenance,
 			...(isTaskState(taskState ?? "")
 				? { task_state: taskState as TaskState }
@@ -1540,18 +1635,23 @@ export function recordEvidence(
 					`Artifact must be an existing repo-safe file: ${input.artifact}`,
 				);
 			}
-			evidence.artifact = relative(root, resolved.value.path).replaceAll(
+			const artifact = relative(root, resolved.value.path).replaceAll(
 				"\\",
 				"/",
 			);
+			const sanitizedArtifact = sanitizeEvidenceText(artifact);
+			if (sanitizedArtifact !== artifact) {
+				throw new Error("Artifact path contains redacted sensitive material.");
+			}
+			evidence.artifact = sanitizedArtifact;
 			evidence.artifact_sha256 = createHash("sha256")
 				.update(readFileSync(resolved.value.path))
 				.digest("hex");
 		} else if (input.artifact) {
-			evidence.artifact = input.artifact;
+			evidence.artifact = sanitizeEvidenceText(input.artifact);
 		}
-		if (input.note) {
-			evidence.note = input.note;
+		if (sanitizedNote) {
+			evidence.note = sanitizedNote;
 		}
 		if (completionPolicy === "waiver") {
 			const approval = input.approvalContext;
@@ -1563,11 +1663,11 @@ export function recordEvidence(
 				throw new Error(
 					"Waiver completion policy requires a trusted local context.",
 				);
-			if (!input.note?.trim())
+			if (!sanitizedNote?.trim())
 				throw new Error(
 					"Waiver completion policy requires a nonempty reason in --note.",
 				);
-			evidence.waiver_reason = input.note.trim();
+			evidence.waiver_reason = sanitizedNote.trim();
 			evidence.approved_by = "local:interactive";
 		}
 		runtime.fencingCheck?.();
@@ -1585,6 +1685,7 @@ export function recordEvidence(
 				flag: "a",
 			});
 		}
+		countHotPathOperation("workbench.canonical_write");
 		const warnings: string[] = [];
 		auxiliaryWarning(
 			warnings,
@@ -1597,7 +1698,7 @@ export function recordEvidence(
 						session: input.session,
 						taskId: input.taskId,
 						command: sanitizedCommand,
-						result: input.result,
+						result: sanitizedResult,
 						detail: {
 							provenance,
 							evidence_id: evidence.id,
@@ -1607,26 +1708,29 @@ export function recordEvidence(
 				),
 			runtime,
 		);
-		if (provenance === "observed") {
+		if (provenance === "observed" && !runtime.skipDefaultTelemetry) {
 			auxiliaryWarning(
 				warnings,
 				"tool-exec telemetry",
 				() =>
-					appendTelemetryEvent(
-						root,
-						{
-							event_type: "tool_exec",
-							session_id: input.session,
-							task_id: input.taskId,
-							cmd_type: firstToken(sanitizedCommand),
-							provenance,
-							outcome:
-								evidenceCompletionStatus([evidence]) === "passed"
-									? "success"
-									: "failure",
-						},
-						runtime.deferredEventRecords,
-					),
+					(() => {
+						countHotPathOperation("workbench.telemetry");
+						return appendTelemetryEvent(
+							root,
+							{
+								event_type: "tool_exec",
+								session_id: input.session,
+								task_id: input.taskId,
+								cmd_type: firstToken(sanitizedCommand),
+								provenance,
+								outcome:
+									evidenceCompletionStatus([evidence]) === "passed"
+										? "success"
+										: "failure",
+							},
+							runtime.deferredEventRecords,
+						);
+					})(),
 				runtime,
 			);
 		}
@@ -2250,31 +2354,6 @@ export function doneTask(
 				),
 			runtime,
 		);
-		auxiliaryWarning(
-			warnings,
-			"task-complete telemetry",
-			() =>
-				appendTelemetryEvent(
-					root,
-					{
-						event_type: "task_complete",
-						session_id: input.session,
-						task_id: input.taskId,
-						cmd_type: "done",
-						outcome: "success",
-					},
-					runtime.deferredEventRecords,
-				),
-			runtime,
-		);
-		if (!runtime.deferLocalStateRefresh) {
-			auxiliaryWarning(
-				warnings,
-				"local-state refresh",
-				() => refreshWorkbenchLocalState(root, input.session),
-				runtime,
-			);
-		}
 		return {
 			authorizingEvidenceId: authorization.evidenceId,
 			...(warnings.length > 0 ? { warnings } : {}),
@@ -2367,7 +2446,7 @@ export function assertObservedBatchTasksReady(
 	});
 }
 
-/** Complete an observed test and task under one lock with one state refresh. */
+/** Complete an observed test and task under one lock without derived refreshes. */
 export function completeObservedTask(
 	root: string,
 	input: CompleteObservedTaskInput,
@@ -2375,68 +2454,49 @@ export function completeObservedTask(
 ): CompleteObservedTaskResult {
 	return withSessionLock(root, input.session, () => {
 		ensureSessionOpenForMutation(root, input.session);
-		let evidenceWritten = false;
-		let result: CompleteObservedTaskResult | undefined;
 		const warnings: string[] = [];
 		const deferredEventRecords: Record<string, unknown>[] = [];
-		try {
-			const evidence = recordEvidence(
+		const evidence = recordEvidence(
+			root,
+			{
+				...input,
+				result: input.exitCode === 0 ? "passed" : "failed",
+				provenance: "observed",
+			},
+			{
+				...runtime,
+				deferLocalStateRefresh: true,
+				skipDefaultTelemetry: true,
+				deferredEventRecords,
+				sessionMutationValidated: true,
+			},
+		);
+		warnings.push(...(evidence.warnings ?? []));
+		if (input.exitCode !== 0) {
+			commitDeferredEventRecordsWithWarning(
+				warnings,
 				root,
-				{
-					...input,
-					result: input.exitCode === 0 ? "passed" : "failed",
-					provenance: "observed",
-				},
-				{
-					...runtime,
-					deferLocalStateRefresh: true,
-					deferredEventRecords,
-					sessionMutationValidated: true,
-				},
+				deferredEventRecords,
+				runtime,
 			);
-			evidenceWritten = true;
-			warnings.push(...(evidence.warnings ?? []));
-			if (input.exitCode === 0) {
-				const done = doneTask(root, input, {
-					...runtime,
-					deferLocalStateRefresh: true,
-					deferredEventRecords,
-					completeObservedTransitionChain: true,
-					sessionMutationValidated: true,
-					authorizingEvidence: evidence,
-				});
-				warnings.push(...(done.warnings ?? []));
-				warnings.push(
-					...observeCompletedSession(
-						root,
-						input.session,
-						runtime,
-						"production-day",
-					),
-				);
-				result = { done, evidence, warnings };
-			} else {
-				result = { evidence, warnings };
-			}
-		} finally {
-			if (evidenceWritten) {
-				auxiliaryWarning(
-					warnings,
-					"local-state refresh",
-					() =>
-						refreshWorkbenchLocalState(
-							root,
-							input.session,
-							deferredEventRecords,
-						),
-					runtime,
-				);
-			}
+			return { evidence, warnings };
 		}
-		if (!result) {
-			throw new Error("Observed task completion did not record evidence.");
-		}
-		return { ...result, warnings };
+		const done = doneTask(root, input, {
+			...runtime,
+			deferLocalStateRefresh: true,
+			deferredEventRecords,
+			completeObservedTransitionChain: true,
+			sessionMutationValidated: true,
+			authorizingEvidence: evidence,
+		});
+		warnings.push(...(done.warnings ?? []));
+		commitDeferredEventRecordsWithWarning(
+			warnings,
+			root,
+			deferredEventRecords,
+			runtime,
+		);
+		return { done, evidence, warnings };
 	});
 }
 
@@ -2475,7 +2535,15 @@ export function completeObservedTasks(
 		const warnings: string[] = [];
 		const deferredEventRecords: Record<string, unknown>[] = [];
 		const { fencingCheck: _fencingCheck, ...commitRuntime } = runtime;
+		const paths = sessionPaths(root, input.session);
+		const originalTask = readFileSync(paths.taskPath, "utf8");
+		const hadEvidence = existsSync(paths.evidencePath);
+		const originalEvidence = hadEvidence
+			? readFileSync(paths.evidencePath, "utf8")
+			: "";
 		try {
+			// Persist every observed result before any State Board transition so a
+			// partial batch can never mark a task done without its evidence.
 			for (const taskId of taskIds) {
 				const entry = recordEvidence(
 					root,
@@ -2488,13 +2556,22 @@ export function completeObservedTasks(
 					{
 						...commitRuntime,
 						deferLocalStateRefresh: true,
+						skipDefaultTelemetry: true,
 						deferredEventRecords,
 						sessionMutationValidated: true,
 					},
 				);
 				evidence.push(entry);
 				warnings.push(...(entry.warnings ?? []));
-				if (input.exitCode === 0) {
+			}
+			if (input.exitCode === 0) {
+				for (const taskId of taskIds) {
+					const entry = evidence.find(
+						(candidate) => candidate.task_id === taskId,
+					);
+					if (!entry) {
+						throw new Error(`Observed batch evidence missing for ${taskId}.`);
+					}
 					const completion = doneTask(
 						root,
 						{ session: input.session, taskId },
@@ -2511,31 +2588,21 @@ export function completeObservedTasks(
 					warnings.push(...(completion.warnings ?? []));
 				}
 			}
-			if (input.exitCode === 0) {
-				warnings.push(
-					...observeCompletedSession(
-						root,
-						input.session,
-						runtime,
-						"production-day",
-					),
-				);
+		} catch (error) {
+			atomicWriteText(paths.taskPath, originalTask);
+			if (hadEvidence) {
+				atomicWriteText(paths.evidencePath, originalEvidence);
+			} else if (existsSync(paths.evidencePath)) {
+				unlinkSync(paths.evidencePath);
 			}
-		} finally {
-			if (evidence.length > 0) {
-				auxiliaryWarning(
-					warnings,
-					"local-state refresh",
-					() =>
-						refreshWorkbenchLocalState(
-							root,
-							input.session,
-							deferredEventRecords,
-						),
-					runtime,
-				);
-			}
+			throw error;
 		}
+		commitDeferredEventRecordsWithWarning(
+			warnings,
+			root,
+			deferredEventRecords,
+			runtime,
+		);
 		return {
 			evidence,
 			done,
@@ -2550,18 +2617,19 @@ export function closeSession(
 	options: CloseSessionOptions = {},
 	runtime: LifecycleAuxiliaryRuntime = {},
 ): CloseSessionResult {
-	return withSessionLock(root, session, () => {
+	const finishMeasurement = beginHotPathMeasurement("close");
+	const result = withSessionLock(root, session, () => {
 		const paths = sessionPaths(root, session);
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
-		let diagnostics: { workbench: boolean; telemetry: boolean };
+		let closeEventRecorded: boolean;
 		if (state.kind === "open") {
 			assertValidEventLedger(root);
-			diagnostics = { workbench: false, telemetry: false };
+			closeEventRecorded = false;
 		} else {
-			diagnostics = closeDiagnosticState(root, session);
+			closeEventRecorded = closeDiagnosticState(root, session);
 		}
 		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
 		const reportRelativePath = relative(root, reportPath).replaceAll("\\", "/");
@@ -2645,12 +2713,14 @@ export function closeSession(
 						),
 						{ syncDirectory: false },
 					);
+					countHotPathOperation("workbench.canonical_write");
 					reportCreated = !reportWasPresent;
 				}
 				if (nextLog !== originalLog) {
 					atomicWriteText(paths.logPath, nextLog, {
 						syncDirectory: false,
 					});
+					countHotPathOperation("workbench.canonical_write");
 					logWritten = true;
 				}
 				markTaskMetadataClosed(
@@ -2692,25 +2762,11 @@ export function closeSession(
 		const deferredEventRecords: Record<string, unknown>[] = [];
 		for (const [alreadyRecorded, writeDiagnostic] of [
 			[
-				diagnostics.workbench,
+				closeEventRecorded,
 				() =>
 					appendWorkbenchEvent(
 						root,
 						{ type: "workbench.close", session },
-						deferredEventRecords,
-					),
-			],
-			[
-				diagnostics.telemetry,
-				() =>
-					appendTelemetryEvent(
-						root,
-						{
-							event_type: "session_end",
-							session_id: session,
-							cmd_type: "close",
-							outcome: "success",
-						},
 						deferredEventRecords,
 					),
 			],
@@ -2726,6 +2782,12 @@ export function closeSession(
 				);
 			}
 		}
+		commitDeferredEventRecordsWithWarning(
+			warnings,
+			root,
+			deferredEventRecords,
+			runtime,
+		);
 		if (existsSync(paths.activeSessionPath)) {
 			try {
 				const active = readFileSync(paths.activeSessionPath, "utf8").trim();
@@ -2739,14 +2801,9 @@ export function closeSession(
 			}
 		}
 
-		try {
-			refreshWorkbenchLocalState(root, session, deferredEventRecords);
-		} catch {
-			warnings.push(
-				"local-state refresh failed after the durable close commit; run afol local-state rebuild.",
-			);
+		if (state.kind === "open") {
+			warnings.push(...observeCompletedSession(root, session, runtime));
 		}
-		warnings.push(...observeCompletedSession(root, session, runtime));
 		const result = warnings as CloseSessionResult;
 		result.report = {
 			status: reportStatus,
@@ -2758,4 +2815,6 @@ export function closeSession(
 		};
 		return result;
 	});
+	finishMeasurement(result.join("\n"));
+	return result;
 }

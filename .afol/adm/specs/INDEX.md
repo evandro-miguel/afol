@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-06-14T00:00:00+00:00"
+updated_at: "2026-07-31T00:00:00+00:00"
 ---
 
 # SPECS INDEX
@@ -16,10 +16,10 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 84 |
+| Total | 85 |
 | Draft | 0 |
-| Active | 8 |
-| Final | 58 |
+| Active | 5 |
+| Final | 62 |
 | Superseded | 18 |
 
 ## Index
@@ -97,21 +97,23 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260711_c01-action-policy-and-protected-resources_spec-child_01 | c01-action-policy-and-protected-resources | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
 | 260711_c01-authorization-red-reproducers_spec-child_01 | c01-authorization-red-reproducers | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
 | 260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01 | agent-cli-extreme-ease-latency-write-tokens | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
-| 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
+| 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
 | 260715_afol-1-0-local-diagnostics_spec-child_01 | afol-1-0-local-diagnostics | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260715_afol-1-0-linux-wsl-release-hardening_spec-child_01 | afol-1-0-linux-wsl-release-hardening | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260726_canonical-adm-context-index-migration_spec-child_01 | canonical-adm-context-index-migration | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260726_afol-only-active-canon-migration_spec-child_01 | afol-only-active-canon-migration | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260726_event-ledger-durability_spec-child_01 | event-ledger-durability | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260726_governance-contract-reconciliation_spec-child_01 | governance-contract-reconciliation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
-| 260727_release-benchmark-timing-and-baseline-contract_spec-child_01 | release-benchmark-timing-and-baseline-contract | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260727_release-benchmark-timing-and-baseline-contract_spec-child_01 | release-benchmark-timing-and-baseline-contract | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260728_2359_session-resolution-reliability_spec-child_01 | session-resolution-reliability | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md, related: .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md |
 | 260716_1234_agent-cli-sequential-verification-runs_spec-child_01 | agent-cli-sequential-verification-runs | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
-| 260717_agent-submission-and-batch-review_spec_01 | agent-submission-and-batch-review | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md, adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md, evolution_adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
+| 260717_agent-submission-and-batch-review_spec_01 | external-receipts-and-harness-profiles | final | F-31 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md, related: F-30 Evolution remains separate under ADR-008 |
 | 260716_2155_afol-evolution-system_spec_01 | afol-evolution-system | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
 | 260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01 | memory-library-adoption-loop | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md, related: F-18.S10 |
+| 260731_hot-path-observability-and-derived-state-separation_spec_01 | hot-path-observability-and-derived-state-separation | final | F-32 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, f03_latency: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md, f07_state: .afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 
 ---
+
 *Index: `.afol/adm/specs/INDEX.md`*

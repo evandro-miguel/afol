@@ -904,7 +904,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -996,6 +996,24 @@ Follow-on slices under this direction:
   manifest, Gitleaks history/worktree, and OSV dependency scans passed. This
   bounded remediation makes no new full-suite, build, release, deployment, or
   global-install claim.
+- Final closure: session `260801_1641_project-finalization` completed the
+  remaining F-29/F-31/F-32 reconciliation. The full local suite, typecheck,
+  generated-contract checks, project validation, security scans, governance
+  benchmarks, and Linux x64 `validate:release` passed on clean candidate
+  `aa6892c`. Project RAG refresh was attempted through its supported snapshot
+  flow and remains explicitly blocked by `REVIEW_REQUIRED` approval; no RAG
+  mutation or unsupported platform/deployment claim is included in this closure.
+- Reopened after the final audit found that F-32 hot-path scenarios declared as
+  compiled binaries were measured through the source runner and that project
+  readiness suppressed failed evidence for every session without open tasks.
+  Final status requires regression coverage for both contracts and a clean
+  `validate:release` result on the eventual final commit.
+- Final audit remediation: session `260803_1315_final-audit-remediation`
+  propagated the compiled release artifact through all F-32 hot-path samples,
+  limited legacy evidence compatibility to pre-contract sessions, and recorded
+  authorizing evidence `E-20260803132802745-747009`. Development validation
+  remains repo-local; global promotion is permitted only from `main` after an
+  explicit user request.
 
 ### F-30 AFOL Evolution System
 
@@ -1063,28 +1081,122 @@ Follow-on slices under this direction:
   slice must remain schema/governance-only, with no LLM call, external
   import, automatic application, or daemon. Do not combine F-30 slices with
   SQLite, memory, library, context, or maintenance rewrites.
+- Boundary with F-31: external receipts and fixed harness tool profiles are
+  **not** an Evolution child. F-30 remains the learning-loop feature only.
+  ADR-008 stays the Evolution autonomy boundary. F-31 and ADR-007 govern the
+  external evidence boundary without selecting or controlling model work.
 
-#### Agent Submission and Batch Review (F-30 child)
+### F-31 External Receipts and Fixed Harness Tool Profiles
 
-- Child status: active
+- Status: final
 - Governing spec:
   .afol/adm/specs/260717_agent-submission-and-batch-review_spec_01.md
-- Parent spec:
-  .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md
-- Intent: explore a bounded one-worker submission and review workflow that may
-  reduce lifecycle round trips while preserving AFOL's existing authority and
-  evidence boundaries.
 - Architectural decision:
   .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md
-- No public `dispatch`, `submit`, or F-30 benchmark pack exists in the current
-  registry. These names remain design vocabulary only until an implementation
-  slice is approved and shipped.
-- Backlog acceptance requires a governing child spec, registered commands and
-  scenarios, deterministic authority/integrity tests, and fresh observed
-  evidence. Planned intent is not production proof.
-- Governance: F-30 is the shared Evolution parent and submission/review child
-  lane. ADR-007 governs submission/review boundaries, while ADR-008 governs
-  Evolution autonomy and evidence boundaries; both decisions remain distinct.
+- Why: external harnesses already select providers/models, run tools, schedule
+  work, retry failures, and supervise execution. AFOL should consume a bounded
+  receipt from that run and validate the fixed tool profile, not become a second
+  model orchestrator. The single-actor AFOL fast path (`st` / `d -x` / `c`)
+  remains canonical for direct project work.
+- Relationship to prior features:
+  - Reuses F-03 command economy without replacing it.
+  - Reuses F-04 / F-22 lifecycle, observed evidence, State Board, and index
+    refresh as the projection path only.
+  - Reuses F-20 session isolation as binding/context, not model ownership.
+  - Distinct from F-30 Evolution (ADR-008); do not fold receipt/profile
+    ingestion into Evolution slices or renumber Evolution off F-30.
+- ID allocation: **F-30 + ADR-008 = Evolution** and **F-31 + ADR-007 = external
+  receipts/profiles**. The 20260719 collision lesson's earlier inverse
+  recommendation is superseded; do not invent a second F-30.
+- Core contract:
+  - The State Board remains the only lifecycle state source:
+    `pending` / `in_progress` / `problem` / `done` / `moved`.
+  - An external harness emits a receipt containing project/session/task
+    binding, run identity, source/artifact identity, check result, tool-trace
+    digest, and the fixed profile id/digest.
+  - AFOL publishes a generated registry-backed catalog of fixed tool-profile
+    metadata. Profiles describe allowed AFOL tool ids; the external harness
+    pins and uses one for a run. They do not choose a provider or model, and
+    remain metadata-only until a separate enforcement decision.
+  - AFOL validates receipt/profile integrity, records observed evidence, and
+    projects normal lifecycle state. AFOL never selects, calls, schedules,
+    retries, or supervises models.
+- Authorized first implementation slice:
+  1. Governance artifacts (this feature, ADR-007, and the governing spec).
+  2. Deterministic generated fixed tool profiles with versioned, digestable
+     ids and allowed tool ids.
+  3. Bounded, redacted external receipt schema and validation with fail-closed
+     profile/provenance/path/duplicate checks.
+  4. Evidence and lifecycle projection after receipt validation, plus tests
+     proving no model orchestration is performed by AFOL.
+- Explicit non-goals:
+  AFOL provider/model selection or invocation; scheduler, retry loop,
+  supervisor, lease/assignment state machine, daemon/broker, hostile
+  multi-tenant auth, remote attestation, shared `$XDG_STATE_HOME` source of
+  truth, or changes to F-30 Evolution and ADR-008.
+- Acceptance direction: profile catalogs are deterministic and current;
+  invalid or mismatched receipts fail closed without lifecycle mutation; valid
+  receipts remain bounded, redacted, idempotent, and project-linked; and fresh
+  observed evidence proves the external boundary on a governed F-31 session.
+- Closure note: implementation is final in governed session
+  `260731_1534_external-receipts-profiles`; observed evidence includes profile,
+  receipt, lifecycle, manifest, template, and typecheck gates. AFOL remains an
+  external-receipt consumer and does not execute or supervise models.
+- Delivery policy: independent PRs; governance-first; do not revive closed
+  PR #58's dispatch/submit/review implementation or treat its assignment store
+  as a merge base. External harnesses own model execution and receipt emission.
+
+### F-32 Hot-Path Observability and Derived-State Separation
+
+- Status: final
+- Governing spec:
+  .afol/adm/specs/260731_hot-path-observability-and-derived-state-separation_spec_01.md
+- Why: the compact `status` / lifecycle path must stay predictable under normal
+  agent use. Observability and derived projections currently compete with the
+  canonical workbench writes for latency and failure handling; F-32 makes those
+  boundaries explicit without weakening lifecycle integrity.
+- Relationship to prior features:
+  - Reuses F-03 latency and token-economy targets, F-04 lifecycle semantics,
+    F-07 local-state/event-log contracts, F-18 temporal health, and F-22
+    transaction-safety rules.
+  - F-32 changes execution ordering and measurement boundaries only. It does
+    not migrate the event log, replace the State Board, or create a second
+    source of truth.
+  - Distinct from F-30 Evolution and F-31 external receipts/profiles; neither
+    feature is expanded by this hot-path slice.
+- Core contract:
+  - `status`, `start`, `done`, and `close` may expose bounded timing/call
+    instrumentation, but they do not append telemetry records on the default
+    path.
+  - Default `status` reads canonical status only. Health, catchup, and other
+    derived/freshness work remain explicit through existing opt-in commands or
+    flags.
+  - Lifecycle commands commit canonical task/evidence/report/State Board
+    changes first. Telemetry, index refresh, health, and other derived work is
+    auxiliary and cannot precede or invalidate a durable canonical write.
+  - Derived rebuild and catchup are explicit, idempotent, recoverable
+    operations. A failed auxiliary step yields a bounded warning and a
+    concrete recovery command; it never silently rewrites canonical state.
+  - Evidence authorization, State Board state transitions, close-report
+    creation/waivers, strict verification, and existing event-log append
+    semantics remain unchanged.
+- Acceptance direction: focused tests prove no telemetry writes on the four
+  hot paths, default `status` skips health and derived work, canonical writes
+  precede auxiliary work, and explicit rebuild/catchup restores projections
+  without duplicate or conflicting evidence, State Board, or report records.
+  Recovery and benchmark gates must pass before implementation status changes.
+- Closure note: implementation is final after the real `workbench-parity`
+  benchmark recorded 20 samples per scenario and passed all 19 scenarios;
+  finalization evidence is retained in session
+  `260801_1641_project-finalization`.
+- Non-goals: event-log migration or schema replacement; F-30 Evolution,
+  observation, or autonomy changes; F-31 receipt/profile behavior; provider or
+  model selection, invocation, scheduling, retries, or supervision; a daemon
+  or always-on watcher.
+- Delivery policy: governance first, then independent implementation and
+  regression slices. Keep the canonical files recoverable, use explicit
+  `afol local-state rebuild` / `afol catchup` recovery, and benchmark default
+  versus opt-in derived paths separately on a compatible warm host.
 
 ## 6) Recommended Delivery Phases
 

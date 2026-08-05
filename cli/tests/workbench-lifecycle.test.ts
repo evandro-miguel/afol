@@ -24,11 +24,19 @@ import {
 import { readTelemetryEvents } from "../services/events/telemetry";
 import { resolvePendingSpec } from "../services/governance/pending-specs";
 import {
+	readHotPathCountersForTests,
+	readHotPathMeasurementsForTests,
+	resetHotPathCountersForTests,
+} from "../services/hot-path/instrumentation";
+import {
 	rebuildFilesIndex,
 	validateFilesIndex,
 } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
-import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
+import {
+	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import { resolveTaskCompletionLockPath } from "../services/workbench/completion-lock";
 import {
@@ -905,7 +913,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("quick-task requires explicit governance and never creates pending_spec", () => {
+	test("quick-task permits a closed pending_spec lifecycle", () => {
 		const root = mkRoot("quick-task-pending-spec");
 		try {
 			writeCliProjectContract(root);
@@ -924,16 +932,32 @@ describe("workbench lifecycle service", () => {
 				"quick missing spec",
 				"--command",
 				"true",
-				"--no-spec-required",
-				"--reason",
-				"quick fixture waiver",
 				"--json",
 			]);
 			expect(quickTask.status).toBe(0);
 			const quickTaskEnvelope = parseEnvelope(quickTask.stdout as string);
 			const quickTaskData = quickTaskEnvelope.data as Record<string, unknown>;
-			expect(quickTaskData.governance_status).toBe("unbound");
-			expect(quickTaskData.pending_spec).toBe(false);
+			expect(quickTaskData.governance_status).toBe("pending_spec");
+			expect(quickTaskData.pending_spec).toBe(true);
+			expect(quickTaskData.pending_spec_question).toBe(
+				"Which roadmap feature and parent spec govern this closed session?",
+			);
+			expect(quickTaskData.next_command).toContain("governance resolve-spec");
+
+			const human = runKernel(root, [
+				"quick-task",
+				"human pending spec",
+				"--command",
+				"true",
+			]);
+			expect(human.status).toBe(0);
+			expect(human.stdout as string).toContain(
+				"question: Which roadmap feature and parent spec govern this closed session?",
+			);
+			expect(human.stdout as string).toContain(
+				"next: run afol governance resolve-spec",
+			);
+			expect(human.stdout as string).not.toContain('hint="');
 
 			const next = runKernel(root, [
 				"new",
@@ -1215,13 +1239,7 @@ describe("workbench lifecycle service", () => {
 			const toolEvents = readTelemetryEvents(root).filter(
 				(event) => event.event_type === "tool_exec",
 			);
-			expect(toolEvents).toHaveLength(1);
-			expect(toolEvents[0]).toMatchObject({
-				task_id: "T-01",
-				cmd_type: "bun",
-				provenance: "observed",
-				outcome: "success",
-			});
+			expect(toolEvents).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1261,7 +1279,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("completeObservedTask coalesces observed completion into one refresh", () => {
+	test("completeObservedTask commits canonical events without derived refresh", () => {
 		const root = mkRoot("complete-observed");
 		try {
 			const created = newWorkstream(root, "complete observed", {
@@ -1289,16 +1307,17 @@ describe("workbench lifecycle service", () => {
 				.trim()
 				.split("\n")
 				.map((line) => JSON.parse(line) as Record<string, unknown>)
-				.slice(-6)
 				.map((event) => event.type ?? event.event_type);
-			expect(completionEvents).toEqual([
-				"workbench.record_evidence",
-				"tool_exec",
-				"workbench.transition_task",
-				"workbench.transition_task",
-				"workbench.mark_done",
-				"task_complete",
-			]);
+			expect(completionEvents).toEqual(
+				expect.arrayContaining([
+					"workbench.record_evidence",
+					"workbench.transition_task",
+					"workbench.transition_task",
+					"workbench.mark_done",
+				]),
+			);
+			expect(completionEvents).not.toContain("tool_exec");
+			expect(completionEvents).not.toContain("task_complete");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1329,7 +1348,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("completeObservedTask preserves committed evidence when refresh warns", () => {
+	test("completeObservedTask does not refresh derived state after durable evidence", () => {
 		const root = mkRoot("complete-observed-refresh-warning");
 		try {
 			const created = newWorkstream(root, "complete observed warning", {
@@ -1353,9 +1372,7 @@ describe("workbench lifecycle service", () => {
 				},
 			);
 			expect(result.done?.authorizingEvidenceId).toBeTruthy();
-			expect(result.warnings).toEqual([
-				"local-state refresh failed after durable commit: injected refresh",
-			]);
+			expect(result.warnings).toEqual([]);
 			expect(
 				readFileSync(created.evidencePath, "utf8").trim().split("\n"),
 			).toHaveLength(1);
@@ -1439,8 +1456,7 @@ describe("workbench lifecycle service", () => {
 					exitCode: 0,
 				},
 				{
-					observerSeam: ({ mode }) => {
-						expect(mode).toBe("production-day");
+					observerSeam: () => {
 						productionDayCalls += 1;
 						return {
 							appended: 0,
@@ -1454,7 +1470,7 @@ describe("workbench lifecycle service", () => {
 			);
 			// Task is still done.
 			expect(completion.done?.authorizingEvidenceId).toBeTruthy();
-			expect(productionDayCalls).toBe(1);
+			expect(productionDayCalls).toBe(0);
 			expect(readFileSync(created.taskPath, "utf8")).toContain(
 				"| T-01 | done |",
 			);
@@ -1501,10 +1517,43 @@ describe("workbench lifecycle service", () => {
 					},
 				},
 			);
-			expect(retryCalls).toBe(1);
+			expect(retryCalls).toBe(0);
 			expect(retryResult).not.toContain(
 				expect.stringContaining("observer failed"),
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("redacts every persisted caller-controlled evidence field", () => {
+		const root = mkRoot("evidence-full-redaction");
+		try {
+			const created = newWorkstream(root, "evidence full redaction", {
+				noSpecRequiredReason: "fixture",
+			});
+			const commandCanary = "REDACTION_COMMAND_CANARY_123456";
+			const resultCanary = "ghp_REDACTION_RESULT_CANARY_12345678901234567890";
+			const artifactCanary = "REDACTION_ARTIFACT_CANARY_123456";
+			const noteCanary = "REDACTION_NOTE_CANARY_123456";
+			recordEvidenceRaw(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: `tool '{"apiKey":"${commandCanary}"}'`,
+				result: `{"github_token":"${resultCanary}"}`,
+				artifact: `artifact?client_secret=${artifactCanary}`,
+				note: `Authorization: Bearer "${noteCanary}"`,
+			});
+			const persisted = readFileSync(created.evidencePath, "utf8");
+			for (const canary of [
+				commandCanary,
+				resultCanary,
+				artifactCanary,
+				noteCanary,
+			]) {
+				expect(persisted).not.toContain(canary);
+			}
+			expect(persisted).toContain("[REDACTED]");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2276,6 +2325,8 @@ describe("workbench lifecycle service", () => {
 			doneTask(root, { session: second.session, taskId: "T-01" });
 			closeSession(root, second.session);
 
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+			rebuildWorkBenchIndex(root);
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(true);
 			expect(readFileSync(filesIndexPath, "utf8")).toBe(filesIndexBefore);
@@ -2656,7 +2707,7 @@ describe("workbench lifecycle service", () => {
 						event.session === created.session,
 				).length,
 			).toBe(closeEventCountAfterClose);
-			expect(sessionEndCountAfterClose).toBe(1);
+			expect(sessionEndCountAfterClose).toBe(0);
 			expect(
 				readTelemetryEvents(root).filter(
 					(event) =>
@@ -2850,6 +2901,8 @@ describe("workbench lifecycle service", () => {
 			expect(validateWorkBenchIndex(root).ok).toBe(false);
 
 			expect(() => closeSession(root, created.session)).not.toThrow();
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+			rebuildWorkBenchIndex(root);
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(false);
 			rebuildFilesIndex(root);
@@ -3760,7 +3813,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("lifecycle emits telemetry events alongside workbench events", () => {
+	test("lifecycle preserves canonical workbench events without hot-path telemetry", () => {
 		const root = mkRoot("telemetry");
 		try {
 			const created = newWorkstream(root, "telemetry-lifecycle");
@@ -3795,12 +3848,13 @@ describe("workbench lifecycle service", () => {
 				telemetry.map((entry) => [entry.event_type, entry]),
 			);
 
-			// All 5 telemetry event types present
+			// Session creation remains observable; hot lifecycle completions avoid
+			// synchronous telemetry writes.
 			expect(eventMap.has("session_start")).toBe(true);
-			expect(eventMap.has("task_start")).toBe(true);
+			expect(eventMap.has("task_start")).toBe(false);
 			expect(eventMap.has("tool_exec")).toBe(true);
-			expect(eventMap.has("task_complete")).toBe(true);
-			expect(eventMap.has("session_end")).toBe(true);
+			expect(eventMap.has("task_complete")).toBe(false);
+			expect(eventMap.has("session_end")).toBe(false);
 
 			// schema_version is always "1"
 			for (const entry of telemetry) {
@@ -3816,13 +3870,8 @@ describe("workbench lifecycle service", () => {
 			expect(toolEvent?.outcome).toBe("success");
 			expect(toolEvent?.provenance).toBe("observed");
 
-			// Task events carry correct task_id
-			expect(eventMap.get("task_start")?.task_id).toBe("T-01");
-			expect(eventMap.get("task_complete")?.task_id).toBe("T-01");
-
-			// Session events do not have task_id
+			// Session events do not have task_id.
 			expect(eventMap.get("session_start")?.task_id).toBeUndefined();
-			expect(eventMap.get("session_end")?.task_id).toBeUndefined();
 
 			// Workbench events still present alongside telemetry
 			const wbEventPath = resolveWorkbenchEventLogPath(root);
@@ -3837,6 +3886,278 @@ describe("workbench lifecycle service", () => {
 			expect(wbTypes.has("workbench.record_evidence")).toBe(true);
 			expect(wbTypes.has("workbench.mark_done")).toBe(true);
 			expect(wbTypes.has("workbench.close")).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("start, observed done, and close skip derived refresh and telemetry", () => {
+		const root = mkRoot("hot-path-no-derived-work");
+		try {
+			const created = newWorkstream(root, "hot path", {
+				noSpecRequiredReason: "fixture",
+			});
+			resetHotPathCountersForTests();
+			startTask(root, { session: created.session, taskId: "T-01" });
+			completeObservedTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				exitCode: 0,
+			});
+			closeSession(root, created.session);
+
+			expect(readHotPathCountersForTests()).toMatchObject({
+				"workbench.local_state_refresh": 0,
+				"workbench.telemetry": 0,
+			});
+			for (const operation of ["start", "close"] as const) {
+				expect(readHotPathMeasurementsForTests()[operation]).toMatchObject({
+					calls: 1,
+					duration_ms: expect.any(Number),
+					output_bytes: expect.any(Number),
+				});
+			}
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+			expect(readFileSync(created.evidencePath, "utf8").trim()).not.toBe("");
+			expect(
+				readFileSync(resolveWorkbenchEventLogPath(root), "utf8"),
+			).toContain("workbench.close");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("observed done preserves canonical evidence when a malformed ledger record rejects append", () => {
+		const root = mkRoot("observed-done-event-tail");
+		try {
+			const created = newWorkstream(root, "event tail", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const eventPath = resolveWorkbenchEventLogPath(root);
+			writeFileSync(eventPath, '{"truncated"\n', { flag: "a" });
+			const invalidLedger = readFileSync(eventPath, "utf8");
+
+			const result = completeObservedTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				exitCode: 0,
+			});
+
+			expect(result.warnings).toEqual([
+				"workbench event commit failed after durable commit; repair the event ledger, then run afol local-state rebuild.",
+			]);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | done |",
+			);
+			expect(readFileSync(created.evidencePath, "utf8").trim()).not.toBe("");
+			expect(readFileSync(eventPath, "utf8")).toBe(invalidLedger);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done command records one metric for failed observed completion", async () => {
+		const root = mkRoot("done-command-failed-metric");
+		const originalError = console.error;
+		const output: string[] = [];
+		try {
+			const created = newWorkstream(root, "failed done metric", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			resetHotPathCountersForTests();
+			console.error = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01",
+						"--test",
+						'bun -e "process.exit(1)"',
+					],
+					root,
+				),
+			).toBe(1);
+			expect(readHotPathMeasurementsForTests().done).toMatchObject({
+				calls: 1,
+				duration_ms: expect.any(Number),
+				output_bytes: Buffer.byteLength(output.join("\n"), "utf8"),
+			});
+			expect(
+				readHotPathMeasurementsForTests().done.output_bytes,
+			).toBeGreaterThan(0);
+		} finally {
+			console.error = originalError;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("batch done command records one metric for all tasks", async () => {
+		const root = mkRoot("done-command-batch-metric");
+		const originalLog = console.log;
+		const output: string[] = [];
+		try {
+			const created = newWorkstream(root, "batch done metric", {
+				tasks: ["first", "second"],
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			resetHotPathCountersForTests();
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01..T-02",
+						"--test",
+						'bun -e "process.exit(0)"',
+					],
+					root,
+				),
+			).toBe(0);
+			expect(readHotPathMeasurementsForTests().done).toMatchObject({
+				calls: 1,
+				output_bytes: Buffer.byteLength(output.join("\n"), "utf8"),
+			});
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done command records the emitted success output", async () => {
+		const root = mkRoot("done-command-success-metric");
+		const originalLog = console.log;
+		const output: string[] = [];
+		try {
+			const created = newWorkstream(root, "success done metric", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			resetHotPathCountersForTests();
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runDoneCommand(
+					[
+						"--session",
+						created.session,
+						"T-01",
+						"--test",
+						'bun -e "process.exit(0)"',
+					],
+					root,
+				),
+			).toBe(0);
+			expect(readHotPathMeasurementsForTests().done).toMatchObject({
+				calls: 1,
+				output_bytes: Buffer.byteLength(output.join("\n"), "utf8"),
+			});
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("deferred event failures warn once without retrying observed done or batch completion", () => {
+		const root = mkRoot("deferred-event-failure");
+		try {
+			const created = newWorkstream(root, "event failure", {
+				tasks: ["first", "second", "third"],
+				noSpecRequiredReason: "fixture",
+			});
+			let eventCommitAttempts = 0;
+			const injectedFailure = {
+				beforeAuxiliary: (label: string) => {
+					if (label === "workbench event commit") {
+						eventCommitAttempts += 1;
+						throw new Error("injected event commit");
+					}
+				},
+			};
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const single = completeObservedTask(
+				root,
+				{
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					exitCode: 0,
+				},
+				injectedFailure,
+			);
+			expect(single.warnings).toEqual([
+				"workbench event commit failed after durable commit; repair the event ledger, then run afol local-state rebuild.",
+			]);
+			expect(eventCommitAttempts).toBe(1);
+
+			startTask(root, { session: created.session, taskId: "T-02" });
+			startTask(root, { session: created.session, taskId: "T-03" });
+			const batch = completeObservedTasks(
+				root,
+				{
+					session: created.session,
+					taskIds: ["T-02", "T-03"],
+					command: "bun test",
+					exitCode: 0,
+				},
+				injectedFailure,
+			);
+			expect(batch.warnings).toEqual([
+				"workbench event commit failed after durable commit; repair the event ledger, then run afol local-state rebuild.",
+			]);
+			expect(eventCommitAttempts).toBe(2);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-03 | done |",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close returns the bounded recovery warning when event commit fails", () => {
+		const root = mkRoot("close-event-failure");
+		try {
+			const created = newWorkstream(root, "close event failure", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			let eventCommitAttempts = 0;
+			const result = closeSession(
+				root,
+				created.session,
+				{},
+				{
+					beforeAuxiliary: (label) => {
+						if (label === "workbench event commit") {
+							eventCommitAttempts += 1;
+							throw new Error("injected event commit");
+						}
+					},
+				},
+			);
+
+			expect([...result]).toEqual([
+				"workbench event commit failed after durable commit; repair the event ledger, then run afol local-state rebuild.",
+			]);
+			expect(eventCommitAttempts).toBe(1);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -5610,10 +5931,10 @@ describe("task completion authorization and transitions", () => {
 			);
 			expect(
 				telemetry.filter((entry) => entry.event_type === "task_start"),
-			).toHaveLength(100);
+			).toHaveLength(0);
 			expect(
 				telemetry.filter((entry) => entry.event_type === "task_complete"),
-			).toHaveLength(100);
+			).toHaveLength(0);
 			expect(Buffer.byteLength(output.join("\n"), "utf8")).toBeLessThan(200);
 		} finally {
 			console.log = originalLog;
@@ -5969,11 +6290,7 @@ describe("durable lifecycle auxiliary failures", () => {
 	});
 
 	test("start preserves in_progress and rejects a duplicate retry", () => {
-		for (const label of [
-			"workbench start event",
-			"task-start telemetry",
-			"local-state refresh",
-		]) {
+		for (const label of ["workbench start event"]) {
 			const root = mkRoot(`start-aux-${label.replaceAll(" ", "-")}`);
 			try {
 				const created = newWorkstream(root, "durable start", {
@@ -6034,11 +6351,7 @@ describe("durable lifecycle auxiliary failures", () => {
 	});
 
 	test("done preserves completion and accepts an idempotent retry", () => {
-		for (const label of [
-			"workbench done event",
-			"task-complete telemetry",
-			"local-state refresh",
-		]) {
+		for (const label of ["workbench done event"]) {
 			const root = mkRoot(`done-aux-${label.replaceAll(" ", "-")}`);
 			try {
 				const created = newWorkstream(root, "durable done", {

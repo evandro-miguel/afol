@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
 import { kernelRegistry } from "../registry";
+import { fixedHarnessProfile } from "../services/receipts/profiles";
 import { waiveSpecCheck } from "../services/spec-gate/checker";
 import {
 	newWorkstream,
@@ -64,6 +65,61 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
 	});
+}
+
+function writeReceiptFixture(
+	root: string,
+	session: string,
+	overrides: Record<string, unknown> = {},
+): string {
+	writeJson(join(root, ".afol", "config.json"), {
+		schema_version: 1,
+		project: {
+			id: "123e4567-e89b-12d3-a456-426614174000",
+			name: "receipt-test",
+		},
+	});
+	writeFileSync(join(root, "checked.txt"), "checked\n", "utf8");
+	execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+	execFileSync("git", ["config", "user.email", "receipt@example.test"], {
+		cwd: root,
+	});
+	execFileSync("git", ["config", "user.name", "Receipt Test"], { cwd: root });
+	execFileSync("git", ["add", "."], { cwd: root });
+	execFileSync("git", ["commit", "-m", "receipt fixture"], {
+		cwd: root,
+		stdio: "ignore",
+	});
+	const head = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: root,
+		encoding: "utf8",
+	}).trim();
+	const profile = fixedHarnessProfile(kernelRegistry.commands, "coder");
+	if (!profile) throw new Error("Missing coder profile fixture");
+	const path = join(root, "receipt.json");
+	writeJson(path, {
+		receipt_id: "receipt-1",
+		project_id: "123e4567-e89b-12d3-a456-426614174000",
+		session_id: session,
+		task_id: "T-01",
+		harness_id: "external-harness",
+		run_id: "run-1",
+		harness_profile_id: profile.id,
+		harness_profile_digest: profile.digest,
+		source_commit: head,
+		head_commit: head,
+		diff_hash:
+			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		checked_paths: ["checked.txt"],
+		check_command: "bun test",
+		check_exit_code: 0,
+		tool_trace_digest: "b".repeat(64),
+		started_at: new Date(Date.now() - 60_000).toISOString(),
+		finished_at: new Date().toISOString(),
+		result: "passed",
+		...overrides,
+	});
+	return path;
 }
 
 function expectRestrictedJsonError(proc: ReturnType<typeof runKernel>): void {
@@ -293,6 +349,7 @@ describe("kernel front-door", () => {
 			["./commands/project-benchmark", ["runProjectBenchmarkCommand"]],
 			["./commands/pstr", ["runPstrCommand"]],
 			["./commands/quick-task", ["runQuickTaskCommand"]],
+			["./commands/receipt", ["runReceiptCommand"]],
 			["./commands/schema-cmd", ["runSchemaCommand"]],
 			["./commands/session", ["runSessionCommand"]],
 			["./commands/spec", ["runSpecCommand"]],
@@ -2063,6 +2120,201 @@ describe("kernel front-door", () => {
 				"curl",
 				"curl",
 			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("ingests fixed-profile receipts idempotently without changing task state", () => {
+		const root = mkProjectRoot("receipt-ingest", "");
+		const created = newWorkstream(root, "receipt ingestion", {
+			task: "record an external receipt",
+		});
+		try {
+			const receiptPath = writeReceiptFixture(root, created.session);
+			const first = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(first.status).toBe(0);
+			const firstPayload = JSON.parse(first.stdout as string) as {
+				data?: { evidence_id?: string; status?: string };
+			};
+			expect(firstPayload.data?.status).toBe("committed");
+			expect(firstPayload.data?.evidence_id).toBeTruthy();
+			const evidencePath = join(
+				root,
+				".afol",
+				"wb",
+				created.session,
+				".evidence.jsonl",
+			);
+			expect(
+				readFileSync(evidencePath, "utf8").trim().split("\n"),
+			).toHaveLength(1);
+			expect(
+				readFileSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						created.session,
+						`${created.session}_task_01.md`,
+					),
+					"utf8",
+				),
+			).toContain("| T-01 | pending |");
+
+			const duplicate = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(duplicate.status).toBe(0);
+			expect(
+				(
+					JSON.parse(duplicate.stdout as string) as {
+						data?: { status?: string };
+					}
+				).data?.status,
+			).toBe("duplicate");
+			expect(
+				readFileSync(evidencePath, "utf8").trim().split("\n"),
+			).toHaveLength(1);
+
+			writeReceiptFixture(root, created.session, { run_id: "run-conflict" });
+			const conflict = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(conflict.status).toBe(2);
+			expect(
+				(
+					JSON.parse(conflict.stdout as string) as {
+						error?: { message?: string };
+					}
+				).error?.message,
+			).toContain("different canonical content");
+			expect(
+				readFileSync(evidencePath, "utf8").trim().split("\n"),
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects secret-like receipt content before evidence mutation", () => {
+		const root = mkProjectRoot("receipt-secret", "");
+		const created = newWorkstream(root, "receipt ingestion", {
+			task: "reject unsafe receipt",
+		});
+		try {
+			const receiptPath = writeReceiptFixture(root, created.session, {
+				check_command: "API_KEY=synthetic-secret bun test",
+			});
+			const proc = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(proc.status).toBe(2);
+			expect(proc.stdout as string).not.toContain("synthetic-secret");
+			expect(
+				readFileSync(
+					join(root, ".afol", "wb", created.session, ".evidence.jsonl"),
+					"utf8",
+				),
+			).toBe("");
+			expect(
+				existsSync(join(root, ".afol", "data", "receipts", "external.jsonl")),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects forged, non-ancestor, and stale receipt provenance", () => {
+		const root = mkProjectRoot("receipt-provenance", "");
+		const created = newWorkstream(root, "receipt ingestion", {
+			task: "reject invalid provenance",
+		});
+		try {
+			const receiptPath = writeReceiptFixture(root, created.session);
+			const original = JSON.parse(readFileSync(receiptPath, "utf8")) as Record<
+				string,
+				unknown
+			>;
+			writeJson(receiptPath, { ...original, diff_hash: "f".repeat(64) });
+			const forged = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(forged.status).toBe(2);
+			expect(forged.stdout as string).toContain("diff_hash does not match");
+
+			const mainHead = execFileSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).trim();
+			execFileSync("git", ["checkout", "--orphan", "receipt-forged"], {
+				cwd: root,
+				stdio: "ignore",
+			});
+			writeFileSync(join(root, "foreign.txt"), "foreign\n", "utf8");
+			execFileSync("git", ["add", "."], { cwd: root });
+			execFileSync("git", ["commit", "-m", "foreign receipt source"], {
+				cwd: root,
+				stdio: "ignore",
+			});
+			const foreignHead = execFileSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).trim();
+			execFileSync("git", ["checkout", "--detach", mainHead], {
+				cwd: root,
+				stdio: "ignore",
+			});
+			writeJson(receiptPath, {
+				...original,
+				source_commit: foreignHead,
+				head_commit: mainHead,
+			});
+			const nonAncestor = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(nonAncestor.status).toBe(2);
+			expect(nonAncestor.stdout as string).toContain("not an ancestor");
+
+			writeJson(receiptPath, {
+				...original,
+				started_at: "2020-01-01T00:00:00.000Z",
+				finished_at: "2020-01-01T00:01:00.000Z",
+			});
+			const stale = runKernel(root, [
+				"receipt",
+				"ingest",
+				"--file",
+				receiptPath,
+			]);
+			expect(stale.status).toBe(2);
+			expect(stale.stdout as string).toContain("allowed ingestion window");
+			expect(
+				readFileSync(
+					join(root, ".afol", "wb", created.session, ".evidence.jsonl"),
+					"utf8",
+				),
+			).toBe("");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

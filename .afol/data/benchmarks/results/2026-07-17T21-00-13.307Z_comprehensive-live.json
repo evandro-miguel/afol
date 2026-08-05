@@ -1,0 +1,191 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpf8x3r",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T21:00:13.307Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpf8x3r",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T21:00:13.307Z",
+      "tokens": {
+        "input": 45151,
+        "output": 313,
+        "cached_input": 24320,
+        "reasoning_output": 176,
+        "total": 69960
+      },
+      "timing": {
+        "wall_clock_ms": 15247
+      },
+      "tools": {
+        "total_calls": 3,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 1,
+          "shell": 0,
+          "agent_message": 2
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "execution": {
+        "phase_ms": {
+          "host_dispatch": 12,
+          "worker": 15195,
+          "host_review": 39,
+          "end_to_end": 15247
+        },
+        "worker_tokens": {
+          "input": 45151,
+          "output": 313,
+          "cached_input": 24320,
+          "reasoning_output": 176,
+          "total": 69960
+        },
+        "host_model_tokens": 0,
+        "protocol_calls": {
+          "host_dispatch": 1,
+          "worker_submit": 1,
+          "host_review": 1,
+          "total": 3
+        },
+        "attempts": {
+          "dispatch": 1,
+          "submit": 1,
+          "review": 1
+        },
+        "retries": {
+          "dispatch": 0,
+          "submit": 0,
+          "review": 0
+        },
+        "evidence_id": "E-20260717170013286-e44028"
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 1,
+        "max_round_trips": 1
+      },
+      "pass": true,
+      "notes": [
+        "token-scope:worker"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpf8x3r",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T21:00:13.307Z",
+    "summary": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "blocked": 0,
+      "total_tokens": 69960,
+      "total_time_ms": 15247,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 45151,
+          "output": 313,
+          "cached_input": 24320,
+          "reasoning_output": 176,
+          "total": 69960
+        },
+        "timing": {
+          "wall_clock_ms": 15247
+        },
+        "tools": {
+          "total_calls": 3,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 1,
+            "shell": 0,
+            "agent_message": 2
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "execution": {
+          "phase_ms": {
+            "host_dispatch": 12,
+            "worker": 15195,
+            "host_review": 39,
+            "end_to_end": 15247
+          },
+          "worker_tokens": {
+            "input": 45151,
+            "output": 313,
+            "cached_input": 24320,
+            "reasoning_output": 176,
+            "total": 69960
+          },
+          "host_model_tokens": 0,
+          "protocol_calls": {
+            "host_dispatch": 1,
+            "worker_submit": 1,
+            "host_review": 1,
+            "total": 3
+          },
+          "attempts": {
+            "dispatch": 1,
+            "submit": 1,
+            "review": 1
+          },
+          "retries": {
+            "dispatch": 0,
+            "submit": 0,
+            "review": 0
+          },
+          "evidence_id": "E-20260717170013286-e44028"
+        },
+        "notes": [
+          "token-scope:worker"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpf8x3r\ntimestamp: 2026-07-17T21:00:13.307Z\nresults: 1 passed=1 failed=0 blocked=0\ntokens: total=69960\ntime_ms: total=15247\ntool_success: 1\npassed orchestration-submission-review tokens=69960 time_ms=15247 tools=3"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpf8x3r\ntimestamp: 2026-07-17T21:00:13.307Z\nresults: 1 passed=1 failed=0 blocked=0\ntokens: total=69960\ntime_ms: total=15247\ntool_success: 1\npassed orchestration-submission-review tokens=69960 time_ms=15247 tools=3"
+}

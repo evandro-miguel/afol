@@ -8,8 +8,13 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import {
+	beginHotPathMeasurement,
+	countHotPathOperation,
+} from "../services/hot-path/instrumentation";
+import {
 	collectSessionIds,
 	detectSessionHealth,
+	loadWorkBenchIndexSnapshot,
 } from "../services/local-state/workbench-index";
 import {
 	type ProjectConfigSource,
@@ -473,6 +478,10 @@ function computeSessionHealth(projectRoot: string): {
 	}
 }
 
+function defaultSessionCount(projectRoot: string): number {
+	return loadWorkBenchIndexSnapshot(projectRoot)?.sessions.length ?? 0;
+}
+
 function mergeStatusEntries(current: string[], additions: string[]): string[] {
 	return normalizeList([...current, ...additions]);
 }
@@ -509,14 +518,19 @@ function readStatusSnapshot(
 	const lockPath = projectPaths.abs.lockFile;
 	const activeSessionPath = projectPaths.abs.activeSessionFile;
 
-	let healthInfo: ReturnType<typeof computeSessionHealth>;
-	try {
-		healthInfo = computeHealthImpl(loaded.value.root);
-	} catch {
-		healthInfo = {
-			sessionCount: null,
-			sessionHealth: ["unavailable: session health collection failed"],
-		};
+	let healthInfo: Pick<StatusSnapshot, "sessionCount" | "sessionHealth"> = {
+		sessionCount: defaultSessionCount(loaded.value.root),
+	};
+	if (includeHealthFindings) {
+		try {
+			countHotPathOperation("status.health");
+			healthInfo = computeHealthImpl(loaded.value.root);
+		} catch {
+			healthInfo = {
+				sessionCount: null,
+				sessionHealth: ["unavailable: session health collection failed"],
+			};
+		}
 	}
 	const globalFindings = includeHealthFindings
 		? collectGlobalStatusFindings(loaded.value.root)
@@ -528,9 +542,12 @@ function readStatusSnapshot(
 		})?.session ?? null;
 	const catchupSession = selectedSession;
 	const catchupReport = includeCatchup
-		? catchupSession
-			? computeCatchupImpl(loaded.value.root, { session: catchupSession })
-			: computeCatchupImpl(loaded.value.root, {})
+		? (() => {
+				countHotPathOperation("status.catchup");
+				return catchupSession
+					? computeCatchupImpl(loaded.value.root, { session: catchupSession })
+					: computeCatchupImpl(loaded.value.root, {});
+			})()
 		: undefined;
 
 	if (!selectedSession) {
@@ -668,6 +685,7 @@ export function runStatusCommand(
 	args: string[],
 	io: CommandIo = DEFAULT_IO,
 ): number {
+	const finishMeasurement = beginHotPathMeasurement("status");
 	let parsed: {
 		json: boolean;
 		session: string | null;
@@ -729,24 +747,26 @@ export function runStatusCommand(
 					}
 				: undefined,
 		};
-		io.stdout(
-			stringifyEnvelope(
-				envelopeWithLegacyKeys(resultEnvelope(data, "status", 0), [
-					"status",
-					"task",
-					"files_written",
-					"validation_or_checks",
-					"blockers",
-					"next",
-					"session_count",
-					"session_health_warnings",
-					"paths",
-				]),
-			),
+		const output = stringifyEnvelope(
+			envelopeWithLegacyKeys(resultEnvelope(data, "status", 0), [
+				"status",
+				"task",
+				"files_written",
+				"validation_or_checks",
+				"blockers",
+				"next",
+				"session_count",
+				"session_health_warnings",
+				"paths",
+			]),
 		);
+		io.stdout(output);
+		finishMeasurement(output);
 		return 0;
 	}
 
-	io.stdout(formatCompact(snapshot));
+	const output = formatCompact(snapshot);
+	io.stdout(output);
+	finishMeasurement(output);
 	return 0;
 }

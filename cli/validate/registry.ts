@@ -15,6 +15,10 @@ import {
 import {
 	type Baseline,
 	BENCHMARK_RESULT_SCHEMA_VERSION,
+	type HotPathDerivedPath,
+	type HotPathScenarioConfig,
+	type HotPathScenarioMode,
+	type HotPathScenarioOperation,
 	type PackId,
 	type PackMetadata,
 	REQUIRED_PACKS,
@@ -144,6 +148,81 @@ function parseScenarioCoverage(
 	return coverage;
 }
 
+function parseHotPathScenario(
+	data: Record<string, unknown>,
+	sourcePath: string,
+): HotPathScenarioConfig | undefined {
+	if (data.runner === undefined && data.hot_path === undefined) {
+		return undefined;
+	}
+	if (data.runner !== "hot-path") {
+		throw new Error(`Invalid hot-path runner: ${sourcePath}.runner`);
+	}
+	const raw = asOptionalObject(data.hot_path, `${sourcePath}.hot_path`);
+	if (raw === undefined) {
+		throw new Error(`Missing hot-path config: ${sourcePath}.hot_path`);
+	}
+	const operation = asString(raw.operation, `${sourcePath}.hot_path.operation`);
+	const operations = ["status", "start", "done", "close"] as const;
+	if (!operations.includes(operation as HotPathScenarioOperation)) {
+		throw new Error(
+			`Invalid hot-path operation: ${sourcePath}.hot_path.operation`,
+		);
+	}
+	const mode = asString(raw.mode, `${sourcePath}.hot_path.mode`);
+	const modes = ["default", "explicit-derived"] as const;
+	if (!modes.includes(mode as HotPathScenarioMode)) {
+		throw new Error(`Invalid hot-path mode: ${sourcePath}.hot_path.mode`);
+	}
+	const derivedPath = asOptionalString(
+		raw.derived_path,
+		`${sourcePath}.hot_path.derived_path`,
+	);
+	const recoveryCommand = asOptionalString(
+		raw.recovery_command,
+		`${sourcePath}.hot_path.recovery_command`,
+	);
+	const derivedPaths = ["health", "catchup", "rebuild"] as const;
+	if (
+		derivedPath !== undefined &&
+		!derivedPaths.includes(derivedPath as HotPathDerivedPath)
+	) {
+		throw new Error(
+			`Invalid hot-path derived path: ${sourcePath}.hot_path.derived_path`,
+		);
+	}
+	if (mode === "explicit-derived" && derivedPath === undefined) {
+		throw new Error(
+			`Explicit hot-path scenarios require derived_path: ${sourcePath}.hot_path.derived_path`,
+		);
+	}
+	if (mode === "default" && derivedPath !== undefined) {
+		throw new Error(
+			`Default hot-path scenarios cannot declare derived_path: ${sourcePath}.hot_path.derived_path`,
+		);
+	}
+	if (mode === "default" && recoveryCommand !== undefined) {
+		throw new Error(
+			`Default hot-path scenarios cannot declare recovery_command: ${sourcePath}.hot_path.recovery_command`,
+		);
+	}
+	if (
+		mode === "explicit-derived" &&
+		operation !== "status" &&
+		recoveryCommand !== "afol local-state rebuild --json"
+	) {
+		throw new Error(
+			`Lifecycle explicit-derived scenarios require afol local-state rebuild --json: ${sourcePath}.hot_path.recovery_command`,
+		);
+	}
+	return {
+		operation: operation as HotPathScenarioOperation,
+		mode: mode as HotPathScenarioMode,
+		...(derivedPath ? { derived_path: derivedPath as HotPathDerivedPath } : {}),
+		...(recoveryCommand ? { recovery_command: recoveryCommand } : {}),
+	};
+}
+
 function parseScenario(
 	data: Record<string, unknown>,
 	sourcePath: string,
@@ -169,6 +248,11 @@ function parseScenario(
 			`${sourcePath}.deterministic_metrics`,
 		),
 	};
+	const hotPath = parseHotPathScenario(data, sourcePath);
+	if (hotPath !== undefined) {
+		scenario.runner = "hot-path";
+		scenario.hot_path = hotPath;
+	}
 	const coverage = parseScenarioCoverage(data.coverage, sourcePath);
 	if (coverage !== undefined) {
 		scenario.coverage = coverage;

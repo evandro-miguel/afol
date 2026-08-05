@@ -298,7 +298,7 @@ describe("session resolution contract", () => {
 		}
 	});
 
-	test("resolveSession ignores missing or corrupt implicit targets", () => {
+	test("resolveSession ignores missing but fails closed for corrupt context bindings", () => {
 		const root = createProjectRoot("invalid-implicit-targets");
 		initGitRepo(root);
 		try {
@@ -323,13 +323,15 @@ describe("session resolution contract", () => {
 				branch: currentGitBranch(root),
 				worktree: root,
 			});
-			expect(resolveSession(root, {})).toBeNull();
+			expect(() => resolveSession(root, {})).toThrow(
+				"Context session binding is corrupt: CORRUPT-CONTEXT",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("malformed context falls through and switch repairs the binding", async () => {
+	test("malformed context fails closed and switch repairs the binding", async () => {
 		const root = createProjectRoot("malformed-context-recovery");
 		initGitRepo(root);
 		try {
@@ -345,10 +347,7 @@ describe("session resolution contract", () => {
 				"{broken",
 				"utf8",
 			);
-			expect(resolveSession(root, {})).toEqual({
-				session: "GLOBAL",
-				source: "global",
-			});
+			expect(() => resolveSession(root, {})).toThrow("Invalid session context");
 
 			const io = captureIo();
 			expect(await runSessionCommand("switch", ["SWITCHED"], root, io.io)).toBe(

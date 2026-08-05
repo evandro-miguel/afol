@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { kernelRegistry } from "../registry";
 import { buildManifestCommands } from "../services/manifest/commands";
+import { buildToolCatalog } from "../services/manifest/tools";
 
 describe("kernel registry", () => {
 	test("exports expected command kinds and alias resolution", () => {
@@ -181,6 +182,39 @@ describe("kernel registry", () => {
 
 			expect(manifest.commands).toEqual(expectedCommands);
 		}
+	});
+
+	test("derives fixed harness tool profiles from the command registry", () => {
+		const catalog = buildToolCatalog(kernelRegistry.commands);
+		expect(catalog.tools).toHaveLength(kernelRegistry.commands.length);
+		expect(catalog.tool_profiles).toMatchObject({
+			kind: "harness_metadata",
+			enforcement: "none",
+		});
+		expect(catalog.tool_profiles.profiles.map((profile) => profile.id)).toEqual(
+			["orchestrator", "planner", "researcher", "coder", "tester", "reviewer"],
+		);
+		const commandsById = new Map(
+			kernelRegistry.commands.map((command) => [command.command, command]),
+		);
+		for (const profileId of ["planner", "researcher"] as const) {
+			const profile = catalog.tool_profiles.profiles.find(
+				(item) => item.id === profileId,
+			);
+			expect(profile?.tool_ids).not.toContain("feedback");
+			for (const toolId of profile?.tool_ids ?? []) {
+				const command = commandsById.get(toolId);
+				expect(command?.sideEffect).toBe("read");
+				expect(
+					(command?.subcommands ?? []).every(
+						(item) => item.sideEffect === "read",
+					),
+				).toBe(true);
+			}
+		}
+		expect(
+			catalog.tools.find((tool) => tool.id === "feedback")?.execution_mode,
+		).toBe("on-demand");
 	});
 
 	test("publishes maintenance review subcommand metadata", () => {

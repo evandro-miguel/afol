@@ -1394,6 +1394,20 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildContextBundle reports a section gap instead of unrelated fallback content", () => {
+		const root = createBundleFixture();
+		try {
+			const bundle = buildContextBundle(root, {
+				surface: "surface-with-no-match",
+				role: "designer",
+			});
+			expect(bundle.refs).toEqual([]);
+			expect(bundle.gaps).toContain("no matching spec sections");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("buildContextBundle populates do_not_load list", () => {
 		const root = createBundleFixture();
 		try {

@@ -1,0 +1,137 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "orchestration-submission-review-mrpdtgg5",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-07-17T20:21:47.170Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "orchestration-submission-review-mrpdtgg5",
+      "scenario_id": "orchestration-submission-review",
+      "pack_id": "comprehensive-live",
+      "status": "failed",
+      "mode": "live",
+      "git_commit": "36cd313e2ca5",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-07-17T20:21:47.170Z",
+      "tokens": {
+        "input": 414684,
+        "output": 5028,
+        "cached_input": 372096,
+        "reasoning_output": 3407,
+        "total": 795215
+      },
+      "timing": {
+        "wall_clock_ms": 110051
+      },
+      "tools": {
+        "total_calls": 22,
+        "success_rate": 0.9091,
+        "by_type": {
+          "file_read": 5,
+          "afol_command": 4,
+          "shell": 2,
+          "agent_message": 11
+        },
+        "error_count": 1
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 1,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8,
+        "max_total_tokens": 90000,
+        "max_afol_commands": 3,
+        "max_round_trips": 4
+      },
+      "pass": false,
+      "notes": [
+        "output-tokens:5028>4000",
+        "total-tokens:795215>90000",
+        "afol-commands:4>3",
+        "round-trips:15>4",
+        "expected-operation-repeated:dispatch:2",
+        "codex-stderr:Reading additional input from stdin...\n2026-07-17T20:20:49.268627Z ERROR codex_core::tools::router: error=Exit code: 1\nWall time: 0.4 seconds\nOutput:\nerr orchestration Dispatch requires a clean worktree.",
+        "codex-exit:0"
+      ]
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "orchestration-submission-review-mrpdtgg5",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-07-17T20:21:47.170Z",
+    "summary": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "total_tokens": 795215,
+      "total_time_ms": 110051,
+      "avg_tool_success_rate": 0.9091
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "orchestration-submission-review",
+        "status": "failed",
+        "pass": false,
+        "tokens": {
+          "input": 414684,
+          "output": 5028,
+          "cached_input": 372096,
+          "reasoning_output": 3407,
+          "total": 795215
+        },
+        "timing": {
+          "wall_clock_ms": 110051
+        },
+        "tools": {
+          "total_calls": 22,
+          "success_rate": 0.9091,
+          "by_type": {
+            "file_read": 5,
+            "afol_command": 4,
+            "shell": 2,
+            "agent_message": 11
+          },
+          "error_count": 1
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 1,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": [
+          "output-tokens:5028>4000",
+          "total-tokens:795215>90000",
+          "afol-commands:4>3",
+          "round-trips:15>4",
+          "expected-operation-repeated:dispatch:2",
+          "codex-stderr:Reading additional input from stdin...\n2026-07-17T20:20:49.268627Z ERROR codex_core::tools::router: error=Exit code: 1\nWall time: 0.4 seconds\nOutput:\nerr orchestration Dispatch requires a clean worktree.",
+          "codex-exit:0"
+        ]
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpdtgg5\ntimestamp: 2026-07-17T20:21:47.170Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=795215\ntime_ms: total=110051\ntool_success: 0.9091\nfailed orchestration-submission-review tokens=795215 time_ms=110051 tools=22"
+  },
+  "text": "bench report: comprehensive-live\nrun: orchestration-submission-review-mrpdtgg5\ntimestamp: 2026-07-17T20:21:47.170Z\nresults: 1 passed=0 failed=1 blocked=0\ntokens: total=795215\ntime_ms: total=110051\ntool_success: 0.9091\nfailed orchestration-submission-review tokens=795215 time_ms=110051 tools=22"
+}

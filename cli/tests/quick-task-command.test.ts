@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { normalizeScopedFlags } from "../aliases";
 import {
 	parseQuickTaskArgs,
 	runQuickTaskCommand,
@@ -109,6 +110,22 @@ describe("quick-task parseQuickTaskArgs", () => {
 		);
 	});
 
+	test("does not normalize -o to the removed --result contract", () => {
+		expect(normalizeScopedFlags("quickTask", ["-o", "passed"])).toEqual([
+			"-o",
+			"passed",
+		]);
+		expect(() =>
+			parseQuickTaskArgs(["alpha", "-o", "passed", "--command", "true"]),
+		).toThrow("Unknown quick-task argument: -o");
+	});
+
+	test("allows omitted governance as a pending-spec quick task", () => {
+		const parsed = parseQuickTaskArgs(["alpha", "--command", "true"]);
+		expect(parsed.metadata.featureId).toBeUndefined();
+		expect(parsed.metadata.parentSpec).toBeUndefined();
+	});
+
 	test("throws on unknown argument", () => {
 		expect(() => parseQuickTaskArgs(["alpha", "--bogus"])).toThrow(
 			"Unknown quick-task argument",
@@ -161,6 +178,26 @@ describe("quick-task parseQuickTaskArgs", () => {
 });
 
 describe("quick-task runQuickTaskCommand", () => {
+	test("closes a pending-spec lifecycle with a structured resolution prompt", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-pending-spec-"));
+		try {
+			const exitCode = await runQuickTaskCommand(
+				["pending", "--command", "true", "--json"],
+				root,
+			);
+			expect(exitCode).toBe(0);
+			const index = JSON.parse(
+				readFileSync(
+					join(root, ".afol", "data", "governance", "pending-specs.json"),
+					"utf8",
+				),
+			) as { entries: Array<{ status: string }> };
+			expect(index.entries).toMatchObject([{ status: "open" }]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("normalizes a governed spec path through task completion", async () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-spec-path-"));
 		try {

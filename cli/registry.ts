@@ -44,6 +44,7 @@ export type CommandKind =
 	| "preflight"
 	| "adapter"
 	| "telemetry"
+	| "receipt"
 	| "session";
 export type CommandSideEffect =
 	| "read"
@@ -269,6 +270,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 					"Run ordered argv-only verification steps, record each result, then complete",
 			},
 			{
+				usage: "--verification-timeout-ms <milliseconds>",
+				sideEffect: "write",
+				description: "Bound each step (default 300000ms; max 600000ms)",
+			},
+			{
 				usage: "-- <argv...>",
 				sideEffect: "write",
 				description: "Run positional argv verification without shell parsing",
@@ -356,7 +362,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "quickTask",
 		sideEffect: "write",
 		description:
-			"Run a single-task lifecycle after executing a verification command",
+			"Run one lifecycle; missing governance stays pending with a next step",
 		category: "workflow",
 		subcommands: [
 			{
@@ -369,6 +375,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--feature-id <F-id> --parent-spec <spec-id>",
 				sideEffect: "write",
 				description: "Create the quick task as a governed session",
+			},
+			{
+				usage: "--no-spec-required --reason <text>",
+				sideEffect: "write",
+				description: "Waive the spec requirement explicitly",
 			},
 		],
 	},
@@ -1297,6 +1308,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "export --format jsonl",
 				sideEffect: "read",
 				description: "Export filtered telemetry events",
+			},
+		],
+	},
+	{
+		command: "receipt",
+		aliases: [],
+		kind: "receipt",
+		sideEffect: "append",
+		description:
+			"Ingest a bounded external harness receipt as observed evidence",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "ingest --file <path>",
+				sideEffect: "append",
+				description:
+					"Validate one fixed-profile receipt and record observed evidence",
 			},
 		],
 	},

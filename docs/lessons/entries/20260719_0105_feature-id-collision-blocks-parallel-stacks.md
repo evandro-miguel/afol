@@ -1,37 +1,38 @@
 ---
 doc_type: lesson_entry
 id: 20260719_0105_feature-id-collision-blocks-parallel-stacks
-status: active
+status: superseded
+superseded_by: ADR-007
 created_at: '2026-07-19T01:05:00-03:00'
-updated_at: '2026-07-19T01:05:00-03:00'
-tags: [governance, roadmap, merge, evolution, f-30, f-31, adr]
+updated_at: '2026-07-31T00:00:00-03:00'
+tags: [governance, roadmap, merge, evolution, f-30, f-31, adr, receipts]
 ---
 
 # Feature Id Collision Blocks Parallel Stacks
 
 ## Context
 
-While Evolution loops (docs/core through capability marker) were stacked on
-feature branches claiming **F-30** and **ADR-007**, `dev` merged Agent
-Submission governance as **F-30** with **ADR-007**. Parallel open PRs and a
-dirty orchestration worktree also treated F-30 as submission/orchestration.
-Merging the Evolution tip without renumber would fight `GENERAL-ROADMAP.md`,
-specs INDEX, decisions INDEX, and ADR-007 content.
+The original entry recorded a collision between parallel Evolution and
+submission/orchestration stacks. Its inverse allocation advice is no longer
+the active contract, and its assignment/dispatch wording was retired by the
+F-31 external-receipt decision.
 
-## Lesson
+## Corrected lesson
 
-Roadmap feature ids and ADR numbers are global scarce resources. Two parallel
-product lanes must not invent the same F-id or ADR-id. When a lane is still
-open on a stack, reserve the next free id on `dev` before the other lane lands,
-or renumber the open stack before merge. Git `MERGEABLE` on a PR does not mean
-governance canon is conflict-free.
+Roadmap feature ids and ADR numbers are global scarce resources. The current
+canon is fixed: **F-30 + ADR-008 = AFOL Evolution** and **F-31 + ADR-007 =
+External Receipts and Fixed Harness Tool Profiles**. Do not renumber Evolution,
+reuse either pair for another product, or treat a harness receipt as an
+assignment or model-orchestration authority.
 
 ## Prevention
 
-- On `dev`, F-30 + ADR-007 = Agent Submission only.
-- Evolution System must land as **F-31** with a new ADR (recommended ADR-008).
-- Before opening a multi-PR stack, allocate the F-id and ADR on `dev` (even as
-  `reserved`) so parallel agents cannot steal them.
-- After merges that claim a new F-id, reindex Project RAG (`afol-dev`) and
-  GitNexus so retrieval matches canon.
-- Do not "fix" a collision by overwriting INDEX rows; renumber the late stack.
+- Allocate roadmap feature and ADR ids on `dev` before parallel implementation.
+- Keep F-30/ADR-008 Evolution and F-31/ADR-007 external receipts/profiles
+  separate in roadmap, spec, decision, and workbench bindings.
+- External harnesses select/call/schedule/retry/supervise models; AFOL only
+  validates their bounded receipts and fixed profile metadata.
+- After a governance allocation changes, refresh the Project RAG and GitNexus
+  indexes so retrieval matches the current canon.
+- Do not resolve a collision by overwriting an index row; update the governing
+  artifacts together and retain the historical entry as superseded.

@@ -3,7 +3,7 @@ doc_type: index
 id: 260223_0000_decisions_index_01
 title: Architecture Decision Records Index
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-07-12T18:47:57-03:00'
+updated_at: '2026-07-29T00:00:00-03:00'
 ---
 
 ## Architecture Decision Records (ADRs)
@@ -44,7 +44,7 @@ ADRs document:
 | ADR-004 | AFOL Administration and Project Structure Surfaces | Accepted | 2026-06-12 |
 | ADR-005 | AFOL Administration Canonical Authority Transfer | Accepted | 2026-06-14 |
 | ADR-006 | F-22 Core Readiness and Selective Mutation Policy | Accepted | 2026-07-12 |
-| ADR-007 | Proposed F-30 Agent Submission and Review Boundary | Proposed | 2026-07-18 |
+| ADR-007 | F-31 External Receipts and Fixed Harness Tool Profiles | Accepted | 2026-07-31 |
 | ADR-008 | AFOL Evolution Autonomy and Evidence Boundary | Accepted | 2026-07-16 |
 
 ### Creating an ADR

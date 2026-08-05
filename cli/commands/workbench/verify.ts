@@ -164,8 +164,28 @@ export type RunVerificationAsyncOptions = {
 	signal?: AbortSignal;
 };
 
-const DEFAULT_VERIFICATION_TIMEOUT_MS = 120_000;
+/**
+ * Full-repository verification can legitimately exceed two minutes on a
+ * warm-but-loaded host. Keep the default finite and bounded so `done --test`
+ * remains fail-closed rather than allowing an unbounded child process.
+ */
+export const DEFAULT_VERIFICATION_TIMEOUT_MS = 300_000;
+export const MAX_VERIFICATION_TIMEOUT_MS = 600_000;
 const DEFAULT_VERIFICATION_OUTPUT_BYTES = 1024 * 1024;
+
+export function resolveVerificationTimeoutMs(timeoutMs?: number): number {
+	if (timeoutMs === undefined) return DEFAULT_VERIFICATION_TIMEOUT_MS;
+	if (
+		!Number.isInteger(timeoutMs) ||
+		timeoutMs < 1 ||
+		timeoutMs > MAX_VERIFICATION_TIMEOUT_MS
+	) {
+		throw new Error(
+			`verification timeout must be an integer between 1 and ${MAX_VERIFICATION_TIMEOUT_MS} ms`,
+		);
+	}
+	return timeoutMs;
+}
 
 function terminateProcessTree(child: ChildProcess, force: boolean): void {
 	const pid = child.pid;
@@ -196,6 +216,7 @@ export function runVerificationAsync(
 ): Promise<ObservedVerificationResult> {
 	const startedAt = Date.now();
 	const durationMs = (): number => Date.now() - startedAt;
+	const timeoutMs = resolveVerificationTimeoutMs(options.timeoutMs);
 	if (
 		(spec.mode === "shell" && spec.command.trim().length === 0) ||
 		(spec.mode === "argv" && spec.executable.trim().length === 0)
@@ -260,10 +281,7 @@ export function runVerificationAsync(
 		child.stderr?.on("data", countOutput);
 		const abortHandler = (): void => terminate("lock_lost");
 		options.signal?.addEventListener("abort", abortHandler, { once: true });
-		const timeout = setTimeout(
-			() => terminate("timed_out"),
-			options.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS,
-		);
+		const timeout = setTimeout(() => terminate("timed_out"), timeoutMs);
 		timeout.unref();
 		child.once("error", () => {
 			finish({
@@ -295,8 +313,9 @@ export function runVerificationAsync(
 export function runVerification(
 	root: string,
 	command: string | VerificationSpec,
-	options: { shell?: boolean } = {},
+	options: { shell?: boolean; timeoutMs?: number } = {},
 ): RunVerificationResult {
+	const timeoutMs = resolveVerificationTimeoutMs(options.timeoutMs);
 	const spec: VerificationSpec =
 		typeof command === "string"
 			? options.shell
@@ -322,7 +341,7 @@ export function runVerification(
 			cwd: root,
 			encoding: "utf8",
 			maxBuffer: 1024 * 1024,
-			timeout: 120_000,
+			timeout: timeoutMs,
 			shell: true,
 		});
 	} else {
@@ -330,7 +349,7 @@ export function runVerification(
 			cwd: root,
 			encoding: "utf8",
 			maxBuffer: 1024 * 1024,
-			timeout: 120_000,
+			timeout: timeoutMs,
 		});
 	}
 

@@ -11,6 +11,7 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import { assertValidEventLedger } from "../services/events/ledger";
+import { countHotPathOperation } from "../services/hot-path/instrumentation";
 import { withSessionLock } from "../services/io/session-lock";
 import {
 	rebuildProjectIndexes,
@@ -169,6 +170,7 @@ export async function runLocalStateCommand(
 			}
 			return withSessionLock(projectRoot, "local-state.rebuild", () => {
 				assertValidEventLedger(projectRoot);
+				countHotPathOperation("workbench.local_state_refresh");
 				const workbench = rebuildWorkBenchIndex(projectRoot);
 				const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
 				const summary = summarizeRebuild(snapshot);
