@@ -256,6 +256,9 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
+		expect(scripts["validate:release"]).toContain(
+			"bun run local-state:rebuild",
+		);
 		expect(scripts["validate:release"]).toContain("bun run validate:project");
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["test:full"]).toBe("bun test --only-failures");
@@ -284,6 +287,9 @@ describe("release and toolchain contracts", () => {
 		}
 		expect(stepIndex("bun run smoke:dist")).toBeLessThan(
 			stepIndex("bun run smoke:clean"),
+		);
+		expect(stepIndex("bun run local-state:rebuild")).toBeLessThan(
+			stepIndex("bun run validate:project"),
 		);
 		expect(stepIndex("bun run validate:project")).toBeLessThan(
 			stepIndex("bun run typecheck"),
@@ -439,6 +445,7 @@ describe("release and toolchain contracts", () => {
 		}
 		const expectedSteps = [
 			"validate:toolchain",
+			"local-state:rebuild",
 			"validate:project",
 			"typecheck",
 			"validate:template",
