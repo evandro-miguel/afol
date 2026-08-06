@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260715_afol-1-0-linux-wsl-finalization_spec_01
 theme: afol-1-0-linux-wsl-finalization
-status: final
+status: active
 owners:
 - orchestrator
 workstream_intent: feature
@@ -22,6 +22,7 @@ links:
   - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
   - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
   - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
+  - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
 risk_level: high
 ---
 
@@ -54,6 +55,9 @@ AFOL-only downstream boundary.
   reconciliation of final F-01, F-11, F-13, and F-15 contracts with the
   AFOL-only TypeScript runtime while preserving their exact prior text in a
   verified retention archive.
+- `260806_release-promotion-remediation_spec-child_01` owns the bounded
+  correction of release-blocking dependency, evidence-compatibility, and
+  compiled-artifact reproducibility defects discovered after final audit.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -84,8 +88,8 @@ In scope:
   validation.
 - CLI diagnostics and integrity boundaries described by the child spec.
 - Linux x64 standalone build/provenance and observed WSL2 smoke evidence.
-- Focused tests, project/release validation, GitNexus change detection, and
-  redacted Gitleaks/OSV evidence.
+- Focused tests, project/release validation, verified Project RAG retrieval
+  plus local source confirmation, and redacted Gitleaks/OSV evidence.
 
 Out of scope:
 

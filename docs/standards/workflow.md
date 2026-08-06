@@ -112,9 +112,12 @@ the missing report from `--summary` or durable session state.
 - Use `--allow-no-report --reason "<reason>"` only for an explicit exception;
   `--summary` cannot be combined with that waiver. A closed legacy session with
   neither report nor persisted waiver is `missing`, not `waived`.
-- Treat `verify-tasks <session> --strict` as session evidence integrity. A
-  release-ready claim additionally requires current clean-checkout build,
-  test, security, checksum, and provenance evidence.
+- Treat `verify-tasks <session> --strict` as raw session evidence integrity.
+  Historical debt is not passed by that command. When a versioned legacy
+  baseline admits an exact pre-contract issue, `afol validate project` reports
+  it as waived debt while still blocking unlisted or changed evidence. A
+  release-ready claim additionally requires current clean-checkout build, test,
+  security, checksum, and provenance evidence.
 
 #### Step 7: Postmortem (Optional but Recommended)
 

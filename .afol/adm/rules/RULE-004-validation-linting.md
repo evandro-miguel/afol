@@ -33,6 +33,11 @@ When a governed session is active, also run:
 afol verify-tasks --strict
 ```
 
+For a project carrying an approved legacy-evidence baseline, strict output is
+the raw historical audit and may remain nonzero. `afol validate project --json`
+is the release-readiness gate: it verifies exact admissions and reports them as
+waived debt; new, changed, open, invalid, or unlisted evidence remains blocking.
+
 ---
 
 ## Validation Commands
