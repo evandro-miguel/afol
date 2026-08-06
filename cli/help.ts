@@ -13,6 +13,8 @@ const CATEGORY_ORDER: readonly CommandCategory[] = [
 	"ops",
 ];
 
+const HELP_LINE_LIMIT = 120;
+
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
 	core: "Core",
 	workflow: "Workflow",
@@ -131,6 +133,24 @@ function formatEntry(spec: CommandSpec): string {
 	}`;
 }
 
+function wrapVerboseLine(prefix: string, content: string): string[] {
+	const lines: string[] = [];
+	let line = prefix;
+	for (const word of content.split(/\s+/)) {
+		const separator = line === prefix ? "" : " ";
+		if (
+			line !== prefix &&
+			line.length + separator.length + word.length > HELP_LINE_LIMIT
+		) {
+			lines.push(line);
+			line = `${prefix}${word}`;
+			continue;
+		}
+		line += `${separator}${word}`;
+	}
+	return [...lines, line];
+}
+
 function formatVerboseEntry(spec: CommandSpec): string[] {
 	const lines = [
 		`  ${spec.command}`,
@@ -149,7 +169,10 @@ function formatVerboseEntry(spec: CommandSpec): string[] {
 		lines.push("    subcommands:");
 		for (const subcommand of spec.subcommands) {
 			lines.push(
-				`      ${subcommand.usage} [${subcommand.sideEffect}] - ${subcommand.description}`,
+				...wrapVerboseLine(
+					"      ",
+					`${subcommand.usage} [${subcommand.sideEffect}] - ${subcommand.description}`,
+				),
 			);
 		}
 	}

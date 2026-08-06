@@ -85,6 +85,7 @@
 			"evidence --command \"<cmd>\" --result passed",
 			"evidence --artifact <path> --note <text>",
 			"evidence --json",
+			"evidence admit --session <id> --all-missing|--task-id <id> --reason \"<text>\" [--dry-run|--confirm] [--json]",
 			"hook list [--json]",
 			"hook show <id> [--json]",
 			"hook resolve --event <event> [--json]",

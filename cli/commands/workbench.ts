@@ -11,12 +11,12 @@ import {
 	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
 import { beginHotPathMeasurement } from "../services/hot-path/instrumentation";
+import { admitLegacyEvidenceIssues } from "../services/project/legacy-evidence-baseline";
 import {
 	TaskCompletionBusyError,
 	type TaskCompletionLease,
 	withTaskCompletionLock,
 } from "../services/workbench/completion-lock";
-import { admitLegacyEvidenceIssues } from "../services/project/legacy-evidence-baseline";
 import {
 	appendTimelineEntry,
 	assertObservedBatchTasksReady,
@@ -470,9 +470,7 @@ function parseEvidenceAdmitArgs(
 		}
 		if (arg === "--reason" || arg === "-r" || arg === "--approval") {
 			if (!value || value.startsWith("-")) {
-				throw new Error(
-					`Missing value for ${arg} in evidence admit.`,
-				);
+				throw new Error(`Missing value for ${arg} in evidence admit.`);
 			}
 			reason = value;
 			i += 1;
@@ -513,9 +511,7 @@ function parseEvidenceAdmitArgs(
 		);
 	}
 	if (!allMissing && taskIds.length === 0) {
-		throw new Error(
-			"evidence admit requires --task-id <id> or --all-missing.",
-		);
+		throw new Error("evidence admit requires --task-id <id> or --all-missing.");
 	}
 
 	return {

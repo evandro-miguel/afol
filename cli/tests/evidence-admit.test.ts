@@ -483,9 +483,9 @@ describe("afol evidence admit", () => {
 			const payload = JSON.parse(result.stdout[0] ?? "{}") as {
 				data?: { admissions?: Array<{ task_id: string }> };
 			};
-			expect(payload.data?.admissions?.map((entry) => entry.task_id).sort()).toEqual(
-				["T-01", "T-02"],
-			);
+			expect(
+				payload.data?.admissions?.map((entry) => entry.task_id).sort(),
+			).toEqual(["T-01", "T-02"]);
 			const baseline = JSON.parse(readFileSync(baselinePath(root), "utf8")) as {
 				admissions: unknown[];
 			};
@@ -584,9 +584,7 @@ describe("afol evidence admit", () => {
 				"--confirm",
 			]);
 			expect(result.code).toBe(2);
-			expect(result.stderr.join("\n")).toMatch(
-				/present but invalid|invalid/i,
-			);
+			expect(result.stderr.join("\n")).toMatch(/present but invalid|invalid/i);
 			// File must remain the original corrupt body (never rewritten as create).
 			expect(readFileSync(path, "utf8")).toBe(corruptBody);
 		} finally {

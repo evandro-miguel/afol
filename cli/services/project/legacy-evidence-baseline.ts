@@ -6,10 +6,7 @@ import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { isSessionClosed } from "../workbench/lifecycle";
 import { sessionPaths } from "../workbench/session-reader";
-import {
-	type VerifyIssue,
-	verifyWorkbenchTasks,
-} from "../workbench/verify";
+import { type VerifyIssue, verifyWorkbenchTasks } from "../workbench/verify";
 import { resolveProjectPaths } from "./paths";
 
 export const LEGACY_EVIDENCE_BASELINE_FILE =
@@ -388,9 +385,7 @@ export function admitLegacyEvidenceIssues(
 	const taskIds = (input.taskIds ?? []).map((id) => id.trim()).filter(Boolean);
 	const allMissing = Boolean(input.allMissing);
 	if (!allMissing && taskIds.length === 0) {
-		throw new Error(
-			"evidence admit requires --task-id <id> or --all-missing.",
-		);
+		throw new Error("evidence admit requires --task-id <id> or --all-missing.");
 	}
 	for (const taskId of taskIds) {
 		if (!/^T-\d{2,3}$/.test(taskId)) {

@@ -585,7 +585,7 @@
       "type": "workflow",
       "side_effect": "append",
       "execution_mode": "on-demand",
-      "description": "Record task evidence",
+      "description": "Record task evidence or admit legacy compatibility debt",
       "subcommands": [
         {
           "usage": "--session <session-id> --task-id <task-id>",
@@ -606,6 +606,11 @@
           "usage": "--json",
           "side_effect": "append",
           "description": "Emit machine-readable evidence result"
+        },
+        {
+          "usage": "admit --session <id> --all-missing|--task-id <id> --reason \"<text>\" [--dry-run|--confirm] [--json]",
+          "side_effect": "write",
+          "description": "Admit hash-bound missing/failed evidence for a closed pre-cutoff session (preview by default; --confirm writes)"
         }
       ]
     },
