@@ -16,6 +16,7 @@ import {
 	type TaskCompletionLease,
 	withTaskCompletionLock,
 } from "../services/workbench/completion-lock";
+import { admitLegacyEvidenceIssues } from "../services/project/legacy-evidence-baseline";
 import {
 	appendTimelineEntry,
 	assertObservedBatchTasksReady,
@@ -68,6 +69,7 @@ import type { DoneArgs, VerificationSpec } from "./workbench/types";
 import {
 	type ObservedVerificationStatus,
 	resolveRequiredSpecCheck,
+	resolveSession,
 	runVerificationAsync,
 } from "./workbench/verify";
 
@@ -340,6 +342,9 @@ export async function runEvidenceCommand(
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
+	if (args[0] === "admit") {
+		return runEvidenceAdmitCommand(args.slice(1), root, ctx);
+	}
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.evidence");
 		const parsed = parseEvidenceArgs(args, root);
@@ -379,6 +384,227 @@ export async function runEvidenceCommand(
 	} catch (error) {
 		if (hasJsonFlag(args)) {
 			writeJsonError("workbench.evidence", error);
+		} else {
+			console.error((error as Error).message);
+		}
+		return 2;
+	}
+}
+
+type EvidenceAdmitArgs = {
+	session: string;
+	taskIds: string[];
+	allMissing: boolean;
+	issueType?: "missing_evidence" | "failed_evidence";
+	reason: string;
+	issueUrl?: string;
+	baselineId?: string;
+	cutoffSessionId?: string;
+	confirm: boolean;
+	json: boolean;
+};
+
+function parseEvidenceAdmitArgs(
+	args: string[],
+	root: string,
+): EvidenceAdmitArgs {
+	let session = "";
+	const taskIds: string[] = [];
+	let allMissing = false;
+	let issueType: "missing_evidence" | "failed_evidence" | undefined;
+	let reason = "";
+	let issueUrl = "";
+	let baselineId = "";
+	let cutoffSessionId = "";
+	let confirm = false;
+	let dryRun = false;
+	let json = false;
+
+	for (let i = 0; i < args.length; i += 1) {
+		const arg = args[i];
+		const value = args[i + 1];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
+		if (arg === "--confirm") {
+			confirm = true;
+			continue;
+		}
+		if (arg === "--dry-run") {
+			dryRun = true;
+			continue;
+		}
+		if (arg === "--all-missing") {
+			allMissing = true;
+			continue;
+		}
+		if (arg === "--session" || arg === "-S") {
+			if (!value || value.startsWith("-")) {
+				throw new Error("Missing value for --session in evidence admit.");
+			}
+			session = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--task-id" || arg === "-T") {
+			if (!value || value.startsWith("-")) {
+				throw new Error("Missing value for --task-id in evidence admit.");
+			}
+			taskIds.push(value);
+			i += 1;
+			continue;
+		}
+		if (arg === "--issue-type") {
+			if (!value || value.startsWith("-")) {
+				throw new Error("Missing value for --issue-type in evidence admit.");
+			}
+			if (value !== "missing_evidence" && value !== "failed_evidence") {
+				throw new Error(
+					`Invalid --issue-type ${value}; use missing_evidence or failed_evidence.`,
+				);
+			}
+			issueType = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--reason" || arg === "-r" || arg === "--approval") {
+			if (!value || value.startsWith("-")) {
+				throw new Error(
+					`Missing value for ${arg} in evidence admit.`,
+				);
+			}
+			reason = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--issue") {
+			if (!value || value.startsWith("-")) {
+				throw new Error("Missing value for --issue in evidence admit.");
+			}
+			issueUrl = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--baseline-id") {
+			if (!value || value.startsWith("-")) {
+				throw new Error("Missing value for --baseline-id in evidence admit.");
+			}
+			baselineId = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--cutoff-session-id") {
+			if (!value || value.startsWith("-")) {
+				throw new Error(
+					"Missing value for --cutoff-session-id in evidence admit.",
+				);
+			}
+			cutoffSessionId = value;
+			i += 1;
+			continue;
+		}
+		throw new Error(`Unknown evidence admit argument: ${arg}`);
+	}
+
+	if (!reason.trim()) {
+		throw new Error(
+			"Missing nonempty --reason (or --approval) for evidence admit.",
+		);
+	}
+	if (!allMissing && taskIds.length === 0) {
+		throw new Error(
+			"evidence admit requires --task-id <id> or --all-missing.",
+		);
+	}
+
+	return {
+		session: resolveSession(root, session, "evidence admit"),
+		taskIds,
+		allMissing,
+		...(issueType ? { issueType } : {}),
+		reason,
+		...(issueUrl ? { issueUrl } : {}),
+		...(baselineId ? { baselineId } : {}),
+		...(cutoffSessionId ? { cutoffSessionId } : {}),
+		confirm: confirm && !dryRun,
+		json,
+	};
+}
+
+export async function runEvidenceAdmitCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
+	try {
+		const parsed = parseEvidenceAdmitArgs(args, root);
+		if (parsed.confirm) {
+			assertWorkbenchMutationAllowed(ctx, "workbench.evidence.admit");
+		}
+		const result = admitLegacyEvidenceIssues(root, {
+			sessionId: parsed.session,
+			taskIds: parsed.taskIds,
+			allMissing: parsed.allMissing,
+			...(parsed.issueType ? { issueType: parsed.issueType } : {}),
+			reason: parsed.reason,
+			...(parsed.issueUrl ? { issueUrl: parsed.issueUrl } : {}),
+			...(parsed.baselineId ? { baselineId: parsed.baselineId } : {}),
+			...(parsed.cutoffSessionId
+				? { cutoffSessionId: parsed.cutoffSessionId }
+				: {}),
+			confirm: parsed.confirm,
+		});
+		const action = result.dry_run
+			? "workbench.evidence.admit.preview"
+			: "workbench.evidence.admit";
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							status: result.written ? "admitted" : "preview",
+							session: result.session_id,
+							path: result.path,
+							baseline_id: result.baseline_id,
+							cutoff_session_id: result.cutoff_session_id,
+							created_baseline: result.created_baseline,
+							written: result.written,
+							dry_run: result.dry_run,
+							admissions: result.admissions,
+							admissions_total: result.admissions_total,
+							replaced: result.replaced,
+							added: result.added,
+						},
+						{ action },
+					),
+				),
+			);
+		} else {
+			const mode = result.written ? "admitted" : "preview (dry-run)";
+			const lines = [
+				`evidence admit ${mode}: ${result.admissions.length} issue(s) for ${result.session_id}`,
+				`baseline: ${result.baseline_id} cutoff=${result.cutoff_session_id}`,
+				`path: ${result.path}`,
+			];
+			for (const admission of result.admissions) {
+				lines.push(
+					`  ${admission.task_id} ${admission.issue_type} board=${admission.state_board_sha256.slice(0, 12)}… ledger=${admission.evidence_ledger_present ? "present" : "absent"}`,
+				);
+			}
+			if (result.dry_run) {
+				lines.push("re-run with --confirm to write the baseline admission(s).");
+			} else {
+				lines.push(
+					`wrote ${result.added} new, replaced ${result.replaced}; total admissions=${result.admissions_total}`,
+				);
+			}
+			console.log(lines.join("\n"));
+		}
+		return 0;
+	} catch (error) {
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.evidence.admit", error);
 		} else {
 			console.error((error as Error).message);
 		}

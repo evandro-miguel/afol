@@ -419,7 +419,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["e"],
 		kind: "evidence",
 		sideEffect: "append",
-		description: "Record task evidence",
+		description: "Record task evidence or admit legacy compatibility debt",
 		category: "workflow",
 		subcommands: [
 			{
@@ -441,6 +441,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--json",
 				sideEffect: "append",
 				description: "Emit machine-readable evidence result",
+			},
+			{
+				usage:
+					'admit --session <id> --all-missing|--task-id <id> --reason "<text>" [--dry-run|--confirm] [--json]',
+				sideEffect: "write",
+				description:
+					"Admit hash-bound missing/failed evidence for a closed pre-cutoff session (preview by default; --confirm writes)",
 			},
 		],
 	},
