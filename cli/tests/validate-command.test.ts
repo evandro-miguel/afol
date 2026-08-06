@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	existsSync,
@@ -9,7 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
 import type { BoundedSpawnResult } from "../core/subprocess";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
@@ -94,6 +95,60 @@ function createValidationFixture(): string {
 function rebuildValidationFixtureIndexes(root: string): void {
 	rebuildWorkBenchIndex(root);
 	rebuildProjectIndexes(root);
+}
+
+function writeLegacyEvidenceAdmission(
+	root: string,
+	session: string,
+	taskPath: string,
+	issueType: "missing_evidence" | "failed_evidence",
+): void {
+	const task = readFileSync(taskPath, "utf8");
+	const heading = /^## State Board\s*$/m.exec(task);
+	if (heading?.index === undefined) throw new Error("Test fixture lacks a State Board.");
+	const start = task.indexOf("\n", heading.index) + 1;
+	const followingSection = task.slice(start).search(/^## /m);
+	const stateBoard =
+		followingSection === -1
+			? task.slice(start)
+			: task.slice(start, start + followingSection);
+	const evidencePath = join(dirname(taskPath), ".evidence.jsonl");
+	const evidencePresent = existsSync(evidencePath);
+	const sha256 = (value: string) =>
+		createHash("sha256").update(value).digest("hex");
+	writeFileSync(
+		join(
+			root,
+			".afol",
+			"adm",
+			"source",
+			"evidence-compatibility-baseline-v1.json",
+		),
+		`${JSON.stringify(
+			{
+				schema_version: 1,
+				baseline_id: "test-legacy-evidence-v1",
+				cutoff_session_id: "260712_0000",
+				admissions: [
+					{
+						session_id: session,
+						task_id: "T-01",
+						issue_type: issueType,
+						state_board_sha256: sha256(stateBoard),
+						evidence_ledger_sha256: sha256(
+							evidencePresent ? readFileSync(evidencePath, "utf8") : "",
+						),
+						evidence_ledger_present: evidencePresent,
+						cutoff_relation: "pre_cutoff",
+						approval: "test admission",
+					},
+				],
+			},
+			null,
+			2,
+		)}\n`,
+		"utf8",
+	);
 }
 
 describe("validate command", () => {
@@ -275,6 +330,11 @@ describe("validate command", () => {
 						"| T-01 | done | worker | historical task |",
 						"",
 					].join("\n"),
+					"utf8",
+				);
+				writeFileSync(
+					join(root, ".afol", "wb", session, ".evidence.jsonl"),
+					`${JSON.stringify({ task_id: "T-01", command: "bun test", result: "passed", exit_code: 0, id: `E-${session}`, provenance: "observed" })}\n`,
 					"utf8",
 				);
 			}
@@ -533,14 +593,15 @@ describe("validate command", () => {
 		}
 	});
 
-	test("project readiness ignores missing evidence for closed legacy history", async () => {
+	test("project readiness admits hash-bound missing evidence for closed legacy history", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_closed-history";
 		try {
 			const sessionDir = join(root, ".afol", "wb", session);
 			mkdirSync(sessionDir, { recursive: true });
+			const taskPath = join(sessionDir, `${session}_task_01.md`);
 			writeFileSync(
-				join(sessionDir, `${session}_task_01.md`),
+				taskPath,
 				[
 					"---",
 					'doc_type: "workbench_task"',
@@ -558,6 +619,7 @@ describe("validate command", () => {
 				].join("\n"),
 				"utf8",
 			);
+			writeLegacyEvidenceAdmission(root, session, taskPath, "missing_evidence");
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
@@ -573,14 +635,15 @@ describe("validate command", () => {
 		}
 	});
 
-	test("project readiness ignores failed evidence for closed legacy history", async () => {
+	test("project readiness requires an individual hash-bound failed-evidence admission", async () => {
 		const root = createValidationFixture();
 		const session = "260701_0800_failed-history";
 		try {
 			const sessionDir = join(root, ".afol", "wb", session);
 			mkdirSync(sessionDir, { recursive: true });
+			const taskPath = join(sessionDir, `${session}_task_01.md`);
 			writeFileSync(
-				join(sessionDir, `${session}_task_01.md`),
+				taskPath,
 				[
 					"---",
 					'doc_type: "workbench_task"',
@@ -603,10 +666,60 @@ describe("validate command", () => {
 				`${JSON.stringify({ task_id: "T-01", command: "bun test", result: "failed", exit_code: 1, id: "e-1", provenance: "observed" })}\n`,
 				"utf8",
 			);
+			writeLegacyEvidenceAdmission(root, session, taskPath, "failed_evidence");
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
 			expect(code).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project readiness rejects a legacy admission after its State Board changes", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_hash-mismatch";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			const taskPath = join(sessionDir, `${session}_task_01.md`);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				taskPath,
+				[
+					"---",
+					'doc_type: "workbench_task"',
+					`session_id: "${session}"`,
+					'status: "closed"',
+					'closed_at: "2026-07-01T08:00:00.000Z"',
+					"---",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | historical task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeLegacyEvidenceAdmission(root, session, taskPath, "missing_evidence");
+			writeFileSync(
+				taskPath,
+				readFileSync(taskPath, "utf8").replace(
+					"historical task",
+					"mutated historical task",
+				),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			expect(await runValidateCommand(root, ["--json"], captured.io)).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
