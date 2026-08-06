@@ -249,18 +249,14 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["build:deterministic"]).toBe(
 			"bun install --frozen-lockfile && bun test cli/tests/reproducible-build.test.ts && bun run build",
 		);
-		expect(scripts["smoke:wsl2"]).toBe(
-			"bun run cli/dev/dist-smoke.ts --wsl2",
-		);
+		expect(scripts["smoke:wsl2"]).toBe("bun run cli/dev/dist-smoke.ts --wsl2");
 		expect(scripts["validate:toolchain"]).toBe(
 			"bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		);
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
-		expect(scripts["validate:release"]).toContain(
-			"bun run validate:project",
-		);
+		expect(scripts["validate:release"]).toContain("bun run validate:project");
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["test:full"]).toBe("bun test --only-failures");
 		expect(scripts["validate:release"]).toContain("bun run test:full");

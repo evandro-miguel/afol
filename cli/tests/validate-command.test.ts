@@ -105,7 +105,8 @@ function writeLegacyEvidenceAdmission(
 ): void {
 	const task = readFileSync(taskPath, "utf8");
 	const heading = /^## State Board\s*$/m.exec(task);
-	if (heading?.index === undefined) throw new Error("Test fixture lacks a State Board.");
+	if (heading?.index === undefined)
+		throw new Error("Test fixture lacks a State Board.");
 	const start = task.indexOf("\n", heading.index) + 1;
 	const followingSection = task.slice(start).search(/^## /m);
 	const stateBoard =

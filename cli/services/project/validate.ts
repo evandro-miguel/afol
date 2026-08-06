@@ -64,7 +64,9 @@ function isHash(value: unknown): value is string {
 	return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 }
 
-function isLegacyEvidenceBaseline(value: Record<string, unknown>): value is LegacyEvidenceBaseline {
+function isLegacyEvidenceBaseline(
+	value: Record<string, unknown>,
+): value is LegacyEvidenceBaseline {
 	if (
 		value.schema_version !== 1 ||
 		typeof value.baseline_id !== "string" ||
@@ -96,14 +98,18 @@ function isLegacyEvidenceBaseline(value: Record<string, unknown>): value is Lega
 	});
 }
 
-function loadLegacyEvidenceBaseline(projectRoot: string): LegacyEvidenceBaseline | null {
+function loadLegacyEvidenceBaseline(
+	projectRoot: string,
+): LegacyEvidenceBaseline | null {
 	const path = join(
 		resolveProjectPaths(projectRoot).abs.admDir,
 		"source",
 		LEGACY_EVIDENCE_BASELINE_FILE,
 	);
 	const loaded = loadJsonObject(path);
-	return loaded.ok && isLegacyEvidenceBaseline(loaded.value) ? loaded.value : null;
+	return loaded.ok && isLegacyEvidenceBaseline(loaded.value)
+		? loaded.value
+		: null;
 }
 
 function stateBoardHash(taskPath: string): string | null {
@@ -120,14 +126,18 @@ function stateBoardHash(taskPath: string): string | null {
 	return board.length > 0 ? sha256(board) : null;
 }
 
-function evidenceLedger(taskPath: string, sessionPath: string): {
+function evidenceLedger(
+	taskPath: string,
+	sessionPath: string,
+): {
 	present: boolean;
 	hash: string;
 } {
 	let current = dirname(taskPath);
 	while (current.startsWith(sessionPath)) {
 		const path = join(current, ".evidence.jsonl");
-		if (existsSync(path)) return { present: true, hash: sha256(readFileSync(path, "utf8")) };
+		if (existsSync(path))
+			return { present: true, hash: sha256(readFileSync(path, "utf8")) };
 		if (current === sessionPath) break;
 		current = dirname(current);
 	}
@@ -150,7 +160,10 @@ function admitsLegacyEvidenceIssue(
 		return false;
 	}
 	const sessionId = sessionPath.split(/[\\/]/).pop() ?? "";
-	if (!/^\d{6}_\d{4}_/.test(sessionId) || sessionId >= baseline.cutoff_session_id)
+	if (
+		!/^\d{6}_\d{4}_/.test(sessionId) ||
+		sessionId >= baseline.cutoff_session_id
+	)
 		return false;
 	try {
 		const boardHash = stateBoardHash(issue.file);
@@ -708,22 +721,19 @@ export async function validateProjectStructure(
 			const results = verifyAllSessions(projectRoot, true);
 			const baseline = loadLegacyEvidenceBaseline(projectRoot);
 			let waivedLegacyIssues = 0;
-			const totalIssues = results.reduce(
-				(sum, result) => {
-					const unadmitted = result.issues.filter((issue) => {
-						const admitted = admitsLegacyEvidenceIssue(
-							baseline,
-							result.sessionPath,
-							issue,
-							result.openTasks.length > 0,
-						);
-						if (admitted) waivedLegacyIssues += 1;
-						return !admitted;
-					});
-					return sum + unadmitted.length;
-				},
-				0,
-			);
+			const totalIssues = results.reduce((sum, result) => {
+				const unadmitted = result.issues.filter((issue) => {
+					const admitted = admitsLegacyEvidenceIssue(
+						baseline,
+						result.sessionPath,
+						issue,
+						result.openTasks.length > 0,
+					);
+					if (admitted) waivedLegacyIssues += 1;
+					return !admitted;
+				});
+				return sum + unadmitted.length;
+			}, 0);
 			const openTaskSessions = results.filter((r) => r.openTasks.length > 0);
 			if (results.length === 0) {
 				return {
