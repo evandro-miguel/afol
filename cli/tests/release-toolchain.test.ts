@@ -9,11 +9,13 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_BUILD_COMMAND } from "../dev/build-release";
 import {
 	buildReleaseProvenance,
 	writeReleaseProvenance,
@@ -243,19 +245,24 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["toolchain:diff"]).toBe(
 			"bun run cli/dev/toolchain-smoke.ts",
 		);
-		expect(scripts.build).toContain(
-			"--no-compile-autoload-dotenv --no-compile-autoload-bunfig",
+		expect(scripts.build).toBe(
+			"bun run version:generate && bun run cli/dev/build-release.ts",
 		);
-		expect(scripts["smoke:wsl2"]).toBe(
-			"bun run build && bun run cli/dev/dist-smoke.ts --wsl2",
+		expect(scripts["build:deterministic"]).toBe(
+			"bun install --frozen-lockfile && bun test cli/tests/reproducible-build.test.ts && bun run build",
 		);
+		expect(scripts["smoke:wsl2"]).toBe("bun run cli/dev/dist-smoke.ts --wsl2");
 		expect(scripts["validate:toolchain"]).toBe(
 			"bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		);
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
-		expect(scripts["validate:release"]).not.toContain("bun run typecheck");
+		expect(scripts["validate:release"]).toContain(
+			"bun run local-state:rebuild",
+		);
+		expect(scripts["validate:release"]).toContain("bun run validate:project");
+		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["test:full"]).toBe("bun test --only-failures");
 		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
@@ -283,6 +290,12 @@ describe("release and toolchain contracts", () => {
 		expect(stepIndex("bun run smoke:dist")).toBeLessThan(
 			stepIndex("bun run smoke:clean"),
 		);
+		expect(stepIndex("bun run local-state:rebuild")).toBeLessThan(
+			stepIndex("bun run validate:project"),
+		);
+		expect(stepIndex("bun run validate:project")).toBeLessThan(
+			stepIndex("bun run typecheck"),
+		);
 		expect(stepIndex("bun run validate:project-benchmarks")).toBeLessThan(
 			stepIndex("bun run validate:ux-governance"),
 		);
@@ -292,11 +305,11 @@ describe("release and toolchain contracts", () => {
 		expect(stepIndex("bun run test:full")).toBeLessThan(
 			stepIndex("bun run coverage:check"),
 		);
-		expect(stepIndex("bun run smoke:clean")).toBeLessThan(
-			stepIndex("bun run validate:security:release"),
-		);
 		expect(stepIndex("bun run validate:security:release")).toBeLessThan(
 			stepIndex("bun run release:provenance:release"),
+		);
+		expect(stepIndex("bun run release:provenance:release")).toBeLessThan(
+			stepIndex("bun run smoke:dist"),
 		);
 		expect(scripts["coverage:check"]).toBe(
 			"bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/validate-internals.test.ts cli/tests/validation.test.ts cli/tests/version-metadata.test.ts",
@@ -434,6 +447,9 @@ describe("release and toolchain contracts", () => {
 		}
 		const expectedSteps = [
 			"validate:toolchain",
+			"local-state:rebuild",
+			"validate:project",
+			"typecheck",
 			"validate:template",
 			"validate:bootstrap",
 			"validate:project-benchmarks",
@@ -441,10 +457,10 @@ describe("release and toolchain contracts", () => {
 			"test:full",
 			"coverage:check",
 			"build:deterministic",
-			"smoke:dist",
-			"smoke:clean",
 			"validate:security:release",
 			"release:provenance:release",
+			"smoke:dist",
+			"smoke:clean",
 		];
 		const root = mkdtempSync(join(tmpdir(), "validate-release-script-"));
 		try {
@@ -639,7 +655,7 @@ describe("release and toolchain contracts", () => {
 			expect(provenance.build_target).toBe(
 				`bun-${process.platform}-${process.arch}`,
 			);
-			expect(provenance.compile_bytecode).toBe(true);
+			expect(provenance.compile_bytecode).toBe(false);
 			expect(provenance.module_format).toBe("esm");
 			expect(provenance.compile_autoload_dotenv).toBe(false);
 			expect(provenance.compile_autoload_bunfig).toBe(false);
@@ -755,13 +771,22 @@ describe("release and toolchain contracts", () => {
 			});
 			expect(readFileSync(checksumPath, "utf8")).toContain("  dist/afol");
 			const provenance = JSON.parse(readFileSync(provenancePath, "utf8"));
+			const artifactPath = join(root, "dist", "afol");
 			expect(provenance).toMatchObject({
 				artifact: "dist/afol",
+				build_command: DEFAULT_BUILD_COMMAND,
+				compile_bytecode: false,
+				compile_autoload_bunfig: false,
+				compile_autoload_dotenv: false,
+				module_format: "esm",
+				sha256: fileSha256(artifactPath),
+				size_bytes: statSync(artifactPath).size,
 				security_scanners: expect.arrayContaining([
 					expect.objectContaining({ kind: "deps", status: "passed" }),
 					expect.objectContaining({ kind: "secrets", status: "passed" }),
 				]),
 			});
+			expect(Number.isSafeInteger(provenance.size_bytes)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -1,0 +1,2087 @@
+{
+  "schema_version": 1,
+  "baseline_id": "legacy-evidence-compatibility-v1",
+  "cutoff_session_id": "260712_0000",
+  "admissions": [
+    {
+      "session_id": "260609_0927_afol-global-readiness-fixes",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "3a60b91101d5046721cd7d2ea4ef33ac67fb8966b36a003fc3501d250e94c943",
+      "evidence_ledger_sha256": "c1cf23f808ff4426f0c1cf37411d45a0cf0be8239cd10574cf757d0f11b1273f",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1032_version-metadata",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "33cdfcc01f3c2ea70d2e4c39df9b2469e6ef89ecd5b443089237e0c8d98177fd",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-05",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-07",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1136_contract-hardening-p0",
+      "task_id": "T-08",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "be7e28ef28c6c568826b14837f7aadfbe2ca07f4a1695a0d16044c2149d9f378",
+      "evidence_ledger_sha256": "26806e85e6b25df51f08df45971ff3ee4bc06f692fb0a72148bef9642da126c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1458_contract-hardening-followup",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6615422c6cd7083c0cb1b64967028bab14a176ea243e568e3e5c8776c0cf2d8b",
+      "evidence_ledger_sha256": "c3fe76914b5d873ceedec941aed3f26cd34a91fe9f0749f622c9120a7552d700",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1458_contract-hardening-followup",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6615422c6cd7083c0cb1b64967028bab14a176ea243e568e3e5c8776c0cf2d8b",
+      "evidence_ledger_sha256": "c3fe76914b5d873ceedec941aed3f26cd34a91fe9f0749f622c9120a7552d700",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1458_contract-hardening-followup",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6615422c6cd7083c0cb1b64967028bab14a176ea243e568e3e5c8776c0cf2d8b",
+      "evidence_ledger_sha256": "c3fe76914b5d873ceedec941aed3f26cd34a91fe9f0749f622c9120a7552d700",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1458_contract-hardening-followup",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6615422c6cd7083c0cb1b64967028bab14a176ea243e568e3e5c8776c0cf2d8b",
+      "evidence_ledger_sha256": "c3fe76914b5d873ceedec941aed3f26cd34a91fe9f0749f622c9120a7552d700",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1458_contract-hardening-followup",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6615422c6cd7083c0cb1b64967028bab14a176ea243e568e3e5c8776c0cf2d8b",
+      "evidence_ledger_sha256": "c3fe76914b5d873ceedec941aed3f26cd34a91fe9f0749f622c9120a7552d700",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1458_contract-hardening-followup",
+      "task_id": "T-06",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "6615422c6cd7083c0cb1b64967028bab14a176ea243e568e3e5c8776c0cf2d8b",
+      "evidence_ledger_sha256": "c3fe76914b5d873ceedec941aed3f26cd34a91fe9f0749f622c9120a7552d700",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1619_contract-hardening-residuals",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5f5a670f18d6c3e8a940fe3db3778e357bef30d6ba6d74732a2127385441f485",
+      "evidence_ledger_sha256": "30d3e57d777c3a515757b662a723183527e18daaaa1112c6e084d3a8958ec3fa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1619_contract-hardening-residuals",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5f5a670f18d6c3e8a940fe3db3778e357bef30d6ba6d74732a2127385441f485",
+      "evidence_ledger_sha256": "30d3e57d777c3a515757b662a723183527e18daaaa1112c6e084d3a8958ec3fa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1619_contract-hardening-residuals",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5f5a670f18d6c3e8a940fe3db3778e357bef30d6ba6d74732a2127385441f485",
+      "evidence_ledger_sha256": "30d3e57d777c3a515757b662a723183527e18daaaa1112c6e084d3a8958ec3fa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1619_contract-hardening-residuals",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5f5a670f18d6c3e8a940fe3db3778e357bef30d6ba6d74732a2127385441f485",
+      "evidence_ledger_sha256": "30d3e57d777c3a515757b662a723183527e18daaaa1112c6e084d3a8958ec3fa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260609_1619_contract-hardening-residuals",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5f5a670f18d6c3e8a940fe3db3778e357bef30d6ba6d74732a2127385441f485",
+      "evidence_ledger_sha256": "30d3e57d777c3a515757b662a723183527e18daaaa1112c6e084d3a8958ec3fa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1619_contract-hardening-residuals",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5f5a670f18d6c3e8a940fe3db3778e357bef30d6ba6d74732a2127385441f485",
+      "evidence_ledger_sha256": "30d3e57d777c3a515757b662a723183527e18daaaa1112c6e084d3a8958ec3fa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1707_afol-governance-issue-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d2ebcf48bf43b27beb7ed16f39f7c1c702a6ea2cfcec182b92da131afe37155f",
+      "evidence_ledger_sha256": "b1a5ea4a02dc7cd126c0b12ce8e781ccc6c2bde9af42d626ac59d9b14d99c5d2",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_1752_final-readiness-commit-audit",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0d571cc26a266cdc2fe87beff0dc6b62ba1c3993b20c8e10d6f2efd577471c03",
+      "evidence_ledger_sha256": "3ba45422e713c72cbb1ca0f146d2581fed38dd0fb07bc2bb495715b3b3c798a3",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2017_public-readiness-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a9984c0251e6945becb3d48ca6d45a4e69d5f526c2606b804b0c0bb4c65b035c",
+      "evidence_ledger_sha256": "ba5580fafa8237d505edd4351cbe08c9344155a4a7f3cdbe8e1f5844297705c9",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2017_public-readiness-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a9984c0251e6945becb3d48ca6d45a4e69d5f526c2606b804b0c0bb4c65b035c",
+      "evidence_ledger_sha256": "ba5580fafa8237d505edd4351cbe08c9344155a4a7f3cdbe8e1f5844297705c9",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2017_public-readiness-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a9984c0251e6945becb3d48ca6d45a4e69d5f526c2606b804b0c0bb4c65b035c",
+      "evidence_ledger_sha256": "ba5580fafa8237d505edd4351cbe08c9344155a4a7f3cdbe8e1f5844297705c9",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2017_public-readiness-hardening",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a9984c0251e6945becb3d48ca6d45a4e69d5f526c2606b804b0c0bb4c65b035c",
+      "evidence_ledger_sha256": "ba5580fafa8237d505edd4351cbe08c9344155a4a7f3cdbe8e1f5844297705c9",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2017_public-readiness-hardening",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a9984c0251e6945becb3d48ca6d45a4e69d5f526c2606b804b0c0bb4c65b035c",
+      "evidence_ledger_sha256": "ba5580fafa8237d505edd4351cbe08c9344155a4a7f3cdbe8e1f5844297705c9",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2017_public-readiness-hardening",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a9984c0251e6945becb3d48ca6d45a4e69d5f526c2606b804b0c0bb4c65b035c",
+      "evidence_ledger_sha256": "ba5580fafa8237d505edd4351cbe08c9344155a4a7f3cdbe8e1f5844297705c9",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2053_legacy-system-retirement",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7f66e2949fddf0a78c515db3b424b05689917df03e42c9fef553c0d84e74ed75",
+      "evidence_ledger_sha256": "d2b9ec417223b451199884f2f0045fd3d8a13bcdea7ced6b3afc294f9ec77ac0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2053_legacy-system-retirement",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7f66e2949fddf0a78c515db3b424b05689917df03e42c9fef553c0d84e74ed75",
+      "evidence_ledger_sha256": "d2b9ec417223b451199884f2f0045fd3d8a13bcdea7ced6b3afc294f9ec77ac0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2053_legacy-system-retirement",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7f66e2949fddf0a78c515db3b424b05689917df03e42c9fef553c0d84e74ed75",
+      "evidence_ledger_sha256": "d2b9ec417223b451199884f2f0045fd3d8a13bcdea7ced6b3afc294f9ec77ac0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2053_legacy-system-retirement",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7f66e2949fddf0a78c515db3b424b05689917df03e42c9fef553c0d84e74ed75",
+      "evidence_ledger_sha256": "d2b9ec417223b451199884f2f0045fd3d8a13bcdea7ced6b3afc294f9ec77ac0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260609_2053_legacy-system-retirement",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7f66e2949fddf0a78c515db3b424b05689917df03e42c9fef553c0d84e74ed75",
+      "evidence_ledger_sha256": "d2b9ec417223b451199884f2f0045fd3d8a13bcdea7ced6b3afc294f9ec77ac0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260610_1312_repo-hygiene-docs",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "28af3512442a38683fab35849c15e7629d7df78c5e90fdcf76338efc8b97a758",
+      "evidence_ledger_sha256": "6d04ca205be7d20b3a62d80f912a2b78bfabd244d08ec65d2ecdfc05d41f0e0a",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260612_1112_f18-agent-operational-state-docs",
+      "task_id": "T-01",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "8a9e1c75382b7ec638a2804ba4ff6651e93b2bc0b5d3134dd22d9d6558bf3d02",
+      "evidence_ledger_sha256": "d2d010b5e01d80d9a791c6c6e44ceab66d9bbb83572977eda693b160c3e22ec4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260612_1153_f18-afol-error-logging-spec",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5ba8846e4c9220489989749da88c350adf5f0528ba7b02db2decc6ab6ee73fd5",
+      "evidence_ledger_sha256": "344405df8569315da73516a5da18e866a1b6ae6735154628d3541e0338f435eb",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260612_1237_afol-adm-pstr-onion-direction",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "33d46eef0175d839161be85f0299a384d9d5fe59588c15eba891c8968d0f8c5e",
+      "evidence_ledger_sha256": "d93e5c6559d664135f4d815bef60d2329e434cfcd43b920721bf3404cf8ac25a",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260613_1811_public-readiness-release-validation",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "6f67e7479d20575da38aee27bf236290ccb32665fb668987c19bec0d5d8c9c66",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260614_2000_comprehensive-benchmark-system",
+      "task_id": "T-01",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "7d3273587a7a57419988f4231b077bb1470075ec5cfa14f5d5d7287b04ff7e22",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1154_lifecycle-ergonomics-waves",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "dc7020cbe01398934c5f9708d5eb503bbb432d633c963f5a5ac39f173eb26b27",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1312_current-pending-issues-resolution",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "42a921020fb4b62be339832e9a6a5a0b6dbddacb8e86d1c5245715cb552973a7",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1350_close-all-known-pending-issues",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "02de24960d2d732e690228febdc219246ff1820071ea9fba0a48ed807d582de8",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1611_gbrain-afol-gap-closure",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "6a0dc339f0a70a855f7458a995d1317e2c42f7199ebe0b236cf7a732ed86dd0a",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1809_review-fixes",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "e90afc317359166d089ec1390cb6a057b994e92e2881e15dced739e17eff827f",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1855_pending-cleanup",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "61f4fc5383b773d0744a85a9f83c330f78a294420311946e863d527306818665",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1938_spec-code-closure",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4f8273e397832aacb8a9f2c0e1cb9a6bb7dbe50b43e62c4e4926343722392b7f",
+      "evidence_ledger_sha256": "b29bc2a2234a5e5b2fc2dcfa4f95dd8fedb8e05f3e8e0fe17e4ffde7be95df35",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1938_spec-code-closure",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4f8273e397832aacb8a9f2c0e1cb9a6bb7dbe50b43e62c4e4926343722392b7f",
+      "evidence_ledger_sha256": "b29bc2a2234a5e5b2fc2dcfa4f95dd8fedb8e05f3e8e0fe17e4ffde7be95df35",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1938_spec-code-closure",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4f8273e397832aacb8a9f2c0e1cb9a6bb7dbe50b43e62c4e4926343722392b7f",
+      "evidence_ledger_sha256": "b29bc2a2234a5e5b2fc2dcfa4f95dd8fedb8e05f3e8e0fe17e4ffde7be95df35",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1938_spec-code-closure",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4f8273e397832aacb8a9f2c0e1cb9a6bb7dbe50b43e62c4e4926343722392b7f",
+      "evidence_ledger_sha256": "b29bc2a2234a5e5b2fc2dcfa4f95dd8fedb8e05f3e8e0fe17e4ffde7be95df35",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_1938_spec-code-closure",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4f8273e397832aacb8a9f2c0e1cb9a6bb7dbe50b43e62c4e4926343722392b7f",
+      "evidence_ledger_sha256": "b29bc2a2234a5e5b2fc2dcfa4f95dd8fedb8e05f3e8e0fe17e4ffde7be95df35",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260615_2134_audit-fix",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "30f26c23abae9c038c06c523e6ae058356893cfe0bff249813d970b91f06accf",
+      "evidence_ledger_sha256": "8f821179c77780c08627b86c1095322bc23e8cbc4db63c458f59b16335282c34",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1232_project-benchmark",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ab000f5e247d47955a6d9d31a6dd00a5d9a95e9571acf78d726890d061f4d1c8",
+      "evidence_ledger_sha256": "e2858e9a89865961aa9e510d67f921ec70c8e6c142a2ac59268a6906f34900d1",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1250_project-benchmark-workflow-coverage",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "5dc58bed69cd124d7fc446870e89ea983fb12120d86409b4bde9d1b20b085d2d",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1358_project-benchmark-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0e36b70beadb1195c51fca7f6cab73d588baaae32265d86023a76a130dd398c7",
+      "evidence_ledger_sha256": "fdd1debe704dd7f247afd607098d5e18c66205ec06beeafc62690b6e85b46247",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1358_project-benchmark-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0e36b70beadb1195c51fca7f6cab73d588baaae32265d86023a76a130dd398c7",
+      "evidence_ledger_sha256": "fdd1debe704dd7f247afd607098d5e18c66205ec06beeafc62690b6e85b46247",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1358_project-benchmark-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0e36b70beadb1195c51fca7f6cab73d588baaae32265d86023a76a130dd398c7",
+      "evidence_ledger_sha256": "fdd1debe704dd7f247afd607098d5e18c66205ec06beeafc62690b6e85b46247",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1358_project-benchmark-hardening",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0e36b70beadb1195c51fca7f6cab73d588baaae32265d86023a76a130dd398c7",
+      "evidence_ledger_sha256": "fdd1debe704dd7f247afd607098d5e18c66205ec06beeafc62690b6e85b46247",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1358_project-benchmark-hardening",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0e36b70beadb1195c51fca7f6cab73d588baaae32265d86023a76a130dd398c7",
+      "evidence_ledger_sha256": "fdd1debe704dd7f247afd607098d5e18c66205ec06beeafc62690b6e85b46247",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260616_1358_project-benchmark-hardening",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0e36b70beadb1195c51fca7f6cab73d588baaae32265d86023a76a130dd398c7",
+      "evidence_ledger_sha256": "fdd1debe704dd7f247afd607098d5e18c66205ec06beeafc62690b6e85b46247",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1416_plan-task-root-cause",
+      "task_id": "T-07",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c555b0df5b55e433682e3c0c5b5953b7a7e09e0e75ca2f127a218a808deea2c4",
+      "evidence_ledger_sha256": "12ab697161635060f2f1d0c464ce24c687c15995e1c49b10c4f34124fc177452",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1507_health-core-default",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "87a13dcd6fbf7698c090fa919b5def8ae547ec32e152f3390972cac58224bf71",
+      "evidence_ledger_sha256": "1a614a0f7e9733f564b1cef2f0a23392a04eab1a72ddd8e0ffe756587c9ca230",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1507_health-core-default",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "87a13dcd6fbf7698c090fa919b5def8ae547ec32e152f3390972cac58224bf71",
+      "evidence_ledger_sha256": "1a614a0f7e9733f564b1cef2f0a23392a04eab1a72ddd8e0ffe756587c9ca230",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1517_skill-agent-routing",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7ddf4fc0f33b6d08ae0e1ae168e62dff0bf804525851af9c2dfbd9d2369d4f1d",
+      "evidence_ledger_sha256": "bfbbac6696780716bc2f1b0bacd86a2a2d03abecb9c5fa901b87bca78d2ca13c",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1517_skill-agent-routing",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7ddf4fc0f33b6d08ae0e1ae168e62dff0bf804525851af9c2dfbd9d2369d4f1d",
+      "evidence_ledger_sha256": "bfbbac6696780716bc2f1b0bacd86a2a2d03abecb9c5fa901b87bca78d2ca13c",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1521_skill-execution-polish",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0b2805ae83007d26d5f1737d2ea785c018a7339e9ea5061cf7c54fbeb933c0f5",
+      "evidence_ledger_sha256": "ee27594dd86da860872b22252d9d011dbc8abcc167aa5ca707f3b5fb9460ce54",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1558_token-output-budget-fix",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "1c6ef4bd8d71ed2471749a900c13b976d17000735b0f84052f80705d284f7500",
+      "evidence_ledger_sha256": "6d6a3362979f82f00632ecf6ae0349322ca82e7ad61592b448122fcff1b5b07e",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1603_project-benchmark-residuals",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "df3420403e915ab970dbb66f7bb3f99d6d415f80512ef9e6a667028dce459ec8",
+      "evidence_ledger_sha256": "ee4ac3999d60b3499c48cbdaad3b7e7d2e83e741314234f2a4eaee8020912899",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1603_project-benchmark-residuals",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "df3420403e915ab970dbb66f7bb3f99d6d415f80512ef9e6a667028dce459ec8",
+      "evidence_ledger_sha256": "ee4ac3999d60b3499c48cbdaad3b7e7d2e83e741314234f2a4eaee8020912899",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1603_project-benchmark-residuals",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "df3420403e915ab970dbb66f7bb3f99d6d415f80512ef9e6a667028dce459ec8",
+      "evidence_ledger_sha256": "ee4ac3999d60b3499c48cbdaad3b7e7d2e83e741314234f2a4eaee8020912899",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1603_project-benchmark-residuals",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "df3420403e915ab970dbb66f7bb3f99d6d415f80512ef9e6a667028dce459ec8",
+      "evidence_ledger_sha256": "ee4ac3999d60b3499c48cbdaad3b7e7d2e83e741314234f2a4eaee8020912899",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1603_project-benchmark-residuals",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "df3420403e915ab970dbb66f7bb3f99d6d415f80512ef9e6a667028dce459ec8",
+      "evidence_ledger_sha256": "ee4ac3999d60b3499c48cbdaad3b7e7d2e83e741314234f2a4eaee8020912899",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1603_project-benchmark-residuals",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "df3420403e915ab970dbb66f7bb3f99d6d415f80512ef9e6a667028dce459ec8",
+      "evidence_ledger_sha256": "ee4ac3999d60b3499c48cbdaad3b7e7d2e83e741314234f2a4eaee8020912899",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260616_1643_review-residuals",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "65f4d722e9a7da3871f4702253543b1a4d7c9d9640d59cd620095466cca8a97b",
+      "evidence_ledger_sha256": "ab452141ad6540d768b10f30b7e5534c2764633915df206970d13977b3313759",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1656_review-residuals-code",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "75f42f85fb3bed4f44df3edaf45674910fac799536012ea71613e2004e65c194",
+      "evidence_ledger_sha256": "277d7e19fd5000b32161fff4ca43fe7b2059d78698636dccef0cc63b566ed967",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1656_review-residuals-code",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "75f42f85fb3bed4f44df3edaf45674910fac799536012ea71613e2004e65c194",
+      "evidence_ledger_sha256": "277d7e19fd5000b32161fff4ca43fe7b2059d78698636dccef0cc63b566ed967",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1656_review-residuals-code",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "75f42f85fb3bed4f44df3edaf45674910fac799536012ea71613e2004e65c194",
+      "evidence_ledger_sha256": "277d7e19fd5000b32161fff4ca43fe7b2059d78698636dccef0cc63b566ed967",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1656_review-residuals-code",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "75f42f85fb3bed4f44df3edaf45674910fac799536012ea71613e2004e65c194",
+      "evidence_ledger_sha256": "277d7e19fd5000b32161fff4ca43fe7b2059d78698636dccef0cc63b566ed967",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1746_command-output-audit",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dab4f428a048114a56007cd09e7f770020a1baf37fce3fbef2b32084eeb2a7e0",
+      "evidence_ledger_sha256": "3a5ad2a22686261861a85817e556cbf67fb9ed23ef2306a13d86bf2f79da5c74",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1746_command-output-audit",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dab4f428a048114a56007cd09e7f770020a1baf37fce3fbef2b32084eeb2a7e0",
+      "evidence_ledger_sha256": "3a5ad2a22686261861a85817e556cbf67fb9ed23ef2306a13d86bf2f79da5c74",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1746_command-output-audit",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dab4f428a048114a56007cd09e7f770020a1baf37fce3fbef2b32084eeb2a7e0",
+      "evidence_ledger_sha256": "3a5ad2a22686261861a85817e556cbf67fb9ed23ef2306a13d86bf2f79da5c74",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1746_command-output-audit",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dab4f428a048114a56007cd09e7f770020a1baf37fce3fbef2b32084eeb2a7e0",
+      "evidence_ledger_sha256": "3a5ad2a22686261861a85817e556cbf67fb9ed23ef2306a13d86bf2f79da5c74",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_1853_compact-afol-aliases",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "8f3c05ec5ab0633d269f677846cc7fe55e781239728339f9c3dc4babe2efe0d0",
+      "evidence_ledger_sha256": "b27a790144373cc64f9c53168f8e94453f59d8bd8c1741320a2ce6ffa3d1232a",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_2005_alias-release-validation",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "12ab28c21faec15f945d605c1458338fe86a3554abb9d725ac41832a41e55d28",
+      "evidence_ledger_sha256": "403dc85ee37dea6243903722dbe3a976c52e96fb837619be60c54f7ed1635f54",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260616_2024_post-push-functional-audit",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5c77db9ef8c77c53d6983124517c05669b019f3016853174afa7d93c944e64a5",
+      "evidence_ledger_sha256": "9796c538e3103bcc2d8cd0a77c55ec11bc1f864bc38e896df39e777411a8a6e7",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_0801_refactor-typed-validation",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9c29458579abce15090b402cea7f27ec7394bcf5040ae8fc5705b6a69f869fca",
+      "evidence_ledger_sha256": "8888a1d87bae3a04851d833e225f702775225c3692973daa459ed7e33a1afa41",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_0801_refactor-typed-validation",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9c29458579abce15090b402cea7f27ec7394bcf5040ae8fc5705b6a69f869fca",
+      "evidence_ledger_sha256": "8888a1d87bae3a04851d833e225f702775225c3692973daa459ed7e33a1afa41",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_0801_refactor-typed-validation",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9c29458579abce15090b402cea7f27ec7394bcf5040ae8fc5705b6a69f869fca",
+      "evidence_ledger_sha256": "8888a1d87bae3a04851d833e225f702775225c3692973daa459ed7e33a1afa41",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_0801_refactor-typed-validation",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9c29458579abce15090b402cea7f27ec7394bcf5040ae8fc5705b6a69f869fca",
+      "evidence_ledger_sha256": "8888a1d87bae3a04851d833e225f702775225c3692973daa459ed7e33a1afa41",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_0801_refactor-typed-validation",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9c29458579abce15090b402cea7f27ec7394bcf5040ae8fc5705b6a69f869fca",
+      "evidence_ledger_sha256": "8888a1d87bae3a04851d833e225f702775225c3692973daa459ed7e33a1afa41",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_0801_refactor-typed-validation",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9c29458579abce15090b402cea7f27ec7394bcf5040ae8fc5705b6a69f869fca",
+      "evidence_ledger_sha256": "8888a1d87bae3a04851d833e225f702775225c3692973daa459ed7e33a1afa41",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_1301_help-command",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "2adb6c2e66d6aa375fd2e1390951b86ab1e657be13684b6f018f7a82d0006d5e",
+      "evidence_ledger_sha256": "7c911264c782acdbdff83b3f82f066d4b1e8f6dc90476e2338a9ac720568543c",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260617_1522_fix-afol-audit",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "76540938ecb72fc5790531453e42c089dd638683573578deaa613cecd06ab42c",
+      "evidence_ledger_sha256": "6470b74d560fb884576b24a0f3f77e21e0af6efbd4821b0edaaba9a044fd91af",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260618_0728_library-memory-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e447a5de6dbee83223b1a03b9cb0e120cbe0b991c74a44e77648627bdfc139e2",
+      "evidence_ledger_sha256": "e507911d7c1ace04b4766aedea19cee55c39a44eeb0da9338bc0ad8842da27aa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0728_library-memory-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e447a5de6dbee83223b1a03b9cb0e120cbe0b991c74a44e77648627bdfc139e2",
+      "evidence_ledger_sha256": "e507911d7c1ace04b4766aedea19cee55c39a44eeb0da9338bc0ad8842da27aa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0728_library-memory-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e447a5de6dbee83223b1a03b9cb0e120cbe0b991c74a44e77648627bdfc139e2",
+      "evidence_ledger_sha256": "e507911d7c1ace04b4766aedea19cee55c39a44eeb0da9338bc0ad8842da27aa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0728_library-memory-hardening",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e447a5de6dbee83223b1a03b9cb0e120cbe0b991c74a44e77648627bdfc139e2",
+      "evidence_ledger_sha256": "e507911d7c1ace04b4766aedea19cee55c39a44eeb0da9338bc0ad8842da27aa",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0745_configurable-rule-injection",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "12ed866a29796b882006a2d73fc0f9d55b15fa81106b02a23d34b39a840b07d0",
+      "evidence_ledger_sha256": "9e5cfaa957e73558cca4c454edf393ac5972a2518025fd5826f3989ebd8699c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0745_configurable-rule-injection",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "12ed866a29796b882006a2d73fc0f9d55b15fa81106b02a23d34b39a840b07d0",
+      "evidence_ledger_sha256": "9e5cfaa957e73558cca4c454edf393ac5972a2518025fd5826f3989ebd8699c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0745_configurable-rule-injection",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "12ed866a29796b882006a2d73fc0f9d55b15fa81106b02a23d34b39a840b07d0",
+      "evidence_ledger_sha256": "9e5cfaa957e73558cca4c454edf393ac5972a2518025fd5826f3989ebd8699c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_0745_configurable-rule-injection",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "12ed866a29796b882006a2d73fc0f9d55b15fa81106b02a23d34b39a840b07d0",
+      "evidence_ledger_sha256": "9e5cfaa957e73558cca4c454edf393ac5972a2518025fd5826f3989ebd8699c5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1033_rules-injection-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "8ef494e1e1314eed877275611895f65a83ca088f09a610fc80cf2b2ce85697a8",
+      "evidence_ledger_sha256": "d575527763faec5f8a9689ddef20346c46a843d09265f9e04f5eda55df90d2ee",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1420_orchestrator-coordination-radar",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9770e8a7124996aa050b601f849018a60a6d35669001ad3e2b5299f1286f6a8c",
+      "evidence_ledger_sha256": "471c75c0a88350f1c09d2a34b9e4467ed162cae0fc6f33fe8a6dc73a9810b1d0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1420_orchestrator-coordination-radar",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9770e8a7124996aa050b601f849018a60a6d35669001ad3e2b5299f1286f6a8c",
+      "evidence_ledger_sha256": "471c75c0a88350f1c09d2a34b9e4467ed162cae0fc6f33fe8a6dc73a9810b1d0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1420_orchestrator-coordination-radar",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9770e8a7124996aa050b601f849018a60a6d35669001ad3e2b5299f1286f6a8c",
+      "evidence_ledger_sha256": "471c75c0a88350f1c09d2a34b9e4467ed162cae0fc6f33fe8a6dc73a9810b1d0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1420_orchestrator-coordination-radar",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9770e8a7124996aa050b601f849018a60a6d35669001ad3e2b5299f1286f6a8c",
+      "evidence_ledger_sha256": "471c75c0a88350f1c09d2a34b9e4467ed162cae0fc6f33fe8a6dc73a9810b1d0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1421_provider-neutral-hooks",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "17967e8550c829a29363d9610ae912b9948224c100fc4709f85094fce970ba78",
+      "evidence_ledger_sha256": "93265c4a402d16e800e1e63123ecede00dc8a711d028daa2731722e50cad4909",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_1500_afol-owned-governance-payloads",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "54a44ceb7939c85032ca3833bbad2445cdbfb457f64403b648fe2fe2bd9cfedc",
+      "evidence_ledger_sha256": "7af2df4e5459645d5b5e0267ac161d537028bd3f9a0afb5aaf0309f792991b02",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_2034_pstr-tooling-watch",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e04212c270791a6c019997be75b9048a88e9214307520d478f0b2b1443a96556",
+      "evidence_ledger_sha256": "6d9742897f5ad62af919f612775496006c7bf05bbe23d0824a81a76718c0f7ab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_2034_pstr-tooling-watch",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e04212c270791a6c019997be75b9048a88e9214307520d478f0b2b1443a96556",
+      "evidence_ledger_sha256": "6d9742897f5ad62af919f612775496006c7bf05bbe23d0824a81a76718c0f7ab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_2034_pstr-tooling-watch",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e04212c270791a6c019997be75b9048a88e9214307520d478f0b2b1443a96556",
+      "evidence_ledger_sha256": "6d9742897f5ad62af919f612775496006c7bf05bbe23d0824a81a76718c0f7ab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260618_2034_pstr-tooling-watch",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e04212c270791a6c019997be75b9048a88e9214307520d478f0b2b1443a96556",
+      "evidence_ledger_sha256": "6d9742897f5ad62af919f612775496006c7bf05bbe23d0824a81a76718c0f7ab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260619_1913_test-gate-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9086dcfb21100f85a22753218878da63d8d40de4ddf12880b1e5e22cab1021f9",
+      "evidence_ledger_sha256": "b93c514fd43f98eacc24d6db6b3b2e55350f6698092e998457e80f791aca42b4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260619_1913_test-gate-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9086dcfb21100f85a22753218878da63d8d40de4ddf12880b1e5e22cab1021f9",
+      "evidence_ledger_sha256": "b93c514fd43f98eacc24d6db6b3b2e55350f6698092e998457e80f791aca42b4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260619_1913_test-gate-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "9086dcfb21100f85a22753218878da63d8d40de4ddf12880b1e5e22cab1021f9",
+      "evidence_ledger_sha256": "b93c514fd43f98eacc24d6db6b3b2e55350f6698092e998457e80f791aca42b4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_0624_release-version-governance",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "fc0f0f8334f34ee028a7475dc089d85a214cf2e521a9dcc5524f3204689cc1ae",
+      "evidence_ledger_sha256": "3e9c114f90efd247146868878f26c1ad6800d2809ef88c7bc77e608945438bb7",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_0624_release-version-governance",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "fc0f0f8334f34ee028a7475dc089d85a214cf2e521a9dcc5524f3204689cc1ae",
+      "evidence_ledger_sha256": "3e9c114f90efd247146868878f26c1ad6800d2809ef88c7bc77e608945438bb7",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_0624_release-version-governance",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "fc0f0f8334f34ee028a7475dc089d85a214cf2e521a9dcc5524f3204689cc1ae",
+      "evidence_ledger_sha256": "3e9c114f90efd247146868878f26c1ad6800d2809ef88c7bc77e608945438bb7",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_0624_release-version-governance",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "fc0f0f8334f34ee028a7475dc089d85a214cf2e521a9dcc5524f3204689cc1ae",
+      "evidence_ledger_sha256": "3e9c114f90efd247146868878f26c1ad6800d2809ef88c7bc77e608945438bb7",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1045_docs-afol-contract-cleanup",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0d0bb6fdd7c366179f18fe7f51744ee848991c5c5d59980d7c472ffcb7619dd4",
+      "evidence_ledger_sha256": "5eba84de1449dd939c1d98800be0f28471260c536bace4a41e253c15d4792041",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1104_cleanup-claude-unused-files",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "936ddbf55ea3be2cbb3d07eb35b333499a86eadea65d55b6c1b5f85dc2832c1e",
+      "evidence_ledger_sha256": "1d774f5342c32f50c69214db988b7c3e920e495fd370c27190757bd9e872e5ba",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1137_review-template-drift",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0d32d0a2256cf3e97eb8baa83ac9fe9b455d59c7b88dd4f87b0b0b436b6bbd0f",
+      "evidence_ledger_sha256": "8b3e92c0e26bcfcacc967bcbcc5040af5c78f9a89888144d31c3e526019e4194",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1214_afol-start-briefing-e-radar-de-alinhamento",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "62b6e678a23c0e1051aedc30c78682098d8bec3774ff83629de62f9f8e438e0a",
+      "evidence_ledger_sha256": "e589d3a7b1a519c47a9e7a5224018b6a6a91d62120d4a67bb7c34eda127594ef",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1214_afol-start-briefing-e-radar-de-alinhamento",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "62b6e678a23c0e1051aedc30c78682098d8bec3774ff83629de62f9f8e438e0a",
+      "evidence_ledger_sha256": "e589d3a7b1a519c47a9e7a5224018b6a6a91d62120d4a67bb7c34eda127594ef",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1214_afol-start-briefing-e-radar-de-alinhamento",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "62b6e678a23c0e1051aedc30c78682098d8bec3774ff83629de62f9f8e438e0a",
+      "evidence_ledger_sha256": "e589d3a7b1a519c47a9e7a5224018b6a6a91d62120d4a67bb7c34eda127594ef",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260620_1254_propagate-skill-guidance",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "02854dc5e3f59103f419dde60151940b10b9cd151db555b2a2ca572de8ad2c93",
+      "evidence_ledger_sha256": "18c03f6464944b85cbb73348c06b4f9d4d6cbb2081e7dd6e92ffd6126c429bc6",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260626_1043_rename-afol",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "2234ef39a84144758eea8c6027e4c803aa1e9a5ad270b23d96dad76a1c47cde7",
+      "evidence_ledger_sha256": "9faa05b8894956d745d095c591a1b08143c13016aa543684bb0d611405ed1022",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260626_1700_security-bootstrap-template-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "452924ae0edd46ffb4a48a5f6ed6d0a4765b3283b6c065c411ed6be628e816e4",
+      "evidence_ledger_sha256": "c12cd45441296a318f42310ac23a55c5228038bcd3f0d8af0e573717e0bc6a40",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260626_1700_security-bootstrap-template-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "452924ae0edd46ffb4a48a5f6ed6d0a4765b3283b6c065c411ed6be628e816e4",
+      "evidence_ledger_sha256": "c12cd45441296a318f42310ac23a55c5228038bcd3f0d8af0e573717e0bc6a40",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260626_1700_security-bootstrap-template-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "452924ae0edd46ffb4a48a5f6ed6d0a4765b3283b6c065c411ed6be628e816e4",
+      "evidence_ledger_sha256": "c12cd45441296a318f42310ac23a55c5228038bcd3f0d8af0e573717e0bc6a40",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260626_1843_repo-hygiene-refactor",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5657522611af50f6c39cc871fd690179c2a26884331238a99345a1abea22a391",
+      "evidence_ledger_sha256": "4b0eb6af219b0106d40586e030b37686afba8a5a926e78ad15c340cd23132fb0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_0949_maintenance-cadence-benchmark",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c3f2bfb9816db192431d183c8c9d633bfc804a59ed72d9332f60a5f2c412247e",
+      "evidence_ledger_sha256": "7a90e23b7341279774a4b3cada49d9f57f2b4023753957f7cdc868b123aaa6d5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_0949_maintenance-cadence-benchmark",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "c3f2bfb9816db192431d183c8c9d633bfc804a59ed72d9332f60a5f2c412247e",
+      "evidence_ledger_sha256": "7a90e23b7341279774a4b3cada49d9f57f2b4023753957f7cdc868b123aaa6d5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260627_1122_ux-scenario-coverage",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "aecf7d181d8a5e41bd1335ddfec40720f51e55ec300c15256bb0c5014177eb64",
+      "evidence_ledger_sha256": "1ce0b5c22025143cbcbf852019b71039ebb5ee24292ed47564703cc1167fc86e",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1211_scenario-coverage-gate",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "f2f322dc706c59de1c0e1ba78fd9574a53bcb8b29b8675d4070678e74679c02f",
+      "evidence_ledger_sha256": "76f4e41d9d7e9a2e79b76617898072fb0a0015a090c8d7ccc8a8d1f4db42b113",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1237_subcommand-coverage-gate",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "da74ee7dffdd7fd0e53b72df0943719a3f7216a1bc6c37bfe0861a504585c8ca",
+      "evidence_ledger_sha256": "602da42f03101dadc43c08bb1d2c189e03d6be32d2e7fe63247140e54beaecbb",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1250_scenario-subcommand-backlog",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "b39b43479565d52611e876122297e7a28ac814e541063cf144ec19623f0e1ae9",
+      "evidence_ledger_sha256": "78d86c7dad0a33c25f05f1ed2cddae3d32843ec2d5ebc43a82f9e8b288c88880",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1324_scenario-tool-journey-gates",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d4fd409807e8af2b5df4ab0d84d9f3fdb8cc43f77bcaad98244015cb3904717c",
+      "evidence_ledger_sha256": "97ea966861423173c51a601a447a4fee0c769a4fca0a00f5ade7fe6dac428f96",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1350_runtime-live-coverage-metadata",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "0fb446c0c9ad72ce4550e7f2113381602e753bd3bb16b605f67b40b1021fb74b",
+      "evidence_ledger_sha256": "92e823f513dfd3de27f078d2ab10a29b2f46ffc034efa2bbf3b57d4236bde357",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1611_agent-ux-experience-map",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "1726e21627ddbcbe8c48aedf7ec2abbde7c4aee245601318b9f9c9d386ab460c",
+      "evidence_ledger_sha256": "24e220bc91837ed42965bd5ee24f77d74fafe234df2da195886db283fc2f81f0",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1628_agent-ux-benchmark-execution",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "96c331ca6a120de2449db8c2e903d49ba35dc1813bb5db0585dcc9f418c5514a",
+      "evidence_ledger_sha256": "bdeb1372dfdc0843682e2e1d386825bc410e7b94708cf453ae6459331e3aac26",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1652_feature-tool-spec-scenario-coverage",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5a65ec6d638c570f25e6bb37764d9b72e55f8bb72bf2327530d0cd8ef003d8e3",
+      "evidence_ledger_sha256": "1f46846577df79a0b1e79bef3bf40a41daba9e9a1db0f1c8af61e8248f4f21b3",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1738_release-validation-benchmark-fix",
+      "task_id": "T-01",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "f0dc52395481deed41bab78458530b7ee821afaec3b0045a26c876af0a890fa2",
+      "evidence_ledger_sha256": "a66d3eaab1631860a929e870af1e8a45916950cc705614abe6ddceb7bafce965",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1738_release-validation-benchmark-fix",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "f0dc52395481deed41bab78458530b7ee821afaec3b0045a26c876af0a890fa2",
+      "evidence_ledger_sha256": "a66d3eaab1631860a929e870af1e8a45916950cc705614abe6ddceb7bafce965",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1738_release-validation-benchmark-fix",
+      "task_id": "T-03",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "f0dc52395481deed41bab78458530b7ee821afaec3b0045a26c876af0a890fa2",
+      "evidence_ledger_sha256": "a66d3eaab1631860a929e870af1e8a45916950cc705614abe6ddceb7bafce965",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1824_open-spec-completion",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ea21330cc74f5d426717d408d12fe110f0e9186c8abcf87b05031ae18a609e59",
+      "evidence_ledger_sha256": "56a526f166683ac1be160626015d19e9a5d4e6d78ff3b5924d2553d282db5bb8",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1824_open-spec-completion",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ea21330cc74f5d426717d408d12fe110f0e9186c8abcf87b05031ae18a609e59",
+      "evidence_ledger_sha256": "56a526f166683ac1be160626015d19e9a5d4e6d78ff3b5924d2553d282db5bb8",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1824_open-spec-completion",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ea21330cc74f5d426717d408d12fe110f0e9186c8abcf87b05031ae18a609e59",
+      "evidence_ledger_sha256": "56a526f166683ac1be160626015d19e9a5d4e6d78ff3b5924d2553d282db5bb8",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_1909_open-spec-gap-closure",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dface1823beca00ccbae616a739041bc88ec44e859b9b7deda85510c79f0a5a6",
+      "evidence_ledger_sha256": "2b63b8273aeeec0f3ec28c3611420f7924d9229b78eb189bbbaf114e89016a39",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260627_2018_resolve-remaining-pending",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "2f7331bfca6f2e7a41b333e7a53df50308e52be2955ef557e574e056501f8f18",
+      "evidence_ledger_sha256": "c9497da233eabdbeee7fd27766a6cc1f218452857334bc4831457dc1084a2185",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260629_1609_project-audit",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5ab3e8f598b6920b981c92403f9d36bc1946033c758f4ac50321107c4b099973",
+      "evidence_ledger_sha256": "f38c45a257a2a9129d30141e6ce6f21cd57cbafcefaf9e19bbdb2957ed469cab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260629_1609_project-audit",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5ab3e8f598b6920b981c92403f9d36bc1946033c758f4ac50321107c4b099973",
+      "evidence_ledger_sha256": "f38c45a257a2a9129d30141e6ce6f21cd57cbafcefaf9e19bbdb2957ed469cab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260629_1609_project-audit",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "5ab3e8f598b6920b981c92403f9d36bc1946033c758f4ac50321107c4b099973",
+      "evidence_ledger_sha256": "f38c45a257a2a9129d30141e6ce6f21cd57cbafcefaf9e19bbdb2957ed469cab",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260629_1853_memory-library-adoption-roadmap",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "bedfc59f9e09b2dad910bd42db76e90951161de737d3daa22188436152a0ec98",
+      "evidence_ledger_sha256": "1e140df0b605bd710d4df6c9f125cb0de5cbb8e3216fe78af2733bf090d12137",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260629_1908_feature-health-sweep",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "54ce73a57a105746cd51fc3efccea584aa6633f3dd4d8f22d059afb88f1ba3cd",
+      "evidence_ledger_sha256": "af92f3189a999c103beb534165afa6d94dcf63791a63880f5fbe77f61641c4b5",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260629_1923_critic-round-remediation",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "f80a3907db05fa4ba1e64bc0a494d2b74233ea1fec59cc396b443d98312b041b",
+      "evidence_ledger_sha256": "3a679029e531f253b3999ee9b898c279da3962ec591253b86ce3fd041166bd5a",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1302_agent-cli-low-noise",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ba2b28e7d60a0c66165346481270678a3ca0b93fb61e2ce8408fca28446a4666",
+      "evidence_ledger_sha256": "faad69cd3114c98978e930583b1ce54657664828540b4d2a84be535e5738d257",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1302_agent-cli-low-noise",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ba2b28e7d60a0c66165346481270678a3ca0b93fb61e2ce8408fca28446a4666",
+      "evidence_ledger_sha256": "faad69cd3114c98978e930583b1ce54657664828540b4d2a84be535e5738d257",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1302_agent-cli-low-noise",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ba2b28e7d60a0c66165346481270678a3ca0b93fb61e2ce8408fca28446a4666",
+      "evidence_ledger_sha256": "faad69cd3114c98978e930583b1ce54657664828540b4d2a84be535e5738d257",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1302_agent-cli-low-noise",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ba2b28e7d60a0c66165346481270678a3ca0b93fb61e2ce8408fca28446a4666",
+      "evidence_ledger_sha256": "faad69cd3114c98978e930583b1ce54657664828540b4d2a84be535e5738d257",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1350_finish-agent-cli-pending",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6a3d2548cfd5d0cac8e730476c79fd12d1bf9e23c33bc62f6bee56204c57c498",
+      "evidence_ledger_sha256": "6bb9f277f810c4bc3f3e0a5efc98109e381a5a0ee5c41b606c955f2cfb130bbe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1350_finish-agent-cli-pending",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6a3d2548cfd5d0cac8e730476c79fd12d1bf9e23c33bc62f6bee56204c57c498",
+      "evidence_ledger_sha256": "6bb9f277f810c4bc3f3e0a5efc98109e381a5a0ee5c41b606c955f2cfb130bbe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260702_1350_finish-agent-cli-pending",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6a3d2548cfd5d0cac8e730476c79fd12d1bf9e23c33bc62f6bee56204c57c498",
+      "evidence_ledger_sha256": "6bb9f277f810c4bc3f3e0a5efc98109e381a5a0ee5c41b606c955f2cfb130bbe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260703_1107_cli-contract-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a15869fbc62f9d25da314739a048d72be84c5a86c9312d87bada1a9e79ccfbd8",
+      "evidence_ledger_sha256": "699083a09e45145b740b26b0ae33fced3a533f245d453e856e555f9366eb8d27",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260703_1107_cli-contract-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a15869fbc62f9d25da314739a048d72be84c5a86c9312d87bada1a9e79ccfbd8",
+      "evidence_ledger_sha256": "699083a09e45145b740b26b0ae33fced3a533f245d453e856e555f9366eb8d27",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260703_1107_cli-contract-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "a15869fbc62f9d25da314739a048d72be84c5a86c9312d87bada1a9e79ccfbd8",
+      "evidence_ledger_sha256": "699083a09e45145b740b26b0ae33fced3a533f245d453e856e555f9366eb8d27",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260703_1158_production-readiness-review",
+      "task_id": "T-01",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "4e3caf3fac122fd05b2443f7a685a3746ada5734a158dccc3c86cb6f71fabec5",
+      "evidence_ledger_sha256": "67bc078a13f06e4ed311fa47d3e4644ad2a1a6dd963ef529232df1171d72f9f6",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260703_1158_production-readiness-review",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4e3caf3fac122fd05b2443f7a685a3746ada5734a158dccc3c86cb6f71fabec5",
+      "evidence_ledger_sha256": "67bc078a13f06e4ed311fa47d3e4644ad2a1a6dd963ef529232df1171d72f9f6",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260703_1158_production-readiness-review",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "4e3caf3fac122fd05b2443f7a685a3746ada5734a158dccc3c86cb6f71fabec5",
+      "evidence_ledger_sha256": "67bc078a13f06e4ed311fa47d3e4644ad2a1a6dd963ef529232df1171d72f9f6",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260705_1606_afol-integrity-hardening",
+      "task_id": "T-07",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "d6431286cd30890373f4789d68c64bf52ede569c47ae4114cf5ba5f7a674a7a2",
+      "evidence_ledger_sha256": "9d919bae8b4add6559a42924e708dc58ab939ea37bb031454b38ab0f9188bd92",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1643_provider-neutral-gitnexus-cleanup",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dceed0c97e7c9fa857cf3a95bb01a6cedd7a35d9d811781507faba8b85b6dddb",
+      "evidence_ledger_sha256": "f7e175ee081de6c260c82c4a1ed7d3bc9e6f6b4d5fdcc5669ca67af23494fcd4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1643_provider-neutral-gitnexus-cleanup",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dceed0c97e7c9fa857cf3a95bb01a6cedd7a35d9d811781507faba8b85b6dddb",
+      "evidence_ledger_sha256": "f7e175ee081de6c260c82c4a1ed7d3bc9e6f6b4d5fdcc5669ca67af23494fcd4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1643_provider-neutral-gitnexus-cleanup",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "dceed0c97e7c9fa857cf3a95bb01a6cedd7a35d9d811781507faba8b85b6dddb",
+      "evidence_ledger_sha256": "f7e175ee081de6c260c82c4a1ed7d3bc9e6f6b4d5fdcc5669ca67af23494fcd4",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1707_execution-behavior-audit",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "95be4a677539fb9877b42225cb0272fc549a1e6d47a603a71d95f73147f8deda",
+      "evidence_ledger_sha256": "bf37603e8e2a6dd75d034d885b077b9a7f70fc579012bb26637206227eadb6fe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1707_execution-behavior-audit",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "95be4a677539fb9877b42225cb0272fc549a1e6d47a603a71d95f73147f8deda",
+      "evidence_ledger_sha256": "bf37603e8e2a6dd75d034d885b077b9a7f70fc579012bb26637206227eadb6fe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1707_execution-behavior-audit",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "95be4a677539fb9877b42225cb0272fc549a1e6d47a603a71d95f73147f8deda",
+      "evidence_ledger_sha256": "bf37603e8e2a6dd75d034d885b077b9a7f70fc579012bb26637206227eadb6fe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1707_execution-behavior-audit",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "95be4a677539fb9877b42225cb0272fc549a1e6d47a603a71d95f73147f8deda",
+      "evidence_ledger_sha256": "bf37603e8e2a6dd75d034d885b077b9a7f70fc579012bb26637206227eadb6fe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1707_execution-behavior-audit",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "95be4a677539fb9877b42225cb0272fc549a1e6d47a603a71d95f73147f8deda",
+      "evidence_ledger_sha256": "bf37603e8e2a6dd75d034d885b077b9a7f70fc579012bb26637206227eadb6fe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1707_execution-behavior-audit",
+      "task_id": "T-06",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "95be4a677539fb9877b42225cb0272fc549a1e6d47a603a71d95f73147f8deda",
+      "evidence_ledger_sha256": "bf37603e8e2a6dd75d034d885b077b9a7f70fc579012bb26637206227eadb6fe",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1806_lifecycle-integrity-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "77deeffe553f7f3045750d63e4f6911fd2ca36a9b53587c1a5a63c690480f702",
+      "evidence_ledger_sha256": "49a0ac932e7c8e58e2110fffc1168e2d00380b50783094c2c9dc2572d949c390",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1806_lifecycle-integrity-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "77deeffe553f7f3045750d63e4f6911fd2ca36a9b53587c1a5a63c690480f702",
+      "evidence_ledger_sha256": "49a0ac932e7c8e58e2110fffc1168e2d00380b50783094c2c9dc2572d949c390",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1806_lifecycle-integrity-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "77deeffe553f7f3045750d63e4f6911fd2ca36a9b53587c1a5a63c690480f702",
+      "evidence_ledger_sha256": "49a0ac932e7c8e58e2110fffc1168e2d00380b50783094c2c9dc2572d949c390",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260709_1806_lifecycle-integrity-hardening",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "77deeffe553f7f3045750d63e4f6911fd2ca36a9b53587c1a5a63c690480f702",
+      "evidence_ledger_sha256": "49a0ac932e7c8e58e2110fffc1168e2d00380b50783094c2c9dc2572d949c390",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_0613_concurrency-execution-integrity",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d62336f8bb75238729e1dd139f4ea4bf5fb274f6713b87c924d7365b1199097a",
+      "evidence_ledger_sha256": "3d84926b2d1dfaea44adfb1d4f1ddd77e65730fdb0ed3f5bea1df32e5425ca5d",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_0613_concurrency-execution-integrity",
+      "task_id": "T-08",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "d62336f8bb75238729e1dd139f4ea4bf5fb274f6713b87c924d7365b1199097a",
+      "evidence_ledger_sha256": "3d84926b2d1dfaea44adfb1d4f1ddd77e65730fdb0ed3f5bea1df32e5425ca5d",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_0736_remaining-integrity-hardening",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e2024e4e027e5d04bb5741e03fc5ac39095f927d18a9e63b6e443788bb1339d7",
+      "evidence_ledger_sha256": "4aaaea3d43467429d2860a556a8d56ee06d9928176ed28dcc8d2b801d533a6be",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_0736_remaining-integrity-hardening",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e2024e4e027e5d04bb5741e03fc5ac39095f927d18a9e63b6e443788bb1339d7",
+      "evidence_ledger_sha256": "4aaaea3d43467429d2860a556a8d56ee06d9928176ed28dcc8d2b801d533a6be",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ,
+    {
+      "session_id": "260710_0736_remaining-integrity-hardening",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e2024e4e027e5d04bb5741e03fc5ac39095f927d18a9e63b6e443788bb1339d7",
+      "evidence_ledger_sha256": "4aaaea3d43467429d2860a556a8d56ee06d9928176ed28dcc8d2b801d533a6be",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_0736_remaining-integrity-hardening",
+      "task_id": "T-04",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e2024e4e027e5d04bb5741e03fc5ac39095f927d18a9e63b6e443788bb1339d7",
+      "evidence_ledger_sha256": "4aaaea3d43467429d2860a556a8d56ee06d9928176ed28dcc8d2b801d533a6be",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_0736_remaining-integrity-hardening",
+      "task_id": "T-05",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "e2024e4e027e5d04bb5741e03fc5ac39095f927d18a9e63b6e443788bb1339d7",
+      "evidence_ledger_sha256": "4aaaea3d43467429d2860a556a8d56ee06d9928176ed28dcc8d2b801d533a6be",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_1159_typescript-7-toolchain-adoption",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ae3f99edd49a45d2cf52fedabb6e32178b6713a87960add6e85c4d8f6628db7e",
+      "evidence_ledger_sha256": "fa71f055b73201fdff21b2b48dc43fb3ae9e70bebde95f868aaf9cbc9616b7ee",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_1159_typescript-7-toolchain-adoption",
+      "task_id": "T-02",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ae3f99edd49a45d2cf52fedabb6e32178b6713a87960add6e85c4d8f6628db7e",
+      "evidence_ledger_sha256": "fa71f055b73201fdff21b2b48dc43fb3ae9e70bebde95f868aaf9cbc9616b7ee",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_1159_typescript-7-toolchain-adoption",
+      "task_id": "T-03",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "ae3f99edd49a45d2cf52fedabb6e32178b6713a87960add6e85c4d8f6628db7e",
+      "evidence_ledger_sha256": "fa71f055b73201fdff21b2b48dc43fb3ae9e70bebde95f868aaf9cbc9616b7ee",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    },
+    {
+      "session_id": "260710_1427_typescript-7-post-commit-errata",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "f324eecb9ee553ffed7c000035b36f1afe3578e07bc802224fef0111f9b0804a",
+      "evidence_ledger_sha256": "aeee19883d2a54edab1d58535fe01be604ac50b3b0efb6dfd2469bd6fc0d3060",
+      "evidence_ledger_present": true,
+      "cutoff_relation": "pre_cutoff",
+      "approval": "release-promotion-remediation baseline v1"
+    }
+  ]
+}

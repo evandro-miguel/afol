@@ -904,7 +904,7 @@ Follow-on slices under this direction:
 
 ### F-29 AFOL 1.0 Linux/WSL Finalization and Local Diagnostics
 
-- Status: final
+- Status: active
 - Governing spec:
   .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md
 - Why: AFOL 1.0 needs one collision-safe, Linux/WSL-scoped finalization lane
@@ -920,6 +920,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260726_afol-only-active-canon-migration_spec-child_01.md
     - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
     - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
+    - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -1014,6 +1015,10 @@ Follow-on slices under this direction:
   authorizing evidence `E-20260803132802745-747009`. Development validation
   remains repo-local; global promotion is permitted only from `main` after an
   explicit user request.
+- Reopened on 2026-08-06 for release-promotion remediation: eliminate the
+  vulnerable `fast-uri` override, replace implicit legacy-evidence masking with
+  an auditable compatibility baseline, and prove a reproducible compiled
+  artifact before any main integration or global installation.
 
 ### F-30 AFOL Evolution System
 
