@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { loadJsonObject } from "../../core/schema";
 import {
 	scanTemplateForbiddenPaths,
@@ -30,160 +29,11 @@ import {
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { verifyAllSessions } from "../workbench/verify";
+import {
+	admitsLegacyEvidenceIssue,
+	validLegacyEvidenceBaseline,
+} from "./legacy-evidence-baseline";
 import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
-
-const LEGACY_EVIDENCE_BASELINE_FILE = "evidence-compatibility-baseline-v1.json";
-const LEGACY_EVIDENCE_ISSUE_TYPES = new Set([
-	"missing_evidence",
-	"failed_evidence",
-]);
-
-type LegacyEvidenceAdmission = {
-	session_id: string;
-	task_id: string;
-	issue_type: "missing_evidence" | "failed_evidence";
-	state_board_sha256: string;
-	evidence_ledger_sha256: string;
-	evidence_ledger_present: boolean;
-	cutoff_relation: "pre_cutoff";
-	approval: string;
-};
-
-type LegacyEvidenceBaseline = {
-	schema_version: 1;
-	baseline_id: string;
-	cutoff_session_id: string;
-	admissions: LegacyEvidenceAdmission[];
-};
-
-function sha256(value: string): string {
-	return createHash("sha256").update(value).digest("hex");
-}
-
-function isHash(value: unknown): value is string {
-	return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-}
-
-function isLegacyEvidenceBaseline(
-	value: Record<string, unknown>,
-): value is LegacyEvidenceBaseline {
-	if (
-		value.schema_version !== 1 ||
-		typeof value.baseline_id !== "string" ||
-		!value.baseline_id ||
-		typeof value.cutoff_session_id !== "string" ||
-		!/^\d{6}_\d{4}$/.test(value.cutoff_session_id) ||
-		!Array.isArray(value.admissions)
-	) {
-		return false;
-	}
-	return value.admissions.every((entry) => {
-		if (entry === null || typeof entry !== "object" || Array.isArray(entry))
-			return false;
-		const admission = entry as Record<string, unknown>;
-		return (
-			typeof admission.session_id === "string" &&
-			/^\d{6}_\d{4}_.+/.test(admission.session_id) &&
-			typeof admission.task_id === "string" &&
-			/^T-\d{2,3}$/.test(admission.task_id) &&
-			(admission.issue_type === "missing_evidence" ||
-				admission.issue_type === "failed_evidence") &&
-			isHash(admission.state_board_sha256) &&
-			isHash(admission.evidence_ledger_sha256) &&
-			typeof admission.evidence_ledger_present === "boolean" &&
-			admission.cutoff_relation === "pre_cutoff" &&
-			typeof admission.approval === "string" &&
-			admission.approval.trim().length > 0
-		);
-	});
-}
-
-function loadLegacyEvidenceBaseline(
-	projectRoot: string,
-): LegacyEvidenceBaseline | null {
-	const path = join(
-		resolveProjectPaths(projectRoot).abs.admDir,
-		"source",
-		LEGACY_EVIDENCE_BASELINE_FILE,
-	);
-	const loaded = loadJsonObject(path);
-	return loaded.ok && isLegacyEvidenceBaseline(loaded.value)
-		? loaded.value
-		: null;
-}
-
-function stateBoardHash(taskPath: string): string | null {
-	const content = readFileSync(taskPath, "utf8");
-	const heading = /^## State Board\s*$/m.exec(content);
-	if (heading?.index === undefined) return null;
-	const start = content.indexOf("\n", heading.index) + 1;
-	if (start === 0) return null;
-	const followingSection = content.slice(start).search(/^## /m);
-	const board =
-		followingSection === -1
-			? content.slice(start)
-			: content.slice(start, start + followingSection);
-	return board.length > 0 ? sha256(board) : null;
-}
-
-function evidenceLedger(
-	taskPath: string,
-	sessionPath: string,
-): {
-	present: boolean;
-	hash: string;
-} {
-	let current = dirname(taskPath);
-	while (current.startsWith(sessionPath)) {
-		const path = join(current, ".evidence.jsonl");
-		if (existsSync(path))
-			return { present: true, hash: sha256(readFileSync(path, "utf8")) };
-		if (current === sessionPath) break;
-		current = dirname(current);
-	}
-	return { present: false, hash: sha256("") };
-}
-
-function admitsLegacyEvidenceIssue(
-	baseline: LegacyEvidenceBaseline | null,
-	sessionPath: string,
-	issue: { type: string; taskId?: string; file?: string },
-	hasOpenTasks: boolean,
-): boolean {
-	if (
-		!baseline ||
-		hasOpenTasks ||
-		!LEGACY_EVIDENCE_ISSUE_TYPES.has(issue.type) ||
-		!issue.taskId ||
-		!issue.file
-	) {
-		return false;
-	}
-	const sessionId = sessionPath.split(/[\\/]/).pop() ?? "";
-	if (
-		!/^\d{6}_\d{4}_/.test(sessionId) ||
-		sessionId >= baseline.cutoff_session_id
-	)
-		return false;
-	try {
-		const boardHash = stateBoardHash(issue.file);
-		if (!boardHash) return false;
-		const evidence = evidenceLedger(issue.file, sessionPath);
-		return baseline.admissions.some(
-			(admission) =>
-				admission.session_id === sessionId &&
-				admission.task_id === issue.taskId &&
-				admission.issue_type === issue.type &&
-				admission.state_board_sha256 === boardHash &&
-				admission.evidence_ledger_sha256 === evidence.hash &&
-				admission.evidence_ledger_present === evidence.present &&
-				admission.cutoff_relation === "pre_cutoff" &&
-				admission.approval.trim().length > 0,
-		);
-	} catch {
-		return false;
-	}
-}
 
 export type ProjectValidationCheck = {
 	id:
@@ -719,7 +569,7 @@ export async function validateProjectStructure(
 		await validateTemplateForbidden(projectRoot),
 		(() => {
 			const results = verifyAllSessions(projectRoot, true);
-			const baseline = loadLegacyEvidenceBaseline(projectRoot);
+			const baseline = validLegacyEvidenceBaseline(projectRoot);
 			let waivedLegacyIssues = 0;
 			const totalIssues = results.reduce((sum, result) => {
 				const unadmitted = result.issues.filter((issue) => {

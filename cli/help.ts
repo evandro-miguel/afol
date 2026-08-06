@@ -31,7 +31,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	log: "append log",
 	"quick-task": "one-task lifecycle",
 	governance: "spec gaps",
-	evidence: "record evidence",
+	evidence: "record/admit evidence",
 	close: "close session",
 	bootstrap: "install elsewhere",
 	verify: "verify tasks",

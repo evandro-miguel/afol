@@ -119,6 +119,15 @@ export function resolveCanonicalAction(
 	}
 
 	if (resolution.kind === "evidence") {
+		if (args[0] === "admit") {
+			const confirm = hasFlag(args, "--confirm") && !hasFlag(args, "--dry-run");
+			return confirm
+				? { action: "workbench.evidence.admit", sideEffect: "write" }
+				: {
+						action: "workbench.evidence.admit.preview",
+						sideEffect: "preview",
+					};
+		}
 		return { action: "workbench.evidence.record", sideEffect: "write" };
 	}
 	if (resolution.kind === "done") {
