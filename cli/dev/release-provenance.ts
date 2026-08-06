@@ -2,7 +2,13 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	readFileSync,
+	renameSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
@@ -18,7 +24,7 @@ import {
 	writeReleaseSecurityScanReport,
 } from "./security-scan";
 
-const DEFAULT_BUILD_COMMAND = "bun run build:deterministic";
+const DEFAULT_BUILD_COMMAND = "bun run cli/dev/build-release.ts";
 const VERSION_REGISTRY_PATH = ".afol/adm/source/release-version.json";
 const RELEASE_SECURITY_EVIDENCE_MAX_AGE_MS = 30 * 60 * 1000;
 const RELEASE_SECURITY_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
@@ -556,7 +562,7 @@ export function buildReleaseProvenance(
 			process.platform && process.arch
 				? `bun-${process.platform}-${process.arch}`
 				: "unknown",
-		compile_bytecode: true,
+		compile_bytecode: false,
 		module_format: "esm",
 		compile_autoload_dotenv: false,
 		compile_autoload_bunfig: false,
@@ -583,14 +589,53 @@ export function writeReleaseProvenance(
 	const provenancePath = join(cwd, `${artifact}.provenance.json`);
 	const provenance = buildReleaseProvenance(options);
 
-	writeFileSync(checksumPath, `${provenance.sha256}  ${artifact}\n`, "utf8");
-	writeFileSync(
+	const checksumContent = `${provenance.sha256}  ${artifact}\n`;
+	const provenanceContent = `${JSON.stringify(provenance, null, 2)}\n`;
+	writeFileAtomically(checksumPath, checksumContent);
+	writeFileAtomically(provenancePath, provenanceContent);
+	assertReleaseProvenanceBindsArtifact(
+		cwd,
+		artifact,
+		provenance,
+		checksumPath,
 		provenancePath,
-		`${JSON.stringify(provenance, null, 2)}\n`,
-		"utf8",
 	);
 
 	return { checksumPath, provenancePath };
+}
+
+function writeFileAtomically(path: string, content: string): void {
+	const tempPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+	writeFileSync(tempPath, content, "utf8");
+	renameSync(tempPath, path);
+}
+
+function assertReleaseProvenanceBindsArtifact(
+	cwd: string,
+	artifact: string,
+	provenance: ReleaseProvenance,
+	checksumPath: string,
+	provenancePath: string,
+): void {
+	const artifactSha256 = sha256Hex(readFileSync(join(cwd, artifact)));
+	const written = JSON.parse(
+		readFileSync(provenancePath, "utf8"),
+	) as ReleaseProvenance;
+	const checksumText = readFileSync(checksumPath, "utf8").trim();
+	const sizeMatches =
+		provenance.size_bytes === statSync(join(cwd, artifact)).size;
+	if (
+		provenance.sha256 !== artifactSha256 ||
+		written.sha256 !== artifactSha256 ||
+		provenance.artifact !== artifact ||
+		written.artifact !== artifact ||
+		checksumText !== `${artifactSha256}  ${artifact}` ||
+		!sizeMatches
+	) {
+		throw new Error(
+			`release provenance does not bind its artifact: ${artifact}`,
+		);
+	}
 }
 
 function main(args: string[]): void {
