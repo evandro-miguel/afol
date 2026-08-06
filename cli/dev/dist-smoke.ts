@@ -159,7 +159,9 @@ function readDistReleaseReceipts(root: string): DistReleaseReceipts {
 		throw new Error("dist/afol.provenance.json does not bind dist/afol");
 	}
 	if (
-		typeof provenance.size_bytes === "number" &&
+		typeof provenance.size_bytes !== "number" ||
+		!Number.isSafeInteger(provenance.size_bytes) ||
+		provenance.size_bytes < 0 ||
 		provenance.size_bytes !== artifactBytes.byteLength
 	) {
 		throw new Error(

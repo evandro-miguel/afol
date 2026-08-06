@@ -3,12 +3,14 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_OUTFILE = "dist/afol";
-const ENTRY = join(REPO_ROOT, "cli", "main.ts");
+const ENTRY = "cli/main.ts";
+
+export const DEFAULT_BUILD_COMMAND = "bun run build:deterministic";
 
 export type BuildReleaseArtifactOptions = {
 	cwd?: string;
@@ -29,10 +31,13 @@ export function buildReleaseArtifact(
 ): BuildReleaseArtifactResult {
 	const cwd = resolve(options.cwd ?? REPO_ROOT);
 	const outfile = resolve(cwd, options.outfile ?? DEFAULT_OUTFILE);
-	if (!existsSync(ENTRY)) {
-		throw new Error(`missing release entrypoint: ${ENTRY}`);
+	const entry = join(cwd, ENTRY);
+	if (!existsSync(entry)) {
+		throw new Error(`missing release entrypoint: ${entry}`);
 	}
 	mkdirSync(dirname(outfile), { recursive: true });
+	const entryArgument = relative(cwd, entry) || ENTRY;
+	const outfileArgument = relative(cwd, outfile) || outfile;
 
 	const result = spawnSync(
 		"bun",
@@ -42,9 +47,9 @@ export function buildReleaseArtifact(
 			"--format=esm",
 			"--no-compile-autoload-dotenv",
 			"--no-compile-autoload-bunfig",
-			ENTRY,
+			entryArgument,
 			"--outfile",
-			outfile,
+			outfileArgument,
 		],
 		{
 			cwd,

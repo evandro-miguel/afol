@@ -15,10 +15,20 @@ function sha256Hex(bytes: Buffer): string {
 	return createHash("sha256").update(bytes).digest("hex");
 }
 
-function writeReceiptFixture(root: string): void {
+function writeReceiptFixture(
+	root: string,
+	options: { sizeBytes?: unknown; omitSizeBytes?: boolean } = {},
+): void {
 	mkdirSync(join(root, "dist"), { recursive: true });
 	writeFileSync(join(root, "dist", "afol"), "artifact-bytes", "utf8");
 	const sha256 = sha256Hex(readFileSync(join(root, "dist", "afol")));
+	const provenance: Record<string, unknown> = {
+		artifact: "dist/afol",
+		sha256,
+	};
+	if (!options.omitSizeBytes) {
+		provenance.size_bytes = options.sizeBytes ?? "artifact-bytes".length;
+	}
 	writeFileSync(
 		join(root, "dist", "afol.sha256"),
 		`${sha256}  dist/afol\n`,
@@ -26,15 +36,7 @@ function writeReceiptFixture(root: string): void {
 	);
 	writeFileSync(
 		join(root, "dist", "afol.provenance.json"),
-		`${JSON.stringify(
-			{
-				artifact: "dist/afol",
-				sha256,
-				size_bytes: "artifact-bytes".length,
-			},
-			null,
-			2,
-		)}\n`,
+		`${JSON.stringify(provenance, null, 2)}\n`,
 		"utf8",
 	);
 }
@@ -75,6 +77,30 @@ describe("dist smoke release receipts", () => {
 			expect(() => verifyDistReleaseReceipts(root)).toThrow(
 				/run release provenance before dist smoke/,
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("verifyDistReleaseReceipts rejects missing or non-number size_bytes", () => {
+		const root = mkdtempSync(join(tmpdir(), "dist-smoke-receipts-size-"));
+		const invalidFixtures: Array<{
+			sizeBytes?: unknown;
+			omitSizeBytes?: boolean;
+		}> = [
+			{ omitSizeBytes: true },
+			{ sizeBytes: "artifact-bytes".length.toString() },
+			{ sizeBytes: "artifact-bytes".length + 0.5 },
+			{ sizeBytes: -1 },
+			{ sizeBytes: Number.MAX_SAFE_INTEGER + 1 },
+		];
+		try {
+			for (const options of invalidFixtures) {
+				writeReceiptFixture(root, options);
+				expect(() => verifyDistReleaseReceipts(root)).toThrow(
+					/size_bytes does not match/,
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -12,6 +12,7 @@ import {
 import { join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { DEFAULT_BUILD_COMMAND } from "./build-release";
 import {
 	buildReleaseSecurityScanOutcomes,
 	DEFAULT_RELEASE_ARTIFACT,
@@ -24,7 +25,6 @@ import {
 	writeReleaseSecurityScanReport,
 } from "./security-scan";
 
-const DEFAULT_BUILD_COMMAND = "bun run cli/dev/build-release.ts";
 const VERSION_REGISTRY_PATH = ".afol/adm/source/release-version.json";
 const RELEASE_SECURITY_EVIDENCE_MAX_AGE_MS = 30 * 60 * 1000;
 const RELEASE_SECURITY_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
@@ -622,8 +622,14 @@ function assertReleaseProvenanceBindsArtifact(
 		readFileSync(provenancePath, "utf8"),
 	) as ReleaseProvenance;
 	const checksumText = readFileSync(checksumPath, "utf8").trim();
+	const artifactSize = statSync(join(cwd, artifact)).size;
 	const sizeMatches =
-		provenance.size_bytes === statSync(join(cwd, artifact)).size;
+		Number.isSafeInteger(provenance.size_bytes) &&
+		Number.isSafeInteger(written.size_bytes) &&
+		provenance.size_bytes >= 0 &&
+		written.size_bytes >= 0 &&
+		provenance.size_bytes === artifactSize &&
+		written.size_bytes === artifactSize;
 	if (
 		provenance.sha256 !== artifactSha256 ||
 		written.sha256 !== artifactSha256 ||

@@ -9,11 +9,13 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_BUILD_COMMAND } from "../dev/build-release";
 import {
 	buildReleaseProvenance,
 	writeReleaseProvenance,
@@ -769,13 +771,22 @@ describe("release and toolchain contracts", () => {
 			});
 			expect(readFileSync(checksumPath, "utf8")).toContain("  dist/afol");
 			const provenance = JSON.parse(readFileSync(provenancePath, "utf8"));
+			const artifactPath = join(root, "dist", "afol");
 			expect(provenance).toMatchObject({
 				artifact: "dist/afol",
+				build_command: DEFAULT_BUILD_COMMAND,
+				compile_bytecode: false,
+				compile_autoload_bunfig: false,
+				compile_autoload_dotenv: false,
+				module_format: "esm",
+				sha256: fileSha256(artifactPath),
+				size_bytes: statSync(artifactPath).size,
 				security_scanners: expect.arrayContaining([
 					expect.objectContaining({ kind: "deps", status: "passed" }),
 					expect.objectContaining({ kind: "secrets", status: "passed" }),
 				]),
 			});
+			expect(Number.isSafeInteger(provenance.size_bytes)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
