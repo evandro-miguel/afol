@@ -6,4 +6,4 @@
 
 ## Summary
 
-Report waived: branch/worktree cleanup deferred; no product or release blocker
+Report waived: T-01/T-02 completed; T-03 branch/worktree cleanup deferred; no product or release blocker
