@@ -119,13 +119,14 @@ describe("F-32 hot-path benchmark runner", () => {
 		try {
 			const artifactPath = join(root, "afol");
 			writeFileSync(artifactPath, "compiled benchmark binary bytes");
-			const profile = executionProfile("/$bunfs/root/cli/main.ts", artifactPath);
+			const profile = executionProfile(
+				"/$bunfs/root/cli/main.ts",
+				artifactPath,
+			);
 			expect(profile.execution_mode).toBe("compiled-release");
 			expect(profile.artifact_mode).toBe("bun-compile");
 			expect(profile.artifact_sha256).toMatch(/^[a-f0-9]{64}$/);
-			expect(profile.artifact_sha256).toBe(
-				sha256(readFileSync(artifactPath)),
-			);
+			expect(profile.artifact_sha256).toBe(sha256(readFileSync(artifactPath)));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
