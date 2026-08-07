@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { boundedSpawn } from "../core/subprocess";
+import { sha256 } from "../services/evolution/imports/digest";
 import {
 	HOT_PATH_BENCHMARK_ENV,
 	HOT_PATH_BENCHMARK_MARKER,
@@ -244,7 +245,33 @@ function gitCommit(projectRoot: string): string {
 	return result.ok ? result.stdout.trim() || "unknown" : "unknown";
 }
 
-function executionProfile(): BenchmarkExecutionProfile {
+/**
+ * Hash the running compiled executable for provenance, failing closed when
+ * the artifact cannot be read or hashed.
+ */
+function hashRunningExecutable(execPath: string): string {
+	try {
+		return sha256(readFileSync(execPath));
+	} catch (error) {
+		throw new Error(
+			`compiled-runtime-artifact-hash-failed:${execPath}:${(error as Error).message}`,
+		);
+	}
+}
+
+/**
+ * Execution profile for a hot-path benchmark run.
+ *
+ * Source runtime reports the historical source profile. Compiled runtime
+ * (the benchmark self-launching from a `bun build --compile` binary) reports
+ * compiled-release/bun-compile provenance with the real SHA-256 of the
+ * running executable and fails closed when the artifact cannot be hashed.
+ */
+export function executionProfile(
+	mainPath: string = Bun.main,
+	execPath: string = process.execPath,
+): BenchmarkExecutionProfile {
+	const compiledRuntime = isHotPathCompiledRuntime(mainPath);
 	return {
 		host_profile_id: `hot-path-${process.platform}-${process.arch}`,
 		os: process.platform,
@@ -252,9 +279,11 @@ function executionProfile(): BenchmarkExecutionProfile {
 		cpu_class: `${cpus().length}-cpu`,
 		bun_version: Bun.version,
 		runtime_version: Bun.version,
-		execution_mode: "source",
-		artifact_mode: "source",
-		artifact_sha256: "source",
+		execution_mode: compiledRuntime ? "compiled-release" : "source",
+		artifact_mode: compiledRuntime ? "bun-compile" : "source",
+		artifact_sha256: compiledRuntime
+			? hashRunningExecutable(execPath)
+			: "source",
 	};
 }
 
