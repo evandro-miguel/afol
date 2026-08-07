@@ -921,6 +921,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
     - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
     - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
+    - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -997,13 +998,11 @@ Follow-on slices under this direction:
   manifest, Gitleaks history/worktree, and OSV dependency scans passed. This
   bounded remediation makes no new full-suite, build, release, deployment, or
   global-install claim.
-- Final closure: session `260801_1641_project-finalization` completed the
-  remaining F-29/F-31/F-32 reconciliation. The full local suite, typecheck,
-  generated-contract checks, project validation, security scans, governance
-  benchmarks, and Linux x64 `validate:release` passed on clean candidate
-  `aa6892c`. Project RAG refresh was attempted through its supported snapshot
-  flow and remains explicitly blocked by `REVIEW_REQUIRED` approval; no RAG
-  mutation or unsupported platform/deployment claim is included in this closure.
+- Release benchmark timing: the bounded child
+  `260727_release-benchmark-timing-and-baseline-contract_spec-child_01` is
+  final. Its mutation-safety scenarios use the compiled release artifact with
+  cold processes on a warm host, and incompatible profiles fail closed without
+  regression claims. The child makes no passing full-release-gate claim.
 - Reopened after the final audit found that F-32 hot-path scenarios declared as
   compiled binaries were measured through the source runner and that project
   readiness suppressed failed evidence for every session without open tasks.
@@ -1019,6 +1018,9 @@ Follow-on slices under this direction:
   vulnerable `fast-uri` override, replace implicit legacy-evidence masking with
   an auditable compatibility baseline, and prove a reproducible compiled
   artifact before any main integration or global installation.
+- No persisted formal `validate:release` evidence authorizes the finalization
+  HEAD. The historical `aa6892c` pass assertion is excluded from release and
+  provenance claims; a fresh `bun run validate:release` gate is required.
 
 ### F-30 AFOL Evolution System
 
