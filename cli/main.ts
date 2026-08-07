@@ -70,6 +70,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"new",
 	"start",
 	"evidence",
+	"legacy",
 	"done",
 	"transition",
 	"log",
@@ -390,6 +391,15 @@ export async function main(argv: string[]): Promise<number> {
 	if (resolution.kind === "evidence") {
 		const { runEvidenceCommand } = await import("./commands/workbench");
 		return runEvidenceCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
+	}
+
+	if (resolution.kind === "legacy") {
+		const { runLegacyCommand } = await import("./commands/legacy");
+		return runLegacyCommand(
 			resolution.args,
 			project.value.root,
 			operationCtx,

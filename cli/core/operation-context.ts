@@ -130,6 +130,18 @@ export function resolveCanonicalAction(
 		}
 		return { action: "workbench.evidence.record", sideEffect: "write" };
 	}
+	if (resolution.kind === "legacy") {
+		if (args[0] === "reconcile") {
+			const confirm = hasFlag(args, "--confirm") && !hasFlag(args, "--dry-run");
+			return confirm
+				? { action: "legacy.reconcile", sideEffect: "write" }
+				: {
+						action: "legacy.reconcile.preview",
+						sideEffect: "preview",
+					};
+		}
+		return { action: "legacy.reconcile.preview", sideEffect: "preview" };
+	}
 	if (resolution.kind === "done") {
 		if (hasFlag(args, "--test-shell")) {
 			return { action: "workbench.done.test-shell", sideEffect: "write" };

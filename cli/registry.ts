@@ -7,6 +7,7 @@ export type CommandKind =
 	| "new"
 	| "start"
 	| "evidence"
+	| "legacy"
 	| "done"
 	| "transition"
 	| "close"
@@ -448,6 +449,24 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				sideEffect: "write",
 				description:
 					"Admit hash-bound missing/failed evidence for a closed pre-cutoff session (preview by default; --confirm writes)",
+			},
+		],
+	},
+	{
+		command: "legacy",
+		aliases: ["lg"],
+		kind: "legacy",
+		sideEffect: "write",
+		description:
+			"Reconcile legacy pre-cutoff evidence debt and close deadlocked sessions",
+		category: "workflow",
+		subcommands: [
+			{
+				usage:
+					'reconcile --session <id> --reason "<text>" --issue <url> [--task-id <id>] [--dry-run|--confirm] [--summary "<text>"] [--json]',
+				sideEffect: "write",
+				description:
+					"Admit legacy evidence debt and close a pre-cutoff all-done session in one transaction (preview by default; --confirm writes and closes)",
 			},
 		],
 	},

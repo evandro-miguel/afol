@@ -35,6 +35,10 @@ import {
 	appendEventsAndRebuildWorkBenchIndex,
 	rebuildWorkBenchIndex,
 } from "../local-state/workbench-index";
+import {
+	admitsLegacyEvidenceIssue,
+	validLegacyEvidenceBaseline,
+} from "../project/legacy-evidence-baseline";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
 import { loadEvidenceEntries, sessionPaths } from "./session-reader";
@@ -279,6 +283,13 @@ export type CloseSessionOptions = {
 	allowNoReport?: boolean;
 	reason?: string;
 	summary?: string;
+	/**
+	 * When set, strict verification waives issues that are admitted by the
+	 * legacy evidence compatibility baseline (pre-cutoff sessions whose
+	 * evidence debt was explicitly admitted). Only consulted for open
+	 * sessions; the strict path is unchanged when the option is absent.
+	 */
+	admitLegacyBaseline?: boolean;
 };
 
 export type CloseSessionReport = {
@@ -2655,6 +2666,21 @@ export function closeSession(
 				throw new Error(`Session ${session} has blocking tasks: ${labels}`);
 			}
 			const verification = verifyWorkbenchTasks(paths.sessionDir, true);
+			if (options.admitLegacyBaseline) {
+				const baseline = validLegacyEvidenceBaseline(root);
+				verification.issues = verification.issues.filter(
+					(issue) =>
+						!admitsLegacyEvidenceIssue(
+							baseline,
+							paths.sessionDir,
+							issue,
+							false,
+						),
+				);
+				verification.allCompleted =
+					verification.openTasks.length === 0 &&
+					verification.issues.length === 0;
+			}
 			if (!verification.allCompleted) {
 				const message =
 					verification.issues.map((issue) => issue.message).join("; ") ||

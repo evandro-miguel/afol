@@ -232,6 +232,14 @@ export const FLAG_ALIASES = Object.freeze({
 		"-T": "--title",
 		"-u": "--url",
 	}),
+	legacy: Object.freeze({
+		"-D": "--dry-run",
+		"-S": "--session",
+		"-T": "--task-id",
+		"-j": "--json",
+		"-m": "--summary",
+		"-r": "--reason",
+	}),
 	log: Object.freeze({
 		"-S": "--session",
 		"-m": "--message",

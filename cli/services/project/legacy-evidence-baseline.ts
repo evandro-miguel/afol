@@ -215,6 +215,12 @@ export type AdmitLegacyEvidenceInput = {
 	baselineId?: string;
 	cutoffSessionId?: string;
 	confirm: boolean;
+	/**
+	 * Reconcile mode: with allMissing, admit every eligible
+	 * missing_evidence AND failed_evidence issue (no default type filter).
+	 * Plain evidence admit keeps the existing missing-only default.
+	 */
+	allIssueTypes?: boolean;
 };
 
 export type AdmitLegacyEvidenceResult = {
@@ -381,6 +387,39 @@ export function admitLegacyEvidenceIssues(
 		throw new Error(`Invalid session id for evidence admit: ${sessionId}`);
 	}
 
+	const paths = sessionPaths(projectRoot, sessionId);
+	if (!existsSync(paths.sessionDir)) {
+		throw new Error(`Session folder not found: ${paths.sessionDir}`);
+	}
+	if (!isSessionClosed(projectRoot, sessionId)) {
+		throw new Error(
+			`Session ${sessionId} is not closed; evidence admit only applies to closed sessions.`,
+		);
+	}
+
+	return applyLegacyEvidenceAdmissions(projectRoot, input, {
+		requireClosed: true,
+	});
+}
+
+/**
+ * Shared eligibility + planning + merge WRITE core for legacy evidence
+ * admissions. `requireClosed: true` (the public evidence admit path) enforces
+ * the closed-session precondition; the legacy reconcile path passes
+ * `requireClosed: false` because it admits the debt and closes the session in
+ * the same transaction. The caller is responsible for holding any session
+ * lock; the baseline lock is taken inside for confirm writes.
+ */
+export function applyLegacyEvidenceAdmissions(
+	projectRoot: string,
+	input: AdmitLegacyEvidenceInput,
+	options: { requireClosed: boolean },
+): AdmitLegacyEvidenceResult {
+	const sessionId = input.sessionId.trim();
+	if (!/^\d{6}_\d{4}_.+/.test(sessionId)) {
+		throw new Error(`Invalid session id for evidence admit: ${sessionId}`);
+	}
+
 	const approval = buildApproval(input.reason, input.issueUrl);
 	const taskIds = (input.taskIds ?? []).map((id) => id.trim()).filter(Boolean);
 	const allMissing = Boolean(input.allMissing);
@@ -404,17 +443,14 @@ export function admitLegacyEvidenceIssues(
 
 	// --all-missing admits only missing_evidence unless --issue-type is set.
 	// With --issue-type failed_evidence --all-missing, only failed_evidence.
+	// Reconcile mode (allIssueTypes) admits both types across all tasks.
 	const issueTypeFilter: LegacyEvidenceIssueType | undefined =
-		input.issueType ?? (allMissing ? "missing_evidence" : undefined);
+		input.issueType ??
+		(input.allIssueTypes ? undefined : allMissing ? "missing_evidence" : undefined);
 
 	const paths = sessionPaths(projectRoot, sessionId);
 	if (!existsSync(paths.sessionDir)) {
 		throw new Error(`Session folder not found: ${paths.sessionDir}`);
-	}
-	if (!isSessionClosed(projectRoot, sessionId)) {
-		throw new Error(
-			`Session ${sessionId} is not closed; evidence admit only applies to closed sessions.`,
-		);
 	}
 
 	const path = legacyEvidenceBaselinePath(projectRoot);
