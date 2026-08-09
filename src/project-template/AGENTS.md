@@ -94,9 +94,11 @@ afol local-state rebuild --json
 - Prefer `afol qt` for micro one-shot work; hygiene warnings (health,
   maintenance, open pending) do not stop mid-delivery lifecycle. Repair corrupt
   context with `afol catchup --fix`.
-- Resolve with
-  `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
-  or waive with `--no-spec-required --reason "<reason>"`.
+- Resolve with short path: `afol gov rs -S <id> -F <F-id> -P <spec-id>`
+  (`-S` optional when active/bound) or waive
+  `afol gov rs -S <id> --no-spec-required -r "<reason>"`.
+- Optional debt cleanup only: `afol gov bulk-waive -r "<reason>" [--limit 20]
+  [--dry-run]` — do not require bulk cleanup to ship one feature.
 - Plans/tasks execute approved intent. They do not replace roadmap/spec
   definition.
 - Non-trivial work -> use `.afol/wb/` for durable execution artifacts.

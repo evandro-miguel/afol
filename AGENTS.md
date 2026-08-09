@@ -236,9 +236,10 @@ Task state source of truth:
 - A `pending_spec` session may continue lifecycle (`start`, `evidence`,
   `done`, `close`) with warnings, and close is allowed; `afol status` and
   `afol validate project` warn while pending specs are open.
-- Resolve with
-  `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
-  or waive with `--no-spec-required --reason "<reason>"`.
+- Resolve with short path: `afol gov rs -S <id> -F <F-id> -P <spec-id>`
+  (`-S` optional when active/bound); waive `afol gov rs -S <id> --no-spec-required -r "<reason>"`.
+- Bulk-waive open pending_spec (default limit 20): `afol gov bw --reason "<text>"`
+  or explicit sessions `afol gov bulk-waive --reason "<text>" --session <id> [...]`.
 - Plans/tasks execute approved intent. They do not replace roadmap/spec
   definition.
 - Non-trivial work -> use `.afol/wb/` for durable execution artifacts.

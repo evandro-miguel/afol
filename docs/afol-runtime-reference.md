@@ -217,11 +217,15 @@ projection in a later observation flow.
 
 ```bash
 afol governance pending --json
-afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
-afol governance resolve-spec --session <session-id> --no-spec-required --reason "<reason>"
+afol gov rs -S <session-id> -F <F-id> -P <spec-id>
+afol gov rs -S <session-id> --no-spec-required -r "<reason>"
+afol gov bulk-waive -r "<reason>" [--limit 20] [--dry-run]
 afol catchup
 afol catchup --fix
 ```
+
+Bulk waive is optional cemetery cleanup only. Shipping one feature never
+requires bulk-waiving historical pending entries.
 
 ## Rule Injection
 

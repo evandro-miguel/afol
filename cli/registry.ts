@@ -415,15 +415,25 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "List open pending_spec entries",
 			},
 			{
-				usage:
-					"resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+				usage: "gov rs -S <id> -F <F-id> -P <spec-id>",
 				sideEffect: "write",
-				description: "Link roadmap feature/spec",
+				description: "Link roadmap feature/spec (session optional if bound)",
 			},
 			{
-				usage: "resolve-spec --session <id> --no-spec-required --reason <text>",
+				usage: 'gov rs -S <id> --no-spec-required -r "<reason>"',
 				sideEffect: "write",
 				description: "Waive with an explicit reason",
+			},
+			{
+				usage: 'bulk-waive --reason "<text>" [--limit N] [--dry-run] [--json]',
+				sideEffect: "write",
+				description: "Waive open pending_spec entries (default limit 20)",
+			},
+			{
+				usage:
+					'bulk-waive --reason "<text>" --session <id> [--session <id2>...]',
+				sideEffect: "write",
+				description: "Waive explicit open sessions (max 100)",
 			},
 			{
 				usage: "repair-index",

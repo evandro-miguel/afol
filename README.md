@@ -77,7 +77,9 @@ afol start --session <session-id> --task-id <task-id>
 afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
 afol close --session <session-id> --summary "<summary>"
 afol governance pending --json
-afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
+afol gov rs -S <session-id> -F <F-id> -P <spec-id>
+afol gov rs -S <session-id> --no-spec-required -r "<reason>"
+afol gov bulk-waive -r "<reason>" [--limit 20] [--dry-run]
 afol evolve status --json
 afol update check
 afol update preview

@@ -40,10 +40,12 @@ export const SUBCOMMAND_ACTION_ALIASES = Object.freeze({
 		ud: "undo",
 	}),
 	governance: Object.freeze({
+		bw: "bulk-waive",
 		ls: "pending",
 		p: "pending",
 		resolve: "resolve-spec",
 		rs: "resolve-spec",
+		"waive-open": "bulk-waive",
 	}),
 	ctx: Object.freeze({
 		b: "build",
