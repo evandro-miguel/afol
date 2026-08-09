@@ -200,13 +200,14 @@ projection in a later observation flow.
 
 ## Governance
 
-- Governed sessions may enter `pending_spec` when roadmap feature or parent
-  spec linkage is missing.
+- `afol new` without `--feature-id`/`--parent-spec` creates the session with
+  `pending_spec` plus warnings; open `pending_spec` entries do not block other
+  new sessions.
 - The current `pending_spec` session can continue through `start`, `evidence`,
   `done`, and `close`; lifecycle commands emit warnings until the pending spec
-  is resolved or waived.
-- Open `pending_spec` entries block new session creation until they are
-  resolved or waived.
+  is resolved or waived, and `close` remains allowed.
+- `afol status` and `afol validate project` warn while open pending specs
+  exist; resolving or waiving is still recommended.
 
 ```bash
 afol governance pending --json

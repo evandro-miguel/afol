@@ -227,16 +227,6 @@ export async function runStartCommand(
 		if (parsed.taskIds.length > 1 && parsed.brief) {
 			throw new Error("Batch start does not support --brief.");
 		}
-		const pending = getSessionPendingSpecNotice(
-			root,
-			parsed.session,
-			parsed.taskId,
-		);
-		if (pending) {
-			throw new Error(
-				`pending_spec blocks start for session ${parsed.session}; ${pending.resolutionHint.replace("<session>", parsed.session)}`,
-			);
-		}
 		const warnings =
 			parsed.taskIds.length === 1
 				? startTask(root, parsed, runtime)

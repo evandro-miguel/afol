@@ -502,14 +502,7 @@ export function formatPendingSpecBlocker(
 		)
 		.join("; ");
 	const suffix = open.length > limit ? `; +${open.length - limit} more` : "";
-	return `open pending_spec blocks new sessions: ${open.length} open; resolve with afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason "<reason>"; open: ${shown}${suffix}`;
-}
-
-export function assertNoOpenPendingSpecs(root: string): void {
-	const open = listOpenPendingSpecs(root);
-	if (open.length > 0) {
-		throw new Error(formatPendingSpecBlocker(open));
-	}
+	return `open pending_spec: ${open.length}; resolve with afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason "<reason>"; open: ${shown}${suffix}`;
 }
 
 function sessionDir(root: string, session: string): string {

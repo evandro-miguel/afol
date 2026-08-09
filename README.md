@@ -58,10 +58,12 @@ Removed legacy surfaces:
 - `agents.config`
 - `legacy:` delegate routing
 
-Governed sessions may enter `pending_spec`, but new sessions are blocked while
-open pending specs exist until they are resolved or waived. The current session
-can continue with lifecycle warnings so the user can finish the work and then
-link or waive the missing spec.
+`afol new` without `--feature-id`/`--parent-spec` creates a session with
+`pending_spec` plus warnings; open pending specs do not block other new
+sessions. The current session can continue through `start`, `evidence`, `done`,
+and `close` with lifecycle warnings so the user can finish the work and then
+link or waive the missing spec. `afol status` and `afol validate project` warn
+while pending specs are open; close is allowed.
 
 ## Commands
 

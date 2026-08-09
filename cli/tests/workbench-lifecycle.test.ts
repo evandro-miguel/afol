@@ -798,7 +798,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("cli pending_spec blocks its own start while unrelated new remains allowed", () => {
+	test("cli pending_spec allows start with warning while unrelated new remains allowed", () => {
 		const root = mkRoot("pending-spec");
 		try {
 			writeCliProjectContract(root);
@@ -818,8 +818,8 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 			]);
-			expect(start.status).toBe(2);
-			expect(start.stderr as string).toContain("pending_spec blocks start");
+			expect(start.status).toBe(0);
+			expect(start.stdout as string).toContain("warning: pending_spec");
 
 			const evidence = runKernel(root, [
 				"evidence",
@@ -843,7 +843,7 @@ describe("workbench lifecycle service", () => {
 				"--test",
 				"true",
 			]);
-			expect(done.status).toBe(2);
+			expect(done.status).toBe(0);
 
 			const unrelated = runKernel(root, [
 				"new",

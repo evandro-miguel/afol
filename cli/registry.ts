@@ -255,10 +255,21 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Complete a task session",
 		category: "workflow",
 		guidance: [
-			"Record evidence first, or repeat --test for up to eight ordered fail-fast checks.",
+			'Prefer -x / batch T-01..T-n: afol d T-01 -x "<cmd>" verifies and completes in one step.',
+			"Separate evidence is diagnostic when you need a receipt without completing.",
 			"Batch selectors run one shared check for execution-policy tasks.",
 		],
 		subcommands: [
+			{
+				usage: 'd T-01 -x "<cmd>"',
+				sideEffect: "write",
+				description: "Verify with -x and complete one task (preferred)",
+			},
+			{
+				usage: 'd T-01..T-n -x "<cmd>"',
+				sideEffect: "write",
+				description: "One shared check for a batch range, then complete each",
+			},
 			{
 				usage: "--session <session-id> --task-id <task-id>",
 				sideEffect: "write",
@@ -367,13 +378,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: '<theme> --task <summary> --command "<cmd>"',
+				usage: '<theme> -t <summary> -c "<cmd>"',
 				sideEffect: "write",
 				description:
 					"Create, start, verify, record evidence, and close one task",
 			},
 			{
-				usage: "--feature-id <F-id> --parent-spec <spec-id>",
+				usage: "-F <F-id> -P <spec-id>",
 				sideEffect: "write",
 				description: "Create the quick task as a governed session",
 			},

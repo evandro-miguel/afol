@@ -86,8 +86,12 @@ afol local-state rebuild --json
 - Roadmap feature -> map to one governing parent spec under `.afol/adm/specs/`.
 - Implementation decomposition needed -> use child specs.
 - Workbench sessions must carry `roadmap_feature` and `parent_spec`.
-- Current `pending_spec` sessions may continue with warnings, but new sessions
-  are blocked while any pending spec is open. Resolve with
+- `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings
+  (allowed); open pending specs do not block other new sessions.
+- A `pending_spec` session may continue lifecycle (`start`, `evidence`,
+  `done`, `close`) with warnings, and close is allowed; `afol status` and
+  `afol validate project` warn while pending specs are open.
+- Resolve with
   `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
   or waive with `--no-spec-required --reason "<reason>"`.
 - Plans/tasks execute approved intent. They do not replace roadmap/spec
@@ -198,8 +202,10 @@ afol local-state rebuild --json
 - Workbench task state lives in the `State Board` and AFOL lifecycle commands.
   Do not use `T-xx` checklist markers or checkbox-done language for lifecycle
   state.
-- Governed sessions may enter `pending_spec`, but new sessions are blocked
-  while open pending specs exist until they are resolved or waived.
+- `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings; open
+  pending specs do not block other new sessions, and a `pending_spec` session
+  may continue lifecycle (`start`, `evidence`, `done`, `close`) with warnings
+  until the spec is resolved or waived.
 - Use `afol start`, `afol evidence`, `afol done`, and `afol close`; `done`
   requires valid task-scoped evidence.
 - Finalize optional artifacts before closure.
