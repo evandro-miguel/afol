@@ -1,14 +1,42 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { boundedSpawn } from "../../core/subprocess";
+import { listOpenPendingSpecs } from "../governance/pending-specs";
 import { collectSessionIds } from "../local-state/workbench-index";
 import { readActiveSession, sessionPaths } from "./lifecycle";
-import { defaultAllowGlobalFallback, resolveSession } from "./session-context";
+import {
+	bindCurrentContextSession,
+	defaultAllowGlobalFallback,
+	inspectImplicitSessionState,
+	listBindings,
+	removeBinding,
+	resolveSession,
+} from "./session-context";
 
 export type ArtifactState = {
 	present: boolean;
 	mtime: string | null;
 	lines: number;
+};
+
+export type CatchupUnbindAction = {
+	session: string;
+	state: "corrupt" | "missing";
+};
+
+export type CatchupSkip = {
+	reason: string;
+	session?: string;
+};
+
+export type CatchupRepairReport = {
+	/** True when --fix path ran (mutations may still be empty). */
+	applied: boolean;
+	unbound: CatchupUnbindAction[];
+	rebound: string | null;
+	skipped: CatchupSkip[];
+	/** True when session-context bindings were written. */
+	mutated: boolean;
 };
 
 export type CatchupReport = {
@@ -30,6 +58,10 @@ export type CatchupReport = {
 		notes: string[];
 	};
 	next_step: string;
+	/** Diagnostic only — never auto-resolved by catchup. Always set by computeCatchup. */
+	pending_spec_open?: number;
+	/** Present when `afol catchup --fix` ran. */
+	repair?: CatchupRepairReport;
 };
 
 const CATCHUP_GIT_FILE_LIMIT = 50;
@@ -201,6 +233,36 @@ function recentSessionsHint(root: string): string {
 	return sessions.length > 0 ? sessions.join(", ") : "none";
 }
 
+function readOpenPendingSpecCount(root: string): number {
+	try {
+		return listOpenPendingSpecs(root).length;
+	} catch {
+		return 0;
+	}
+}
+
+function appendPendingSpecDiagnostics(
+	notes: string[],
+	nextStep: string,
+	pendingSpecOpen: number,
+	options: { preferPendingNextStep: boolean },
+): { notes: string[]; next_step: string } {
+	if (pendingSpecOpen <= 0) {
+		return { notes, next_step: nextStep };
+	}
+	const pendingNote = `open pending_spec: ${pendingSpecOpen} (not auto-resolved; run afol governance pending)`;
+	const nextNotes = notes.includes(pendingNote)
+		? notes
+		: [...notes, pendingNote];
+	if (!options.preferPendingNextStep) {
+		return { notes: nextNotes, next_step: nextStep };
+	}
+	return {
+		notes: nextNotes,
+		next_step: `open pending_spec count=${pendingSpecOpen} — run afol governance pending`,
+	};
+}
+
 function buildArtifactStates(
 	root: string,
 	session: string,
@@ -223,12 +285,118 @@ function buildArtifactStates(
 	};
 }
 
+/**
+ * Safe session-context repair for `afol catchup --fix`.
+ *
+ * Fail-closed and partial: unbind corrupt/missing bindings, optionally rebind
+ * a usable global active session when git context exists. Never deletes session
+ * dirs, never resolves/waives governance, never archives.
+ */
+export function applyCatchupRepair(root: string): CatchupRepairReport {
+	const unbound: CatchupUnbindAction[] = [];
+	const skipped: CatchupSkip[] = [];
+	let rebound: string | null = null;
+
+	let bindings: ReturnType<typeof listBindings> = [];
+	try {
+		bindings = listBindings(root);
+	} catch (error) {
+		skipped.push({
+			reason: `context file unreadable: ${(error as Error).message}`,
+		});
+		return {
+			applied: true,
+			unbound,
+			rebound,
+			skipped,
+			mutated: false,
+		};
+	}
+
+	for (const binding of bindings) {
+		const state = inspectImplicitSessionState(root, binding.session);
+		if (state !== "corrupt" && state !== "missing") {
+			continue;
+		}
+		try {
+			const removed = removeBinding(root, binding.session);
+			if (removed) {
+				unbound.push({ session: binding.session, state });
+			} else {
+				skipped.push({
+					reason: "unbind found no matching binding",
+					session: binding.session,
+				});
+			}
+		} catch (error) {
+			skipped.push({
+				reason: `unbind failed: ${(error as Error).message}`,
+				session: binding.session,
+			});
+		}
+	}
+
+	let hasEffectiveOpen = false;
+	try {
+		const resolved = resolveSession(root, {
+			allowGlobalFallback: defaultAllowGlobalFallback(),
+		});
+		hasEffectiveOpen = resolved !== null;
+	} catch (error) {
+		skipped.push({
+			reason: `session resolve failed after unbind: ${(error as Error).message}`,
+		});
+		hasEffectiveOpen = false;
+	}
+
+	if (!hasEffectiveOpen) {
+		const active = readActiveSession(root);
+		if (!active) {
+			skipped.push({ reason: "no global active session to rebind" });
+		} else {
+			const activeState = inspectImplicitSessionState(root, active);
+			if (activeState !== "open") {
+				skipped.push({
+					reason: `global active not usable (${activeState})`,
+					session: active,
+				});
+			} else {
+				try {
+					const binding = bindCurrentContextSession(root, active);
+					if (binding) {
+						rebound = active;
+					} else {
+						skipped.push({
+							reason: "no git context to bind",
+							session: active,
+						});
+					}
+				} catch (error) {
+					skipped.push({
+						reason: `rebind failed: ${(error as Error).message}`,
+						session: active,
+					});
+				}
+			}
+		}
+	}
+
+	return {
+		applied: true,
+		unbound,
+		rebound,
+		skipped,
+		mutated: unbound.length > 0 || rebound !== null,
+	};
+}
+
 export function computeCatchup(
 	root: string,
-	opts: { session?: string },
+	opts: { session?: string; repair?: CatchupRepairReport } = {},
 ): CatchupReport {
 	const explicitSession = opts.session?.trim() || null;
 	const activeSession = readActiveSession(root);
+	const pendingSpecOpen = readOpenPendingSpecCount(root);
 	const effectiveSession = resolveSession(root, {
 		...(explicitSession ? { explicit: explicitSession } : {}),
 		allowGlobalFallback: defaultAllowGlobalFallback(),
@@ -245,7 +413,13 @@ export function computeCatchup(
 		} else if (git.gitQueryFailed) {
 			notes.unshift("degraded: git status query failed, state uncertain");
 		}
-		return {
+		const pending = appendPendingSpecDiagnostics(
+			notes,
+			"no active session — run afol n",
+			pendingSpecOpen,
+			{ preferPendingNextStep: false },
+		);
+		const report: CatchupReport = {
 			session: null,
 			session_status: "no-session",
 			git_changed_files: git.files,
@@ -261,10 +435,15 @@ export function computeCatchup(
 			freshness: {
 				findings_stale: false,
 				log_behind_diff: false,
-				notes,
+				notes: pending.notes,
 			},
-			next_step: "no active session — run afol n",
+			next_step: pending.next_step,
+			pending_spec_open: pendingSpecOpen,
 		};
+		if (opts.repair) {
+			report.repair = opts.repair;
+		}
+		return report;
 	}
 
 	const sessionState = buildArtifactStates(root, session);
@@ -335,7 +514,12 @@ export function computeCatchup(
 		nextStep = "sync findings into research before continuing";
 	}
 
-	return {
+	// Prefer pending_spec hint only when the session is otherwise healthy.
+	const pending = appendPendingSpecDiagnostics(notes, nextStep, pendingSpecOpen, {
+		preferPendingNextStep: nextStep === "artifacts look fresh",
+	});
+
+	const report: CatchupReport = {
 		session,
 		session_status: sessionIsActive ? "active" : "closed",
 		git_changed_files: git.files,
@@ -346,8 +530,13 @@ export function computeCatchup(
 		freshness: {
 			findings_stale: findingsStale,
 			log_behind_diff: logBehindDiff,
-			notes,
+			notes: pending.notes,
 		},
-		next_step: nextStep,
+		next_step: pending.next_step,
+		pending_spec_open: pendingSpecOpen,
 	};
+	if (opts.repair) {
+		report.repair = opts.repair;
+	}
+	return report;
 }

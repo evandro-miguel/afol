@@ -91,6 +91,9 @@ afol local-state rebuild --json
 - A `pending_spec` session may continue lifecycle (`start`, `evidence`,
   `done`, `close`) with warnings, and close is allowed; `afol status` and
   `afol validate project` warn while pending specs are open.
+- Prefer `afol qt` for micro one-shot work; hygiene warnings (health,
+  maintenance, open pending) do not stop mid-delivery lifecycle. Repair corrupt
+  context with `afol catchup --fix`.
 - Resolve with
   `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
   or waive with `--no-spec-required --reason "<reason>"`.

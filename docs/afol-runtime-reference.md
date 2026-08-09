@@ -208,11 +208,19 @@ projection in a later observation flow.
   is resolved or waived, and `close` remains allowed.
 - `afol status` and `afol validate project` warn while open pending specs
   exist; resolving or waiving is still recommended.
+- Prefer `afol qt` for micro one-shot work; multi-task slices may use repeated
+  `-t` with one `-c`, or the `n` / `st` / `d -x` / `c` path when qt is not enough.
+- Hygiene warnings (`afol health`, maintenance, open pending, stale reviews)
+  must not stop feature lifecycle mid-delivery. Lifecycle hard blocks remain:
+  done without observed evidence, close with open tasks, CI ambiguous session,
+  and corrupt context binding (`afol catchup --fix` for safe unbind/rebind).
 
 ```bash
 afol governance pending --json
 afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
 afol governance resolve-spec --session <session-id> --no-spec-required --reason "<reason>"
+afol catchup
+afol catchup --fix
 ```
 
 ## Rule Injection

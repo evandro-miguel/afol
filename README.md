@@ -84,6 +84,11 @@ afol update preview
 afol update apply --dry-run
 ```
 
+Micro one-shot work should prefer `afol qt <theme> -t "<task>" -c "<cmd>"`
+(repeat `-t` for multi-task with one shared verify). Hygiene signals from
+`afol health`, maintenance, or open `pending_spec` are warnings—not mid-delivery
+stops. Corrupt session context: `afol catchup --fix`.
+
 When one active or bound session is unambiguous, agents should prefer the
 compact path:
 

@@ -374,14 +374,20 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "quickTask",
 		sideEffect: "write",
 		description:
-			"Run one lifecycle; missing governance stays pending with a next step",
+			"One-shot lifecycle (single or multi-task); missing governance stays pending",
 		category: "workflow",
 		subcommands: [
 			{
 				usage: '<theme> -t <summary> -c "<cmd>"',
 				sideEffect: "write",
 				description:
-					"Create, start, verify, record evidence, and close one task",
+					"Create, start, verify once, record evidence, and close one task",
+			},
+			{
+				usage: '<theme> -t <a> -t <b> [-t ...] -c "<cmd>"',
+				sideEffect: "write",
+				description:
+					"One-shot multi-task: shared verification across all -t summaries (max 100)",
 			},
 			{
 				usage: "-F <F-id> -P <spec-id>",
@@ -1289,6 +1295,20 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description:
 			"Compare active session artifacts against git state and report unsynced context",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "[--session <id>] [--json]",
+				sideEffect: "read",
+				description:
+					"Read-only report of session artifacts, git freshness, and pending_spec",
+			},
+			{
+				usage: "--fix [--json]",
+				sideEffect: "write",
+				description:
+					"Safe repair: unbind corrupt/missing bindings; rebind usable active",
+			},
+		],
 	},
 	{
 		command: "preflight",

@@ -13,11 +13,10 @@ import {
 import type { NewWorkstreamMetadata } from "../services/workbench/lifecycle";
 import {
 	closeSession,
-	doneTask,
+	completeObservedTask,
+	completeObservedTasks,
 	newWorkstream,
-	recordEvidence,
-	startTask,
-	transitionTask,
+	startTasks,
 } from "../services/workbench/lifecycle";
 import {
 	formatHintLine,
@@ -27,6 +26,9 @@ import {
 import { writeJsonError } from "./workbench/shared";
 import { runVerification } from "./workbench/verify";
 
+/** Match batch start / task-selector cap in workbench args. */
+const QUICK_TASK_MAX_TASKS = 100;
+
 export type ParsedQuickTaskArgs = {
 	theme: string;
 	json: boolean;
@@ -35,6 +37,20 @@ export type ParsedQuickTaskArgs = {
 	artifact?: string;
 	note?: string;
 };
+
+function formatTaskId(index: number): string {
+	return `T-${String(index).padStart(2, "0")}`;
+}
+
+/** Task ids T-01..T-n matching newWorkstream summary order. */
+export function deriveQuickTaskIds(metadata: NewWorkstreamMetadata): string[] {
+	const fromList =
+		metadata.tasks
+			?.map((task) => task.trim())
+			.filter((task) => task.length > 0) ?? [];
+	const count = fromList.length > 0 ? fromList.length : 1;
+	return Array.from({ length: count }, (_, index) => formatTaskId(index + 1));
+}
 
 export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	let theme = "";
@@ -84,7 +100,14 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 		}
 		if (arg === "--task") {
 			if (!value) throw new Error("Missing value for --task in quick-task.");
-			metadata.task = value;
+			metadata.task ??= value;
+			metadata.tasks ??= [];
+			metadata.tasks.push(value);
+			if (metadata.tasks.length > QUICK_TASK_MAX_TASKS) {
+				throw new Error(
+					`quick-task supports at most ${QUICK_TASK_MAX_TASKS} tasks.`,
+				);
+			}
 			index += 1;
 			continue;
 		}
@@ -151,6 +174,7 @@ export async function runQuickTaskCommand(
 ): Promise<number> {
 	let parsed: ParsedQuickTaskArgs | null = null;
 	let session: string | null = null;
+	let taskIds: string[] = ["T-01"];
 	let failedStep = "parse";
 	let exitCode = 2;
 	try {
@@ -171,23 +195,34 @@ export async function runQuickTaskCommand(
 		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
 		session = created.session;
+		taskIds = deriveQuickTaskIds(parsed.metadata);
 		failedStep = "start";
-		const taskId = "T-01";
-		startTask(root, { session: created.session, taskId });
+		startTasks(root, { session: created.session, taskIds });
 		failedStep = "verification";
 		const verification = runVerification(root, parsed.command);
 		failedStep = "evidence";
 		const verificationPassed = verification.exitCode === 0;
-		const evidence = recordEvidence(root, {
+		const observedInput = {
 			session: created.session,
-			taskId,
 			command: parsed.command,
-			result: verificationPassed ? "passed" : "failed",
 			exitCode: verification.exitCode,
-			provenance: "observed",
 			...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 			...(parsed.note ? { note: parsed.note } : {}),
-		});
+		};
+		let evidenceIds: string[] = [];
+		if (taskIds.length === 1) {
+			const completion = completeObservedTask(root, {
+				...observedInput,
+				taskId: taskIds[0] as string,
+			});
+			evidenceIds = [completion.evidence.id];
+		} else {
+			const completion = completeObservedTasks(root, {
+				...observedInput,
+				taskIds,
+			});
+			evidenceIds = completion.evidence.map((entry) => entry.id);
+		}
 		if (!verificationPassed) {
 			failedStep = "verification";
 			exitCode = 1;
@@ -200,30 +235,22 @@ export async function runQuickTaskCommand(
 				`--command failed with exit code ${verification.exitCode}${details}`,
 			);
 		}
-		failedStep = "done";
-		transitionTask(root, {
-			session: created.session,
-			taskId,
-			state: "implemented_untested",
-		});
-		transitionTask(root, {
-			session: created.session,
-			taskId,
-			state: "tested_needs_spec_validation",
-		});
-		doneTask(root, { session: created.session, taskId });
 		failedStep = "close";
 		closeSession(root, created.session);
+		const primaryTaskId = taskIds[0] as string;
 		const hint = nextCommandHint("quick-task", { session: created.session });
 		const pendingNotice = getSessionPendingSpecNotice(
 			root,
 			created.session,
-			taskId,
+			primaryTaskId,
 		);
 		const payload = {
 			session: created.session,
-			task: taskId,
-			evidence_id: evidence.id,
+			task: primaryTaskId,
+			tasks: taskIds,
+			task_ids: taskIds,
+			evidence_id: evidenceIds[0],
+			evidence_ids: evidenceIds,
 			status: "closed",
 			governance_status: governance.governanceStatus,
 			pending_spec: Boolean(pendingNotice) || governance.pendingSpec,
@@ -260,7 +287,7 @@ export async function runQuickTaskCommand(
 		return 0;
 	} catch (error) {
 		const context = session
-			? { session, taskId: "T-01" }
+			? { session, taskId: taskIds[0] ?? "T-01" }
 			: parsed
 				? { theme: parsed.theme }
 				: {};

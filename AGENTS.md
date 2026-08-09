@@ -157,6 +157,8 @@ resolves; see F-03 and
 afol s
 afol v project
 afol validate bench --pack <pack-id> --json
+afol qt <theme> -t "<task>" -c "<cmd>"
+afol qt <theme> -t "a" -t "b" -c "<shared-cmd>"
 afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
 afol st T-01
 afol e T-01 -c "<cmd>" -o passed
@@ -168,6 +170,14 @@ afol up check
 afol up preview
 afol up apply --dry-run
 ```
+
+- Prefer `afol qt` for micro one-shot work (create→start→one verify→done→close).
+- Multi-task micro path: repeat `-t`/`--task`; one shared `-c`/`--command` verifies all.
+- When `qt` is not enough, multi-task slices still use `n` → `st` → `d -x` → `c`.
+- Hygiene warnings (`afol health`, maintenance, open `pending_spec`, stale
+  reviews) must not stop feature lifecycle mid-delivery. Hard lifecycle blocks
+  remain: done without observed evidence, close with open tasks, CI ambiguous
+  session, corrupt context binding (repair with `afol catchup --fix`).
 
 Explicit multi-agent / CI path (when session is ambiguous or global fallback
 is disabled):
