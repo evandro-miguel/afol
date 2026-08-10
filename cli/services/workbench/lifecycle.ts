@@ -219,6 +219,19 @@ export function sanitizeEvidenceText(value: string): string {
 			return `${prefix}${keyQuote}${key}${keyQuote}${separator}[REDACTED]`;
 		},
 	);
+	sanitized = sanitized.replace(/\bcurl\b[^\r\n;|&]*/g, (curlCommand) =>
+		curlCommand
+			.replace(
+				/(^|[ \t])(-u)(=|[ \t]+)?("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+)/g,
+				(_match, prefix: string, option: string, separator = "") =>
+					`${prefix}${option}${separator}[REDACTED]`,
+			)
+			.replace(
+				/(^|[ \t])(--user)(=|[ \t]+)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+)/g,
+				(_match, prefix: string, option: string, separator: string) =>
+					`${prefix}${option}${separator}[REDACTED]`,
+			),
+	);
 	sanitized = sanitized.replace(
 		/(^|\s)(--[A-Za-z0-9-]+)(=|\s+)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+)/g,
 		(match, prefix: string, option: string, separator: string) =>
@@ -1718,20 +1731,22 @@ export function recordEvidence(
 			);
 			if (existing) return existing;
 		}
-		if (input.verification) {
-			const evidenceFd = openSync(paths.evidencePath, "a");
-			try {
-				writeFileSync(evidenceFd, `${JSON.stringify(evidence)}\n`, "utf8");
-				fsyncSync(evidenceFd);
-			} finally {
-				closeSync(evidenceFd);
-			}
-		} else {
-			writeFileSync(paths.evidencePath, `${JSON.stringify(evidence)}\n`, {
-				encoding: "utf8",
-				flag: "a",
-			});
+		const evidenceFd = openSync(paths.evidencePath, "a");
+		let primaryError: unknown;
+		let closeError: unknown;
+		try {
+			writeFileSync(evidenceFd, `${JSON.stringify(evidence)}\n`, "utf8");
+			fsyncSync(evidenceFd);
+		} catch (error) {
+			primaryError = error;
 		}
+		try {
+			closeSync(evidenceFd);
+		} catch (error) {
+			closeError = error;
+		}
+		if (primaryError !== undefined) throw primaryError;
+		if (closeError !== undefined) throw closeError;
 		countHotPathOperation("workbench.canonical_write");
 		const warnings: string[] = [];
 		auxiliaryWarning(

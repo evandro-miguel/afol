@@ -53,6 +53,7 @@ import {
 	type RecordEvidenceInput,
 	recordEvidence as recordEvidenceRaw,
 	recordVerificationRunStep,
+	sanitizeEvidenceText,
 	startTask,
 	taskAttemptSnapshot,
 	transitionTask,
@@ -1632,6 +1633,38 @@ describe("workbench lifecycle service", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("redacts curl user credentials without redacting user-agent options", () => {
+		for (const [command, expected] of [
+			[
+				"curl -u alice:REDACTION_CURL_SHORT_CANARY https://example.test",
+				"curl -u [REDACTED] https://example.test",
+			],
+			[
+				"curl --user alice:REDACTION_CURL_LONG_CANARY https://example.test",
+				"curl --user [REDACTED] https://example.test",
+			],
+			[
+				"curl --user=alice:REDACTION_CURL_EQUALS_CANARY https://example.test",
+				"curl --user=[REDACTED] https://example.test",
+			],
+			[
+				"curl -ualice:REDACTION_CURL_ATTACHED_CANARY https://example.test",
+				"curl -u[REDACTED] https://example.test",
+			],
+			[
+				"curl -u alice:REDACTION_CURL_FIRST_CANARY --user=alice:REDACTION_CURL_SECOND_CANARY https://example.test",
+				"curl -u [REDACTED] --user=[REDACTED] https://example.test",
+			],
+		] as const) {
+			expect(sanitizeEvidenceText(command)).toBe(expected);
+		}
+		expect(
+			sanitizeEvidenceText(
+				"curl --user-agent 'AFOL test client' https://example.test",
+			),
+		).toBe("curl --user-agent 'AFOL test client' https://example.test");
 	});
 
 	test("automatic observation requires autonomy.auto_observe", () => {
