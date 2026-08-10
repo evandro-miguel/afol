@@ -6,8 +6,8 @@ metadata:
   tags: "complexity, refactoring, cyclomatic-complexity, cognitive-complexity, typescript, bun, react, python"
   triggers: "cyclomatic complexity, cognitive complexity, refactor hotspot, reduce complexity, nested conditionals, simplify function, safe refactoring, complexity budget, branch explosion, boolean soup, complexidade ciclomatica, complexidade cognitiva, reduzir complexidade, refatoracao segura"
   references: "core, patterns, troubleshooting, gotchas"
-  version: "1.0.0"
-  updated_at: "2026-06-05T00:00:00Z"
+  version: "1.0.2"
+  updated_at: "2026-07-18T14:18:13Z"
   target_provider: universal
 ---
 
@@ -27,6 +27,10 @@ paths, clearer domain boundaries, fewer impossible states, and stronger tests.
   refactor needs characterization tests and small behavior-preserving steps.
   TypeScript/Bun/React/Python code mixes decisions, validation, transformation,
   IO, errors, and public response shaping in one place.
+
+If the user only asks to detect duplicate logic, UX effort, runtime cost, or
+bundle cost without changing code, use `quality-signal-audit` first. Return here
+only when complexity reduction is the selected owner.
 
 ## Do Not Activate For
 
@@ -229,7 +233,7 @@ Use this skill with:
 - `typescript-skill` for narrowing, discriminated unions, and type-safe
   refactors; `qa-fix` when a bug reproduction already exists;
   `mutation-testing-guardian` when tests look green but weak; `playwright-skill`
-  when UI behavior needs browser proof; `code-discovery` when callers and
+  when UI behavior needs browser proof; `exploring-tools` when callers and
   ownership are unclear.
 
 Do not duplicate their work. Use this skill as the refactor safety spine and

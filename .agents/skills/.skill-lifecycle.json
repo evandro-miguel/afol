@@ -1,0 +1,434 @@
+{
+  "$schema": "schema/skill-lifecycle.schema.json",
+  "version": 1,
+  "updated_at": "2026-07-18T14:12:00Z",
+  "entries": [
+    {
+      "skill": "analysis-tools-guide",
+      "event": "archived",
+      "date": "2026-05-30",
+      "replacements": [
+        "exploring-tools"
+      ],
+      "reason": "Superseded by the canonical exploring-tools skill after bounded discovery and ca, codex-analysis, run-toolbox.sh, and run-repo-map guidance moved there.",
+      "agent_action": "Use exploring-tools for repository analysis tool selection, bounded discovery, ca, run-toolbox.sh, run-repo-map.sh, and repo-analysis fallback guidance.",
+      "archive_path": ".arq/universal-skills/archived-skills/analysis-tools-guide",
+      "references": [
+        "skills/exploring-tools/SKILL.md"
+      ]
+    },
+    {
+      "skill": "basic-memory-nota",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "agent-memory"
+      ],
+      "reason": "Basic Memory note creation is no longer global-core; Agent Memory is the canonical memory surface for agent knowledge workflows.",
+      "agent_action": "Use agent-memory for Agent Memory workflows and only use basic-memory-nota when a project explicitly installs it.",
+      "references": [
+        "skills/basic-memory-nota/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-cli",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "gitnexus"
+      ],
+      "reason": "GitNexus task-specific skills were consolidated into one compact global GitNexus dispatcher to reduce Codex prompt load.",
+      "agent_action": "Use gitnexus for GitNexus CLI, exploration, impact, PR review, and refactoring workflows.",
+      "references": [
+        "skills/gitnexus-cli/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-debugging",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "systematic-debugging"
+      ],
+      "reason": "GitNexus debugging guidance was merged into the general systematic-debugging root-cause workflow.",
+      "agent_action": "Use systematic-debugging for bugs and failures; use GitNexus commands inside that workflow only as graph locators.",
+      "references": [
+        "skills/gitnexus-debugging/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-exploring",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "gitnexus"
+      ],
+      "reason": "GitNexus task-specific skills were consolidated into one compact global GitNexus dispatcher to reduce Codex prompt load.",
+      "agent_action": "Use gitnexus for GitNexus CLI, exploration, impact, PR review, and refactoring workflows.",
+      "references": [
+        "skills/gitnexus-exploring/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-guide",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "gitnexus"
+      ],
+      "reason": "GitNexus task-specific skills were consolidated into one compact global GitNexus dispatcher to reduce Codex prompt load.",
+      "agent_action": "Use gitnexus for GitNexus CLI, exploration, impact, PR review, and refactoring workflows.",
+      "references": [
+        "skills/gitnexus-guide/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-impact-analysis",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "gitnexus"
+      ],
+      "reason": "GitNexus task-specific skills were consolidated into one compact global GitNexus dispatcher to reduce Codex prompt load.",
+      "agent_action": "Use gitnexus for GitNexus CLI, exploration, impact, PR review, and refactoring workflows.",
+      "references": [
+        "skills/gitnexus-impact-analysis/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-pr-review",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "gitnexus"
+      ],
+      "reason": "GitNexus task-specific skills were consolidated into one compact global GitNexus dispatcher to reduce Codex prompt load.",
+      "agent_action": "Use gitnexus for GitNexus CLI, exploration, impact, PR review, and refactoring workflows.",
+      "references": [
+        "skills/gitnexus-pr-review/SKILL.md"
+      ]
+    },
+    {
+      "skill": "gitnexus-refactoring",
+      "event": "deprecated",
+      "date": "2026-05-19",
+      "replacements": [
+        "gitnexus"
+      ],
+      "reason": "GitNexus task-specific skills were consolidated into one compact global GitNexus dispatcher to reduce Codex prompt load.",
+      "agent_action": "Use gitnexus for GitNexus CLI, exploration, impact, PR review, and refactoring workflows.",
+      "references": [
+        "skills/gitnexus-refactoring/SKILL.md"
+      ]
+    },
+    {
+      "skill": "agentic-system-workflow",
+      "event": "merged",
+      "date": "2026-04-12",
+      "replacements": [
+        "agentic-folder-sys"
+      ],
+      "reason": "Scaffold lifecycle guidance was merged with the workbench session workflow into one folder-system skill.",
+      "agent_action": "Use `agentic-folder-sys` for scaffold bootstrap, upgrade, skills sync, and governed workbench operations.",
+      "references": [
+        "CHANGELOG.md"
+      ]
+    },
+    {
+      "skill": "workbench-agent-teams",
+      "event": "merged",
+      "date": "2026-04-12",
+      "replacements": [
+        "agentic-folder-sys"
+      ],
+      "reason": "Workbench session guidance was merged with scaffold lifecycle guidance into the canonical agentic folder system skill.",
+      "agent_action": "Use `agentic-folder-sys` for AFOL `.afol/wb/` sessions, artifacts, closure evidence, and scaffold lifecycle operations.",
+      "archive_path": "archives/skills/20260412_merged-agentic-folder-sys/workbench-agent-teams",
+      "references": [
+        "CHANGELOG.md"
+      ]
+    },
+    {
+      "skill": "contemplative-orchestrator",
+      "event": "renamed",
+      "date": "2026-04-10",
+      "replacements": [
+        "agentic-orchestrator"
+      ],
+      "reason": "The orchestration entrypoint was renamed/replaced by agentic-orchestrator.",
+      "agent_action": "Use `agentic-orchestrator` for ambiguous, multi-step, delegated, or governed work.",
+      "references": [
+        "CHANGELOG.md"
+      ]
+    },
+    {
+      "skill": "browser-automation",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "playwright-skill"
+      ],
+      "reason": "Legacy browser automation guidance was merged into the Playwright automation/test surface.",
+      "agent_action": "Use `playwright-skill` for Playwright automation and E2E testing; use `agent-browser` only for direct browser operation.",
+      "references": []
+    },
+    {
+      "skill": "chrome-devtools-mcp-puppeteer",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "opencode-platform"
+      ],
+      "reason": "OpenCode browser/MCP operational guidance was consolidated into the canonical OpenCode platform skill.",
+      "agent_action": "Use `opencode-platform` for OpenCode browser, MCP, and platform operations.",
+      "references": []
+    },
+    {
+      "skill": "confidence-check",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "executing-plans"
+      ],
+      "reason": "Confidence/preflight checks became a mode inside the canonical plan execution skill.",
+      "agent_action": "Use `executing-plans` preflight mode when execution readiness is uncertain.",
+      "references": []
+    },
+    {
+      "skill": "code-discovery",
+      "event": "archived",
+      "date": "2026-07-18",
+      "replacements": [
+        "exploring-tools"
+      ],
+      "reason": "Hypothesis-first bounded repository discovery was consolidated with concrete analysis-tool routing in exploring-tools.",
+      "agent_action": "Use exploring-tools for code search, symbols, architecture, dependencies, execution flows, and bounded implementation discovery.",
+      "references": [
+        "skills/exploring-tools/SKILL.md"
+      ]
+    },
+    {
+      "skill": "code-tools",
+      "event": "deprecated",
+      "date": "2026-07-18",
+      "replacements": [
+        "exploring-tools"
+      ],
+      "reason": "Concrete ca, repo-analysis, toolbox, host-CLI, and full-map routing moved to exploring-tools while this compatibility skill remains active but deprecated.",
+      "agent_action": "Prefer exploring-tools for repository analysis tool selection and bounded discovery; use code-tools only for legacy compatibility.",
+      "references": [
+        "skills/exploring-tools/SKILL.md"
+      ]
+    },
+    {
+      "skill": "create-task",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "agentic-folder-sys"
+      ],
+      "reason": "The old `.agents/task/` model was folded into the workbench session workflow.",
+      "agent_action": "Use `agentic-folder-sys` for governed task/session creation and artifacts.",
+      "references": []
+    },
+    {
+      "skill": "debugging-expert",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "systematic-debugging"
+      ],
+      "reason": "Generic debugging patterns were absorbed by the canonical systematic debugging skill.",
+      "agent_action": "Use `systematic-debugging` for hypothesis-driven debugging and RCA.",
+      "references": []
+    },
+    {
+      "skill": "deep-code-analisys",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "exploring-tools"
+      ],
+      "reason": "Repository investigation was consolidated under the canonical code discovery dispatcher.",
+      "agent_action": "Use `exploring-tools` for repo search, symbols, dependency tracing, tool selection, and implementation discovery.",
+      "references": []
+    },
+    {
+      "skill": "devcontainers-skill",
+      "event": "archived",
+      "date": "2026-03-24",
+      "replacements": [
+        "wsl-skill",
+        "git-skill"
+      ],
+      "reason": "Devcontainer guidance overlapped with WSL and Git workflow guidance and was removed from the active catalog.",
+      "agent_action": "Use `wsl-skill` for environment/substrate issues and `git-skill` for repository workflow concerns.",
+      "references": []
+    },
+    {
+      "skill": "grepai",
+      "event": "removed",
+      "date": "2026-03-24",
+      "replacements": [
+        "semantic-search"
+      ],
+      "reason": "The legacy alias was removed after semantic repository search was standardized under semantic-search.",
+      "agent_action": "Use `semantic-search` for semantic codebase search and related MCP/index workflows.",
+      "references": []
+    },
+    {
+      "skill": "knowledge-curation",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "docs-operations"
+      ],
+      "reason": "Operational documentation curation responsibilities were moved into docs-operations.",
+      "agent_action": "Use `docs-operations` for post-implementation documentation consolidation and curation.",
+      "references": []
+    },
+    {
+      "skill": "llm-markdown-skill",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "markdownlint-skill"
+      ],
+      "reason": "Markdown linting and formatting guidance was consolidated under the canonical markdownlint skill.",
+      "agent_action": "Use `markdownlint-skill` for Markdown linting, fixing, and validation.",
+      "references": []
+    },
+    {
+      "skill": "markitdown-skill",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "document-processing"
+      ],
+      "reason": "MarkItDown-specific guidance was reframed as part of the broader document processing workflow.",
+      "agent_action": "Use `document-processing` for document conversion, extraction, annotation, and MarkItDown routing.",
+      "references": []
+    },
+    {
+      "skill": "molecular-docs-architect",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "doc-standards"
+      ],
+      "reason": "Documentation architecture guidance was moved into the canonical documentation standards skill.",
+      "agent_action": "Use `doc-standards` for repository documentation structure and standards.",
+      "references": []
+    },
+    {
+      "skill": "opencode-install",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "opencode-platform"
+      ],
+      "reason": "OpenCode installation guidance was consolidated into the canonical OpenCode platform skill.",
+      "agent_action": "Use `opencode-platform` for OpenCode installation and platform operations.",
+      "references": []
+    },
+    {
+      "skill": "opencode-troubleshoot",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "opencode-platform"
+      ],
+      "reason": "OpenCode troubleshooting guidance was consolidated into the canonical OpenCode platform skill.",
+      "agent_action": "Use `opencode-platform` for OpenCode troubleshooting and platform operations.",
+      "references": []
+    },
+    {
+      "skill": "personal-security",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "opencode-platform"
+      ],
+      "reason": "Codex/OpenCode log and history scrub guidance moved into opencode-platform.",
+      "agent_action": "Use `opencode-platform` for OpenCode/Codex auth, secret, and history hygiene workflows.",
+      "references": []
+    },
+    {
+      "skill": "projects-workflow",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "agentic-folder-sys"
+      ],
+      "reason": "Project workflow guidance was consolidated into the canonical workbench session model.",
+      "agent_action": "Use `agentic-folder-sys` for AFOL `.afol/wb/` sessions, artifacts, and closure evidence.",
+      "references": []
+    },
+    {
+      "skill": "spec-compliance-review",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "code-review-expert"
+      ],
+      "reason": "Spec compliance review became a review lens inside the canonical code review skill.",
+      "agent_action": "Use `code-review-expert` and apply its spec compliance lens.",
+      "references": []
+    },
+    {
+      "skill": "subagent-driven-development",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "executing-plans"
+      ],
+      "reason": "Subagent-heavy execution became a mode inside the canonical plan execution skill.",
+      "agent_action": "Use `executing-plans` subagent mode for bounded delegated implementation slices.",
+      "references": []
+    },
+    {
+      "skill": "type-inject-skill",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "opencode-platform"
+      ],
+      "reason": "Type-inject operational guidance was consolidated into the OpenCode platform skill.",
+      "agent_action": "Use `opencode-platform` for OpenCode type injection and platform-level troubleshooting.",
+      "references": []
+    },
+    {
+      "skill": "update-doc",
+      "event": "removed",
+      "date": "2026-03-24",
+      "replacements": [
+        "docs-operations"
+      ],
+      "reason": "The legacy update-doc alias was removed after documentation operations were standardized.",
+      "agent_action": "Use `docs-operations` for documentation updates after implementation.",
+      "references": []
+    },
+    {
+      "skill": "uso-apis-e-auth",
+      "event": "merged",
+      "date": "2026-03-24",
+      "replacements": [
+        "opencode-platform"
+      ],
+      "reason": "OpenCode auth/API usage guidance was consolidated into the OpenCode platform skill.",
+      "agent_action": "Use `opencode-platform` for OpenCode API/auth and platform troubleshooting.",
+      "references": []
+    },
+    {
+      "skill": "vps-jellyfin-workflow",
+      "event": "removed",
+      "date": "2026-03-24",
+      "replacements": [
+        "vps-pvt"
+      ],
+      "reason": "The Jellyfin-specific VPS alias was removed in favor of the canonical VPS private-ops skill.",
+      "agent_action": "Use `vps-pvt` for private VPS operational workflows.",
+      "references": []
+    }
+  ]
+}

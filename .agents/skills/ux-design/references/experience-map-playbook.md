@@ -75,16 +75,21 @@ Map the marketplace UX.
 
 ### 2. Map The Current Experience
 
-Use this structure:
+Use this structure for each phase:
 
-| Phase | User action | Thought or question | Emotion or risk | Touchpoint | Evidence | Friction | Opportunity |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Trigger |  |  |  |  |  |  |  |
-| Entry |  |  |  |  |  |  |  |
-| Progress |  |  |  |  |  |  |  |
-| Decision |  |  |  |  |  |  |  |
-| Completion |  |  |  |  |  |  |  |
-| Aftermath |  |  |  |  |  |  |  |
+```markdown
+### Phase: Trigger
+
+- User action:
+- Thought or question:
+- Emotion or risk:
+- Touchpoint:
+- Evidence:
+- Friction:
+- Opportunity:
+```
+
+Repeat for entry, progress, decision, completion, and aftermath.
 
 Rename phases to fit the real journey. Keep phase count small enough to scan.
 
@@ -92,9 +97,17 @@ Rename phases to fit the real journey. Keep phase count small enough to scan.
 
 Use a service blueprint layer when friction depends on internal delivery:
 
-| Journey phase | Customer action | Frontstage | Backstage | Systems/data | Policy/SLA | Failure mode |
-| --- | --- | --- | --- | --- | --- | --- |
-|  |  |  |  |  |  |  |
+```markdown
+### Blueprint Layer
+
+- Journey phase:
+- Customer action:
+- Frontstage:
+- Backstage:
+- Systems/data:
+- Policy/SLA:
+- Failure mode:
+```
 
 Look for handoffs, queues, approvals, manual work, unclear ownership, missing
 data, conflicting policies, and support scripts that create user friction.
@@ -141,11 +154,17 @@ For each phase, decide:
 - What should happen if the happy path fails?
 - What evidence would show this is better?
 
-Use this output:
+Use this output for each target phase:
 
-| Phase | Target behavior | Change needed | Owner | Metric | Validation |
-| --- | --- | --- | --- | --- | --- |
-|  |  |  |  |  |  |
+```markdown
+### Target Phase
+
+- Target behavior:
+- Change needed:
+- Owner:
+- Metric:
+- Validation:
+```
 
 ### 7. Convert To Work
 

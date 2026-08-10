@@ -6,8 +6,8 @@ metadata:
   tags: "ux, user-experience, experience-mapping, flows, journeys, service-design, touchpoints, forms, onboarding, microcopy, usability, accessibility, metrics"
   triggers: "ux design, experience mapping, desired experience, customer journey, service blueprint, touchpoint map, behavior metrics, user flow, journey audit, onboarding ux, form ux, microcopy, empty state, error state, usability validation, web interface audit"
   references: "experience-map-playbook, ux-flow-playbook, ux-state-patterns, ux-validation-metrics, web-interface-audit, sources"
-  version: "1.1.0"
-  updated_at: "2026-06-27T00:00:00Z"
+  version: "1.1.1"
+  updated_at: "2026-06-29T00:00:00Z"
   target_provider: universal
 ---
 
@@ -20,6 +20,11 @@ less doubt, and more control.
 
 If the main problem is visual composition, design-system fit, frontend component
 quality, typography, spacing, or motion polish, also use `ui-design`.
+
+If the user only asks whether a journey has too many steps, clicks, task-time
+cost, or observable errors and the next owner is unclear, use
+`quality-signal-audit` first. Use this skill once the task is to map, judge,
+design, or improve the experience.
 
 ## Operating Principle
 

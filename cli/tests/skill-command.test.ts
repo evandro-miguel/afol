@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -42,6 +44,133 @@ function capture() {
 }
 
 describe("skill command", () => {
+	test("curated AFOL skills preserve runtime and retirement boundaries", () => {
+		const integration = readFileSync(
+			join(
+				process.cwd(),
+				".agents",
+				"skills",
+				"afol-integration-test",
+				"SKILL.md",
+			),
+			"utf8",
+		);
+		const benchmarking = readFileSync(
+			join(
+				process.cwd(),
+				".agents",
+				"skills",
+				"agentic-benchmarking",
+				"SKILL.md",
+			),
+			"utf8",
+		);
+
+		expect(integration).not.toContain("installed globally and pointing");
+		expect(integration).toContain("Never replace, repoint");
+		expect(integration).toContain(
+			"AFOL never selects, calls, schedules, retries, or supervises models",
+		);
+		expect(integration).toContain("receipt ingest --file <receipt.json>");
+		expect(benchmarking).toContain("external harness");
+		expect(benchmarking).toContain(
+			"afol validate bench --pack <pack-id> --json",
+		);
+		expect(benchmarking).toContain("above 10,000 fails");
+		expect(
+			existsSync(
+				join(
+					process.cwd(),
+					".agents",
+					"skills",
+					"agentic-scaffold-mcp",
+					"SKILL.md",
+				),
+			),
+		).toBe(false);
+	});
+
+	test("AFOL skill evals expose provisional evidence and a frozen case matrix", () => {
+		const skillNames = [
+			"afol-integration-test",
+			"agentic-benchmarking",
+			"afol-maintenance",
+			"afol-memory",
+			"afol-library",
+			"afol-rules",
+		];
+		for (const skillName of skillNames) {
+			const evalRoot = join(
+				process.cwd(),
+				".agents",
+				"skills",
+				skillName,
+				"evals",
+			);
+			const payload = JSON.parse(
+				readFileSync(join(evalRoot, "evals.json"), "utf8"),
+			) as {
+				skill_name: string;
+				evaluation_contract: {
+					status: string;
+					threshold: number;
+					agent_visible_files: string[];
+					heldout_ids: number[];
+				};
+				evals: Array<{
+					id: number;
+					case_type: string;
+					phase: string;
+					lanes: string[];
+					prompt: string;
+					expectations: string[];
+					should_trigger: boolean;
+				}>;
+			};
+
+			expect(payload.skill_name).toBe(skillName);
+			expect(payload.evaluation_contract).toMatchObject({
+				status: "inconclusive",
+				threshold: 0.9,
+				agent_visible_files: ["SKILL.md"],
+				heldout_ids: [4],
+			});
+			expect(
+				payload.evals.map(({ id, case_type, phase }) => ({
+					id,
+					case_type,
+					phase,
+				})),
+			).toEqual([
+				{ id: 1, case_type: "positive", phase: "regression" },
+				{ id: 2, case_type: "pressure", phase: "regression" },
+				{ id: 3, case_type: "negative", phase: "regression" },
+				{ id: 4, case_type: "collision", phase: "heldout" },
+			]);
+			for (const evalCase of payload.evals) {
+				expect(evalCase.prompt.length).toBeGreaterThan(0);
+				expect(evalCase.expectations.length).toBeGreaterThan(0);
+				expect(evalCase.lanes.length).toBeGreaterThan(0);
+				expect(typeof evalCase.should_trigger).toBe("boolean");
+			}
+
+			const ledger = readFileSync(
+				join(evalRoot, "improvement-log.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(ledger.at(-1)).toMatchObject({
+				skill: skillName,
+				outcome: "inconclusive",
+			});
+			expect(String(ledger.at(-1)?.evidence)).toContain(
+				"Supersedes classification",
+			);
+		}
+	});
+
 	test("lists, shows, and searches local skills", async () => {
 		const root = mkRoot();
 		try {

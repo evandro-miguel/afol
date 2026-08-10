@@ -1,0 +1,69 @@
+{
+  "skill_name": "agentic-benchmarking",
+  "evaluation_contract": {
+    "status": "inconclusive",
+    "threshold": 0.9,
+    "safety_gate": "Any safety-critical miss fails regardless of aggregate accuracy.",
+    "lanes": ["native_selection", "explicit_behavior", "deterministic_contract"],
+    "agent_visible_files": ["SKILL.md"],
+    "heldout_ids": [4],
+    "reason": "The complete fresh-agent held-out and regression matrix has not been run."
+  },
+  "evals": [
+    {
+      "id": 1,
+      "case_type": "positive",
+      "phase": "regression",
+      "lanes": ["native_selection", "explicit_behavior"],
+      "prompt": "Design a controlled AFOL runtime live-agent benchmark that measures output tokens, latency, tool success, and required command coverage.",
+      "expected_output": "Uses the AFOL benchmark catalog and validation gates with bounded thresholds and external harness ownership.",
+      "expectations": [
+        "Uses AFOL benchmark commands rather than an ad hoc rubric alone",
+        "Defines bounded token, duration, and tool-success thresholds",
+        "Keeps model execution in the external harness",
+        "Requires saved evidence and benchmark validation"
+      ],
+      "should_trigger": true
+    },
+    {
+      "id": 2,
+      "case_type": "pressure",
+      "phase": "regression",
+      "lanes": ["explicit_behavior"],
+      "prompt": "Review whether an external agent benchmark receipt is comparable across runs and whether its fixed harness profile and provenance are sufficient.",
+      "expected_output": "Reviews profile, receipt, provenance, thresholds, and comparability without asking AFOL to run a model.",
+      "expectations": [
+        "Checks fixed harness profile identity and receipt provenance",
+        "Separates AFOL validation from external execution",
+        "Treats missing or incomparable evidence as a failed or inconclusive run"
+      ],
+      "should_trigger": true
+    },
+    {
+      "id": 3,
+      "case_type": "negative",
+      "phase": "regression",
+      "lanes": ["native_selection"],
+      "prompt": "Run one governed AFOL lifecycle smoke for a local CLI change and record observed evidence. No benchmark comparison is requested.",
+      "expected_output": "Routes to AFOL integration testing rather than benchmark design.",
+      "expectations": [
+        "Does not select agentic-benchmarking",
+        "Recognizes integration testing as the primary task"
+      ],
+      "should_trigger": false
+    },
+    {
+      "id": 4,
+      "case_type": "collision",
+      "phase": "heldout",
+      "lanes": ["native_selection"],
+      "prompt": "Compare Aider and OpenHands against the repository-context and evidence axes in AFOL's reference-project catalog.",
+      "expected_output": "Uses AFOL project-benchmark instead of the runtime live-agent benchmarking skill.",
+      "expectations": [
+        "Does not select agentic-benchmarking",
+        "Routes to afol project-benchmark"
+      ],
+      "should_trigger": false
+    }
+  ]
+}

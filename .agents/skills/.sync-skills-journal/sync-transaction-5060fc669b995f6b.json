@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "id": "5060fc669b995f6b",
+  "status": "complete",
+  "createdAt": "2026-08-10T15:10:07.214Z",
+  "updatedAt": "2026-08-10T15:10:07.280Z",
+  "items": [
+    {
+      "kind": "file",
+      "label": "lifecycle",
+      "from": "/home/ozy/01_projects/dev/universall-skill-sys-pvt/universall-skill-sys-pvt/skill-lifecycle.json",
+      "to": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.skill-lifecycle.json",
+      "temp": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-tmp/5060fc669b995f6b/0003-lifecycle",
+      "backup": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-backup/5060fc669b995f6b/0003-lifecycle",
+      "expectedDigest": "9e673b88af87c6d4d1801036c7d14b253f05265b17fe130c9d728006c103368f",
+      "state": "swapped",
+      "hadTarget": false,
+      "stagedType": "file",
+      "stagedDev": 2128,
+      "stagedIno": 3277929,
+      "stagedDigest": "9e673b88af87c6d4d1801036c7d14b253f05265b17fe130c9d728006c103368f"
+    },
+    {
+      "kind": "directory",
+      "label": "skill:mutation-testing-guardian",
+      "from": "/home/ozy/01_projects/dev/universall-skill-sys-pvt/universall-skill-sys-pvt/skills/mutation-testing-guardian",
+      "to": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/mutation-testing-guardian",
+      "temp": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-tmp/5060fc669b995f6b/0000-skill-mutation-testing-guardian",
+      "backup": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-backup/5060fc669b995f6b/0000-skill-mutation-testing-guardian",
+      "expectedDigest": "63e553d2174c73b0378d7c21309ec036c64d9fa131076c8b2dfd07d4ca5a942f",
+      "state": "swapped",
+      "hadTarget": true,
+      "stagedType": "directory",
+      "stagedDev": 2128,
+      "stagedIno": 3277926,
+      "originalKind": "directory",
+      "originalDigest": "582ac7cded319b0232eccee32187489c58ce31957fadd522d81772bbb401d37f",
+      "stagedDigest": "63e553d2174c73b0378d7c21309ec036c64d9fa131076c8b2dfd07d4ca5a942f"
+    },
+    {
+      "kind": "directory",
+      "label": "skill:reducao-segura-complexidade-ciclomatica",
+      "from": "/home/ozy/01_projects/dev/universall-skill-sys-pvt/universall-skill-sys-pvt/skills/reducao-segura-complexidade-ciclomatica",
+      "to": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/reducao-segura-complexidade-ciclomatica",
+      "temp": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-tmp/5060fc669b995f6b/0001-skill-reducao-segura-complexidade-ciclomatica",
+      "backup": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-backup/5060fc669b995f6b/0001-skill-reducao-segura-complexidade-ciclomatica",
+      "expectedDigest": "43032402e5fefb9ef15ad3e1ca77c6098f33a6f42a1d79fcb2141b1af04cd086",
+      "state": "swapped",
+      "hadTarget": true,
+      "stagedType": "directory",
+      "stagedDev": 2128,
+      "stagedIno": 3277930,
+      "originalKind": "directory",
+      "originalDigest": "7e3f570ff49f170544769e03fb22a25f777093578414edd22d0bcd0f70b1e7c6",
+      "stagedDigest": "43032402e5fefb9ef15ad3e1ca77c6098f33a6f42a1d79fcb2141b1af04cd086"
+    },
+    {
+      "kind": "directory",
+      "label": "skill:ux-design",
+      "from": "/home/ozy/01_projects/dev/universall-skill-sys-pvt/universall-skill-sys-pvt/skills/ux-design",
+      "to": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/ux-design",
+      "temp": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-tmp/5060fc669b995f6b/0002-skill-ux-design",
+      "backup": "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills/.sync-backup/5060fc669b995f6b/0002-skill-ux-design",
+      "expectedDigest": "41ebacce4114220eb57a4827cbb47e352598c821ef05600a36cae55677db4874",
+      "state": "swapped",
+      "hadTarget": true,
+      "stagedType": "directory",
+      "stagedDev": 2128,
+      "stagedIno": 3277940,
+      "originalKind": "directory",
+      "originalDigest": "509155df921b1f96dd42ba423d97807606662b67da326e71e9adba5543bf2f4d",
+      "stagedDigest": "41ebacce4114220eb57a4827cbb47e352598c821ef05600a36cae55677db4874"
+    }
+  ],
+  "allowedRoots": [
+    "/home/ozy/01_projects/dev/afol/afol.dev/.agents/skills"
+  ]
+}

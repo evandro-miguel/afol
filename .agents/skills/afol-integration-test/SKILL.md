@@ -1,113 +1,127 @@
 ---
 name: afol-integration-test
-description: Use when running live integration tests of the AFOL CLI tool, workbench lifecycle, agent orchestration, and token/latency telemetry. Covers session creation, plan/task quality scoring, agent delegation, evidence collection, and teardown validation.
+description: Use when running live integration tests of the AFOL CLI, workbench lifecycle, external receipt ingestion, evidence projection, recovery, or token and latency telemetry. Do not use for benchmark design without a lifecycle smoke.
 metadata:
   category: testing
-  tags: "integration-test, afol, lifecycle, telemetry, token-measurement, orchestration, benchmark"
-  triggers: "integration test, afol test, live test, orchestration test, agent test, telemetry test, lifecycle test, token measurement"
-  version: "1.0.0"
-  updated_at: "2026-06-10T00:00:00Z"
+  tags: "integration-test, afol, lifecycle, receipts, evidence, recovery, telemetry, token-measurement"
+  triggers: "AFOL integration test, AFOL live test, lifecycle smoke, external receipt test, evidence projection, catchup recovery, telemetry test, token measurement"
+  references: "lifecycle, receipts, evidence, telemetry, recovery, token-economy"
+  version: "1.1.0"
+  updated_at: "2026-08-10T00:00:00Z"
   target_provider: universal
+  tier: 1
 ---
 
 # AFOL Integration Test
 
-Use this skill to run controlled integration tests of the AFOL CLI in a real
-project. Measure tool performance, agent delegation quality, and token
-efficiency.
+Use this skill to prove one AFOL CLI behavior end to end in a real project.
+Keep the tested artifact, lifecycle state, external execution boundary, and
+observed evidence explicit.
 
-## Prerequisites
+## Boundaries
 
-- `afol` installed globally and pointing at current build
-- Project validated: `afol validate project` passes
-- Baseline git state captured, with pre-existing changes identified and preserved
+- Test development changes through `./afol`, `bun run kernel --`, `./dist/afol`,
+  or a differently named repo-local compiled artifact. Never replace, repoint,
+  or rebuild the global `afol` binary from `dev` or an unmerged worktree.
+- AFOL never selects, calls, schedules, retries, or supervises models. An
+  external harness owns model execution and emits a bounded fixed-profile
+  receipt; AFOL validates and ingests that receipt.
+- Receipt ingestion records observed evidence only. It does not mark a task
+  done, close a session, or authorize unrelated mutation.
+- Capture the baseline branch, exact HEAD, worktree status, tested artifact
+  path, version, and checksum before claiming a live result.
 
-## Test Fixture
+## Lifecycle Fixture
 
-For each test run:
+Use the shortest route that proves the behavior. Replace `<afol-dev>` with the
+repo-local command selected above.
 
-1. Record `TELEMETRY_START=$(date +%s%N)` before first afol command
-2. Create session: `afol new "<theme>" --intent "<scope>" --task "<acceptance>"`
-3. Add more `--task "<acceptance>"` arguments when the run needs multiple tasks
-4. Start task: `afol start --session <session> --task-id T-01`
-5. Log plan: `afol log --session <session> --message "<execution plan>"`
-6. Delegate bounded read-only analysis to agent(s)
-7. Record returned evidence with this command:
+For one task and one verification:
+
+```bash
+<afol-dev> qt <theme> -F <F-id> -P <parent-spec> \
+  -t "<acceptance>" -c "<verification command>"
+```
+
+For a staged or multi-task fixture:
+
+```bash
+<afol-dev> n <theme> -F <F-id> -P <parent-spec> -t "<task>"
+<afol-dev> st T-01
+<afol-dev> d T-01 -x "<verification command>"
+<afol-dev> c
+```
+
+Repeat `-t` for multi-task `qt`. When several tasks share one verification,
+start and complete the range so the command runs once and evidence remains
+task-specific. Use explicit `-S` and `-T` only when session context is
+ambiguous, such as concurrent agents or CI.
+
+Missing governance metadata creates `pending_spec` with warnings. It does not
+freeze the lifecycle. Test resolution or waiver through `afol gov rs`; test a
+corrupt binding through `afol catchup --fix` rather than editing workbench files.
+
+## External Receipt Fixture
+
+1. Capture the external harness id, run id, fixed profile id and digest,
+   project/session/task binding, source commit, and bounded result.
+2. Keep the receipt redacted and free of secrets or raw credential-bearing
+   output.
+3. Ingest it with the repo-local command:
 
    ```bash
-   afol evidence --session <session> --task-id T-01 \
-     --command "<what>" --result passed
+   <afol-dev> receipt ingest --file <receipt.json>
    ```
 
-8. Mark the task done: `afol done --session <session> --task-id T-01`
-9. Create the required report for a multi-task session
-10. Close: `afol close --session <session>`
-11. Record `TELEMETRY_END=$(date +%s%N)`
+4. Verify idempotency and observed evidence projection.
+5. Verify separately that task state did not advance. Complete lifecycle state
+   only through the normal `st`, `e`, `d`, and `c` commands.
 
 ## Telemetry Capture
 
-For each test run, record these facts:
+Record only facts available from the harness or AFOL artifacts:
 
 ```text
 run_id: <session_id>
 timestamp: <ISO 8601>
+source_head: <commit>
+tested_artifact: <path and checksum>
 duration_ms: <end - start>
 afol_commands: <count>
 afol_failures: <count>
 afol_retries: <count>
-agent_type: explore | build | architect | general
+harness_id: <external harness>
+harness_profile_id: <fixed profile>
+receipt_id: <id or none>
 tool_calls_total: <count>
-tool_calls_by_type: {read: N, edit: N, bash: N, grep: N, glob: N}
-files_read: <count>
-files_edited: <count>
-tokens_estimated: <count if available>
+output_tokens: <provider-reported count or unavailable>
+session_id: <AFOL session>
+task_ids: <AFOL tasks>
+evidence_ids: <observed evidence>
 ```
 
-## Agent Delegation Protocol
+Do not estimate tokens when the provider does not report them. Routine AFOL
+output above 5,000 tokens is a warning; above 10,000 is a failure.
 
-When testing agent orchestration:
+## Assertions
 
-1. **Orchestrator** is the single writer for AFOL lifecycle state
-2. **Orchestrator** creates the session, starts tasks, writes logs, records
-   evidence, marks tasks done, and closes the session through the AFOL CLI
-3. **Planner and specialist agents** inspect bounded scope and return findings;
-   they do not mutate shared lifecycle state
-4. **Executor agent** changes product files only within its assigned scope
-5. **Orchestrator** validates results: `afol validate project`, `bun test`,
-   `bun run typecheck`
-
-Lifecycle state has one writer. File editing is only for product changes,
-never for plan, task, or log files.
-
-## Quality Scoring
-
-Apply the agentic-benchmarking rubric after each run:
-
-- Plan/Task rubric: threshold 80/100
-- Execution/Report rubric: threshold 85/100
-- Combined: 40% plan + 60% execution, threshold 85/100
-
-Score compactly:
-
-```text
-phase | score | pass | failed criteria | evidence
-plan_task | XX | yes/no | criteria name | evidence line
-report_exec | XX | yes/no | criteria name | evidence line
-```
-
-## Known Limitations
-
-- Token counts are estimated unless the provider reports usage.
-- Wall-clock duration uses shell timestamps. AFOL lifecycle and command events
-  use the native telemetry stream under `.afol/data/events/events.jsonl`.
+- The tested command resolves to the intended repo-local artifact.
+- The State Board remains the lifecycle source of truth.
+- Done requires observed passing evidence from the exact verification command.
+- A failed verification remains failed; a prose report cannot override it.
+- Hygiene warnings remain visible but do not interrupt active delivery.
+- Receipt/profile mismatch, stale provenance, unsafe content, or wrong
+  project/session/task binding fails closed without lifecycle mutation.
 
 ## Failure Protocol
 
-If a run scores below threshold:
-
-1. Record the failure with evidence
-2. Inspect `git status` and preserve all unrelated user changes
-3. Apply the smallest reversible correction
-4. Run `afol local-state rebuild --json` only when the local index is stale
-5. Re-run with corrected parameters
-6. Compare Run N vs Run N+1 telemetry
+1. Preserve the failing command, exit code, artifact identity, and compact
+   error anchor.
+2. Inspect Git state and preserve unrelated user changes.
+3. Apply the smallest reversible root-cause correction.
+4. Rebuild derived state only when diagnostics prove drift:
+   `afol local-state rebuild --json`, then `afol pstr rebuild --json` when
+   applicable.
+5. Rerun the same path and compare evidence. Do not turn infrastructure,
+   timeout, authentication, or unavailable-provider failures into product
+   passes.

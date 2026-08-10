@@ -6,8 +6,8 @@ metadata:
   tags: "mutation-testing, testing, test-quality, stryker, mutmut, cosmic-ray, vitest, pytest, bun, react"
   triggers: "mutation testing, survived mutants, mutation score, stryker, mutmut, cosmic ray, oracle gap, strengthen tests, test quality, kill mutants, weak assertions, mutantes sobreviventes, testes fracos"
   references: "core, patterns, troubleshooting, gotchas"
-  version: "2.0.0"
-  updated_at: "2026-06-05T00:00:00Z"
+  version: "2.0.1"
+  updated_at: "2026-06-29T00:00:00Z"
   target_provider: universal
 ---
 
@@ -32,8 +32,9 @@ would fail if the behavior changed.
 - Trivial code, logs, telemetry without contract, generated files, config-only
   changes, thin wrappers, dead code slated for removal, old migrations, or
   purely visual UI without logic. Repositories whose normal tests are failing or
-  flaky until baseline is understood. Whole-repo mutation as a first move unless
-  the project is already configured for it.
+  flaky until baseline is understood. Broad quality triage where mutation is
+  only one possible signal; use `quality-signal-audit` first. Whole-repo
+  mutation as a first move unless the project is already configured for it.
 
 ## Fast Trigger Examples
 
