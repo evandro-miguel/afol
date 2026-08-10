@@ -165,11 +165,11 @@ export type RunVerificationAsyncOptions = {
 };
 
 /**
- * Full-repository verification can legitimately exceed two minutes on a
- * warm-but-loaded host. Keep the default finite and bounded so `done --test`
+ * Full-repository verification can legitimately take more than five minutes on
+ * a warm-but-loaded host. Keep the default finite and bounded so `done --test`
  * remains fail-closed rather than allowing an unbounded child process.
  */
-export const DEFAULT_VERIFICATION_TIMEOUT_MS = 300_000;
+export const DEFAULT_VERIFICATION_TIMEOUT_MS = 600_000;
 export const MAX_VERIFICATION_TIMEOUT_MS = 600_000;
 const DEFAULT_VERIFICATION_OUTPUT_BYTES = 1024 * 1024;
 

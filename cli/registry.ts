@@ -284,7 +284,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "--verification-timeout-ms <milliseconds>",
 				sideEffect: "write",
-				description: "Bound each step (default 300000ms; max 600000ms)",
+				description: "Bound each step (default 600000ms; max 600000ms)",
 			},
 			{
 				usage: "-- <argv...>",

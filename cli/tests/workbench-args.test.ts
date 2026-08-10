@@ -6,6 +6,7 @@ import {
 	parseSessionTaskArgs,
 } from "../commands/workbench/args";
 import {
+	DEFAULT_VERIFICATION_TIMEOUT_MS,
 	MAX_VERIFICATION_TIMEOUT_MS,
 	resolveVerificationTimeoutMs,
 	runVerification,
@@ -242,7 +243,24 @@ describe("parseDoneArgs", () => {
 		]);
 	});
 
-	test("accepts a bounded verification timeout above the legacy two-minute cap", () => {
+	test("defaults verification timeout to the bounded maximum and preserves explicit values", () => {
+		const defaultParsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test",
+				"bun test --only-failures",
+			],
+			process.cwd(),
+		);
+		expect(defaultParsed.verificationTimeoutMs).toBe(
+			DEFAULT_VERIFICATION_TIMEOUT_MS,
+		);
+		expect(DEFAULT_VERIFICATION_TIMEOUT_MS).toBe(
+			MAX_VERIFICATION_TIMEOUT_MS,
+		);
+
 		const parsed = parseDoneArgs(
 			[
 				"--session",
@@ -257,6 +275,9 @@ describe("parseDoneArgs", () => {
 		);
 
 		expect(parsed.verificationTimeoutMs).toBe(120001);
+		expect(resolveVerificationTimeoutMs(MAX_VERIFICATION_TIMEOUT_MS)).toBe(
+			MAX_VERIFICATION_TIMEOUT_MS,
+		);
 		expect(() =>
 			parseDoneArgs(
 				[
