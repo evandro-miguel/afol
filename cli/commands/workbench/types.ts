@@ -53,6 +53,7 @@ export type CloseArgs = {
 	allowNoReport: boolean;
 	reason: string;
 	summary: string;
+	admitLegacyBaseline: boolean;
 };
 
 export type LogArgs = {

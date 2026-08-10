@@ -2,8 +2,8 @@
 
 Use RTK selectively for high-output shell commands.
 
-- Prefer `rg`, `fd`, focused reads, repo-analysis, Project RAG, and GitNexus
-  CLI to locate targets before using RTK.
+- Prefer `rg`, `fd`, focused reads, and Project RAG through `ragctl` to locate
+  targets before using RTK.
 - Use `rtk git status`, `rtk find`, `rtk summary`, and bounded `rtk grep` for
   noisy follow-up output.
 - For `rtk grep`, search a directory with `--glob`; avoid single-file

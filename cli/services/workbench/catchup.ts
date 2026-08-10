@@ -515,9 +515,14 @@ export function computeCatchup(
 	}
 
 	// Prefer pending_spec hint only when the session is otherwise healthy.
-	const pending = appendPendingSpecDiagnostics(notes, nextStep, pendingSpecOpen, {
-		preferPendingNextStep: nextStep === "artifacts look fresh",
-	});
+	const pending = appendPendingSpecDiagnostics(
+		notes,
+		nextStep,
+		pendingSpecOpen,
+		{
+			preferPendingNextStep: nextStep === "artifacts look fresh",
+		},
+	);
 
 	const report: CatchupReport = {
 		session,

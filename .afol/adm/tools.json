@@ -22,6 +22,7 @@
           "quick-task",
           "governance",
           "evidence",
+          "legacy",
           "hook",
           "rule",
           "skill",
@@ -83,7 +84,6 @@
           "doctor",
           "sweep",
           "bench",
-          "catchup",
           "preflight",
           "telemetry"
         ]
@@ -110,7 +110,6 @@
           "doctor",
           "sweep",
           "bench",
-          "catchup",
           "preflight",
           "telemetry"
         ]
@@ -130,6 +129,7 @@
           "quick-task",
           "governance",
           "evidence",
+          "legacy",
           "close",
           "bootstrap",
           "verify",
@@ -174,7 +174,6 @@
           "doctor",
           "sweep",
           "bench",
-          "catchup",
           "preflight",
           "telemetry"
         ]
@@ -394,6 +393,16 @@
       "description": "Complete a task session",
       "subcommands": [
         {
+          "usage": "d T-01 -x \"<cmd>\"",
+          "side_effect": "write",
+          "description": "Verify with -x and complete one task (preferred)"
+        },
+        {
+          "usage": "d T-01..T-n -x \"<cmd>\"",
+          "side_effect": "write",
+          "description": "One shared check for a batch range, then complete each"
+        },
+        {
           "usage": "--session <session-id> --task-id <task-id>",
           "side_effect": "write",
           "description": "Mark a task complete"
@@ -518,15 +527,20 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Run one lifecycle; missing governance stays pending with a next step",
+      "description": "One-shot lifecycle (single or multi-task); missing governance stays pending",
       "subcommands": [
         {
-          "usage": "<theme> --task <summary> --command \"<cmd>\"",
+          "usage": "<theme> -t <summary> -c \"<cmd>\"",
           "side_effect": "write",
-          "description": "Create, start, verify, record evidence, and close one task"
+          "description": "Create, start, verify once, record evidence, and close one task"
         },
         {
-          "usage": "--feature-id <F-id> --parent-spec <spec-id>",
+          "usage": "<theme> -t <a> -t <b> [-t ...] -c \"<cmd>\"",
+          "side_effect": "write",
+          "description": "One-shot multi-task: shared verification across all -t summaries (max 100)"
+        },
+        {
+          "usage": "-F <F-id> -P <spec-id>",
           "side_effect": "write",
           "description": "Create the quick task as a governed session"
         },
@@ -557,14 +571,24 @@
           "description": "List open pending_spec entries"
         },
         {
-          "usage": "resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+          "usage": "gov rs -S <id> -F <F-id> -P <spec-id>",
           "side_effect": "write",
-          "description": "Link roadmap feature/spec"
+          "description": "Link roadmap feature/spec (session optional if bound)"
         },
         {
-          "usage": "resolve-spec --session <id> --no-spec-required --reason <text>",
+          "usage": "gov rs -S <id> --no-spec-required -r \"<reason>\"",
           "side_effect": "write",
           "description": "Waive with an explicit reason"
+        },
+        {
+          "usage": "bulk-waive --reason \"<text>\" [--limit N] [--dry-run] [--json]",
+          "side_effect": "write",
+          "description": "Waive open pending_spec entries (default limit 20)"
+        },
+        {
+          "usage": "bulk-waive --reason \"<text>\" --session <id> [--session <id2>...]",
+          "side_effect": "write",
+          "description": "Waive explicit open sessions (max 100)"
         },
         {
           "usage": "repair-index",
@@ -611,6 +635,27 @@
           "usage": "admit --session <id> --all-missing|--task-id <id> --reason \"<text>\" [--dry-run|--confirm] [--json]",
           "side_effect": "write",
           "description": "Admit hash-bound missing/failed evidence for a closed pre-cutoff session (preview by default; --confirm writes)"
+        }
+      ]
+    },
+    {
+      "id": "legacy",
+      "name": "AFOL Legacy",
+      "tool": "afol",
+      "wrapper_command": "afol legacy",
+      "aliases": [
+        "lg"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Reconcile legacy pre-cutoff evidence debt and close deadlocked sessions",
+      "subcommands": [
+        {
+          "usage": "reconcile --session <id> --reason \"<text>\" --issue <url> [--task-id <id>] [--dry-run|--confirm] [--summary \"<text>\"] [--json]",
+          "side_effect": "write",
+          "description": "Admit legacy evidence debt and close a pre-cutoff all-done session in one transaction (preview by default; --confirm writes and closes)"
         }
       ]
     },
@@ -730,6 +775,11 @@
           "usage": "--allow-no-report --reason <text>",
           "side_effect": "write",
           "description": "Close without a report with an explicit waiver"
+        },
+        {
+          "usage": "--admit-legacy-baseline",
+          "side_effect": "write",
+          "description": "Retry close waiving issues admitted by the legacy evidence baseline"
         },
         {
           "usage": "--json",
@@ -1579,9 +1629,20 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Compare active session artifacts against git state and report unsynced context",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "[--session <id>] [--json]",
+          "side_effect": "read",
+          "description": "Read-only report of session artifacts, git freshness, and pending_spec"
+        },
+        {
+          "usage": "--fix [--json]",
+          "side_effect": "write",
+          "description": "Safe repair: unbind corrupt/missing bindings; rebind usable active"
+        }
+      ]
     },
     {
       "id": "preflight",

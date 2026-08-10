@@ -118,17 +118,11 @@ describe("skill command", () => {
 	test("discovers skills nested under grouping directories", async () => {
 		const root = mkRoot();
 		try {
-			const skillDir = join(
-				root,
-				".agents",
-				"skills",
-				"gitnexus",
-				"gitnexus-cli",
-			);
+			const skillDir = join(root, ".agents", "skills", "group", "nested-skill");
 			mkdirSync(skillDir, { recursive: true });
 			writeFileSync(
 				join(skillDir, "SKILL.md"),
-				"---\nname: gitnexus-cli\ndescription: GitNexus CLI workflows.\n---\n\n# GitNexus\n",
+				"---\nname: nested-skill\ndescription: Nested skill discovery.\n---\n\n# Nested skill\n",
 				"utf8",
 			);
 
@@ -136,14 +130,14 @@ describe("skill command", () => {
 			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
 			expect(list.stdout.join("\n")).toContain("skills: 3");
 			expect(list.stdout.join("\n")).toContain(
-				"gitnexus-cli .agents/skills/gitnexus/gitnexus-cli/SKILL.md",
+				"nested-skill .agents/skills/group/nested-skill/SKILL.md",
 			);
 
 			const show = capture();
 			expect(
-				await runSkillCommand(["show", "gitnexus-cli"], root, show.io),
+				await runSkillCommand(["show", "nested-skill"], root, show.io),
 			).toBe(0);
-			expect(show.stdout.join("\n")).toContain("GitNexus CLI workflows.");
+			expect(show.stdout.join("\n")).toContain("Nested skill discovery.");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

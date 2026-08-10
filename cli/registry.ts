@@ -591,6 +591,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Close without a report with an explicit waiver",
 			},
 			{
+				usage: "--admit-legacy-baseline",
+				sideEffect: "write",
+				description:
+					"Retry close waiving issues admitted by the legacy evidence baseline",
+			},
+			{
 				usage: "--json",
 				sideEffect: "write",
 				description: "Emit machine-readable close result",

@@ -122,6 +122,9 @@ not a project-local skills root.
   - `ragctl project verify --project afol-dev --json`
   - `ragctl project search --project afol-dev "<query>" --mode vector --json`
   - `ragctl project file --project afol-dev --file <repo-relative-path> --json`
+- Semantic repository discovery uses Project RAG only. Use the global
+  `evandro-rag-system` skill and `ragctl` for semantic navigation; use `rg` and
+  focused source reads to confirm exact implementation facts.
 
 Large AFOL changes should use the global Codex `agentic-folder-sys` skill when
 available. Do not require or restore a project-local
@@ -426,18 +429,3 @@ bun run validate:release
 Do not reintroduce legacy fallback files or docs. If a useful old artifact is
 found, move it into an AFOL-owned path under `.afol/` or convert it into the
 TypeScript AFOL implementation.
-
-<!-- gitnexus:start -->
-## GitNexus Code Intelligence
-
-- Repository index: `afol-dev`.
-- Use the globally installed `gitnexus` skill as the operating guide.
-- Check index freshness before graph queries. When stale, run
-  `gitnexus analyze --index-only --no-stats`; do not use plain `analyze`,
-  `npx`, `npm`, or `pnpm`, because provider-context injection can recreate
-  disabled `.claude/**` artifacts or mutate host tooling.
-- Before editing a function, class, or method, run upstream impact analysis and report any HIGH or CRITICAL risk.
-- After meaningful edits and before committing, run change detection against `main`.
-- Confirm graph findings in source. Do not depend on provider-specific files, local provider skill mirrors, or MCP-only routing.
-
-<!-- gitnexus:end -->

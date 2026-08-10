@@ -624,7 +624,10 @@ describe("catchup command text output with degraded overflow", () => {
 
 function writePendingSpecs(
 	root: string,
-	entries: Array<{ session_id: string; status: "open" | "resolved" | "waived" }>,
+	entries: Array<{
+		session_id: string;
+		status: "open" | "resolved" | "waived";
+	}>,
 ): void {
 	mkdirSync(join(root, ".afol", "data", "governance"), { recursive: true });
 	writeFileSync(
@@ -656,7 +659,9 @@ function currentGitBranch(root: string): string {
 		encoding: "utf8",
 	});
 	if (result.status !== 0) {
-		throw new Error(result.stderr || result.stdout || "git branch lookup failed");
+		throw new Error(
+			result.stderr || result.stdout || "git branch lookup failed",
+		);
 	}
 	return result.stdout.trim();
 }
@@ -840,9 +845,9 @@ describe("catchup --fix session repair", () => {
 					"utf8",
 				),
 			) as { entries: Array<{ status: string }> };
-			expect(index.entries.filter((entry) => entry.status === "open")).toHaveLength(
-				2,
-			);
+			expect(
+				index.entries.filter((entry) => entry.status === "open"),
+			).toHaveLength(2);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -883,9 +888,9 @@ describe("catchup --fix session repair", () => {
 			expect(repair.mutated).toBe(false);
 			expect(repair.unbound).toEqual([]);
 			expect(repair.rebound).toBeNull();
-			expect(repair.skipped.some((item) => item.reason.includes("unreadable"))).toBe(
-				true,
-			);
+			expect(
+				repair.skipped.some((item) => item.reason.includes("unreadable")),
+			).toBe(true);
 			// Original corrupt file remains (fail-closed; no overwrite).
 			expect(
 				readFileSync(join(root, ".afol", "wb", "session-context.json"), "utf8"),

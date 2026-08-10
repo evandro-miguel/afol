@@ -171,6 +171,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let allowNoReport = false;
 	let reason = "";
 	let summary = "";
+	let admitLegacyBaseline = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -188,6 +189,10 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		}
 		if (arg === "--allow-no-report") {
 			allowNoReport = true;
+			continue;
+		}
+		if (arg === "--admit-legacy-baseline") {
+			admitLegacyBaseline = true;
 			continue;
 		}
 		if (arg === "--summary" || arg === "-m") {
@@ -225,6 +230,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		allowNoReport,
 		reason,
 		summary,
+		admitLegacyBaseline,
 	};
 }
 

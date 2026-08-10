@@ -54,6 +54,7 @@ const CLOSE_COMMAND_HELP = [
 	"  -m, --summary <text>        Summary for the generated report",
 	"  --allow-no-report           Explicitly waive a missing report",
 	"  --reason <text>             Required with --allow-no-report",
+	"  --admit-legacy-baseline     Waive issues admitted by the legacy evidence baseline",
 	"  -j, --json                  Emit machine-readable close result",
 ].join("\n");
 
@@ -399,11 +400,7 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "legacy") {
 		const { runLegacyCommand } = await import("./commands/legacy");
-		return runLegacyCommand(
-			resolution.args,
-			project.value.root,
-			operationCtx,
-		);
+		return runLegacyCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "done") {

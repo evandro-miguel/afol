@@ -194,7 +194,10 @@ Operand rules:
 
 ## Verification and Acceptance
 
-- GitNexus impact for each edited symbol is checked and confirmed in source. Any `HIGH` or `CRITICAL` risk blocks implementation until reported.
+- Project RAG impact analysis covers each edited symbol:
+  run `ragctl project verify` and `ragctl project search`.
+  Confirm results with exhaustive `rg` and focused source inspection.
+  Any `HIGH` or `CRITICAL` risk blocks implementation until reported.
 - Current C01 red proofs `R-02`, `SEC-001`, `SEC-003`, and `SEC-004` turn green for the intended policy reason.
 - A focused `SEC-006` assertion records synthetic assignment and long-option forms through the evidence path, then verifies the canonical redacted command is identical in evidence and its workbench event without invoking the test shell.
 - Focused denial assertions verify the structured `approval-required` envelope and unchanged project bytes. They do not expect a persistent denial log.

@@ -95,6 +95,36 @@ describe("workbench parseCloseArgs", () => {
 			),
 		).toThrow("Cannot combine --summary with --allow-no-report.");
 	});
+
+	test("accepts --admit-legacy-baseline and defaults it to false", () => {
+		const parsed = parseCloseArgs(
+			["--session", "260530_2256_cli-native", "--admit-legacy-baseline"],
+			process.cwd(),
+		);
+		expect(parsed.session).toBe("260530_2256_cli-native");
+		expect(parsed.admitLegacyBaseline).toBe(true);
+		expect(parsed.allowNoReport).toBe(false);
+
+		const strict = parseCloseArgs(
+			["--session", "260530_2256_cli-native"],
+			process.cwd(),
+		);
+		expect(strict.admitLegacyBaseline).toBe(false);
+	});
+
+	test("rejects unknown close flags next to --admit-legacy-baseline", () => {
+		expect(() =>
+			parseCloseArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"--admit-legacy-baseline",
+					"--unknown-flag",
+				],
+				process.cwd(),
+			),
+		).toThrow("Unknown close argument: --unknown-flag");
+	});
 });
 
 describe("workbench parseSessionTaskArgs", () => {

@@ -1365,6 +1365,7 @@ export async function runCloseCommand(
 			allowNoReport: parsed.allowNoReport,
 			reason: parsed.reason,
 			summary: parsed.summary,
+			admitLegacyBaseline: parsed.admitLegacyBaseline,
 		});
 		try {
 			removeBinding(root, parsed.session);

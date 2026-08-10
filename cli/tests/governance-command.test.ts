@@ -2,16 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	normalizeScopedFlags,
-	normalizeSubcommandAction,
-} from "../aliases";
+import { normalizeScopedFlags, normalizeSubcommandAction } from "../aliases";
 import { runGovernanceCommand } from "../commands/governance";
 import { remoteOperationContext } from "../core/operation-context";
 import {
+	type PendingSpecEntry,
 	readPendingSpecIndex,
 	writePendingSpecIndex,
-	type PendingSpecEntry,
 } from "../services/governance/pending-specs";
 
 const tempRoots: string[] = [];
@@ -309,12 +306,12 @@ describe("governance command", () => {
 		expect(envelope.data.skipped).toEqual(["s3", "s4", "s5"]);
 		expect(envelope.data.limit).toBe(2);
 		const index = readPendingSpecIndex(root);
-		expect(index.entries.filter((entry) => entry.status === "waived")).toHaveLength(
-			2,
-		);
-		expect(index.entries.filter((entry) => entry.status === "open")).toHaveLength(
-			3,
-		);
+		expect(
+			index.entries.filter((entry) => entry.status === "waived"),
+		).toHaveLength(2);
+		expect(
+			index.entries.filter((entry) => entry.status === "open"),
+		).toHaveLength(3);
 	});
 
 	test("bulk-waive explicit sessions ignore limit and skip non-open", () => {

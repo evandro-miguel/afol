@@ -349,8 +349,7 @@ function runBulkWaiveCommand(
 		}
 	}
 
-	const exitCode =
-		waived.length > 0 ? 0 : errors.length > 0 ? 1 : 0;
+	const exitCode = waived.length > 0 ? 0 : errors.length > 0 ? 1 : 0;
 	const payload = {
 		waived,
 		skipped,

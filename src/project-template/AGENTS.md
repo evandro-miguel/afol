@@ -173,8 +173,8 @@ afol local-state rebuild --json
 
 - Use Caveman-style updates by default: concise, no filler, no repeated setup.
   Keep full precise prose when compression could hide risk, order, or evidence.
-- Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
-  CLI, and existing `.afol/pstr/` maps before broad scans.
+- Start narrow: `rg`, `fd`, focused reads, Project RAG through `ragctl`, and
+  existing `.afol/pstr/` maps before broad scans.
 - Prefer repo-local configured plan state and `.afol/memory/` records
   before broad historical reads.
 - Use RTK only for noisy shell output:
@@ -187,10 +187,15 @@ afol local-state rebuild --json
 
 - Exact search/config: `rg`, `fd`, `jq`.
 - Current structure: `.afol/pstr/` when present.
-- Indexed/structured: use MCPs only when configured and narrower than local
-  tools.
+- Semantic repository navigation: Project RAG only. Use the global
+  `evandro-rag-system` skill when available, verify with
+  `ragctl project verify --project <project-slug-or-id> --json`, then search
+  with `ragctl project search --project <project-slug-or-id> "<query>" --json`.
+  Confirm findings with focused local reads. If the project is unregistered or
+  stale, use that skill's bounded registration or ingestion flow before relying
+  on semantic results.
 - Syntax search: `sg`/`ast-grep`.
-- Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
+- Repo history/context: `git`/`gh`.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
   `lightpanda`.
 - Runtime/tasks: `bun`/`node`/`npm`, `afol`, and project-specific toolchains
