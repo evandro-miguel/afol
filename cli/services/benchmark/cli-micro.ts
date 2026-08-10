@@ -13,6 +13,16 @@ export type CliMicroResult = {
 	notes: string[];
 };
 
+export type CliMicroThresholds = {
+	max_wall_clock_ms: number;
+	max_output_tokens: number;
+};
+
+export const CLI_MICRO_THRESHOLDS: CliMicroThresholds = {
+	max_wall_clock_ms: 60_000,
+	max_output_tokens: 5_000,
+};
+
 const MICRO_COMMANDS: string[][] = [
 	["status"],
 	["validate", "project", "--json"],
@@ -23,7 +33,29 @@ const MICRO_COMMANDS: string[][] = [
 	["preflight", "test"],
 ];
 
-export function runCliMicroBenchmark(root: string): CliMicroResult[] {
+export function collectCliMicroThresholdNotes(
+	wallClockMs: number,
+	estimatedOutputTokens: number,
+	thresholds: CliMicroThresholds = CLI_MICRO_THRESHOLDS,
+): string[] {
+	const notes: string[] = [];
+	if (wallClockMs > thresholds.max_wall_clock_ms) {
+		notes.push(
+			`threshold-exceeded:max_wall_clock_ms:${wallClockMs}>${thresholds.max_wall_clock_ms}`,
+		);
+	}
+	if (estimatedOutputTokens > thresholds.max_output_tokens) {
+		notes.push(
+			`threshold-exceeded:max_output_tokens:${estimatedOutputTokens}>${thresholds.max_output_tokens}`,
+		);
+	}
+	return notes;
+}
+
+export function runCliMicroBenchmark(
+	root: string,
+	thresholds: CliMicroThresholds = CLI_MICRO_THRESHOLDS,
+): CliMicroResult[] {
 	const afolPath = join(root, "afol");
 	return MICRO_COMMANDS.map((args) => {
 		const startedAt = Date.now();
@@ -33,16 +65,29 @@ export function runCliMicroBenchmark(root: string): CliMicroResult[] {
 		});
 		const wallClockMs = Date.now() - startedAt;
 		const outputBytes = Buffer.byteLength(result.stdout, "utf8");
-		const pass = result.ok && !result.timedOut && result.status === 0;
+		const estimatedOutputTokens = Math.ceil(outputBytes / 4);
+		const thresholdNotes = collectCliMicroThresholdNotes(
+			wallClockMs,
+			estimatedOutputTokens,
+			thresholds,
+		);
+		const pass =
+			result.ok &&
+			!result.timedOut &&
+			result.status === 0 &&
+			thresholdNotes.length === 0;
 		return {
 			command: "afol",
 			args,
 			exit_code: result.status,
 			wall_clock_ms: wallClockMs,
 			output_bytes: outputBytes,
-			estimated_output_tokens: Math.ceil(outputBytes / 4),
+			estimated_output_tokens: estimatedOutputTokens,
 			status: pass ? "passed" : "failed",
-			notes: pass ? [] : [spawnFailureDetail(result)],
+			notes:
+				result.ok && !result.timedOut && result.status === 0
+					? thresholdNotes
+					: [spawnFailureDetail(result), ...thresholdNotes],
 		};
 	});
 }

@@ -200,6 +200,7 @@ describe("validate command", () => {
 				exit_code: number;
 				ok: boolean;
 				findings: Array<{ hint?: string }>;
+				data: { findings?: unknown; checked_at?: unknown };
 			};
 			expect(payload).toMatchObject({
 				schema: "afol.result/v1",
@@ -207,6 +208,8 @@ describe("validate command", () => {
 				ok: false,
 			});
 			expect(payload.findings.length).toBeGreaterThan(0);
+			expect(payload.data).not.toHaveProperty("findings");
+			expect(payload.data).not.toHaveProperty("checked_at");
 
 			const human = captureIo();
 			expect(
@@ -240,6 +243,7 @@ describe("validate command", () => {
 			expect(payload.report).toBeDefined();
 			const data = payload.data as { report?: { ok?: boolean } };
 			expect(data.report?.ok).toBe(true);
+			expect(data).not.toHaveProperty("checks");
 			const checks = payload.checks as Array<Record<string, unknown>>;
 			expect(Array.isArray(checks)).toBe(true);
 			expect(

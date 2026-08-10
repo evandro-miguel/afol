@@ -44,6 +44,9 @@ const SANDBOX_COPY_EXCLUDES = [
 	"dist",
 	".bun-build*",
 	".coverage",
+	".tmp",
+	"coverage",
+	".gitnexus",
 	".afol/tmp",
 ];
 const WORKBENCH_SANDBOX_CONTRACT_FILES = [

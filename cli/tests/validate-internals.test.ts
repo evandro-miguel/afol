@@ -17,12 +17,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { saveRuntimeLiveSnapshot } from "../commands/bench";
-import { buildReport, saveRunArchive } from "../services/benchmark/report";
-import {
-	type BenchResult,
-	DEFAULT_BENCH_MODEL,
-} from "../services/benchmark/types";
+import { DEFAULT_BENCH_MODEL } from "../services/benchmark/types";
 import {
 	resolveTaskCompletionLockPath,
 	withTaskCompletionLock,
@@ -2196,13 +2191,22 @@ describe("scenario benchmark execution", () => {
 			);
 			mkdirSync(dirname(sentinel), { recursive: true });
 			writeFileSync(sentinel, "must-not-copy\n");
+			for (const relativePath of [
+				".tmp/sandbox-copy-sentinel",
+				"coverage/sandbox-copy-sentinel",
+				".gitnexus/sandbox-copy-sentinel",
+			]) {
+				const path = join(root, relativePath);
+				mkdirSync(dirname(path), { recursive: true });
+				writeFileSync(path, "must-not-copy\n");
+			}
 			const scenario: Scenario = {
 				schema_version: "1.0.0",
 				scenario_id: "sandbox-temp-exclusion",
 				scenario_version: "1.0.0",
 				pack_id: "pstr-integrity",
 				command:
-					'node -e \'process.exit(require("node:fs").existsSync(".afol/tmp/afol-bench-release-sentinel/afol") ? 9 : 1)\'',
+					'node -e \'const fs=require("node:fs"); process.exit([".afol/tmp/afol-bench-release-sentinel/afol",".tmp/sandbox-copy-sentinel","coverage/sandbox-copy-sentinel",".gitnexus/sandbox-copy-sentinel"].some(fs.existsSync) ? 9 : 1)\'',
 				sandbox: true,
 				expected_exit: 1,
 				setup: [
@@ -4085,57 +4089,9 @@ describe("runtime live validation helpers", () => {
 		}
 	});
 
-	test("validates a saved v2 archive through its fresh normalized snapshot", () => {
+	test("validates an externally produced receipt through its fresh snapshot", () => {
 		const root = createFixtureRoot();
 		try {
-			const ids = [
-				"governed-task-lifecycle",
-				"file-inspection-vs-command",
-				"validation-flow",
-				"maintenance-cadence-review",
-			];
-			const results = ids.map((scenarioId, index) => ({
-				schema_version: "2.0.0",
-				run_id: `run-${index}`,
-				scenario_id: scenarioId,
-				pack_id: "comprehensive-live",
-				status: "passed",
-				mode: "live",
-				git_commit: "fixture",
-				model: DEFAULT_BENCH_MODEL,
-				timestamp: new Date().toISOString(),
-				tokens: {
-					input: 10,
-					output: 10,
-					cached_input: 0,
-					reasoning_output: 0,
-					total: 20,
-				},
-				timing: { wall_clock_ms: 10 },
-				tools: {
-					total_calls: 1,
-					success_rate: 1,
-					by_type: {
-						file_read: 0,
-						afol_command: 1,
-						shell: 0,
-						agent_message: 0,
-					},
-					error_count: 0,
-				},
-				effectiveness: { task_completed: true, error_count: 0 },
-				plan_quality: { meta_planning_detected: false, direct_execution: true },
-				thresholds: {
-					max_output_tokens: 4000,
-					max_duration_ms: 60000,
-					min_tool_success_rate: 0.98,
-				},
-				pass: true,
-				notes: [],
-			})) as BenchResult[];
-			const report = buildReport(results, null);
-			const runPath = saveRunArchive(root, report);
-			saveRuntimeLiveSnapshot(root, report, runPath);
 			const registry = loadRegistry(root);
 			const scenarios = registry.scenariosByPack["runtime-live-agent"] ?? [];
 			const baselinePath = join(
@@ -4165,10 +4121,8 @@ describe("runtime live validation helpers", () => {
 		// Spec child 260423_2006 defines default live benchmark profile:
 		//   runtime: codex, model: gpt-5.4-mini, reasoning_effort: medium
 		expect(DEFAULT_BENCH_MODEL).toBe("gpt-5.4-mini/medium");
-		// The validation layer in runtime-live.ts enforces medium (verified by
-		// snapshot and payload checks). The live-runner.ts passes
-		// model_reasoning_effort="medium" to codex exec. This test locks
-		// the constant so any future drift is caught at typecheck+test time.
+		// The validation layer enforces this fixed external-harness profile from
+		// the receipt snapshot and payload; AFOL never executes that profile.
 	});
 
 	test("runtime-live-agent catalog scenarios map to all live-runner scenario IDs", () => {
@@ -4296,7 +4250,7 @@ describe("runtime live validation helpers", () => {
 				missing.results.filter((entry) => entry.status === "failed"),
 			).toHaveLength(4);
 			expect(missing.notes).toContain(
-				"runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol bench run --all --save;then:afol validate bench --pack runtime-live-agent --json",
+				"runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:external fixed harness receipt;then:afol validate bench --pack runtime-live-agent --json",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
