@@ -184,18 +184,17 @@ function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 function checkPstrHealth(root: string, deep: boolean): HealthFinding[] {
 	const findings: HealthFinding[] = [];
 	const validation = validatePstrIndex(root);
-	if (!validation.ok) {
-		findings.push(
-			makeFinding("pstr", "fail", validation.message, "run afol pstr rebuild"),
-		);
-		return findings;
-	}
 	const stale = checkPstrStale(root);
 	for (const entry of stale) {
 		addIf(
 			findings,
 			entry.stale,
 			makeFinding("pstr", "fail", entry.message, "run afol pstr rebuild"),
+		);
+	}
+	if (!validation.ok && findings.length === 0) {
+		findings.push(
+			makeFinding("pstr", "fail", validation.message, "run afol pstr rebuild"),
 		);
 	}
 	if (deep && findings.length === 0) {

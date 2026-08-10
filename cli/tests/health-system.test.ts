@@ -312,6 +312,25 @@ describe("health system", () => {
 		}
 	});
 
+	test("checkHealth detects PSTR source drift before expiry", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				"export const cli = false;\n",
+			);
+			const report = checkHealth(root, { area: "pstr" });
+			expect(
+				report.findings.some((finding) =>
+					finding.message.includes("stale pstr map: cli"),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("checkHealth default ignores auxiliary health surfaces", () => {
 		const root = createFixture();
 		try {
