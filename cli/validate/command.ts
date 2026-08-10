@@ -508,7 +508,10 @@ function resolveResultStatus(
 	if (execution && !execution.passed) {
 		return "failed";
 	}
-	if (thresholdNotes.length > 0 || regressionNotes.length > 0) {
+	if (
+		thresholdNotes.length > 0 ||
+		(scenario.pack_id !== "mutation-safety" && regressionNotes.length > 0)
+	) {
 		return "failed";
 	}
 	if (compatibilityNotes.length > 0) {

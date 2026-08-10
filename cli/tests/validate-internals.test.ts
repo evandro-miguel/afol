@@ -3508,7 +3508,7 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
-	test("applies an absolute process-jitter floor to mutation timing regressions", () => {
+	test("keeps mutation timing baseline regressions advisory under the hard SLO", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
 			const baselinePath = join(root, "baseline-v1.json");
@@ -3565,10 +3565,46 @@ describe("scenario benchmark execution", () => {
 				baselinePath,
 				baseline,
 			);
-			expect(regression.status).toBe("failed");
+			expect(regression.status).toBe("passed");
 			expect(regression.notes).toContain(
 				"baseline-regression:timing_p95_ms:80>79",
 			);
+			const sloViolation = buildResult(
+				root,
+				{
+					...scenario,
+					deterministic_metrics: {
+						...scenario.deterministic_metrics,
+						duration_ms: 301,
+						timing_p95_ms: 301,
+					},
+				},
+				baselinePath,
+				baseline,
+			);
+			expect(sloViolation.status).toBe("failed");
+			expect(sloViolation.notes).toContain(
+				"threshold-exceeded:max_p95_ms:301>300",
+			);
+			const functionalFailure = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					{
+						...scenario,
+						scenario_id: "mutation-functional-failure",
+						command: "node -e 'process.exit(1)'",
+						deterministic_metrics: {},
+					},
+					baselinePath,
+					baseline,
+				),
+			).result;
+			expect(functionalFailure.status).toBe("failed");
+			expect(
+				functionalFailure.notes.some((note) =>
+					note.startsWith("sample-failed:"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
