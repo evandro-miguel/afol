@@ -1,8 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+	copyFileSync,
+	cpSync,
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -11,10 +15,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
+import { baselineFilename, loadRegistry } from "../validate/registry";
+import { assertCompiledHotPathBenchmark } from "./dist-smoke-assertions";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const distPath = join(repoRoot, "dist", "afol");
 const requireWsl2 = process.argv.includes("--wsl2");
+const DIAGNOSTIC_LIMIT = 800;
 
 if (requireWsl2) {
 	if (process.platform !== "linux" || process.arch !== "x64") {
@@ -64,8 +71,8 @@ function assertStatus(
 				`${label} failed`,
 				`expected status=${expectedStatus}`,
 				`actual status=${proc.status}`,
-				`stdout=${(proc.stdout as string).trim()}`,
-				`stderr=${(proc.stderr as string).trim()}`,
+				`stdout=${compactDiagnostic(proc.stdout)}`,
+				`stderr=${compactDiagnostic(proc.stderr)}`,
 			].join("\n"),
 		);
 	}
@@ -95,6 +102,12 @@ function assertContains(
 	}
 }
 
+function compactDiagnostic(value: unknown): string {
+	const text = typeof value === "string" ? value.trim() : String(value ?? "");
+	if (text.length <= DIAGNOSTIC_LIMIT) return text || "<empty>";
+	return `${text.slice(0, DIAGNOSTIC_LIMIT)}…`;
+}
+
 function sessionFrom(stdout: string): string {
 	const match = /session created:\s*(\S+)/.exec(stdout);
 	if (!match) {
@@ -117,6 +130,136 @@ function writeJson(path: string, value: unknown): void {
 
 function sha256Hex(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
+}
+
+function runGit(
+	cwd: string,
+	args: string[],
+	env: Record<string, string> = {},
+): SpawnResult {
+	return spawnSync("git", args, {
+		cwd,
+		encoding: "utf8",
+		env: { ...process.env, ...env },
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+}
+
+function expectedBenchmarkScenarioIds(): ReadonlySet<string> {
+	const scenarios = loadRegistry(repoRoot).scenariosByPack["workbench-parity"];
+	const ids = scenarios?.map((scenario) => scenario.scenario_id) ?? [];
+	const uniqueIds = new Set(ids);
+	if (
+		ids.length === 0 ||
+		ids.some((scenarioId) => scenarioId.trim() === "") ||
+		uniqueIds.size !== ids.length
+	) {
+		throw new Error(
+			`Invalid trusted workbench-parity scenario-id set: count=${ids.length} unique=${uniqueIds.size}`,
+		);
+	}
+	return uniqueIds;
+}
+
+function copyManagedFile(workspace: string, relativePath: string): void {
+	const target = join(workspace, relativePath);
+	mkdirSync(dirname(target), { recursive: true });
+	copyFileSync(join(repoRoot, relativePath), target);
+}
+
+function normalizeTemporaryGitProvenance(
+	workspace: string,
+	commit: string,
+): void {
+	const snapshot = loadRegistry(workspace);
+	for (const pack of snapshot.packs) {
+		const scenarios = snapshot.scenariosByPack[pack.pack_id] ?? [];
+		if (!scenarios.some((scenario) => scenario.measurement !== undefined)) {
+			continue;
+		}
+		const scenarioDirectory = join(
+			workspace,
+			".afol",
+			"data",
+			"benchmarks",
+			"catalog",
+			"scenarios",
+			pack.pack_id,
+		);
+		for (const entry of readdirSync(scenarioDirectory)) {
+			if (!entry.endsWith(".json")) continue;
+			const path = join(scenarioDirectory, entry);
+			const scenario = readJson<{
+				measurement?: Record<string, unknown>;
+			}>(path);
+			if (typeof scenario.measurement?.git_commit !== "string") continue;
+			scenario.measurement.git_commit = commit;
+			writeJson(path, scenario);
+		}
+		const baselinePath = join(
+			workspace,
+			".afol",
+			"data",
+			"benchmarks",
+			"catalog",
+			"baselines",
+			pack.pack_id,
+			baselineFilename(pack.pack_id),
+		);
+		const baseline = readJson<Record<string, unknown>>(baselinePath);
+		baseline.git_commit = commit;
+		writeJson(baselinePath, baseline);
+	}
+}
+
+function prepareBenchmarkWorkspace(root: string): string {
+	const workspace = join(root, "benchmark-workspace");
+	mkdirSync(workspace, { recursive: true });
+	cpSync(
+		join(repoRoot, ".afol", "data", "benchmarks", "catalog"),
+		join(workspace, ".afol", "data", "benchmarks", "catalog"),
+		{ recursive: true },
+	);
+	for (const relativePath of [
+		".afol/config.json",
+		".agents/lock.json",
+		".agents/manifest.json",
+	]) {
+		copyManagedFile(workspace, relativePath);
+	}
+	assertOk(
+		runGit(workspace, ["init", "--quiet"]),
+		"benchmark workspace git init",
+	);
+	assertOk(runGit(workspace, ["add", "."]), "benchmark workspace git add");
+	assertOk(
+		runGit(
+			workspace,
+			[
+				"-c",
+				"user.name=AFOL dist smoke",
+				"-c",
+				"user.email=afol-dist-smoke@example.invalid",
+				"commit",
+				"--quiet",
+				"-m",
+				"benchmark workspace",
+			],
+			{
+				GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+				GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+			},
+		),
+		"benchmark workspace git commit",
+	);
+	const head = runGit(workspace, ["rev-parse", "HEAD"]);
+	assertOk(head, "benchmark workspace git head");
+	const commit = (head.stdout as string).trim();
+	if (!/^[a-f0-9]{40}$/u.test(commit)) {
+		throw new Error(`benchmark workspace git head invalid: ${commit}`);
+	}
+	normalizeTemporaryGitProvenance(workspace, commit);
+	return workspace;
 }
 
 type DistReleaseReceipts = {
@@ -204,6 +347,8 @@ function main(): void {
 	const sandbox = mkdtempSync(join(tmpdir(), "afol-dist-smoke-"));
 
 	try {
+		const expectedScenarioIds = expectedBenchmarkScenarioIds();
+		const benchmarkWorkspace = prepareBenchmarkWorkspace(sandbox);
 		const help = runDist(repoRoot, ["--help"]);
 		assertOk(help, "dist help");
 		assertContains(help, "dist help", ["Usage: afol"]);
@@ -267,6 +412,20 @@ function main(): void {
 			"TASK: T-01",
 			"SESSIONS: 1",
 		]);
+
+		const hotPathBenchmark = runDist(benchmarkWorkspace, [
+			"v",
+			"bench",
+			"--pack",
+			"workbench-parity",
+			"--json",
+		]);
+		assertOk(hotPathBenchmark, "dist compiled workbench-parity benchmark");
+		assertCompiledHotPathBenchmark(
+			hotPathBenchmark.stdout as string,
+			expectedScenarioIds,
+			receiptsBefore.sha256,
+		);
 
 		const radarAfterNew = runDist(lifecycleTarget, ["session", "radar"]);
 		assertOk(radarAfterNew, "dist session radar");
