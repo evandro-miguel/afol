@@ -1245,6 +1245,81 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("declared evidence retries do not duplicate no-exit rows", () => {
+		const root = mkRoot("declared-evidence-retry");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "declared evidence retry");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const args = [
+				"evidence",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--command",
+				"bun test",
+				"--result",
+				"passed",
+				"--json",
+			];
+
+			const first = runKernel(root, args);
+			const second = runKernel(root, args);
+
+			expect(first.status).toBe(0);
+			expect(second.status).toBe(0);
+			const evidence = loadEvidenceEntries(created.evidencePath);
+			expect(evidence).toHaveLength(1);
+			expect(evidence[0]).toMatchObject({
+				task_id: "T-01",
+				command: "bun test",
+				result: "passed",
+				provenance: "declared",
+			});
+			expect(evidence[0]?.exit_code).toBeUndefined();
+			expect(
+				readLocalStateEvents(root).filter(
+					(event) => event.type === "workbench.record_evidence",
+				),
+			).toHaveLength(1);
+
+			const completion = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				"true",
+				"--json",
+			]);
+			expect(completion.status).toBe(0);
+			const close = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--json",
+			]);
+			expect(close.status).toBe(0);
+			const report = readFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"utf8",
+			);
+			expect(
+				report.match(/declared passed \(bun test; exit_code=n\/a\)/g) ?? [],
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("done preserves argv boundaries in recorded evidence", () => {
 		const root = mkRoot("done-argv-evidence");
 		try {

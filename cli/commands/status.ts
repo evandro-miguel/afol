@@ -562,10 +562,7 @@ function readStatusSnapshot(
 				["none"],
 				globalFindings.map((entry) => entry.validation),
 			),
-			blockers: mergeStatusEntries(
-				["none"],
-				globalFindings.map((entry) => entry.blocker),
-			),
+			blockers: ["none"],
 			next: mergeStatusEntries(
 				["none"],
 				globalFindings.map((entry) => entry.next),
@@ -595,10 +592,7 @@ function readStatusSnapshot(
 				["none"],
 				globalFindings.map((entry) => entry.validation),
 			),
-			blockers: mergeStatusEntries(
-				["missing canonical task file"],
-				globalFindings.map((entry) => entry.blocker),
-			),
+			blockers: ["missing canonical task file"],
 			next: mergeStatusEntries(
 				["none"],
 				globalFindings.map((entry) => entry.next),
@@ -627,10 +621,7 @@ function readStatusSnapshot(
 			extractFieldList(content, "VALIDATION_OR_CHECKS"),
 			globalFindings.map((entry) => entry.validation),
 		),
-		blockers: mergeStatusEntries(
-			extractFieldList(content, "BLOCKERS"),
-			globalFindings.map((entry) => entry.blocker),
-		),
+		blockers: extractFieldList(content, "BLOCKERS"),
 		next: mergeStatusEntries(
 			extractFieldList(content, "NEXT"),
 			globalFindings.map((entry) => entry.next),

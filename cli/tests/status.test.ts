@@ -520,7 +520,7 @@ describe("status command", () => {
 			expect(text).toContain("BLOCKERS:");
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
-			expect(text).not.toContain("BLOCKERS:\n- none");
+			expect(text).toContain("BLOCKERS:\n- none");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -615,9 +615,9 @@ describe("status command", () => {
 			expect(findings).toHaveLength(1);
 			expect(findings[0]).toMatchObject({
 				validation: "local-state: 5 index snapshots need rebuild",
-				blocker: "local-state: 5 index snapshots need rebuild",
 				next: "run afol local-state rebuild",
 			});
+			expect(findings[0]).not.toHaveProperty("blocker");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

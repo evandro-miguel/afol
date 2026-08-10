@@ -12,13 +12,15 @@ import { join } from "node:path";
 import { normalizeScopedFlags } from "../aliases";
 import { runLegacyCommand } from "../commands/legacy";
 import { runValidateCommand } from "../commands/validate";
+import { runCloseCommand } from "../commands/workbench";
 import { resolveCanonicalAction } from "../core/operation-context";
-import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import {
-	LEGACY_EVIDENCE_BASELINE_FILE,
 	admitsLegacyEvidenceIssue,
+	applyLegacyEvidenceAdmissions,
+	LEGACY_EVIDENCE_BASELINE_FILE,
 	validLegacyEvidenceBaseline,
 } from "../services/project/legacy-evidence-baseline";
 import { legacyReconcileSession } from "../services/project/legacy-reconcile";
@@ -201,6 +203,29 @@ async function captureLegacy(
 	};
 	try {
 		const code = await runLegacyCommand(["reconcile", ...args], root);
+		return { code, stdout, stderr };
+	} finally {
+		console.log = previousStdout;
+		console.error = previousStderr;
+	}
+}
+
+async function captureClose(
+	root: string,
+	args: string[],
+): Promise<{ code: number; stdout: string[]; stderr: string[] }> {
+	const previousStdout = console.log;
+	const previousStderr = console.error;
+	const stdout: string[] = [];
+	const stderr: string[] = [];
+	console.log = (...parts: unknown[]) => {
+		stdout.push(parts.map(String).join(" "));
+	};
+	console.error = (...parts: unknown[]) => {
+		stderr.push(parts.map(String).join(" "));
+	};
+	try {
+		const code = await runCloseCommand(args, root);
 		return { code, stdout, stderr };
 	} finally {
 		console.log = previousStdout;
@@ -507,9 +532,9 @@ describe("afol legacy reconcile", () => {
 			expect(
 				legacyReconcileSession(root, baseInput(session, true)).status,
 			).toBe("reconciled");
-			const before = JSON.parse(
-				readFileSync(baselinePath(root), "utf8"),
-			) as { admissions: unknown[] };
+			const before = JSON.parse(readFileSync(baselinePath(root), "utf8")) as {
+				admissions: unknown[];
+			};
 			expect(() =>
 				legacyReconcileSession(root, baseInput(session, true)),
 			).toThrow(/already closed/);
@@ -546,6 +571,47 @@ describe("afol legacy reconcile", () => {
 			expect(() =>
 				closeSession(root, session, { admitLegacyBaseline: true }),
 			).not.toThrow();
+			expect(isSessionClosed(root, session)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("retry close --admit-legacy-baseline succeeds after baseline_written_close_failed while plain close stays strict", async () => {
+		const root = createFixture();
+		const session = "260701_0800_reconcile-retry-cli";
+		try {
+			writeOpenAllDoneSession(root, session, [
+				"| T-01 | done | worker | historical task |",
+			]);
+			rebuildIndexes(root);
+			const eventPath = resolveWorkbenchEventLogPath(root);
+			rmSync(eventPath, { force: true });
+			mkdirSync(eventPath, { recursive: true });
+
+			const result = legacyReconcileSession(root, baseInput(session, true));
+			expect(result.status).toBe("baseline_written_close_failed");
+			expect(result.written).toBe(true);
+			expect(result.baseline_path).toBe(baselinePath(root));
+			expect(existsSync(baselinePath(root))).toBe(true);
+			expect(isSessionClosed(root, session)).toBe(false);
+
+			rmSync(eventPath, { recursive: true, force: true });
+
+			// Plain close stays strict: admitted debt still blocks without the flag.
+			const strict = await captureClose(root, ["--session", session]);
+			expect(strict.code).toBe(2);
+			expect(strict.stderr.join("\n")).toMatch(/failed strict verification/);
+			expect(isSessionClosed(root, session)).toBe(false);
+
+			// The documented retry closes the session via the CLI flag.
+			const retry = await captureClose(root, [
+				"--session",
+				session,
+				"--admit-legacy-baseline",
+			]);
+			expect(retry.code).toBe(0);
+			expect(retry.stdout.join("\n")).toContain("session closed:");
 			expect(isSessionClosed(root, session)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -615,5 +681,40 @@ describe("afol legacy reconcile", () => {
 			"--dry-run",
 			"--json",
 		]);
+	});
+
+	test("applyLegacyEvidenceAdmissions requireClosed gate: true refuses an open session, false keeps the atomic reconcile preview", () => {
+		const root = createFixture();
+		const session = "260701_0800_reconcile-gate";
+		try {
+			writeOpenAllDoneSession(root, session, [
+				"| T-01 | done | worker | historical task |",
+			]);
+			rebuildIndexes(root);
+			const input = {
+				sessionId: session,
+				allMissing: true,
+				reason: "legacy debt",
+				confirm: false,
+			};
+			// Normal evidence admit contract: the shared core refuses an open
+			// session when requireClosed is true.
+			expect(() =>
+				applyLegacyEvidenceAdmissions(root, input, {
+					requireClosed: true,
+				}),
+			).toThrow(/not closed/);
+			// Legacy reconcile opt-in: the same open session is admit-able when
+			// requireClosed is false (the atomic admit+close path).
+			const preview = applyLegacyEvidenceAdmissions(root, input, {
+				requireClosed: false,
+			});
+			expect(preview.dry_run).toBe(true);
+			expect(preview.admissions).toHaveLength(1);
+			expect(existsSync(baselinePath(root))).toBe(false);
+			expect(isSessionClosed(root, session)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });

@@ -9,7 +9,6 @@ import { validatePstrIndex } from "../pstr/builder";
 
 export type GlobalStatusFinding = {
 	validation: string;
-	blocker: string;
 	next: string;
 };
 
@@ -41,7 +40,6 @@ export function collectGlobalStatusFindings(
 		const normalized = normalizeGlobalMessage(result.message);
 		findings.push({
 			validation: `${scope}: ${normalized.validation}`,
-			blocker: `${scope}: ${normalized.validation}`,
 			next: normalized.next ?? fallbackNext ?? "review failing project checks",
 		});
 	};
@@ -60,7 +58,6 @@ export function collectGlobalStatusFindings(
 	if (localStateFailureCount > 0 && !pstrResult.ok) {
 		findings.push({
 			validation: "project indexes need rebuild",
-			blocker: "project indexes need rebuild",
 			next: "run afol local-state rebuild; afol pstr rebuild",
 		});
 		return findings;

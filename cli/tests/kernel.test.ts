@@ -341,6 +341,7 @@ describe("kernel front-door", () => {
 			["./commands/health", ["runHealthCommand"]],
 			["./commands/hydrate", ["runHydrateCommand"]],
 			["./commands/init", ["runInitCommand"]],
+			["./commands/legacy", ["runLegacyCommand"]],
 			["./commands/library", ["runLibraryCommand"]],
 			["./commands/local-state", ["runLocalStateCommand"]],
 			["./commands/maintenance", ["runMaintenanceCommand"]],
@@ -593,6 +594,39 @@ describe("kernel front-door", () => {
 					},
 				],
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("help close --json surfaces the --admit-legacy-baseline retry contract", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "kernel-help-close-json-no-project-"),
+		);
+		try {
+			const proc = runKernel(root, ["help", "close", "--json"]);
+			expect(proc.status).toBe(0);
+			const payload = JSON.parse(proc.stdout as string) as {
+				command: string;
+				subcommands?: Array<{
+					usage: string;
+					sideEffect: string;
+					description: string;
+					requires_approval: boolean;
+				}>;
+			};
+			expect(payload.command).toBe("close");
+			expect(payload.subcommands).toEqual(
+				expect.arrayContaining([
+					{
+						usage: "--admit-legacy-baseline",
+						sideEffect: "write",
+						description:
+							"Retry close waiving issues admitted by the legacy evidence baseline",
+						requires_approval: true,
+					},
+				]),
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1570,6 +1604,7 @@ describe("kernel front-door", () => {
 			expect(closeHelp.stdout as string).toContain("--allow-no-report");
 			expect(closeHelp.stdout as string).toContain("--reason <text>");
 			expect(closeHelp.stdout as string).toContain("-j, --json");
+			expect(closeHelp.stdout as string).toContain("--admit-legacy-baseline");
 			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

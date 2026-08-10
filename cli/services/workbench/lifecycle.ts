@@ -597,6 +597,36 @@ function renderCloseReport(
 	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
 }
 
+function isDuplicateDeclaredEvidence(
+	existing: EvidenceEntry,
+	candidate: EvidenceEntry,
+): boolean {
+	return (
+		existing.provenance === "declared" &&
+		candidate.provenance === "declared" &&
+		existing.task_id === candidate.task_id &&
+		existing.attempt === candidate.attempt &&
+		existing.command === candidate.command &&
+		existing.result === candidate.result &&
+		existing.exit_code === candidate.exit_code &&
+		existing.signal === candidate.signal &&
+		existing.artifact === candidate.artifact &&
+		existing.artifact_sha256 === candidate.artifact_sha256 &&
+		existing.note === candidate.note &&
+		existing.authorization_type === candidate.authorization_type &&
+		existing.waiver_reason === candidate.waiver_reason &&
+		existing.approved_by === candidate.approved_by &&
+		existing.verification_run_id === candidate.verification_run_id &&
+		existing.task_attempt === candidate.task_attempt &&
+		existing.verification_attempt === candidate.verification_attempt &&
+		existing.step_index === candidate.step_index &&
+		existing.step_count === candidate.step_count &&
+		existing.verification_status === candidate.verification_status &&
+		existing.duration_ms === candidate.duration_ms &&
+		existing.command_digest === candidate.command_digest
+	);
+}
+
 function factualCloseSummary(
 	taskRows: TaskRow[],
 	evidence: EvidenceEntry[],
@@ -1682,6 +1712,12 @@ export function recordEvidence(
 			evidence.approved_by = "local:interactive";
 		}
 		runtime.fencingCheck?.();
+		if (provenance === "declared") {
+			const existing = loadEvidenceEntries(paths.evidencePath).find((entry) =>
+				isDuplicateDeclaredEvidence(entry, evidence),
+			);
+			if (existing) return existing;
+		}
 		if (input.verification) {
 			const evidenceFd = openSync(paths.evidencePath, "a");
 			try {

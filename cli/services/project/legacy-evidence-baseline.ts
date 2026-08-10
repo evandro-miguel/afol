@@ -446,11 +446,20 @@ export function applyLegacyEvidenceAdmissions(
 	// Reconcile mode (allIssueTypes) admits both types across all tasks.
 	const issueTypeFilter: LegacyEvidenceIssueType | undefined =
 		input.issueType ??
-		(input.allIssueTypes ? undefined : allMissing ? "missing_evidence" : undefined);
+		(input.allIssueTypes
+			? undefined
+			: allMissing
+				? "missing_evidence"
+				: undefined);
 
 	const paths = sessionPaths(projectRoot, sessionId);
 	if (!existsSync(paths.sessionDir)) {
 		throw new Error(`Session folder not found: ${paths.sessionDir}`);
+	}
+	if (options.requireClosed && !isSessionClosed(projectRoot, sessionId)) {
+		throw new Error(
+			`Session ${sessionId} is not closed; evidence admit only applies to closed sessions.`,
+		);
 	}
 
 	const path = legacyEvidenceBaselinePath(projectRoot);

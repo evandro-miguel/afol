@@ -4,13 +4,13 @@ import { closeSession, isSessionClosed } from "../workbench/lifecycle";
 import { sessionPaths } from "../workbench/session-reader";
 import { verifyWorkbenchTasks } from "../workbench/verify";
 import {
-	DEFAULT_LEGACY_EVIDENCE_CUTOFF_SESSION_ID,
 	type AdmitLegacyEvidenceInput,
-	type LegacyEvidenceAdmission,
 	admitsLegacyEvidenceIssue,
 	applyLegacyEvidenceAdmissions,
-	legacyEvidenceBaselinePath,
+	DEFAULT_LEGACY_EVIDENCE_CUTOFF_SESSION_ID,
+	type LegacyEvidenceAdmission,
 	type LegacyEvidenceBaseline,
+	legacyEvidenceBaselinePath,
 } from "./legacy-evidence-baseline";
 
 export type LegacyReconcileInput = {
@@ -96,8 +96,7 @@ function assertEligible(
 	}
 	const invalid = verify.issues.find(
 		(issue) =>
-			issue.type === "invalid_evidence" ||
-			issue.type === "invalid_task_state",
+			issue.type === "invalid_evidence" || issue.type === "invalid_task_state",
 	);
 	if (invalid) {
 		throw new Error(
@@ -107,8 +106,7 @@ function assertEligible(
 	if (
 		!verify.issues.some(
 			(issue) =>
-				issue.type === "missing_evidence" ||
-				issue.type === "failed_evidence",
+				issue.type === "missing_evidence" || issue.type === "failed_evidence",
 		)
 	) {
 		throw new Error(
@@ -153,8 +151,7 @@ function projectClose(
 	};
 	const sessionPath = sessionPaths(root, sessionId).sessionDir;
 	const remaining = verify.issues.filter(
-		(issue) =>
-			!admitsLegacyEvidenceIssue(synthetic, sessionPath, issue, false),
+		(issue) => !admitsLegacyEvidenceIssue(synthetic, sessionPath, issue, false),
 	);
 	return { all_issues_admitted: remaining.length === 0 };
 }
@@ -178,9 +175,13 @@ export function legacyReconcileSession(
 	const verify = assertEligible(root, sessionId);
 
 	if (!input.confirm) {
-		const preview = applyLegacyEvidenceAdmissions(root, admitInputFor(input, false), {
-			requireClosed: false,
-		});
+		const preview = applyLegacyEvidenceAdmissions(
+			root,
+			admitInputFor(input, false),
+			{
+				requireClosed: false,
+			},
+		);
 		return {
 			session_id: sessionId,
 			dry_run: true,

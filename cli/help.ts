@@ -349,6 +349,13 @@ export function formatHelpText(
 			? `Usage: afol help --for ${options.intent}`
 			: "Usage: afol [command] [options]",
 		"",
+		...(options.intent === undefined || options.intent === "execution"
+			? [
+					"Agent fast path (active session)",
+					'  afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+					"",
+				]
+			: []),
 		options.intent ? `Commands for ${options.intent}` : "Commands",
 	];
 	for (const category of CATEGORY_ORDER) {

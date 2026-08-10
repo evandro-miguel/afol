@@ -26,6 +26,10 @@ describe("help formatter", () => {
 		expect(help).toBe(copy);
 		expect(help.split("\n").length).toBeLessThanOrEqual(70);
 		expect(help).toContain("Usage: afol");
+		expect(help).toContain("Agent fast path (active session)");
+		expect(help).toContain(
+			'afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+		);
 		expect(help).toContain("Commands");
 		expect(help).toContain("\n  s/status");
 		expect(help).toContain("s/status");
@@ -71,6 +75,7 @@ describe("help formatter", () => {
 		expect(planning).toContain("evolve");
 		expect(planning).not.toContain("qt/quick-task");
 		expect(execution).toContain("Commands for execution");
+		expect(execution).toContain("Agent fast path (active session)");
 		expect(execution).toContain("n/new");
 		expect(execution).toContain("qt/quick-task");
 		expect(execution).not.toContain("ma/maintenance");

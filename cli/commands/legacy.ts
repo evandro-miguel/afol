@@ -1,13 +1,13 @@
-import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
+import { envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
 import { legacyReconcileSession } from "../services/project/legacy-reconcile";
-import { resolveSession } from "./workbench/verify";
 import { hasJsonFlag } from "./workbench/args";
 import { writeJsonError } from "./workbench/shared";
+import { resolveSession } from "./workbench/verify";
 
 function assertWorkbenchMutationAllowed(
 	ctx: OperationContext,
@@ -135,10 +135,12 @@ export async function runLegacyCommand(
 	}
 	const action = args[0] ?? "";
 	if (action) {
-		console.error(`err unknown-legacy-action action=${action} hint="afol legacy reconcile"`);
+		console.error(
+			`err unknown-legacy-action action=${action} hint="afol legacy reconcile"`,
+		);
 		return 2;
 	}
-	console.error("err missing-legacy-action hint=\"afol legacy reconcile\"");
+	console.error('err missing-legacy-action hint="afol legacy reconcile"');
 	return 2;
 }
 
@@ -199,7 +201,9 @@ export async function runLegacyReconcileCommand(
 					? "projected close: would succeed after admission"
 					: "projected close: would still fail (remaining issues)",
 			);
-			lines.push("re-run with --confirm to admit and close in one transaction.");
+			lines.push(
+				"re-run with --confirm to admit and close in one transaction.",
+			);
 		} else if (result.status === "reconciled") {
 			lines.push("session closed in the same transaction.");
 			for (const warning of result.close?.warnings ?? []) {
