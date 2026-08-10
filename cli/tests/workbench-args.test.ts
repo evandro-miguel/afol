@@ -257,9 +257,7 @@ describe("parseDoneArgs", () => {
 		expect(defaultParsed.verificationTimeoutMs).toBe(
 			DEFAULT_VERIFICATION_TIMEOUT_MS,
 		);
-		expect(DEFAULT_VERIFICATION_TIMEOUT_MS).toBe(
-			MAX_VERIFICATION_TIMEOUT_MS,
-		);
+		expect(DEFAULT_VERIFICATION_TIMEOUT_MS).toBe(MAX_VERIFICATION_TIMEOUT_MS);
 
 		const parsed = parseDoneArgs(
 			[
