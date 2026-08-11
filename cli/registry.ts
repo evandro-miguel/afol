@@ -215,9 +215,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "core",
 		subcommands: [
 			{
-				usage: "--dry-run",
+				usage: "--dry-run [--json]",
 				sideEffect: "read",
-				description: "Preview scaffold install without writing",
+				description:
+					"Preview scaffold install without writing; --json emits a result envelope",
 			},
 		],
 	},
@@ -1225,17 +1226,51 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		command: "adr",
 		aliases: [],
 		kind: "adr",
-		sideEffect: "read",
-		description: "Inspect ADRs",
+		sideEffect: "write",
+		description: "Create and manage ADRs",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "new|create <topic>",
+				sideEffect: "write",
+				description: "Create an ADR",
+			},
+			{
+				usage: "accept|ac <id>",
+				sideEffect: "write",
+				description: "Accept an ADR",
+			},
+			{
+				usage: "supersede|sp <old-id> <new-id>",
+				sideEffect: "write",
+				description: "Supersede an ADR",
+			},
+			{
+				usage: "abandon|ab <id> --reason <text>",
+				sideEffect: "write",
+				description: "Abandon an ADR with a reason",
+			},
+			{
+				usage: "archive|ar <id> --reason <text>",
+				sideEffect: "write",
+				description: "Archive an ADR with a reason",
+			},
+		],
 	},
 	{
 		command: "changelog",
 		aliases: ["cl"],
 		kind: "changelog",
-		sideEffect: "read",
-		description: "Inspect changelog entries",
+		sideEffect: "append",
+		description: "Append changelog entries",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "add|a --type <type> --message <text>",
+				sideEffect: "append",
+				description: "Append a changelog entry",
+			},
+		],
 	},
 	{
 		command: "health",

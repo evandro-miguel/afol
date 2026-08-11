@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { envelopeErr, stringifyEnvelope } from "../core/envelope";
 import {
 	defaultOperationContext,
 	type OperationContext,
@@ -17,6 +18,10 @@ function parseInitArgs(args: string[]): InitArgs {
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (arg === undefined) {
+			continue;
+		}
+		if (arg === "--json" || arg === "-j") {
+			forwarded.push(arg);
 			continue;
 		}
 		if (
@@ -55,6 +60,12 @@ function parseInitArgs(args: string[]): InitArgs {
 		}
 		throw new Error(`Unexpected init argument: ${arg}`);
 	}
+	if (
+		(forwarded.includes("--json") || forwarded.includes("-j")) &&
+		!forwarded.includes("--dry-run")
+	) {
+		throw new Error("Unsupported init argument: --json requires --dry-run");
+	}
 
 	return {
 		targetRoot: resolve(targetRoot || process.cwd()),
@@ -70,7 +81,17 @@ export async function runInitCommand(
 	try {
 		parsed = parseInitArgs(args);
 	} catch (error) {
-		console.error((error as Error).message);
+		const message = (error as Error).message;
+		if (args.includes("--json") || args.includes("-j")) {
+			console.log(
+				stringifyEnvelope(
+					envelopeErr("INIT_ERROR", message, {
+						action: "init",
+						exitCode: 2,
+					}),
+				),
+			);
+		} else console.error(message);
 		return 2;
 	}
 

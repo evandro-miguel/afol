@@ -129,8 +129,8 @@ describe("kernel registry", () => {
 		expect(byCommand.get("bench")?.sideEffect).toBe("read");
 		expect(byCommand.get("project-benchmark")?.sideEffect).toBe("generated");
 		expect(byCommand.get("spec")?.sideEffect).toBe("read");
-		expect(byCommand.get("adr")?.sideEffect).toBe("read");
-		expect(byCommand.get("changelog")?.sideEffect).toBe("read");
+		expect(byCommand.get("adr")?.sideEffect).toBe("write");
+		expect(byCommand.get("changelog")?.sideEffect).toBe("append");
 		expect(byCommand.get("health")?.sideEffect).toBe("read");
 		expect(byCommand.get("db")?.sideEffect).toBe("read");
 		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
@@ -139,6 +139,28 @@ describe("kernel registry", () => {
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
 		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
+
+		const adr = byCommand.get("adr");
+		expect(adr?.sideEffect).toBe("write");
+		expect(adr?.subcommands?.map((entry) => entry.usage)).toEqual([
+			"new|create <topic>",
+			"accept|ac <id>",
+			"supersede|sp <old-id> <new-id>",
+			"abandon|ab <id> --reason <text>",
+			"archive|ar <id> --reason <text>",
+		]);
+		expect(
+			adr?.subcommands?.every((entry) => entry.sideEffect === "write"),
+		).toBe(true);
+
+		const changelog = byCommand.get("changelog");
+		expect(changelog?.sideEffect).toBe("append");
+		expect(changelog?.subcommands?.map((entry) => entry.usage)).toEqual([
+			"add|a --type <type> --message <text>",
+		]);
+		expect(
+			changelog?.subcommands?.every((entry) => entry.sideEffect === "append"),
+		).toBe(true);
 
 		for (const entry of kernelRegistry.commands) {
 			expect(["read", "write", "append", "generated"]).toContain(

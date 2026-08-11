@@ -578,16 +578,17 @@ describe("help formatter", () => {
 		);
 	});
 
-	test("does not advertise unsupported init json output", () => {
+	test("advertises init json preview output", () => {
 		const help = buildCommandHelpJson("init", kernelRegistry);
 
 		expect(help).not.toBeNull();
 		expect(help?.subcommands).toEqual([
 			{
-				usage: "--dry-run",
+				usage: "--dry-run [--json]",
 				sideEffect: "read",
 				requires_approval: false,
-				description: "Preview scaffold install without writing",
+				description:
+					"Preview scaffold install without writing; --json emits a result envelope",
 			},
 		]);
 	});

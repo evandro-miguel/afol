@@ -937,6 +937,98 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 	});
 
+	test("dry-run json emits one preview envelope without writes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-json-"));
+		const logs: string[] = [];
+		const errors: string[] = [];
+		const originalLog = console.log;
+		const originalError = console.error;
+		try {
+			console.log = (...values: unknown[]) => {
+				logs.push(values.map(String).join(" "));
+			};
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+
+			const before = readdirSync(target);
+			expect(await runBootstrapCommand([target, "--dry-run", "--json"])).toBe(
+				0,
+			);
+			expect(errors).toEqual([]);
+			expect(logs).toHaveLength(1);
+			const payload = JSON.parse(logs[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				data?: {
+					target?: string;
+					mode?: string;
+					dry_run?: boolean;
+					conflicts?: number;
+				};
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("bootstrap.preview");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data).toMatchObject({
+				target,
+				mode: "dry-run",
+				dry_run: true,
+				conflicts: 0,
+			});
+			expect(readdirSync(target)).toEqual(before);
+		} finally {
+			console.log = originalLog;
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("dry-run json preserves conflict exit 4 and reports no writes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-json-conflict-"));
+		const targetFile = join(target, "AGENTS.md");
+		writeFileSync(targetFile, "project-owned\n", "utf8");
+		const logs: string[] = [];
+		const errors: string[] = [];
+		const originalLog = console.log;
+		const originalError = console.error;
+		try {
+			console.log = (...values: unknown[]) => {
+				logs.push(values.map(String).join(" "));
+			};
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+
+			const before = readFileSync(targetFile, "utf8");
+			expect(await runBootstrapCommand([target, "--dry-run", "--json"])).toBe(
+				4,
+			);
+			expect(errors).toEqual([]);
+			expect(logs).toHaveLength(1);
+			const payload = JSON.parse(logs[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				data?: { conflicts?: number };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("bootstrap.preview");
+			expect(payload.exit_code).toBe(4);
+			expect(payload.data?.conflicts).toBeGreaterThan(0);
+			expect(readFileSync(targetFile, "utf8")).toBe(before);
+		} finally {
+			console.log = originalLog;
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
 	test("--without-claude omits Claude artifacts and marks config disabled", async () => {
 		const target = mkdtempSync(join(tmpdir(), "bootstrap-without-claude-"));
 		try {

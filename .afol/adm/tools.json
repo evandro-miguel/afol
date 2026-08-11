@@ -75,8 +75,6 @@
           "verify-tasks",
           "state",
           "adm",
-          "adr",
-          "changelog",
           "health",
           "db",
           "doctor",
@@ -99,8 +97,6 @@
           "verify-tasks",
           "state",
           "adm",
-          "adr",
-          "changelog",
           "health",
           "db",
           "doctor",
@@ -161,8 +157,6 @@
           "verify-tasks",
           "state",
           "adm",
-          "adr",
-          "changelog",
           "health",
           "db",
           "doctor",
@@ -335,9 +329,9 @@
       "description": "Install scaffold; use --dry-run to preview writes",
       "subcommands": [
         {
-          "usage": "--dry-run",
+          "usage": "--dry-run [--json]",
           "side_effect": "read",
-          "description": "Preview scaffold install without writing"
+          "description": "Preview scaffold install without writing; --json emits a result envelope"
         }
       ]
     },
@@ -1472,10 +1466,36 @@
       "aliases": [],
       "category": "inspect",
       "type": "inspect",
-      "side_effect": "read",
-      "execution_mode": "read-only",
-      "description": "Inspect ADRs",
-      "subcommands": []
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Create and manage ADRs",
+      "subcommands": [
+        {
+          "usage": "new|create <topic>",
+          "side_effect": "write",
+          "description": "Create an ADR"
+        },
+        {
+          "usage": "accept|ac <id>",
+          "side_effect": "write",
+          "description": "Accept an ADR"
+        },
+        {
+          "usage": "supersede|sp <old-id> <new-id>",
+          "side_effect": "write",
+          "description": "Supersede an ADR"
+        },
+        {
+          "usage": "abandon|ab <id> --reason <text>",
+          "side_effect": "write",
+          "description": "Abandon an ADR with a reason"
+        },
+        {
+          "usage": "archive|ar <id> --reason <text>",
+          "side_effect": "write",
+          "description": "Archive an ADR with a reason"
+        }
+      ]
     },
     {
       "id": "changelog",
@@ -1487,10 +1507,16 @@
       ],
       "category": "inspect",
       "type": "inspect",
-      "side_effect": "read",
-      "execution_mode": "read-only",
-      "description": "Inspect changelog entries",
-      "subcommands": []
+      "side_effect": "append",
+      "execution_mode": "on-demand",
+      "description": "Append changelog entries",
+      "subcommands": [
+        {
+          "usage": "add|a --type <type> --message <text>",
+          "side_effect": "append",
+          "description": "Append a changelog entry"
+        }
+      ]
     },
     {
       "id": "health",

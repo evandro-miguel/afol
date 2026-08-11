@@ -1442,6 +1442,172 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("init dry-run json emits one preview envelope without writes", () => {
+		for (const jsonFlag of ["--json", "-j"]) {
+			const root = mkdtempSync(join(tmpdir(), "kernel-init-json-"));
+			const target = join(root, "target");
+			mkdirSync(target);
+			try {
+				const proc = runKernel(root, ["init", target, "--dry-run", jsonFlag]);
+				expect(proc.status).toBe(0);
+				expect(proc.stderr as string).toBe("");
+				const lines = (proc.stdout as string).trim().split("\n");
+				expect(lines).toHaveLength(1);
+				const payload = JSON.parse(lines[0] ?? "{}") as {
+					schema?: string;
+					ok?: boolean;
+					action?: string;
+					exit_code?: number;
+					data?: { target?: string; mode?: string; dry_run?: boolean };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.action).toBe("bootstrap.preview");
+				expect(payload.exit_code).toBe(0);
+				expect(payload.data).toMatchObject({
+					target,
+					mode: "dry-run",
+					dry_run: true,
+				});
+				expect(readdirSync(target)).toEqual([]);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("init dry-run json preserves conflict exit 4 without writes", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-init-json-conflict-"));
+		const target = join(root, "target");
+		const targetFile = join(target, "AGENTS.md");
+		mkdirSync(target);
+		writeFileSync(targetFile, "project-owned\n", "utf8");
+		try {
+			const proc = runKernel(root, ["init", target, "--dry-run", "--json"]);
+			expect(proc.status).toBe(4);
+			expect(proc.stderr as string).toBe("");
+			const lines = (proc.stdout as string).trim().split("\n");
+			expect(lines).toHaveLength(1);
+			const payload = JSON.parse(lines[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				data?: { conflicts?: number };
+				error?: { code?: string };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("bootstrap.preview");
+			expect(payload.exit_code).toBe(4);
+			expect(payload.data?.conflicts).toBeGreaterThan(0);
+			expect(payload.error?.code).toBe("BOOTSTRAP_CONFLICT");
+			expect(readFileSync(targetFile, "utf8")).toBe("project-owned\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("init rejects json without dry-run", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-init-json-apply-"));
+		try {
+			const proc = runKernel(root, ["init", "--json"]);
+			expect(proc.status).toBe(2);
+			expect(proc.stderr as string).toBe("");
+			const payload = JSON.parse((proc.stdout as string).trim()) as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				error?: { code?: string; message?: string };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("init");
+			expect(payload.exit_code).toBe(2);
+			expect(payload.error).toMatchObject({
+				code: "INIT_ERROR",
+				message: "Unsupported init argument: --json requires --dry-run",
+			});
+			expect(readdirSync(root)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("init dry-run json returns an error envelope for invalid arguments", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-init-json-error-"));
+		try {
+			const proc = runKernel(root, [
+				"init",
+				"--dry-run",
+				"--json",
+				"--partial",
+			]);
+			expect(proc.status).toBe(2);
+			expect(proc.stderr as string).toBe("");
+			const lines = (proc.stdout as string).trim().split("\n");
+			expect(lines).toHaveLength(1);
+			const payload = JSON.parse(lines[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				error?: { code?: string; message?: string };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("init");
+			expect(payload.exit_code).toBe(2);
+			expect(payload.error).toMatchObject({
+				code: "INIT_ERROR",
+				message: expect.stringContaining(
+					"Unsupported init argument: --partial",
+				),
+			});
+			expect(readdirSync(root)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("bootstrap dry-run json emits one preview envelope without writes", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-bootstrap-json-"));
+		const target = join(root, "target");
+		mkdirSync(target);
+		try {
+			const proc = runKernel(root, [
+				"bootstrap",
+				target,
+				"--dry-run",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			expect(proc.stderr as string).toBe("");
+			const lines = (proc.stdout as string).trim().split("\n");
+			expect(lines).toHaveLength(1);
+			const payload = JSON.parse(lines[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				data?: { target?: string; mode?: string; dry_run?: boolean };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("bootstrap.preview");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data).toMatchObject({
+				target,
+				mode: "dry-run",
+				dry_run: true,
+			});
+			expect(readdirSync(target)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("init rejects unsupported partial installs", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-init-partial-"));
 		try {

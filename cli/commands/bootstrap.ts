@@ -13,6 +13,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	defaultOperationContext,
 	type OperationContext,
@@ -50,6 +51,7 @@ import type { TemplateFileMap } from "../services/template/payload";
 type BootstrapArgs = {
 	targetRoot: string;
 	dryRun: boolean;
+	json: boolean;
 	forceManaged: boolean;
 	cleanupObsolete: boolean;
 	cleanupProviderCompatibleMutable: boolean;
@@ -226,6 +228,7 @@ function sha256Hex(content: Buffer): string {
 function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	let targetRoot = "";
 	let dryRun = false;
+	let json = false;
 	let forceManaged = false;
 	let cleanupObsolete = false;
 	let cleanupProviderCompatibleMutable = false;
@@ -241,6 +244,10 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		}
 		if (arg === "--dry-run") {
 			dryRun = true;
+			continue;
+		}
+		if (arg === "--json" || arg === "-j") {
+			json = true;
 			continue;
 		}
 		if (arg === "--provider-compatible") {
@@ -304,10 +311,16 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	if (!targetRoot) {
 		throw new Error("Missing bootstrap target path");
 	}
+	if (json && !dryRun) {
+		throw new Error(
+			"Unsupported bootstrap argument: --json requires --dry-run",
+		);
+	}
 
 	return {
 		targetRoot: resolve(targetRoot),
 		dryRun,
+		json,
 		forceManaged,
 		cleanupObsolete,
 		cleanupProviderCompatibleMutable,
@@ -838,22 +851,35 @@ export async function runBootstrapCommand(
 					operation.kind === "create" || operation.kind === "update-managed",
 			);
 
-			console.log(
-				[
-					`bootstrap: target=${parsed.targetRoot}`,
-					`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
-					`mutable=${parsed.mutableDir}`,
-					`without-claude=${parsed.withoutClaude}`,
-					`files=${Object.keys(templateFiles).length}`,
-					`operations=${plan.operations.length}`,
-					`conflicts=${conflicts.length}`,
-					`cleanup=${cleanupPlan.candidates.length}`,
-					`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
-					parsed.verbose ? "details=verbose" : "details=run-with---verbose",
-				].join(" "),
-			);
+			const resultData = {
+				target: parsed.targetRoot,
+				mode: "dry-run",
+				dry_run: parsed.dryRun,
+				mutable: parsed.mutableDir,
+				without_claude: parsed.withoutClaude,
+				files: Object.keys(templateFiles).length,
+				operations: plan.operations.length,
+				conflicts: conflicts.length,
+				cleanup: cleanupPlan.candidates.length,
+				provider_cleanup: providerCompatibleCleanupPlan.length,
+			};
+			if (!parsed.json)
+				console.log(
+					[
+						`bootstrap: target=${parsed.targetRoot}`,
+						`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
+						`mutable=${parsed.mutableDir}`,
+						`without-claude=${parsed.withoutClaude}`,
+						`files=${Object.keys(templateFiles).length}`,
+						`operations=${plan.operations.length}`,
+						`conflicts=${conflicts.length}`,
+						`cleanup=${cleanupPlan.candidates.length}`,
+						`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
+						parsed.verbose ? "details=verbose" : "details=run-with---verbose",
+					].join(" "),
+				);
 
-			if (parsed.verbose) {
+			if (!parsed.json && parsed.verbose) {
 				for (const operation of plan.operations) {
 					console.log(
 						`${operation.kind} ${operation.path} ${operation.reason}`,
@@ -874,7 +900,33 @@ export async function runBootstrapCommand(
 				}
 			}
 
-			if (parsed.dryRun) return conflicts.length > 0 ? 4 : 0;
+			if (parsed.dryRun) {
+				const exitCode = conflicts.length > 0 ? 4 : 0;
+				if (parsed.json) {
+					console.log(
+						stringifyEnvelope(
+							exitCode === 0
+								? envelopeOk(resultData, {
+										action: "bootstrap.preview",
+										exitCode,
+									})
+								: {
+										schema: "afol.result/v1",
+										ok: false,
+										action: "bootstrap.preview",
+										exit_code: exitCode,
+										data: resultData,
+										error: {
+											code: "BOOTSTRAP_CONFLICT",
+											message:
+												"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
+										},
+									},
+						),
+					);
+				}
+				return exitCode;
+			}
 
 			if (conflicts.length > 0 && !parsed.forceManaged) {
 				console.error(
@@ -1003,7 +1055,17 @@ export async function runBootstrapCommand(
 			? await execute()
 			: await withExternalPathLock(initialCanonicalTarget, execute);
 	} catch (error) {
-		console.error((error as Error).message);
+		const message = (error as Error).message;
+		if (args.includes("--json") || args.includes("-j")) {
+			console.log(
+				stringifyEnvelope(
+					envelopeErr("BOOTSTRAP_ERROR", message, {
+						action: "bootstrap",
+						exitCode: 2,
+					}),
+				),
+			);
+		} else console.error(message);
 		return 2;
 	}
 }
