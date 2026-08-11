@@ -339,6 +339,34 @@ describe("evolve status", () => {
 		}
 	});
 
+	test("blocked analysis points to bounded evolve status diagnostics", async () => {
+		const root = fixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runEvolveCommand(
+					"analyze",
+					["--json"],
+					root,
+					captured.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({
+				status: "blocked",
+				blocked_reason: "evolution state is unavailable",
+				recovery_action: "afol evolve status --json",
+			});
+			expect(JSON.stringify(payload.data)).not.toContain(root);
+			expect(Buffer.byteLength(captured.stdout[0] ?? "", "utf8")).toBeLessThan(
+				4_000,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("status isolates mixed-project latest day and recurring cluster without writes", async () => {
 		const root = fixture();
 		try {

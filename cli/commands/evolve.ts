@@ -1153,12 +1153,16 @@ export function publicAnalysisDto(
 			Number(alert.distinct_production_day_count) || 0,
 	});
 	const blocked = analysis.status === "blocked";
+	const blockedReason = blocked
+		? boundedPublicText(analysis.blocked_reason ?? "analysis unavailable") ||
+			"analysis unavailable"
+		: null;
 	const dto: PublicEvolutionAnalysisDto = {
 		version: Number(analysis.version) || 1,
 		mode: boundedPublicText(analysis.mode),
 		status: boundedPublicText(analysis.status),
-		blocked_reason: blocked ? "analysis unavailable" : null,
-		recovery_action: blocked ? "afol health --area state --json" : null,
+		blocked_reason: blockedReason,
+		recovery_action: blocked ? "afol evolve status --json" : null,
 		generated_at: boundedPublicText(analysis.generated_at),
 		scorecard: publicScorecard(analysis.scorecard),
 		baseline: {

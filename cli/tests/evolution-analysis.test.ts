@@ -1052,9 +1052,7 @@ describe("evolution analysis previews", () => {
 			expect(exitCode).toBe(0);
 			const payload = JSON.parse(output[0] ?? "{}");
 			expect(payload.data.status).toBe("blocked");
-			expect(payload.data.recovery_action).toBe(
-				"afol health --area state --json",
-			);
+			expect(payload.data.recovery_action).toBe("afol evolve status --json");
 			expect(payload.data).not.toHaveProperty("project_id");
 			expect(JSON.stringify(payload)).not.toContain(PROJECT_ID);
 			expect(existsSync(join(root, ".afol", "state", "evolution.db"))).toBe(
