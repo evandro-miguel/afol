@@ -72,6 +72,14 @@ export type ProjectBenchmarkIssue = {
 	message: string;
 };
 
+export type ProjectBenchmarkValidationResult = {
+	ok: boolean;
+	issues: ProjectBenchmarkIssue[];
+	error_count: number;
+	warning_count: number;
+	project_count: number;
+};
+
 export type ProjectBenchmarkPaths = {
 	admDir: string;
 	axesFile: string;

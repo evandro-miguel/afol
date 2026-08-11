@@ -11,11 +11,16 @@ import {
 	rmSync,
 	statSync,
 	symlinkSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_BUILD_COMMAND } from "../dev/build-release";
+import {
+	compiledReleaseBuildArgs,
+	DEFAULT_BUILD_COMMAND,
+	writeCompiledReleaseBuildReceipt,
+} from "../dev/build-release";
 import {
 	buildReleaseProvenance,
 	writeReleaseProvenance,
@@ -198,6 +203,13 @@ function runGit(root: string, args: string[], env: NodeJS.ProcessEnv): void {
 }
 
 function commitReleaseFixture(root: string, env: NodeJS.ProcessEnv): void {
+	const artifactPath = join(root, "dist", "afol");
+	if (existsSync(artifactPath)) {
+		writeCompiledReleaseBuildReceipt(
+			artifactPath,
+			compiledReleaseBuildArgs("cli/main.ts", "dist/afol"),
+		);
+	}
 	runGit(root, ["init"], env);
 	runGit(root, ["add", "-A"], env);
 	runGit(root, ["commit", "--no-verify", "-m", "test release provenance"], env);
@@ -278,8 +290,14 @@ describe("release and toolchain contracts", () => {
 			"bun run release:provenance:release",
 		);
 		const releaseSteps = splitScriptSteps(scripts["validate:release"]);
+		const compactCliBenchmarks =
+			"bun run kernel -- v bench --pack token-economy --pack cli-kernel-local --json";
 		const stepIndex = (step: string) => releaseSteps.indexOf(step);
 		expect(releaseSteps[0]).toBe("bun run validate:toolchain");
+		expect(releaseSteps).toContain(compactCliBenchmarks);
+		expect(stepIndex("bun run validate:project")).toBeLessThan(
+			stepIndex("bun run typecheck"),
+		);
 		for (const step of [
 			"bun run smoke:dist",
 			"bun run smoke:clean",
@@ -294,13 +312,13 @@ describe("release and toolchain contracts", () => {
 		expect(stepIndex("bun run local-state:rebuild")).toBeLessThan(
 			stepIndex("bun run validate:project"),
 		);
-		expect(stepIndex("bun run validate:project")).toBeLessThan(
-			stepIndex("bun run typecheck"),
-		);
 		expect(stepIndex("bun run validate:project-benchmarks")).toBeLessThan(
 			stepIndex("bun run validate:ux-governance"),
 		);
 		expect(stepIndex("bun run validate:ux-governance")).toBeLessThan(
+			stepIndex(compactCliBenchmarks),
+		);
+		expect(stepIndex(compactCliBenchmarks)).toBeLessThan(
 			stepIndex("bun run test:full"),
 		);
 		expect(stepIndex("bun run test:full")).toBeLessThan(
@@ -455,6 +473,7 @@ describe("release and toolchain contracts", () => {
 			"validate:bootstrap",
 			"validate:project-benchmarks",
 			"validate:ux-governance",
+			"kernel",
 			"test:full",
 			"coverage:check",
 			"build:deterministic",
@@ -476,6 +495,7 @@ describe("release and toolchain contracts", () => {
 			);
 			const scripts: Record<string, string> = {
 				"validate:release": releaseScript,
+				kernel: "bun run mark.ts kernel",
 			};
 			for (const step of expectedSteps) {
 				scripts[step] = `bun run mark.ts ${step}`;
@@ -657,6 +677,7 @@ describe("release and toolchain contracts", () => {
 				`bun-${process.platform}-${process.arch}`,
 			);
 			expect(provenance.compile_bytecode).toBe(false);
+			expect(provenance.compile_minify).toBe(true);
 			expect(provenance.module_format).toBe("esm");
 			expect(provenance.compile_autoload_dotenv).toBe(false);
 			expect(provenance.compile_autoload_bunfig).toBe(false);
@@ -685,6 +706,146 @@ describe("release and toolchain contracts", () => {
 			expect(existsSync(join(root, "dist", "security-scan.release.json"))).toBe(
 				true,
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance fails closed without a SHA-bound build receipt", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-missing-receipt-"),
+		);
+		const distDir = join(root, "dist");
+		const binDir = join(root, "bin");
+		mkdirSync(distDir, { recursive: true });
+		mkdirSync(binDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		symlinkSync("/usr/bin/git", join(binDir, "git"));
+		writeFakeReleaseScanners(binDir);
+		const gitEnv = {
+			...process.env,
+			PATH: binDir,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+		try {
+			commitReleaseFixture(root, gitEnv);
+			unlinkSync(join(distDir, "afol.build.json"));
+			expect(() =>
+				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
+			).toThrow(/missing compiled release build receipt/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance rejects a SHA-bound receipt without minification", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-unminified-receipt-"),
+		);
+		const distDir = join(root, "dist");
+		const binDir = join(root, "bin");
+		mkdirSync(distDir, { recursive: true });
+		mkdirSync(binDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		symlinkSync("/usr/bin/git", join(binDir, "git"));
+		writeFakeReleaseScanners(binDir);
+		const gitEnv = {
+			...process.env,
+			PATH: binDir,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+		try {
+			commitReleaseFixture(root, gitEnv);
+			writeCompiledReleaseBuildReceipt(join(distDir, "afol"), [
+				"build",
+				"--compile",
+				"--format=esm",
+				"--no-compile-autoload-dotenv",
+				"--no-compile-autoload-bunfig",
+				"cli/main.ts",
+				"--outfile",
+				"dist/afol",
+			]);
+			expect(() =>
+				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
+			).toThrow(/compiled release build receipt has noncanonical flags/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance rejects a receipt whose artifact SHA no longer matches", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-mismatched-receipt-"),
+		);
+		const distDir = join(root, "dist");
+		const binDir = join(root, "bin");
+		mkdirSync(distDir, { recursive: true });
+		mkdirSync(binDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		symlinkSync("/usr/bin/git", join(binDir, "git"));
+		writeFakeReleaseScanners(binDir);
+		const gitEnv = {
+			...process.env,
+			PATH: binDir,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+		try {
+			commitReleaseFixture(root, gitEnv);
+			writeFileSync(join(distDir, "afol"), "mutated artifact", "utf8");
+			expect(() =>
+				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
+			).toThrow(/compiled release build receipt does not bind artifact/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance rejects a SHA-valid receipt with a forged artifact contract", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-forged-receipt-contract-"),
+		);
+		const distDir = join(root, "dist");
+		const binDir = join(root, "bin");
+		mkdirSync(distDir, { recursive: true });
+		mkdirSync(binDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		symlinkSync("/usr/bin/git", join(binDir, "git"));
+		writeFakeReleaseScanners(binDir);
+		const gitEnv = {
+			...process.env,
+			PATH: binDir,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+		try {
+			commitReleaseFixture(root, gitEnv);
+			writeCompiledReleaseBuildReceipt(
+				join(distDir, "afol"),
+				compiledReleaseBuildArgs("cli/forged-main.ts", "dist/forged-afol"),
+			);
+			expect(() =>
+				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
+			).toThrow(/compiled release build receipt has noncanonical flags/);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -777,6 +938,7 @@ describe("release and toolchain contracts", () => {
 				artifact: "dist/afol",
 				build_command: DEFAULT_BUILD_COMMAND,
 				compile_bytecode: false,
+				compile_minify: true,
 				compile_autoload_bunfig: false,
 				compile_autoload_dotenv: false,
 				module_format: "esm",

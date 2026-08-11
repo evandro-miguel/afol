@@ -12,7 +12,11 @@ import {
 import { join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
-import { DEFAULT_BUILD_COMMAND } from "./build-release";
+import {
+	compiledReleaseBuildArgs,
+	DEFAULT_BUILD_COMMAND,
+	readMinifiedCompiledReleaseBuildReceipt,
+} from "./build-release";
 import {
 	buildReleaseSecurityScanOutcomes,
 	DEFAULT_RELEASE_ARTIFACT,
@@ -51,7 +55,8 @@ type ReleaseProvenance = {
 	platform: string;
 	arch: string;
 	build_target: string;
-	compile_bytecode: boolean;
+	compile_bytecode?: boolean;
+	compile_minify?: boolean;
 	module_format: "esm";
 	compile_autoload_dotenv: boolean;
 	compile_autoload_bunfig: boolean;
@@ -260,7 +265,6 @@ function assertKnownReleaseFields(provenance: ReleaseProvenance): void {
 		"platform",
 		"arch",
 		"build_target",
-		"compile_bytecode",
 		"module_format",
 		"compile_autoload_dotenv",
 		"compile_autoload_bunfig",
@@ -520,6 +524,13 @@ export function buildReleaseProvenance(
 			`missing required ${VERSION_REGISTRY_PATH} for release provenance`,
 		);
 	}
+	const compiledReceipt = readMinifiedCompiledReleaseBuildReceipt(
+		artifactPath,
+		compiledReleaseBuildArgs("cli/main.ts", artifact),
+	);
+	if (options.releaseMode && !compiledReceipt) {
+		throw new Error(`missing compiled release build receipt: ${artifactPath}`);
+	}
 	if (options.releaseMode) {
 		assertCleanReleaseSource(cwd);
 		refreshReleaseSecurityScanEvidence(cwd, options.env);
@@ -562,7 +573,9 @@ export function buildReleaseProvenance(
 			process.platform && process.arch
 				? `bun-${process.platform}-${process.arch}`
 				: "unknown",
-		compile_bytecode: false,
+		...(compiledReceipt
+			? { compile_bytecode: false, compile_minify: true }
+			: {}),
 		module_format: "esm",
 		compile_autoload_dotenv: false,
 		compile_autoload_bunfig: false,

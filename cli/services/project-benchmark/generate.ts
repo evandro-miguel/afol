@@ -16,8 +16,8 @@ import type {
 	ProjectBenchmarkAxesFile,
 	ProjectBenchmarkProject,
 	ProjectBenchmarkScore,
+	ProjectBenchmarkValidationResult,
 } from "./types";
-import type { ProjectBenchmarkValidationResult } from "./validate";
 
 const PROJECT_BENCHMARK_GENERATOR = "afol pb generate" as const;
 

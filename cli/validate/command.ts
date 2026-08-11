@@ -168,6 +168,21 @@ function applyProjectTokenRule(result: BenchmarkResult): BenchmarkResult {
 	return result;
 }
 
+export function combinedProjectTokenRuleNote(
+	results: Array<Pick<BenchmarkResult, "status" | "output_tokens">>,
+): string | null {
+	const outputTokens = results
+		.filter((result) => result.status !== "skipped")
+		.reduce((total, result) => total + (result.output_tokens ?? 0), 0);
+	if (outputTokens > TOKEN_RULE_PROHIBITIVE) {
+		return `token-rule:combined-prohibitive(>10k):${outputTokens}tokens`;
+	}
+	if (outputTokens > TOKEN_RULE_NONIDEAL) {
+		return `token-rule:combined-non-ideal(>5k):${outputTokens}tokens`;
+	}
+	return null;
+}
+
 function resolveBenchmarkStatus(
 	status: BenchmarkResult["status"],
 ): "passed" | "failed" | "skipped" {
@@ -614,11 +629,17 @@ function handleBenchmark(
 	const results = packResults.flatMap((entry) => entry.results);
 	const benchmarkNotes = packResults.flatMap((entry) => entry.notes);
 	const summary = summarizeBenchmarkResults(results);
-	const status = resolveBenchmarkRunStatus(summary, contractIssues.length);
+	const combinedTokenRuleNote = combinedProjectTokenRuleNote(results);
+	const status = combinedTokenRuleNote?.includes("combined-prohibitive")
+		? "failed"
+		: resolveBenchmarkRunStatus(summary, contractIssues.length);
 	const notes =
 		status === "skipped"
 			? ["all-scenarios-skipped:not-implemented-live-runner", ...benchmarkNotes]
-			: benchmarkNotes;
+			: [
+					...benchmarkNotes,
+					...(combinedTokenRuleNote ? [combinedTokenRuleNote] : []),
+				];
 	const payload: Record<string, unknown> = {
 		schema_version: VALIDATION_SCHEMA_VERSION,
 		command_family: "validation",

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	cpSync,
@@ -27,6 +28,7 @@ import { saveBenchmarkPayload } from "../validate/benchmark-files";
 import {
 	buildResult,
 	collectProfileCompatibilityNotes,
+	combinedProjectTokenRuleNote,
 } from "../validate/command";
 import {
 	loadRegistry,
@@ -61,6 +63,7 @@ import {
 	type ScenarioExecutionResult,
 	type ScenarioSamplePhase,
 	type ScenarioSampleRun,
+	writeBenchmarkArtifactProvenance,
 } from "../validate/scenario-execution";
 import {
 	asBoolean,
@@ -1883,7 +1886,7 @@ describe("scenario benchmark execution", () => {
 			[
 				"build",
 				"--compile",
-				"--bytecode",
+				"--minify",
 				"--format=esm",
 				"--no-compile-autoload-dotenv",
 				"--no-compile-autoload-bunfig",
@@ -1892,6 +1895,28 @@ describe("scenario benchmark execution", () => {
 				"/fixture/.afol/tmp/release/afol",
 			],
 		);
+	});
+
+	test("omits compiler claims when a copied benchmark artifact has no receipt", () => {
+		const root = mkdtempSync(join(tmpdir(), "benchmark-copy-provenance-"));
+		try {
+			const artifact = join(root, "afol");
+			writeFileSync(artifact, "copied executable", "utf8");
+			const provenancePath = writeBenchmarkArtifactProvenance(
+				artifact,
+				createHash("sha256").update(readFileSync(artifact)).digest("hex"),
+				"a".repeat(40),
+				new Date().toISOString(),
+				"b".repeat(64),
+				false,
+				"copy current compiled executable for self-benchmark",
+			);
+			const provenance = readJson(provenancePath);
+			expect(provenance).not.toHaveProperty("compile_minify");
+			expect(provenance).not.toHaveProperty("compile_bytecode");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("detects Bun compiled virtual entrypoints", () => {
@@ -1951,7 +1976,8 @@ describe("scenario benchmark execution", () => {
 				package_name: "afol",
 				version: expect.any(String),
 				sha256: artifact.profile.artifact_sha256,
-				compile_bytecode: true,
+				compile_bytecode: false,
+				compile_minify: true,
 				module_format: "esm",
 				compile_autoload_dotenv: false,
 				compile_autoload_bunfig: false,
@@ -3924,6 +3950,22 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("enforces the combined benchmark output token rule", () => {
+		expect(
+			combinedProjectTokenRuleNote([
+				{ status: "passed", output_tokens: 3_000 },
+				{ status: "passed", output_tokens: 3_000 },
+				{ status: "skipped", output_tokens: 20_000 },
+			]),
+		).toBe("token-rule:combined-non-ideal(>5k):6000tokens");
+		expect(
+			combinedProjectTokenRuleNote([
+				{ status: "passed", output_tokens: 6_000 },
+				{ status: "passed", output_tokens: 6_000 },
+			]),
+		).toBe("token-rule:combined-prohibitive(>10k):12000tokens");
 	});
 });
 

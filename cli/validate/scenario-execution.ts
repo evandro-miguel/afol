@@ -24,10 +24,27 @@ import {
 import { cpus, arch as osArch, platform } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
+import {
+	readMinifiedCompiledReleaseBuildReceipt,
+	compiledReleaseBuildArgs as releaseBuildArgs,
+	writeCompiledReleaseBuildReceipt,
+} from "../dev/build-release";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
-import type { BenchmarkExecutionProfile, Scenario } from "./types";
+import type {
+	BenchmarkExecutionProfile,
+	PreparedCompiledReleaseArtifact,
+	Scenario,
+	ScenarioExecutionMetrics,
+	ScenarioExecutionResult,
+} from "./types";
+
+export type {
+	PreparedCompiledReleaseArtifact,
+	ScenarioExecutionMetrics,
+	ScenarioExecutionResult,
+} from "./types";
 
 const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
@@ -115,55 +132,8 @@ export interface ScenarioSampleRun {
 	stderr: string;
 }
 
-interface ScenarioExecutionMetrics {
-	duration_ms: number;
-	timing_p50_ms: number;
-	timing_p95_ms: number;
-	error_count: number;
-	retry_count: number;
-	context_tokens: number;
-	prompt_tokens: number;
-	output_tokens: number;
-	context_bytes: number;
-	output_bytes: number;
-	argv_chars?: number;
-	tool_call_count: number;
-	tool_success_rate: number;
-	sample_count: number;
-	warmup_count: number;
-	canonical_write_count?: number;
-	telemetry_append_count?: number;
-	derived_work_calls?: number;
-	instrumented_duration_ms?: number;
-	instrumented_output_bytes?: number;
-	fixture_creation_duration_ms?: number;
-	setup_duration_ms?: number;
-	recovery_duration_ms?: number;
-}
-
 function argvCharCount(command: string): number {
 	return Array.from(command.trim()).length;
-}
-
-export interface ScenarioExecutionResult {
-	metrics: ScenarioExecutionMetrics;
-	notes: string[];
-	passed: boolean;
-	profile: BenchmarkExecutionProfile;
-	timestamp: string;
-	git_commit: string;
-	source_state_sha256?: string;
-	source_dirty?: boolean | null;
-}
-
-export interface PreparedCompiledReleaseArtifact {
-	binaryPath: string;
-	profile: BenchmarkExecutionProfile;
-	timestamp: string;
-	git_commit: string;
-	source_state_sha256: string;
-	source_dirty: boolean | null;
-	cleanup: () => void;
 }
 
 export interface ScenarioExecutionOptions {
@@ -351,17 +321,7 @@ export function ensureBenchmarkTempRoot(projectRoot: string): string {
 }
 
 export function compiledReleaseBuildArgs(targetBinary: string): string[] {
-	return [
-		"build",
-		"--compile",
-		"--bytecode",
-		"--format=esm",
-		"--no-compile-autoload-dotenv",
-		"--no-compile-autoload-bunfig",
-		join(REAL_REPO_ROOT, "cli", "main.ts"),
-		"--outfile",
-		targetBinary,
-	];
+	return releaseBuildArgs(join(REAL_REPO_ROOT, "cli", "main.ts"), targetBinary);
 }
 
 export function writeBenchmarkArtifactProvenance(
@@ -374,6 +334,10 @@ export function writeBenchmarkArtifactProvenance(
 	buildCommand = `bun ${compiledReleaseBuildArgs(targetBinary).join(" ")}`,
 ): string {
 	const provenancePath = `${targetBinary}.provenance.json`;
+	const compiledReceipt = readMinifiedCompiledReleaseBuildReceipt(
+		targetBinary,
+		compiledReleaseBuildArgs(targetBinary),
+	);
 	writeFileSync(
 		provenancePath,
 		`${JSON.stringify(
@@ -390,7 +354,9 @@ export function writeBenchmarkArtifactProvenance(
 				platform: process.platform,
 				arch: process.arch,
 				build_target: `bun-${process.platform}-${process.arch}`,
-				compile_bytecode: true,
+				...(compiledReceipt
+					? { compile_bytecode: false, compile_minify: true }
+					: {}),
 				module_format: "esm",
 				compile_autoload_dotenv: false,
 				compile_autoload_bunfig: false,
@@ -781,6 +747,10 @@ export function prepareCompiledReleaseArtifact(
 		}
 		chmodSync(targetBinary, 0o755);
 		const artifactSha256 = hashFile(targetBinary);
+		writeCompiledReleaseBuildReceipt(
+			targetBinary,
+			compiledReleaseBuildArgs(targetBinary),
+		);
 		const timestamp = new Date().toISOString();
 		const commit = gitCommit(projectRoot);
 		writeBenchmarkArtifactProvenance(
@@ -1707,9 +1677,6 @@ export function runScenarioCommand(
 	if (command.length === 0) {
 		throw new Error("Scenario command is required for execution");
 	}
-	console.error(
-		`bench: running ${scenario.pack_id}/${scenario.scenario_id} ...`,
-	);
 	if (scenario.sandbox) {
 		return runSandboxScenarioCommand(
 			projectRoot,

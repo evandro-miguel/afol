@@ -19,13 +19,11 @@ import {
 	startTask,
 } from "../services/workbench/lifecycle";
 import type {
-	PreparedCompiledReleaseArtifact,
-	ScenarioExecutionResult,
-} from "./scenario-execution";
-import type {
 	BenchmarkExecutionProfile,
 	HotPathScenarioConfig,
+	PreparedCompiledReleaseArtifact,
 	Scenario,
+	ScenarioExecutionResult,
 } from "./types";
 
 type HotPathRunnerOptions = {
