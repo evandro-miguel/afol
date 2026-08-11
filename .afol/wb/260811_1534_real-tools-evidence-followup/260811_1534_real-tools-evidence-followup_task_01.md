@@ -25,4 +25,4 @@ spec_waiver_reason: ""
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | pending | worker | I-008 owner AFOL evidence UX: done -x returned opaque exit 2 for valid test jq and nested AFOL recovery commands; next reproduce parser and lock cases with actionable error contracts |
+| T-01 | done | worker | I-008 owner AFOL evidence UX: done -x returned opaque exit 2 for valid test jq and nested AFOL recovery commands; next reproduce parser and lock cases with actionable error contracts attempt=1 |
