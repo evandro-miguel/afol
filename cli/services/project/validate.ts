@@ -18,15 +18,12 @@ import {
 import { validateEvolutionConfigExtension } from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
-	validateFilesIndex,
-	validateRulesIndex,
-	validateSkillsIndex,
-	validateSpecsIndex,
-} from "../local-state/project-indexes";
+	collectFreshnessReport,
+	type FreshnessReport,
+} from "../local-state/freshness";
 import {
 	detectSessionHealth,
 	loadWorkBenchIndexSnapshot,
-	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { verifyAllSessions } from "../workbench/verify";
 import {
@@ -292,56 +289,30 @@ async function validateTemplateForbidden(
 	};
 }
 
-function detectIndexDrift(projectRoot: string): string[] {
-	const drifts: string[] = [];
-
-	type IndexRebuilder = {
-		id: string;
-	};
-	const indexFiles: IndexRebuilder[] = [
-		{ id: "rules" },
-		{ id: "skills" },
-		{ id: "specs" },
-		{ id: "files" },
-		{ id: "workbench" },
-	];
-
-	for (const { id } of indexFiles) {
-		// We compare using the validate functions which check freshness
-		// against source file mtimes — if generated_at < source_mtime, it's stale
-		switch (id) {
-			case "rules": {
-				const result = validateRulesIndex(projectRoot);
-				if (!result.ok) drifts.push(`${id}: ${result.message}`);
-				break;
-			}
-			case "skills": {
-				const result = validateSkillsIndex(projectRoot);
-				if (!result.ok) drifts.push(`${id}: ${result.message}`);
-				break;
-			}
-			case "specs": {
-				const result = validateSpecsIndex(projectRoot);
-				if (!result.ok) drifts.push(`${id}: ${result.message}`);
-				const markdownResult = validateSpecsMarkdownIndex(projectRoot);
-				if (!markdownResult.ok) {
-					drifts.push(`specs_markdown: ${markdownResult.message}`);
-				}
-				break;
-			}
-			case "files": {
-				const result = validateFilesIndex(projectRoot);
-				if (!result.ok) drifts.push(`${id}: ${result.message}`);
-				break;
-			}
-			case "workbench": {
-				const result = validateWorkBenchIndex(projectRoot);
-				if (!result.ok) drifts.push(`${id}: ${result.message}`);
-				break;
-			}
-		}
+function detectIndexDrift(
+	projectRoot: string,
+	freshness: FreshnessReport,
+): string[] {
+	const localStateDrifts = freshness.findings
+		.filter((finding) => finding.surface === "local-state")
+		.map((finding) => {
+			const name = finding.id.replace(/^local-state:/, "");
+			return `${name}: ${finding.message}`;
+		});
+	const pstrFindings = freshness.findings.filter(
+		(finding) => finding.surface === "pstr",
+	);
+	const staleMaps = pstrFindings.filter((finding) =>
+		finding.id.startsWith("pstr:map:"),
+	);
+	const pstrDrifts = (staleMaps.length > 0 ? staleMaps : pstrFindings).map(
+		(finding) => `${finding.id}: ${finding.message}; ${finding.remediation}`,
+	);
+	const drifts = [...localStateDrifts, ...pstrDrifts];
+	const markdownResult = validateSpecsMarkdownIndex(projectRoot);
+	if (!markdownResult.ok) {
+		drifts.push(`specs_markdown: ${markdownResult.message}`);
 	}
-
 	return drifts;
 }
 
@@ -496,10 +467,38 @@ export async function validateProjectStructure(
 ): Promise<ProjectValidationReport> {
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const eventLedger = inspectEventLedger(projectRoot);
-	const workbenchIndex = validateWorkBenchIndex(projectRoot, { eventLedger });
+	const freshness = collectFreshnessReport(projectRoot, {
+		localState: true,
+		pstr: Boolean(
+			options?.checkDrift &&
+				existsSync(join(projectPaths.abs.pstrDir, "index.json")),
+		),
+		eventLedger,
+	});
+	const workbenchFreshness = freshness.checks.find(
+		(finding) => finding.id === "local-state:workbench",
+	);
+	const workbenchIndex = {
+		ok: workbenchFreshness?.ok ?? false,
+		message:
+			workbenchFreshness?.message ?? "missing workbench freshness finding",
+	};
 	const workbenchSnapshot = workbenchIndex.ok
 		? loadWorkBenchIndexSnapshot(projectRoot)
 		: null;
+	const localStateCheck = (
+		id: ProjectValidationCheck["id"],
+		name: string,
+	): ProjectValidationCheck => {
+		const finding = freshness.checks.find(
+			(candidate) => candidate.id === `local-state:${name}`,
+		);
+		return {
+			id,
+			ok: finding?.ok ?? false,
+			message: finding?.message ?? `missing local-state:${name} finding`,
+		};
+	};
 	const checks: ProjectValidationCheck[] = [
 		validateConfig(projectRoot),
 		validateJsonFile("lock", projectPaths.abs.lockFile),
@@ -523,38 +522,10 @@ export async function validateProjectStructure(
 			ok: workbenchIndex.ok,
 			message: workbenchIndex.message,
 		},
-		(() => {
-			const result = validateRulesIndex(projectRoot);
-			return {
-				id: "rules_local_state_index",
-				ok: result.ok,
-				message: result.message,
-			};
-		})(),
-		(() => {
-			const result = validateSkillsIndex(projectRoot);
-			return {
-				id: "skills_local_state_index",
-				ok: result.ok,
-				message: result.message,
-			};
-		})(),
-		(() => {
-			const result = validateSpecsIndex(projectRoot);
-			return {
-				id: "specs_local_state_index",
-				ok: result.ok,
-				message: result.message,
-			};
-		})(),
-		(() => {
-			const result = validateFilesIndex(projectRoot);
-			return {
-				id: "files_local_state_index",
-				ok: result.ok,
-				message: result.message,
-			};
-		})(),
+		localStateCheck("rules_local_state_index", "rules"),
+		localStateCheck("skills_local_state_index", "skills"),
+		localStateCheck("specs_local_state_index", "specs"),
+		localStateCheck("files_local_state_index", "files"),
 		(() => {
 			const open = listOpenPendingSpecs(projectRoot);
 			return {
@@ -668,7 +639,7 @@ export async function validateProjectStructure(
 
 	// Index drift check (opt-in via --check-drift)
 	if (options?.checkDrift) {
-		const drifts = detectIndexDrift(projectRoot);
+		const drifts = detectIndexDrift(projectRoot, freshness);
 		checks.push({
 			id: "index_drift",
 			ok: drifts.length === 0,

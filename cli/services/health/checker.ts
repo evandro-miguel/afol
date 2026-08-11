@@ -12,6 +12,7 @@ import {
 } from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import { getTopic, listTopics } from "../library";
+import { collectFreshnessReport } from "../local-state/freshness";
 import {
 	collectSessionIds,
 	detectSessionHealth,
@@ -19,7 +20,6 @@ import {
 } from "../local-state/workbench-index";
 import { readMemory } from "../memory";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
-import { checkPstrStale, validatePstrIndex } from "../pstr";
 import { readMaintenanceReviewSummary } from "./maintenance-review";
 import type { HealthArea, HealthFinding, HealthReport } from "./types";
 
@@ -50,16 +50,6 @@ function makeFinding(
 	hint?: string,
 ): HealthFinding {
 	return { area, severity, message, ...(hint ? { hint } : {}) };
-}
-
-function addIf(
-	findings: HealthFinding[],
-	condition: boolean,
-	finding: HealthFinding,
-): void {
-	if (condition) {
-		findings.push(finding);
-	}
 }
 
 function parseIsoDate(value: string): number | null {
@@ -183,27 +173,28 @@ function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 
 function checkPstrHealth(root: string, deep: boolean): HealthFinding[] {
 	const findings: HealthFinding[] = [];
-	const validation = validatePstrIndex(root);
-	const stale = checkPstrStale(root);
-	for (const entry of stale) {
-		addIf(
-			findings,
-			entry.stale,
-			makeFinding("pstr", "fail", entry.message, "run afol pstr rebuild"),
-		);
-	}
-	if (!validation.ok && findings.length === 0) {
+	const report = collectFreshnessReport(root, {
+		localState: false,
+		pstr: true,
+	});
+	const pstrFindings = report.findings.filter(
+		(finding) => finding.surface === "pstr",
+	);
+	const staleMaps = pstrFindings.filter((finding) =>
+		finding.id.startsWith("pstr:map:"),
+	);
+	const findingsToReport = staleMaps.length > 0 ? staleMaps : pstrFindings;
+	for (const finding of findingsToReport) {
 		findings.push(
-			makeFinding("pstr", "fail", validation.message, "run afol pstr rebuild"),
+			makeFinding("pstr", "fail", finding.message, finding.remediation),
 		);
 	}
 	if (deep && findings.length === 0) {
+		const mapCount = report.checks.filter((finding) =>
+			finding.id.startsWith("pstr:map:"),
+		).length;
 		findings.push(
-			makeFinding(
-				"pstr",
-				"info",
-				`pstr index is current (${stale.length} maps)`,
-			),
+			makeFinding("pstr", "info", `pstr index is current (${mapCount} maps)`),
 		);
 	}
 	return findings;

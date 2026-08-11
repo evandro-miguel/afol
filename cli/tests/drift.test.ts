@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
@@ -10,6 +16,7 @@ import {
 	checkStateDrift,
 	runDriftCheck,
 } from "../services/drift/checker";
+import { collectFreshnessReport } from "../services/local-state/freshness";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import { hydrateSession } from "../services/state/session-state";
 import { sweepDaily } from "../services/sweep/runner";
@@ -227,6 +234,98 @@ describe("drift validation", () => {
 					(finding) => finding.domain === "pstr" && finding.severity === "warn",
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("canonical PSTR freshness keeps map state across drift adapters", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				"export const cli = false;\n",
+				"utf8",
+			);
+			const report = collectFreshnessReport(root, {
+				localState: false,
+				pstr: true,
+			});
+			const canonical = report.findings.find(
+				(finding) => finding.id === "pstr:map:cli",
+			);
+			expect(canonical).toMatchObject({
+				surface: "pstr",
+				state: "stale",
+				remediation: "run afol pstr rebuild",
+			});
+
+			const drift = checkPstrDrift(root).find(
+				(finding) => finding.id === "pstr:map:cli:stale",
+			);
+			expect(drift).toMatchObject({
+				domain: "pstr",
+				severity: "warn",
+				hint: "run afol pstr rebuild",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("PSTR drift preserves an invalid index instead of deriving missing maps", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(join(root, ".afol", "pstr", "index.json"), "{", "utf8");
+
+			const report = collectFreshnessReport(root, {
+				localState: false,
+				pstr: true,
+			});
+			expect(report.findings).toEqual([
+				expect.objectContaining({
+					id: "pstr:index",
+					state: "invalid",
+				}),
+			]);
+			expect(checkPstrDrift(root)).toEqual([
+				expect.objectContaining({ id: "pstr:index:invalid" }),
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("PSTR drift preserves an index with an unknown map entry", () => {
+		const root = createFixture();
+		try {
+			const indexPath = join(root, ".afol", "pstr", "index.json");
+			const index = JSON.parse(readFileSync(indexPath, "utf8")) as {
+				maps: Array<{ id: string }>;
+				manifest?: unknown;
+			};
+			const [firstMap] = index.maps;
+			if (!firstMap) {
+				throw new Error("fixture PSTR index must have a map");
+			}
+			firstMap.id = "unknown-map";
+			delete index.manifest;
+			writeFileSync(indexPath, `${JSON.stringify(index)}\n`, "utf8");
+
+			const report = collectFreshnessReport(root, {
+				localState: false,
+				pstr: true,
+			});
+			expect(report.findings).toEqual([
+				expect.objectContaining({
+					id: "pstr:index",
+					state: "invalid",
+					message: expect.stringContaining("unknown pstr map entry"),
+				}),
+			]);
+			expect(checkPstrDrift(root)).toEqual([
+				expect.objectContaining({ id: "pstr:index:invalid" }),
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
