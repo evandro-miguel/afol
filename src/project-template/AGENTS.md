@@ -194,6 +194,26 @@ afol local-state rebuild --json
   Confirm findings with focused local reads. If the project is unregistered or
   stale, use that skill's bounded registration or ingestion flow before relying
   on semantic results.
+- Verify the live Project RAG index immediately before trusting a result. A
+  stale, failed, missing, or out-of-scope result is orientation only, never
+  proof of current code or governance.
+- Project RAG scopes may exclude leading-dot directories. Treat `.afol/adm/**`
+  and `.agents/**` as a deliberate hidden-administration gap when they are not
+  registered: read those paths directly from the checkout instead of inferring
+  their contents or absence from search.
+- For an existing registered project with stale indexed files, use a bounded
+  manual delta reingest from the selected `rag-v2` checkout, then verify again:
+
+  ```bash
+  bun run ingest-project \
+    --root <absolute-project-root> \
+    --include <include-roots> --max-files 100
+  ragctl project verify --project <project-slug-or-id> --json
+  ```
+
+  Repeat only as needed, and reserve `--force` for an explicitly owned full
+  rebuild. Project RAG watchers are removed; no watcher or resident MCP/core
+  startup is required for retrieval or freshness repair.
 - Syntax search: `sg`/`ast-grep`.
 - Repo history/context: `git`/`gh`.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:

@@ -97,34 +97,49 @@ not a project-local skills root.
 
 ## Project RAG
 
-- Status: active (reindexed 2026-07-19). Postgres id `1707`, slug `afol-dev`.
+- Identity is live state, not a static readiness claim: Postgres id `1707`,
+  slug `afol-dev`. Run `ragctl project verify --project afol-dev --json`
+  immediately before trusting indexed results.
 - Indexed root: `/home/ozy/01_projects/dev/afol/afol.dev`.
 - Include roots (platform rejects leading-dot dirs): `cli`, `src`, `docs`.
   Do not pass `.afol` or `.agents` as include roots; Project RAG forbids them.
+- This scope leaves a deliberate hidden-administration gap: `.afol/adm/**`
+  (including specs, doctrine, and release policy) and `.agents/**` are not in
+  the Project RAG corpus. Read those paths directly from the checkout; an
+  indexed search result cannot prove their current contents or absence.
 - Allowlist (blocked findings suppressed):
   - `cli/generated` (`generated_dir`)
   - `src/project-template/.afol/tmp` (`temp_dir`)
-- Known verify drift: 8 `docs/templates/*.md` symlinks report
+- `docs/templates/*.md` symlinks may report
   `PROJECT_INDEX_SCOPE_DRIFT` because inventory expects the link path while
   content is already indexed via `src/project-template/docs/templates/**`.
-  Search still works; treat that gate as non-blocking until symlink accounting
-  improves.
-- Reindex (from the rag-v2 checkout):
+  Treat this as non-blocking only when the current verifier marks it so; do
+  not infer current index health from this note.
+- If verification reports stale or missing indexed files, perform a bounded
+  manual delta reingest from the `rag-v2` checkout, then verify again. Use a
+  reviewed positive cap and repeat while the verify result remains stale; do
+  not use a watcher or make resident MCP/core startup a dependency:
+
   ```bash
-  bun run register-project --root /home/ozy/01_projects/dev/afol/afol.dev \
-    --include cli,src,docs \
-    --replace-blocked-finding-allowlist \
-    '[{"relativePath":"cli/generated","category":"generated_dir"},{"relativePath":"src/project-template/.afol/tmp","category":"temp_dir"}]'
-  bun run ingest-project --root /home/ozy/01_projects/dev/afol/afol.dev \
-    --include cli,src,docs --force
+  cd "${RAG_REPO_ROOT:?set RAG_REPO_ROOT to the rag-v2 checkout}"
+  bun run ingest-project \
+    --root /home/ozy/01_projects/dev/afol/afol.dev \
+    --include cli,src,docs --max-files 100
+  ragctl project verify --project afol-dev --json
   ```
+
+  Use `register-project` only when the repository is not registered. Reserve
+  `--force` for an explicitly owned full rebuild; it is not the normal stale
+  index repair. Project RAG watchers are removed, so freshness is operator
+  checked and manually repaired rather than continuously synchronized.
 - Critical read-only checks:
   - `ragctl project verify --project afol-dev --json`
-  - `ragctl project search --project afol-dev "<query>" --mode vector --json`
+  - `ragctl project search --project afol-dev "<query>" --mode hybrid --json`
   - `ragctl project file --project afol-dev --file <repo-relative-path> --json`
 - Semantic repository discovery uses Project RAG only. Use the global
   `evandro-rag-system` skill and `ragctl` for semantic navigation; use `rg` and
-  focused source reads to confirm exact implementation facts.
+  focused source reads to confirm exact implementation facts. A stale,
+  missing, or out-of-scope result is orientation only, never proof.
 
 Large AFOL changes should use the global Codex `agentic-folder-sys` skill when
 available. Do not require or restore a project-local
