@@ -23,6 +23,15 @@ import {
 const TASK_SELECTOR_ITEM_RE = /^T-(\d{2,3})(?:\.\.T-(\d{2,3}))?$/;
 const TASK_SELECTOR_MAX_TASKS = 100;
 
+export class DoneArgumentError extends Error {
+	readonly code = "workbench.invalid_arguments";
+
+	constructor(message: string) {
+		super(message);
+		this.name = "DoneArgumentError";
+	}
+}
+
 function parseTaskSelector(selector: string): string[] {
 	const taskIds: string[] = [];
 	const seen = new Set<string>();
@@ -598,7 +607,12 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	if (!taskId) {
 		throw new Error("Missing --task-id for done.");
 	}
-	const taskIds = parseTaskSelector(taskId);
+	let taskIds: string[];
+	try {
+		taskIds = parseTaskSelector(taskId);
+	} catch {
+		throw new DoneArgumentError("Invalid done task selector.");
+	}
 	if (
 		(evidenceCommand && !evidenceResult) ||
 		(!evidenceCommand && evidenceResult)

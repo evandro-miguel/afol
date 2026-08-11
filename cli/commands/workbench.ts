@@ -31,6 +31,7 @@ import {
 	prepareVerificationRun,
 	recordEvidence,
 	recordVerificationRunStep,
+	sanitizeEvidenceText,
 	startTask,
 	startTasks,
 	type TaskState,
@@ -55,6 +56,7 @@ import {
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
 import {
+	DoneArgumentError,
 	hasJsonFlag,
 	parseCloseArgs,
 	parseDoneArgs,
@@ -713,7 +715,6 @@ type DoneLockedFailure = {
 	stepCount?: number;
 	evidenceIds?: string[];
 	warnings?: string[];
-	legacyError?: boolean;
 };
 
 type DoneLockedResult = DoneLockedSuccess | DoneLockedFailure;
@@ -732,6 +733,28 @@ type DoneRecoveryData = {
 	evidence_ids: string[];
 	next_command: string;
 };
+
+const DONE_DIAGNOSTIC_MAX_BYTES = 512;
+const DONE_DIAGNOSTIC_CONTROL = /\p{Cc}/gu;
+
+function boundDoneDiagnostic(value: unknown): string {
+	const message = value instanceof Error ? value.message : String(value);
+	const sanitized = sanitizeEvidenceText(message)
+		.replace(DONE_DIAGNOSTIC_CONTROL, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (Buffer.byteLength(sanitized, "utf8") <= DONE_DIAGNOSTIC_MAX_BYTES) {
+		return sanitized || "Done command failed.";
+	}
+	let bounded = "";
+	for (const character of sanitized) {
+		const candidate = `${bounded}${character}`;
+		if (Buffer.byteLength(candidate, "utf8") > DONE_DIAGNOSTIC_MAX_BYTES - 3)
+			break;
+		bounded = candidate;
+	}
+	return `${bounded}...`;
+}
 
 function doneRecoveryData(
 	parsed: DoneArgs | undefined,
@@ -761,13 +784,17 @@ function stringifyDoneJsonError(
 	error: unknown,
 	exitCode: number,
 	data: DoneRecoveryData,
+	options: { code?: string; message?: string } = {},
 ): string {
-	const message = error instanceof Error ? error.message : String(error);
 	return stringifyEnvelope({
-		...envelopeErr("workbench.error", message, {
-			action: "workbench.done",
-			exitCode,
-		}),
+		...envelopeErr(
+			options.code ?? "workbench.completion_failed",
+			options.message ?? boundDoneDiagnostic(error),
+			{
+				action: "workbench.done",
+				exitCode,
+			},
+		),
 		data,
 	});
 }
@@ -790,7 +817,6 @@ async function executeDoneLocked(
 				message: `spec check failed: ${specCheck.spec_id || parsed.taskId}`,
 				status: "spec_conflict",
 				exitCode: 1,
-				...(parsed.testCommands.length < 2 ? { legacyError: true } : {}),
 			};
 		}
 	}
@@ -955,7 +981,6 @@ async function executeDoneLocked(
 				exitCode: 1,
 				evidenceIds: [observedCompletion.evidence.id],
 				warnings: observedCompletion.warnings,
-				legacyError: true,
 			};
 		}
 	}
@@ -989,7 +1014,6 @@ async function executeDoneLocked(
 				status: verification.status,
 				exitCode: 1,
 				evidenceIds: [observedCompletion.evidence.id],
-				legacyError: true,
 			};
 		}
 	}
@@ -1230,23 +1254,15 @@ export async function runDoneCommand(
 					warnings: result.warnings ?? [],
 				};
 				output.stdout(
-					result.legacyError
-						? stringifyDoneJsonError(
-								new Error(result.message),
-								result.exitCode,
-								data,
-							)
-						: stringifyEnvelope({
-								...envelopeErr(
-									"workbench.verification_failed",
-									result.message,
-									{
-										action: "workbench.done",
-										exitCode: result.exitCode,
-									},
-								),
-								data,
-							}),
+					stringifyDoneJsonError(
+						new Error(result.message),
+						result.exitCode,
+						data,
+						{
+							code: "workbench.verification_failed",
+							message: boundDoneDiagnostic(result.message),
+						},
+					),
 				);
 			} else {
 				output.stderr(result.message);
@@ -1323,6 +1339,19 @@ export async function runDoneCommand(
 							status: "stale_conflict",
 							failed_step: "verification",
 						},
+					}),
+				);
+			} else if (parsed === undefined) {
+				output.stdout(
+					stringifyDoneJsonError(error, 2, data, {
+						code:
+							error instanceof DoneArgumentError
+								? error.code
+								: "workbench.invalid_arguments",
+						message:
+							error instanceof DoneArgumentError
+								? error.message
+								: "Invalid done arguments.",
 					}),
 				);
 			} else {

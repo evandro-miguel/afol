@@ -1059,7 +1059,7 @@ describe("workbench lifecycle service", () => {
 				"spec check failed",
 			);
 			expect((payload.error as Record<string, unknown>).code).toBe(
-				"workbench.error",
+				"workbench.verification_failed",
 			);
 			expect(payload.data).toMatchObject({
 				session: created.session,
@@ -1101,7 +1101,7 @@ describe("workbench lifecycle service", () => {
 				exit_code: 1,
 			});
 			expect(payload.error).toMatchObject({
-				code: "workbench.error",
+				code: "workbench.verification_failed",
 				message: "--test failed with exit code 3",
 			});
 			expect(payload.data).toMatchObject({
@@ -1112,6 +1112,97 @@ describe("workbench lifecycle service", () => {
 				status: "failed",
 				evidence_ids: expect.any(Array),
 				next_command: expect.any(String),
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done parser diagnostics are classified, bounded, and sanitized", () => {
+		const root = mkRoot("done-parser-diagnostic");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done parser diagnostic");
+			const invalidTaskSelector = `I008_PARSE_CANARY_${"x".repeat(800)}`;
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				invalidTaskSelector,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(2);
+			const payload = parseEnvelope(proc.stdout as string);
+			const error = payload.error as {
+				code?: unknown;
+				message?: unknown;
+			};
+			const message = typeof error?.message === "string" ? error.message : "";
+			expect({
+				generic_code: error?.code === "workbench.error",
+				bounded_utf8: Buffer.byteLength(message, "utf8") <= 512,
+				raw_input_reflected: message.includes(invalidTaskSelector),
+				failed_step: (payload.data as Record<string, unknown> | undefined)
+					?.failed_step,
+			}).toEqual({
+				generic_code: false,
+				bounded_utf8: true,
+				raw_input_reflected: false,
+				failed_step: "parse",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done child failures retain a bounded classification without child output", () => {
+		const root = mkRoot("done-child-diagnostic");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done child diagnostic");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const rawChildDiagnostic = `I008_CHILD_DIAGNOSTIC_${"secret".repeat(120)}`;
+			const codePoints = Array.from(rawChildDiagnostic, (char) =>
+				char.charCodeAt(0),
+			);
+			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.exit(7)`;
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				`bun -e ${JSON.stringify(script)}`,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string);
+			const error = payload.error as {
+				code?: unknown;
+				message?: unknown;
+			};
+			const data = payload.data as Record<string, unknown>;
+			const message = typeof error?.message === "string" ? error.message : "";
+			const persistedEvidence = readFileSync(created.evidencePath, "utf8");
+			expect({
+				classified: error?.code === "workbench.verification_failed",
+				bounded_utf8: Buffer.byteLength(message, "utf8") <= 512,
+				status: data?.status,
+				raw_child_output_reflected:
+					message.includes(rawChildDiagnostic) ||
+					String(data?.diagnostic ?? "").includes(rawChildDiagnostic) ||
+					persistedEvidence.includes(rawChildDiagnostic) ||
+					String(proc.stdout).includes(rawChildDiagnostic) ||
+					String(proc.stderr).includes(rawChildDiagnostic),
+			}).toEqual({
+				classified: true,
+				bounded_utf8: true,
+				status: "failed",
+				raw_child_output_reflected: false,
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1143,7 +1234,7 @@ describe("workbench lifecycle service", () => {
 				exit_code: 1,
 			});
 			expect(payload.error).toMatchObject({
-				code: "workbench.error",
+				code: "workbench.verification_failed",
 				message: "--test-shell failed with exit code 1",
 			});
 			expect(payload.data).toMatchObject({
@@ -1190,7 +1281,7 @@ describe("workbench lifecycle service", () => {
 				exit_code: 1,
 			});
 			expect(payload.error).toMatchObject({
-				code: "workbench.error",
+				code: "workbench.verification_failed",
 				message: "--test failed with exit code 4",
 			});
 			expect(payload.data).toMatchObject({
