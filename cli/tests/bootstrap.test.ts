@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runBootstrapCommand } from "../commands/bootstrap";
 import { agentOperationContext } from "../core/operation-context";
+import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 import { resolveExternalPathLockPath } from "../services/io/session-lock";
@@ -37,6 +38,24 @@ function templateFileMap(entries: Record<string, string>): TemplateFileMap {
 	}
 	return files;
 }
+
+const LEGACY_SPECS_INDEX = [
+	"---",
+	'id: "specs-index"',
+	'type: "index"',
+	'desc: "AFOL specs index"',
+	'created: "2026-06-20"',
+	'updated: "2026-06-20"',
+	"---",
+	"",
+	"# Specs INDEX",
+	"",
+	"- Parent spec:",
+	"- Child spec:",
+	"",
+	"Keep this index updated in downstream projects as new specs are added.",
+	"",
+].join("\n");
 
 function mkCliRuntimeRoot(
 	options: {
@@ -631,6 +650,28 @@ describe("bootstrap provider-compatible mutable state", () => {
 				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as { project: { id: string; timezone: string } };
 			expect(secondConfig.project).toEqual(firstConfig.project);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("migrates an untouched legacy specs index through bootstrap apply", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-legacy-index-"));
+		const indexPath = join(target, ".afol", "adm", "specs", "INDEX.md");
+		try {
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+			writeFileSync(indexPath, LEGACY_SPECS_INDEX, "utf8");
+
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+			const expected = DEFAULT_TEMPLATE_FILES[".afol/adm/specs/INDEX.md"];
+			expect(expected).toBeDefined();
+			expect(readFileSync(indexPath, "utf8")).toBe(
+				Buffer.from(expected?.contentBase64 ?? "", "base64").toString("utf8"),
+			);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}
