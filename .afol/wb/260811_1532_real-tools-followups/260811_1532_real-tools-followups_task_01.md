@@ -25,8 +25,8 @@ spec_waiver_reason: ""
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | pending | worker | I-002 owner AFOL CLI: add structured JSON support to init dry-run; next add contract test and implementation |
-| T-02 | pending | worker | I-003 owner AFOL registry: correct adr and changelog side-effect metadata; next update registry parity tests |
-| T-03 | pending | worker | I-004 owner AFOL evolution: reconcile evolve analyze blocked status with green state health; next reproduce and fix diagnostic dependency |
-| T-04 | pending | worker | I-005 owner AFOL context: resolve active session in ctx bundle after hydrate and rebuild; next add active-binding regression |
+| T-01 | done | worker | I-002 owner AFOL CLI: add structured JSON support to init dry-run; next add contract test and implementation attempt=1 |
+| T-02 | done | worker | I-003 owner AFOL registry: correct adr and changelog side-effect metadata; next update registry parity tests attempt=1 |
+| T-03 | done | worker | I-004 owner AFOL evolution: reconcile evolve analyze blocked status with green state health; next reproduce and fix diagnostic dependency attempt=1 |
+| T-04 | done | worker | I-005 owner AFOL context: resolve active session in ctx bundle after hydrate and rebuild; next add active-binding regression attempt=1 |
 | T-05 | pending | worker | I-006 owner AFOL scaffold: manage downstream .afol/wb/.locks ignore rule; next define safe project-owned gitignore update |
