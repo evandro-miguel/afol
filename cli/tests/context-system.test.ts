@@ -1783,6 +1783,59 @@ describe("context system", () => {
 		}
 	});
 
+	test("afol ctx bundle resolves the active hydrated session when -S is omitted", async () => {
+		const root = createBundleFixture();
+		const saved = {
+			AFOL_CI: process.env.AFOL_CI,
+			CI: process.env.CI,
+		};
+		try {
+			delete process.env.AFOL_CI;
+			delete process.env.CI;
+			const taskPath = join(
+				root,
+				".afol",
+				"wb",
+				"session-1",
+				"alpha_task_1.md",
+			);
+			const task = readFileSync(taskPath, "utf8");
+			rmSync(taskPath);
+			writeFileSync(
+				join(root, ".afol", "wb", "session-1", "session-1_task_01.md"),
+				task,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"session-1\n",
+				"utf8",
+			);
+			hydrateSession(root, "session-1");
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					["-T", "T-01", "--role", "designer", "--surface", "alpha", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: { task_id: string; gaps: string[] };
+			};
+			expect(payload.data.task_id).toBe("T-01");
+			expect(payload.data.gaps).not.toContain("missing session");
+			expect(payload.data.gaps).not.toContain("no hydrated session state");
+		} finally {
+			if (saved.AFOL_CI === undefined) delete process.env.AFOL_CI;
+			else process.env.AFOL_CI = saved.AFOL_CI;
+			if (saved.CI === undefined) delete process.env.CI;
+			else process.env.CI = saved.CI;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol ctx bundle warns when applicable rules exceed injection limits", async () => {
 		const root = createBundleFixture();
 		try {
