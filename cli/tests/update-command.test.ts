@@ -19,6 +19,7 @@ import {
 	loadMutationJournalStrict,
 	type MutationRecord,
 } from "../services/mutations/journal";
+import { checkTemplateUpdate } from "../services/update/check";
 import { newWorkstream, startTask } from "../services/workbench/lifecycle";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
@@ -205,6 +206,36 @@ function mkBoundUpdateContext(root: string): {
 }
 
 describe("update command", () => {
+	test("check creates missing baseline docs under project-owned roots", () => {
+		const root = mkRoot();
+		try {
+			writeFileSync(
+				join(root, ".agents", "lock.json"),
+				templateText(".agents/lock.json"),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".agents", "manifest.json"),
+				templateText(".agents/manifest.json"),
+				"utf8",
+			);
+
+			const result = checkTemplateUpdate(root);
+			const operations = new Map(
+				result.operations.map((operation) => [operation.path, operation]),
+			);
+			expect(
+				operations.get("docs/standards/user-journey-registry.md"),
+			).toMatchObject({ kind: "create", owner: "project-owned" });
+			expect(operations.get("docs/templates/ux-journey.md")).toMatchObject({
+				kind: "create",
+				owner: "project-owned",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("check reports source drift without writing files", async () => {
 		const root = mkRoot();
 		const sourceLock = templateJson<{ revision: string }>(".agents/lock.json");

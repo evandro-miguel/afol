@@ -41,8 +41,21 @@ export type BootstrapPlan = {
 	filteredForbiddenCount: number;
 };
 
+const LEGACY_SPECS_INDEX_PATH = ".afol/adm/specs/INDEX.md";
+// This is the untouched index shipped before the specs-index validation schema
+// was introduced. Only this exact scaffold payload is safe to migrate.
+const LEGACY_SPECS_INDEX_SHA256 =
+	"cbbc5c7bd9e882a44c2fc12a020e671fd2250ffd841ebe87fee4c5e4d736e808";
+
 function sha256Hex(value: string): string {
 	return createHash("sha256").update(value).digest("hex");
+}
+
+function isLegacySpecsIndex(path: string, content: string): boolean {
+	return (
+		path === LEGACY_SPECS_INDEX_PATH &&
+		sha256Hex(content) === LEGACY_SPECS_INDEX_SHA256
+	);
 }
 
 function toOperationOwner(
@@ -70,6 +83,9 @@ function buildPreserveProjectOwnedOperation(
 	owner: ManagedOwnership | undefined,
 	isMissing: boolean,
 ): BootstrapOperation | null {
+	if (owner === "project-owned" && isMissing) {
+		return null;
+	}
 	if (owner !== "project-owned" && owner !== "ignored") {
 		return null;
 	}
@@ -150,6 +166,20 @@ export function planBootstrapOperations(
 				reason: "same-content-hash",
 				owner,
 			});
+			continue;
+		}
+
+		if (owner === "project-owned" && isLegacySpecsIndex(path, currentContent)) {
+			operations.push(
+				buildOperationWithPatch(
+					"update-managed",
+					path,
+					"legacy-template-index",
+					"generated",
+					currentContent,
+					templateContent,
+				),
+			);
 			continue;
 		}
 
