@@ -6,9 +6,10 @@ metadata:
   tags: "afol, rules, governance, hooks, context-budget, lifecycle, token-economy"
   triggers: "afol rules, create rule, update rule, rule drift, stale rule, rule budget, hook context, lifecycle rule, .afol/adm/rules"
   references: "rules, hooks, governance, token-economy"
-  version: "1.0.0"
-  updated_at: "2026-06-20T00:00:00Z"
+  version: "1.1.0"
+  updated_at: "2026-08-10T00:00:00Z"
   target_provider: universal
+  tier: 1
 ---
 
 # AFOL Rules
@@ -33,6 +34,8 @@ Use this skill to author AFOL rules that are short, current, and enforceable.
 - Verify live AFOL behavior from code, tests, or compact commands.
 - Create a rule only for durable operational contracts. Use docs, specs, ADRs,
   tests, hooks, or skills when those are the real source of truth.
+- When the change follows a user correction, add exactly one English lesson
+  entry under `docs/lessons/entries/` with the correction and prevention rule.
 
 ## Rule Shape
 
@@ -62,8 +65,8 @@ Fix related drift in the same change. Report unrelated drift.
 - For rule/hook/budget/template changes, run the smallest relevant check:
 
 ```bash
-afol validate project
-afol status
+afol v project
+afol s
 bun test cli/tests/rule-command.test.ts cli/tests/context-system.test.ts
 bun run kernel -- ck
 bun run cli/dev/generate-template.ts

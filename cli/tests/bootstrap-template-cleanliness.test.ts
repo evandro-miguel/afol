@@ -120,7 +120,10 @@ describe("generated template cleanliness", () => {
 
 		for (const path of skillPaths) {
 			const entry = DEFAULT_TEMPLATE_FILES[path];
-			expect(entry, `${path} must exist in the generated template`).toBeDefined();
+			expect(
+				entry,
+				`${path} must exist in the generated template`,
+			).toBeDefined();
 			if (!entry) {
 				throw new Error(`${path} is missing from the generated template`);
 			}
