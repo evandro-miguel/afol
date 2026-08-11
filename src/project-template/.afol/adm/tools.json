@@ -74,8 +74,6 @@
           "verify",
           "verify-tasks",
           "state",
-          "library",
-          "memory",
           "adm",
           "adr",
           "changelog",
@@ -100,8 +98,6 @@
           "verify",
           "verify-tasks",
           "state",
-          "library",
-          "memory",
           "adm",
           "adr",
           "changelog",
@@ -164,8 +160,6 @@
           "verify",
           "verify-tasks",
           "state",
-          "library",
-          "memory",
           "adm",
           "adr",
           "changelog",
@@ -303,6 +297,11 @@
           "usage": "bench --pack <pack-id> --json",
           "side_effect": "read",
           "description": "Run one benchmark pack with its configured gates"
+        },
+        {
+          "usage": "bench --pack <pack-id> --scenario-id <scenario-id> --json",
+          "side_effect": "read",
+          "description": "Rerun one scored scenario in a benchmark pack"
         },
         {
           "usage": "bench --pack governance-history --timing-mode observe --json",
@@ -1155,9 +1154,65 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect library entries",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list|ls [--json]",
+          "side_effect": "read",
+          "description": "List library topics"
+        },
+        {
+          "usage": "topic <topic>|--topic <topic> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one library topic"
+        },
+        {
+          "usage": "search <query>|--query <query> [--json]",
+          "side_effect": "read",
+          "description": "Search library topics and claims"
+        },
+        {
+          "usage": "graph [--json]",
+          "side_effect": "read",
+          "description": "Render the library topic and claim graph"
+        },
+        {
+          "usage": "health [--json]",
+          "side_effect": "read",
+          "description": "Run library health checks"
+        },
+        {
+          "usage": "doctor [--json]",
+          "side_effect": "read",
+          "description": "Show library remediation steps"
+        },
+        {
+          "usage": "propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+          "side_effect": "write",
+          "description": "Propose a library topic with an optional source"
+        },
+        {
+          "usage": "add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+          "side_effect": "write",
+          "description": "Add a source to a library topic"
+        },
+        {
+          "usage": "add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+          "side_effect": "write",
+          "description": "Add a sourced claim to a library topic"
+        },
+        {
+          "usage": "invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+          "side_effect": "write",
+          "description": "Invalidate a library claim with a reason"
+        },
+        {
+          "usage": "rebuild-index [--json]",
+          "side_effect": "generated",
+          "description": "Refresh the generated library index"
+        }
+      ]
     },
     {
       "id": "memory",
@@ -1170,9 +1225,65 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect memory entries",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list|ls [--json]",
+          "side_effect": "read",
+          "description": "List memory entries"
+        },
+        {
+          "usage": "show|get --id <id> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one memory entry"
+        },
+        {
+          "usage": "search|find --query <query> [--json]",
+          "side_effect": "read",
+          "description": "Search memory entries"
+        },
+        {
+          "usage": "render [--json]",
+          "side_effect": "read",
+          "description": "Render the memory document"
+        },
+        {
+          "usage": "recall --query <query> [--json]",
+          "side_effect": "read",
+          "description": "Recall entries relevant to a query"
+        },
+        {
+          "usage": "add --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+          "side_effect": "write",
+          "description": "Add an active memory entry"
+        },
+        {
+          "usage": "update|set --id <id> [--title <title>] [--body <text>] [--tags <tag>[,<tag>...]] [--json]",
+          "side_effect": "write",
+          "description": "Update a memory entry"
+        },
+        {
+          "usage": "archive --id <id> [--json]",
+          "side_effect": "write",
+          "description": "Archive a memory entry"
+        },
+        {
+          "usage": "propose --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+          "side_effect": "write",
+          "description": "Add a proposed memory entry"
+        },
+        {
+          "usage": "promote --id <id> [--json]",
+          "side_effect": "write",
+          "description": "Promote a proposed memory entry"
+        },
+        {
+          "usage": "reject --id <id> --reason <text> [--json]",
+          "side_effect": "write",
+          "description": "Reject a proposed memory entry"
+        }
+      ]
     },
     {
       "id": "evolve",
@@ -1394,7 +1505,33 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Inspect health checks",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "[core] [--json]",
+          "side_effect": "read",
+          "description": "Check core workbench health"
+        },
+        {
+          "usage": "full [--json]",
+          "side_effect": "read",
+          "description": "Check every health area"
+        },
+        {
+          "usage": "release|--release [--json]",
+          "side_effect": "read",
+          "description": "Run release-scoped health checks"
+        },
+        {
+          "usage": "--area <adm|pstr|wb|memory|library|state|ctx|evolution|token_budget> [--deep] [--json]",
+          "side_effect": "read",
+          "description": "Check one named health area"
+        },
+        {
+          "usage": "--deep [--json]",
+          "side_effect": "read",
+          "description": "Check every health area in deep mode"
+        }
+      ]
     },
     {
       "id": "db",
@@ -1657,7 +1794,13 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Search governance context before planning",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "<intent query> [--json]",
+          "side_effect": "read",
+          "description": "Search specs, lessons, rules, and similar systems"
+        }
+      ]
     },
     {
       "id": "adapter",
