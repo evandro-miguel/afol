@@ -145,6 +145,18 @@ describe("help formatter", () => {
 		expect(unknown).toBeNull();
 	});
 
+	test("advertises compact and verbose verify-task report options", () => {
+		const help = formatCommandHelp("verify-tasks", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected verify-tasks command help");
+		}
+		expect(help).toContain("Aliases: vt");
+		expect(help).toContain("[session-path] [--strict] [--verbose] [read]");
+		expect(help).toContain("--session <session-id> --json [read]");
+	});
+
 	test("routes command group help before subcommand parsers", () => {
 		const helpGroups = SUBCOMMAND_DISPATCH_GROUPS.map((group) => ({
 			group,

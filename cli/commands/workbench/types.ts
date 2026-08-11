@@ -66,4 +66,5 @@ export type VerifyArgs = {
 	sessionPath: string;
 	strict: boolean;
 	json: boolean;
+	verbose: boolean;
 };

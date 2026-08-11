@@ -1310,7 +1310,9 @@ export async function runVerifyTasksCommand(
 ): Promise<number> {
 	try {
 		if (args.length === 1 && (args[0] === "-h" || args[0] === "--help")) {
-			console.log("Usage: afol verify-tasks [session-path] [--strict]");
+			console.log(
+				"Usage: afol verify-tasks [session-path] [--strict] [--verbose]",
+			);
 			return 0;
 		}
 		const parsed = parseVerifyArgs(args, root);
@@ -1340,7 +1342,7 @@ export async function runVerifyTasksCommand(
 				);
 			}
 		} else {
-			console.log(formatVerifyReport(result).trimEnd());
+			console.log(formatVerifyReport(result, parsed.verbose).trimEnd());
 		}
 		return result.allCompleted ? 0 : 1;
 	} catch (error) {

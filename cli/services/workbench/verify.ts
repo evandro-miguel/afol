@@ -677,7 +677,10 @@ export function verifyWorkbenchTasks(
 	return result;
 }
 
-export function formatVerifyReport(result: VerifyResult): string {
+export function formatVerifyReport(
+	result: VerifyResult,
+	verbose = false,
+): string {
 	const sessionLabel = relative(process.cwd(), result.sessionPath) || ".";
 	const lines = [
 		"Task Verification Report",
@@ -709,23 +712,49 @@ export function formatVerifyReport(result: VerifyResult): string {
 	}
 
 	if (result.openTasks.length > 0) {
-		lines.push("", "Open Tasks:");
-		for (const task of result.openTasks) {
+		const visibleTasks = verbose
+			? result.openTasks
+			: result.openTasks.slice(0, VERIFY_REPORT_DETAIL_LIMIT);
+		lines.push("", `Open Tasks: ${result.openTasks.length}`);
+		for (const task of visibleTasks) {
 			const file = relative(result.sessionPath, task.file);
 			lines.push(
 				`  ${task.id} | ${file}:${task.line} | ${task.state} | ${task.description}`,
 			);
 		}
+		appendReportOmission(
+			lines,
+			result.openTasks.length - visibleTasks.length,
+			"open task(s)",
+			verbose,
+		);
 	}
 
 	if (result.issues.length > 0) {
-		lines.push("", "Issues:");
+		const counts = new Map<VerifyIssue["type"], number>();
 		for (const issue of result.issues) {
+			counts.set(issue.type, (counts.get(issue.type) ?? 0) + 1);
+		}
+		lines.push("", `Issues: ${result.issues.length}`);
+		for (const [type, count] of counts) {
+			lines.push(`  ${type}: ${count}`);
+		}
+		const visibleIssues = verbose
+			? result.issues
+			: result.issues.slice(0, VERIFY_REPORT_DETAIL_LIMIT);
+		lines.push("", verbose ? "Issue details:" : "Issue examples:");
+		for (const issue of visibleIssues) {
 			const location = issue.file
 				? ` ${relative(result.sessionPath, issue.file)}:${issue.line}`
 				: "";
 			lines.push(`  ${issue.type}${location} - ${issue.message}`);
 		}
+		appendReportOmission(
+			lines,
+			result.issues.length - visibleIssues.length,
+			"issue(s)",
+			verbose,
+		);
 	}
 
 	lines.push(
@@ -733,6 +762,20 @@ export function formatVerifyReport(result: VerifyResult): string {
 		result.allCompleted ? "All tasks completed." : "Verification failed.",
 	);
 	return `${lines.join("\n")}\n`;
+}
+
+const VERIFY_REPORT_DETAIL_LIMIT = 5;
+
+function appendReportOmission(
+	lines: string[],
+	remaining: number,
+	label: string,
+	verbose: boolean,
+): void {
+	if (verbose || remaining <= 0) return;
+	lines.push(
+		`  ... ${remaining} more ${label} omitted; rerun with --verbose for full details.`,
+	);
 }
 
 export function verifyAllSessions(

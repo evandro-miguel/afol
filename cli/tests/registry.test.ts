@@ -150,6 +150,20 @@ describe("kernel registry", () => {
 		}
 	});
 
+	test("publishes verify report flags while preserving aliases and JSON usage", () => {
+		for (const command of ["verify", "verify-tasks"] as const) {
+			const spec = kernelRegistry.commands.find(
+				(entry) => entry.command === command,
+			);
+			expect(spec?.kind).toBe("verifyTasks");
+			expect(spec?.aliases).toEqual(command === "verify" ? ["vf"] : ["vt"]);
+			expect(spec?.subcommands?.map((entry) => entry.usage)).toEqual([
+				"[session-path] [--strict] [--verbose]",
+				"--session <session-id> --json",
+			]);
+		}
+	});
+
 	test("does not label write commands as simple inspection", () => {
 		for (const entry of kernelRegistry.commands) {
 			if (entry.sideEffect !== "write") {

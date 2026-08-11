@@ -709,7 +709,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "[session-path] --strict",
+				usage: "[session-path] [--strict] [--verbose]",
 				sideEffect: "read",
 				description: "Require all tasks in a session path to be complete",
 			},
@@ -729,7 +729,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "[session-path] --strict",
+				usage: "[session-path] [--strict] [--verbose]",
 				sideEffect: "read",
 				description: "Require all tasks in a session path to be complete",
 			},

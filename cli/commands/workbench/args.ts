@@ -669,10 +669,15 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 	let strict = false;
 	let sessionPath = "";
 	let json = false;
+	let verbose = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
 			json = true;
+			continue;
+		}
+		if (arg === "--verbose" || arg === "-v") {
+			verbose = true;
 			continue;
 		}
 		if (arg === "--strict") {
@@ -689,7 +694,9 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 			continue;
 		}
 		if (arg === "-h" || arg === "--help") {
-			throw new Error("Usage: afol verify-tasks [session-path] [--strict]");
+			throw new Error(
+				"Usage: afol verify-tasks [session-path] [--strict] [--verbose]",
+			);
 		}
 		if (arg?.startsWith("-")) {
 			throw new Error(`Unknown verify argument: ${arg}`);
@@ -705,5 +712,5 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 		sessionPath = resolveProjectPaths(root).abs.wbDir;
 	}
 
-	return { sessionPath, strict, json };
+	return { sessionPath, strict, json, verbose };
 }

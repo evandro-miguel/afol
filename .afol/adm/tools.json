@@ -911,7 +911,7 @@
       "description": "Verify workbench tasks",
       "subcommands": [
         {
-          "usage": "[session-path] --strict",
+          "usage": "[session-path] [--strict] [--verbose]",
           "side_effect": "read",
           "description": "Require all tasks in a session path to be complete"
         },
@@ -937,7 +937,7 @@
       "description": "Verify workbench tasks",
       "subcommands": [
         {
-          "usage": "[session-path] --strict",
+          "usage": "[session-path] [--strict] [--verbose]",
           "side_effect": "read",
           "description": "Require all tasks in a session path to be complete"
         },
