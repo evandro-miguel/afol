@@ -18,7 +18,10 @@ import { runBootstrapCommand } from "../commands/bootstrap";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
-import { planBootstrapOperations } from "../services/bootstrap/planner";
+import {
+	planBootstrapOperations,
+	planCompletionLockGitignoreOperation,
+} from "../services/bootstrap/planner";
 import { resolveExternalPathLockPath } from "../services/io/session-lock";
 import type { TemplateFileMap } from "../services/template/payload";
 
@@ -125,6 +128,79 @@ function treeState(root: string): string[] {
 }
 
 describe("bootstrap planner ownership policy", () => {
+	test("plans the project-owned completion-lock ignore policy without writing in dry-run", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-gitignore-policy-"));
+		const gitignore = join(target, ".gitignore");
+		try {
+			writeFileSync(gitignore, "custom-rule\n", "utf8");
+			const before = readFileSync(gitignore);
+			const logs: string[] = [];
+			const originalLog = console.log;
+			console.log = (...values: unknown[]) => logs.push(values.join(" "));
+			try {
+				expect(
+					await runBootstrapCommand([target, "--dry-run", "--verbose"]),
+				).toBe(0);
+			} finally {
+				console.log = originalLog;
+			}
+			expect(logs.join("\n")).toContain(
+				"update-managed .gitignore managed-lock-ignore",
+			);
+			expect(readFileSync(gitignore)).toEqual(before);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves project-owned gitignore line order and final-newline semantics", () => {
+		for (const [content, expected] of [
+			["alpha\n", "alpha\n.afol/wb/.locks/\n"],
+			["alpha", "alpha\n.afol/wb/.locks/\n"],
+			["", ".afol/wb/.locks/\n"],
+		]) {
+			const operation = planCompletionLockGitignoreOperation({
+				state: "regular",
+				content: content ?? "",
+			});
+			expect(operation).toMatchObject({
+				kind: "update-managed",
+				path: ".gitignore",
+				owner: "project-owned",
+				nextContent: expected,
+			});
+		}
+		expect(
+			planCompletionLockGitignoreOperation({
+				state: "regular",
+				content: ".afol/wb/.locks/\n.afol/wb/.locks/\n",
+			}),
+		).toMatchObject({ kind: "skip-identical" });
+		expect(
+			planCompletionLockGitignoreOperation({ state: "unsafe" }),
+		).toMatchObject({ kind: "conflict" });
+	});
+
+	test("fails closed for a symlink or non-regular completion-lock gitignore", async () => {
+		for (const kind of ["symlink", "directory"] as const) {
+			const target = mkdtempSync(
+				join(tmpdir(), `bootstrap-gitignore-${kind}-`),
+			);
+			try {
+				const gitignore = join(target, ".gitignore");
+				if (kind === "symlink")
+					symlinkSync(join(target, "missing-target"), gitignore);
+				else mkdirSync(gitignore);
+				expect(await runBootstrapCommand([target, "--dry-run"])).toBe(4);
+				expect(
+					await runBootstrapCommand([target, "--dry-run", "--force-managed"]),
+				).toBe(4);
+			} finally {
+				rmSync(target, { recursive: true, force: true });
+			}
+		}
+	});
+
 	test("plans create/skip-identical/update-managed/preserve-project-owned", () => {
 		const managedCurrent = "managed-old";
 		const templateFiles = templateFileMap({
@@ -437,6 +513,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 			});
 			expect(exitCode).toBe(0);
 			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
+			expect(readFileSync(join(target, ".gitignore"), "utf8")).toBe(
+				".afol/wb/.locks/\n",
+			);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });

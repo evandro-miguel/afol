@@ -28,6 +28,7 @@ export type BootstrapOperation = {
 	reason: string;
 	owner: ManagedOwnership;
 	diffPreview?: string;
+	nextContent?: string;
 };
 
 export type BootstrapPlanInput = {
@@ -42,6 +43,7 @@ export type BootstrapPlan = {
 };
 
 const LEGACY_SPECS_INDEX_PATH = ".afol/adm/specs/INDEX.md";
+export const COMPLETION_LOCK_GITIGNORE_RULE = ".afol/wb/.locks/";
 // This is the untouched index shipped before the specs-index validation schema
 // was introduced. Only this exact scaffold payload is safe to migrate.
 const LEGACY_SPECS_INDEX_SHA256 =
@@ -111,6 +113,41 @@ function buildOperationWithPatch(
 		reason,
 		owner,
 		diffPreview: buildPatch(path, currentContent, templateContent),
+	};
+}
+
+export function planCompletionLockGitignoreOperation(input: {
+	state: "absent" | "regular" | "unsafe";
+	content?: string;
+	reason?: string;
+}): BootstrapOperation {
+	if (input.state === "unsafe") {
+		return {
+			kind: "conflict",
+			path: ".gitignore",
+			reason: input.reason ?? "project-owned-gitignore-unsafe",
+			owner: "conflict",
+		};
+	}
+	const currentContent = input.content ?? "";
+	if (currentContent.split(/\r?\n/).includes(COMPLETION_LOCK_GITIGNORE_RULE)) {
+		return {
+			kind: "skip-identical",
+			path: ".gitignore",
+			reason: "managed-lock-ignore-present",
+			owner: "project-owned",
+		};
+	}
+	const nextContent = `${currentContent}${
+		currentContent.length > 0 && !currentContent.endsWith("\n") ? "\n" : ""
+	}${COMPLETION_LOCK_GITIGNORE_RULE}\n`;
+	return {
+		kind: "update-managed",
+		path: ".gitignore",
+		reason: "managed-lock-ignore",
+		owner: "project-owned",
+		nextContent,
+		diffPreview: buildPatch(".gitignore", currentContent, nextContent),
 	};
 }
 

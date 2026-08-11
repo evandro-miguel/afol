@@ -29,7 +29,10 @@ import type {
 	BootstrapManifestEntry,
 	ManagedOwnership,
 } from "../services/bootstrap/planner";
-import { planBootstrapOperations } from "../services/bootstrap/planner";
+import {
+	planBootstrapOperations,
+	planCompletionLockGitignoreOperation,
+} from "../services/bootstrap/planner";
 import {
 	isValidIanaTimezone,
 	isValidProjectUuid,
@@ -683,6 +686,42 @@ function readTargetFiles(
 	return files;
 }
 
+function planCompletionLockGitignore(targetRoot: string) {
+	if (!existsSync(targetRoot)) {
+		return planCompletionLockGitignoreOperation({ state: "absent" });
+	}
+	const resolved = resolveProjectWritePath(targetRoot, ".gitignore");
+	if (!resolved.ok) {
+		return planCompletionLockGitignoreOperation({
+			state: "unsafe",
+			reason: "project-owned-gitignore-unsafe-path",
+		});
+	}
+	try {
+		const stats = lstatSync(resolved.value.path);
+		if (!stats.isFile()) {
+			return planCompletionLockGitignoreOperation({
+				state: "unsafe",
+				reason: stats.isSymbolicLink()
+					? "project-owned-gitignore-symlink"
+					: "project-owned-gitignore-non-regular",
+			});
+		}
+		return planCompletionLockGitignoreOperation({
+			state: "regular",
+			content: readFileSync(resolved.value.path, "utf8"),
+		});
+	} catch (error) {
+		if ((error as { code?: string }).code !== "ENOENT") {
+			return planCompletionLockGitignoreOperation({
+				state: "unsafe",
+				reason: "project-owned-gitignore-unreadable",
+			});
+		}
+		return planCompletionLockGitignoreOperation({ state: "absent" });
+	}
+}
+
 function hasOwnershipOwner(value: unknown): value is ManagedOwnership {
 	return (
 		value === "managed" ||
@@ -768,6 +807,9 @@ function writeTemplateFile(
 	templateFiles: TemplateFileMap,
 ): Promise<void> {
 	const entry = templateFiles[path];
+	if (path === ".gitignore") {
+		throw new Error(".gitignore requires its named policy merge payload");
+	}
 	if (!entry) {
 		throw new Error(`Missing generated template entry: ${path}`);
 	}
@@ -832,6 +874,7 @@ export async function runBootstrapCommand(
 				currentFiles,
 				manifest,
 			});
+			plan.operations.push(planCompletionLockGitignore(parsed.targetRoot));
 			const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
 			const mutableBaselinePlan = planMutableBaselines(
 				parsed.targetRoot,
@@ -845,6 +888,9 @@ export async function runBootstrapCommand(
 
 			const conflicts = plan.operations.filter(
 				(operation) => operation.kind === "conflict",
+			);
+			const policyConflicts = conflicts.filter(
+				(operation) => operation.path === ".gitignore",
 			);
 			const writable = plan.operations.filter(
 				(operation) =>
@@ -928,7 +974,10 @@ export async function runBootstrapCommand(
 				return exitCode;
 			}
 
-			if (conflicts.length > 0 && !parsed.forceManaged) {
+			if (
+				conflicts.length > 0 &&
+				(!parsed.forceManaged || policyConflicts.length > 0)
+			) {
 				console.error(
 					"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
 				);
@@ -966,11 +1015,19 @@ export async function runBootstrapCommand(
 					mkdirSync(parsed.targetRoot, { recursive: true });
 				}
 				for (const operation of writable) {
-					await writeTemplateFile(
-						parsed.targetRoot,
-						operation.path,
-						templateFiles,
-					);
+					if (operation.path === ".gitignore") {
+						const target = resolveBootstrapWritePath(
+							parsed.targetRoot,
+							operation.path,
+						);
+						await Bun.write(target, operation.nextContent ?? "");
+					} else {
+						await writeTemplateFile(
+							parsed.targetRoot,
+							operation.path,
+							templateFiles,
+						);
+					}
 					if (runtime.failAfterTemplateWrite)
 						throw new Error("Injected bootstrap failure after template write");
 				}
@@ -988,6 +1045,7 @@ export async function runBootstrapCommand(
 				}
 				if (parsed.forceManaged) {
 					for (const operation of conflicts) {
+						if (operation.path === ".gitignore") continue;
 						await writeTemplateFile(
 							parsed.targetRoot,
 							operation.path,
