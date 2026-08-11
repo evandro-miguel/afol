@@ -14,6 +14,11 @@ import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
+const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 550;
+
+function estimateOutputTokens(output: string): number {
+	return Math.ceil(Buffer.byteLength(output, "utf8") / 4);
+}
 
 describe("help formatter", () => {
 	test("formats compact deterministic help text", () => {
@@ -45,12 +50,21 @@ describe("help formatter", () => {
 			"pb/project-benchmark[generated] - compare references",
 		);
 		expect(help).toContain("Side effects");
-		expect(help).toContain("write=changes files/state");
-		expect(help).toContain("afol help <command>");
-		expect(help).toContain("afol help --verbose");
+		expect(help).toMatch(/write=[^;\n]*files\/state/);
+		expect(help).toContain("  afol help --verbose");
+		expect(help).toContain("  afol help <command>");
+		expect(help).not.toContain("afol help --verbose|help <command>");
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
 		expect(help).not.toContain("ma/maintenance");
+	});
+
+	test("keeps root help within the agent output token budget", () => {
+		const output = `${formatHelpText()}\n`;
+
+		expect(estimateOutputTokens(output)).toBeLessThanOrEqual(
+			ROOT_HELP_OUTPUT_TOKEN_BUDGET,
+		);
 	});
 
 	test("keeps compact help lines scan-friendly", () => {
@@ -112,7 +126,7 @@ describe("help formatter", () => {
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
-		expect(help).toContain("  --verbose  Show subcommands");
+		expect(help).toContain("  --verbose  details");
 	});
 
 	test("formats per-command help from registry metadata", () => {

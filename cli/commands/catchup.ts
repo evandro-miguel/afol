@@ -152,9 +152,7 @@ export async function runCatchupCommand(
 		const repair = parsed.fix ? applyCatchupRepair(projectRoot) : undefined;
 		const report =
 			parsed.session === null
-				? computeCatchup(projectRoot, {
-						...(repair ? { repair } : {}),
-					})
+				? computeCatchup(projectRoot, repair ? { repair } : undefined)
 				: computeCatchup(projectRoot, {
 						session: parsed.session,
 						...(repair ? { repair } : {}),

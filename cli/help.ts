@@ -35,6 +35,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	governance: "spec gaps",
 	evidence: "record/admit evidence",
 	legacy: "legacy reconcile/close",
+	transition: "transition task",
 	close: "close session",
 	bootstrap: "install elsewhere",
 	verify: "verify tasks",
@@ -57,18 +58,19 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	changelog: "inspect changelog",
 	bench: "run benchmarks",
 	"project-benchmark": "compare references",
-	catchup: "unsynced context",
-	preflight: "planning preflight",
+	catchup: "recover context",
+	preflight: "plan checks",
 	telemetry: "inspect telemetry",
 	file: "append/move/archive",
 	update: "update scaffold",
 	health: "health checks",
 	db: "database state",
-	doctor: "doctor checks",
+	doctor: "run doctor",
 	maintenance: "maintenance checks",
 	sweep: "repo sweep",
-	schema: "schema review/apply",
+	schema: "review schema",
 	adapter: "manage adapters",
+	receipt: "ingest receipt",
 };
 
 export type HelpIntent = "planning" | "execution" | "maintenance";
@@ -385,14 +387,14 @@ export function formatHelpText(
 	lines.push(
 		"",
 		"Flags",
-		"  -j, --json  JSON output",
-		"  --for <intent>  Filter: planning, execution, maintenance",
-		"  --verbose  Show subcommands",
-		"  afol help <command>",
+		"  -j, --json  JSON",
+		"  --for <intent>  planning|execution|maintenance",
+		"  --verbose  details",
 		"  afol help --verbose",
+		"  afol help <command>",
 		"  a=afol",
 		"Side effects",
-		"  read=no writes; generated=derived; append=adds rows; write=changes files/state",
+		"  read=no writes; generated=derived; append=rows; write=files/state",
 	);
 	return lines.join("\n");
 }

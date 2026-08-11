@@ -146,6 +146,139 @@ describe("ux command", () => {
 		expect(validatePayload.error_count).toBe(0);
 	});
 
+	test("keeps default list compact and exposes paths in verbose mode", async () => {
+		const compact = captureIo();
+		expect(await runUxCommand("list", [], root, compact.io)).toBe(0);
+		const compactOutput = compact.stdout.join("\n");
+		expect(compactOutput).toContain("ux journeys: 2");
+		expect(compactOutput).toContain("statuses: active=2");
+		expect(compactOutput).toContain("sources: spec=1 ux-journey=1");
+		expect(compactOutput).toContain("issues: none");
+		expect(compactOutput).toContain(
+			"next: use afol ux list --verbose for paths/details",
+		);
+		expect(compactOutput).not.toContain("path=");
+		expect(Buffer.byteLength(compactOutput, "utf8")).toBeLessThan(500);
+		expect(
+			Math.ceil(Buffer.byteLength(compactOutput, "utf8") / 4),
+		).toBeLessThan(125);
+		expect(compactOutput.split("\n")).toHaveLength(5);
+
+		const verbose = captureIo();
+		expect(await runUxCommand("list", ["--verbose"], root, verbose.io)).toBe(0);
+		const verboseOutput = verbose.stdout.join("\n");
+		expect(verboseOutput).toContain(
+			"path=.afol/adm/ux/fixture-maintenance_ux-journey_01.md",
+		);
+		expect(Buffer.byteLength(verboseOutput, "utf8")).toBeGreaterThan(
+			Buffer.byteLength(compactOutput, "utf8"),
+		);
+	});
+
+	test("keeps compact list JSON entries and full verbose entries", async () => {
+		const compact = captureIo();
+		expect(await runUxCommand("list", ["--json"], root, compact.io)).toBe(0);
+		const payload = parsePayload(compact);
+		expect(Object.keys(payload).sort()).toEqual([
+			"action",
+			"count",
+			"data",
+			"detail_hint",
+			"entries",
+			"exit_code",
+			"generated_at",
+			"issue_count",
+			"issues",
+			"ok",
+			"schema",
+			"verbose",
+		]);
+		expect(payload).toMatchObject({
+			schema: "afol.result/v1",
+			ok: true,
+			action: "ux.list",
+			exit_code: 0,
+			count: 2,
+			issue_count: 0,
+			verbose: false,
+		});
+		const data = payload.data as Record<string, unknown>;
+		expect(data).toMatchObject({
+			ok: true,
+			count: 2,
+			issue_count: 0,
+			verbose: false,
+		});
+		expect(payload.entries).toEqual(data.entries);
+		const entry = (payload.entries as Record<string, unknown>[]).find(
+			(candidate) => candidate.id === "fixture-maintenance_ux-journey_01",
+		);
+		expect(entry).toBeDefined();
+		expect(Object.keys(entry ?? {}).sort()).toEqual([
+			"doc_type",
+			"id",
+			"source",
+			"status",
+		]);
+		expect(entry).toMatchObject({
+			id: "fixture-maintenance_ux-journey_01",
+			doc_type: "ux-journey",
+			status: "active",
+			source: "ux-journey",
+		});
+
+		const verbose = captureIo();
+		expect(
+			await runUxCommand("list", ["--json", "--verbose"], root, verbose.io),
+		).toBe(0);
+		const verbosePayload = parsePayload(verbose);
+		const verboseEntry = (
+			verbosePayload.entries as Record<string, unknown>[]
+		).find((candidate) => candidate.id === "fixture-maintenance_ux-journey_01");
+		expect(Object.keys(verboseEntry ?? {}).sort()).toEqual([
+			"commands",
+			"doc_type",
+			"id",
+			"missing_fields",
+			"parent_spec",
+			"path",
+			"roadmap_feature",
+			"source",
+			"status",
+			"title",
+		]);
+		expect(verboseEntry).toMatchObject({
+			path: ".afol/adm/ux/fixture-maintenance_ux-journey_01.md",
+			title: "UX Journey: Maintenance Warning UX",
+			commands: expect.any(Array),
+			missing_fields: [],
+			roadmap_feature: "F-TEST",
+			parent_spec: "fixture-parent_spec_01",
+		});
+	});
+
+	test("summarizes issue severity and points to validation", async () => {
+		write(
+			".afol/adm/ux/incomplete_ux-journey_01.md",
+			`
+---
+doc_type: ux-journey
+id: incomplete_ux-journey_01
+theme: Incomplete
+status: draft
+---
+
+# Incomplete UX Journey
+`,
+		);
+		const captured = captureIo();
+		expect(await runUxCommand("list", [], root, captured.io)).toBe(0);
+		const output = captured.stdout.join("\n");
+		expect(output).toMatch(/issues: [1-9].*errors=[1-9]/);
+		expect(output).toContain("next: run afol ux validate to inspect issues");
+		expect(output).not.toContain("incomplete_ux-journey_01");
+	});
+
 	test("shows coverage for one AFOL tool", async () => {
 		const captured = captureIo();
 		expect(
