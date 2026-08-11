@@ -121,7 +121,9 @@ describe("bootstrap planner conflict handling", () => {
 		const operations = new Map(
 			plan.operations.map((operation) => [operation.path, operation]),
 		);
-		expect(operations.get("docs/standards/user-journey-registry.md")).toMatchObject({
+		expect(
+			operations.get("docs/standards/user-journey-registry.md"),
+		).toMatchObject({
 			kind: "create",
 			owner: "project-owned",
 		});
