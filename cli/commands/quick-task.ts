@@ -174,7 +174,8 @@ export async function runQuickTaskCommand(
 ): Promise<number> {
 	let parsed: ParsedQuickTaskArgs | null = null;
 	let session: string | null = null;
-	let taskIds: string[] = ["T-01"];
+	let taskIds: string[] = [];
+	let evidenceIds: string[] = [];
 	let failedStep = "parse";
 	let exitCode = 2;
 	try {
@@ -209,7 +210,6 @@ export async function runQuickTaskCommand(
 			...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 			...(parsed.note ? { note: parsed.note } : {}),
 		};
-		let evidenceIds: string[] = [];
 		if (taskIds.length === 1) {
 			const completion = completeObservedTask(root, {
 				...observedInput,
@@ -298,7 +298,15 @@ export async function runQuickTaskCommand(
 			? `session=${session} failed_step=${failedStep} ${(error as Error).message}`
 			: (error as Error).message;
 		if (args.includes("--json") || args.includes("-j")) {
-			writeJsonError("quick-task", new Error(message), exitCode);
+			writeJsonError("quick-task", new Error(message), exitCode, {
+				session,
+				task_id: taskIds[0] ?? null,
+				task_ids: taskIds,
+				failed_step: failedStep,
+				status: "failed",
+				evidence_ids: evidenceIds,
+				next_command: hint,
+			});
 		} else {
 			console.error(`${message} ${formatHintLine(hint)}`);
 		}

@@ -4,11 +4,14 @@ export function writeJsonError(
 	action: string,
 	error: unknown,
 	exitCode = 2,
+	data?: Record<string, unknown>,
 ): void {
 	const message = error instanceof Error ? error.message : String(error);
+	const envelope = envelopeErr("workbench.error", message, {
+		action,
+		exitCode,
+	});
 	console.log(
-		stringifyEnvelope(
-			envelopeErr("workbench.error", message, { action, exitCode }),
-		),
+		stringifyEnvelope(data === undefined ? envelope : { ...envelope, data }),
 	);
 }

@@ -341,6 +341,48 @@ describe("quick-task runQuickTaskCommand", () => {
 		expect(exitCode).toBe(2);
 	});
 
+	test("JSON parse recovery does not report a phantom task", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-parse-recovery-"));
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			const exitCode = await runQuickTaskCommand(
+				["alpha", "--bogus", "--json"],
+				root,
+			);
+			expect(exitCode).toBe(2);
+			const envelope = JSON.parse(output.at(-1) ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				exit_code?: number;
+				error?: { code?: string };
+				data?: {
+					session?: string | null;
+					task_id?: string | null;
+					task_ids?: string[];
+					failed_step?: string;
+				};
+			};
+			expect(envelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				exit_code: 2,
+				error: { code: "workbench.error" },
+				data: {
+					session: null,
+					task_id: null,
+					task_ids: [],
+					failed_step: "parse",
+				},
+			});
+			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("single-task qt still closes with done state", async () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-single-"));
 		try {
@@ -433,7 +475,10 @@ describe("quick-task runQuickTaskCommand", () => {
 
 	test("fail path records failed evidence and does not close", async () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-multi-fail-"));
+		const output: string[] = [];
+		const originalLog = console.log;
 		try {
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
 			const exitCode = await runQuickTaskCommand(
 				[
 					"multi-fail",
@@ -451,6 +496,16 @@ describe("quick-task runQuickTaskCommand", () => {
 				root,
 			);
 			expect(exitCode).toBe(1);
+			const envelope = JSON.parse(output.at(-1) ?? "{}") as {
+				data?: Record<string, unknown>;
+			};
+			expect(envelope.data).toMatchObject({
+				failed_step: "verification",
+				status: "failed",
+				task_ids: ["T-01", "T-02"],
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
 			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
 				(name) => !name.startsWith("."),
 			);
@@ -483,6 +538,7 @@ describe("quick-task runQuickTaskCommand", () => {
 				expect(entry.provenance).toBe("observed");
 			}
 		} finally {
+			console.log = originalLog;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

@@ -1061,7 +1061,15 @@ describe("workbench lifecycle service", () => {
 			expect((payload.error as Record<string, unknown>).code).toBe(
 				"workbench.error",
 			);
-			expect((payload as Record<string, unknown>).data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "spec_conflict",
+				evidence_ids: [],
+				next_command: expect.any(String),
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1096,7 +1104,15 @@ describe("workbench lifecycle service", () => {
 				code: "workbench.error",
 				message: "--test failed with exit code 3",
 			});
-			expect(payload.data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "failed",
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1130,7 +1146,15 @@ describe("workbench lifecycle service", () => {
 				code: "workbench.error",
 				message: "--test-shell failed with exit code 1",
 			});
-			expect(payload.data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "failed",
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
 			expect(
 				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
 			).toBe(false);
@@ -1169,7 +1193,15 @@ describe("workbench lifecycle service", () => {
 				code: "workbench.error",
 				message: "--test failed with exit code 4",
 			});
-			expect(payload.data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "failed",
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
 			expect(
 				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
 			).toBe(false);
@@ -5645,9 +5677,11 @@ describe("task completion authorization and transitions", () => {
 				action: "workbench.done",
 				data: {
 					session: created.session,
-					tasks: ["T-01", "T-02"],
+					task_ids: ["T-01", "T-02"],
+					failed_step: "verification",
 					status: "failed",
 					evidence_count: 2,
+					next_command: expect.any(String),
 				},
 			});
 			const data = envelope.data as { evidence_ids: string[] };

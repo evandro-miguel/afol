@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runUxCommand } from "../commands/ux";
 import { agentOperationContext } from "../core/operation-context";
+import { loadUxRegistry } from "../services/ux/journeys";
 
 type CapturedIo = {
 	stdout: string[];
@@ -96,7 +97,7 @@ Entry is a changed maintenance cadence. Exit is validated UX and benchmark evide
 
 1. Run \`afol maintenance weekly --dry-run\`.
 2. Run \`afol ux coverage --tool maintenance\`.
-3. Run \`a mt review --area memory --dry-run\`.
+3. Run \`afol mt review --area memory --dry-run\`.
 
 ## Expected Result
 
@@ -332,6 +333,60 @@ status: draft
 		expect(payload.count).toBe(1);
 		expect(JSON.stringify(payload)).toContain("afol maintenance review");
 		expect(JSON.stringify(payload)).not.toContain("a mt review");
+	});
+
+	test.each([
+		{
+			name: "canonical command in inline code",
+			id: "canonical-inline",
+			body: "Run `afol status --json`.",
+			expected: ["afol status"],
+		},
+		{
+			name: "documented command alias in inline code",
+			id: "documented-alias",
+			body: "Run `afol mt review --dry-run`.",
+			expected: ["afol maintenance review"],
+		},
+		{
+			name: "local executable in a fenced code block",
+			id: "local-executable",
+			body: "```sh\n./afol v project --json\n```",
+			expected: ["afol validate project"],
+		},
+		{
+			name: "bare prose alias",
+			id: "prose-alias",
+			body: "A prose sentence mentions a mt review without a code span.",
+			expected: [],
+		},
+		{
+			name: "unknown command in inline code",
+			id: "unknown-command",
+			body: "The invalid invocation is `afol not-a-command inspect`.",
+			expected: [],
+		},
+		{
+			name: "known executable in prose",
+			id: "known-executable-prose",
+			body: "The prose says afol ux user journey without documenting a command.",
+			expected: [],
+		},
+	])("extracts $name without indexing prose or unknown commands", ({
+		body,
+		expected,
+		id: fixtureId,
+	}) => {
+		const id = `fixture-extraction-${fixtureId}_spec-child_01`;
+		write(
+			`.afol/adm/specs/${id}.md`,
+			`\n---\ndoc_type: spec-child\nid: ${id}\ntheme: UX extraction\nstatus: active\nroadmap_feature: F-TEST\nparent_spec: fixture-parent_spec_01\n---\n\n# Extraction fixture\n\n${body}\n`,
+		);
+
+		const entry = loadUxRegistry(root).entries.find(
+			(candidate) => candidate.id === id,
+		);
+		expect(entry?.commands).toEqual([...expected]);
 	});
 
 	test("previews spec-linked UX journey registration", async () => {

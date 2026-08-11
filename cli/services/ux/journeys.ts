@@ -164,27 +164,50 @@ function extractTitle(document: MarkdownDocument): string {
 }
 
 const AFOL_COMMAND_RE =
-	/\b(?:afol|a|\.\/afol)\s+[a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*)?/g;
+	/(?<![\w./-])(?:afol|\.\/afol)\s+[a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*)?/g;
+
+function codeContextSegments(content: string): string[] {
+	const segments: string[] = [];
+	let inFence = false;
+	for (const line of content.split(/\r?\n/)) {
+		if (/^\s{0,3}```/.test(line)) {
+			inFence = !inFence;
+			continue;
+		}
+		if (inFence) {
+			segments.push(line);
+			continue;
+		}
+		for (const match of line.matchAll(/`([^`\n]+)`/g)) {
+			if (match[1] !== undefined) {
+				segments.push(match[1]);
+			}
+		}
+	}
+	return segments;
+}
 
 function canonicalizeAfolCommandMention(command: string): string | null {
 	const tokens = command.trim().split(/\s+/).filter(Boolean);
 	const executable = tokens[0];
-	if (
-		tokens.length < 2 ||
-		(executable !== "afol" && executable !== "a" && executable !== "./afol")
-	) {
+	if (tokens.length < 2 || (executable !== "afol" && executable !== "./afol")) {
 		return null;
 	}
 	const canonicalCommand = kernelRegistry.canonicalize(tokens[1] ?? "");
+	if (kernelRegistry.resolveKind(canonicalCommand) === null) {
+		return null;
+	}
 	return ["afol", canonicalCommand, ...tokens.slice(2)].join(" ");
 }
 
 function extractAfolCommands(content: string): string[] {
 	const commands = new Set<string>();
-	for (const match of content.matchAll(AFOL_COMMAND_RE)) {
-		const canonical = canonicalizeAfolCommandMention(match[0]);
-		if (canonical) {
-			commands.add(canonical);
+	for (const segment of codeContextSegments(content)) {
+		for (const match of segment.matchAll(AFOL_COMMAND_RE)) {
+			const canonical = canonicalizeAfolCommandMention(match[0]);
+			if (canonical) {
+				commands.add(canonical);
+			}
 		}
 	}
 	return [...commands].sort();

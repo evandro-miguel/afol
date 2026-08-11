@@ -215,6 +215,47 @@ describe("preflight search service", () => {
 		}
 	});
 
+	test("ranks UX journeys by score with a stable id tie-breaker", () => {
+		const root = createRoot();
+		try {
+			for (const id of [
+				"rankingproof-high_ux-journey_01",
+				"ranking-alpha_ux-journey_01",
+				"ranking-beta_ux-journey_01",
+			]) {
+				writeFileSync(
+					join(root, ".afol", "adm", "ux", `${id}.md`),
+					[
+						"---",
+						"doc_type: ux-journey",
+						`id: ${id}`,
+						"theme: rankingproof",
+						"status: active",
+						"roadmap_feature: F-TEST",
+						"parent_spec: 260418_test-session-isolation_spec_01",
+						"---",
+						"",
+						"# Rankingproof Journey",
+						"",
+					].join("\n"),
+					"utf8",
+				);
+			}
+
+			const runs = Array.from({ length: 3 }, () =>
+				runPreflight(root, "rankingproof").ux_journeys.map((entry) => entry.id),
+			);
+			const expected = [
+				"rankingproof-high_ux-journey_01",
+				"ranking-alpha_ux-journey_01",
+				"ranking-beta_ux-journey_01",
+			];
+			expect(runs).toEqual([expected, expected, expected]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("reports gaps when nothing matches", () => {
 		const root = createRoot();
 		try {

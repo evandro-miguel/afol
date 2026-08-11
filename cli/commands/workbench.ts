@@ -64,6 +64,7 @@ import {
 	parseSessionTaskArgs,
 	parseVerifyArgs,
 } from "./workbench/args";
+import { repairHintForStep } from "./workbench/hints";
 import { writeJsonError } from "./workbench/shared";
 import type { DoneArgs, VerificationSpec } from "./workbench/types";
 import {
@@ -722,14 +723,53 @@ type DoneOutput = {
 	stderr: (value: string) => void;
 };
 
-function stringifyDoneJsonError(error: unknown, exitCode = 2): string {
+type DoneRecoveryData = {
+	session: string | null;
+	task_id: string | null;
+	task_ids: string[];
+	failed_step: string;
+	status: string;
+	evidence_ids: string[];
+	next_command: string;
+};
+
+function doneRecoveryData(
+	parsed: DoneArgs | undefined,
+	options: {
+		failedStep: string;
+		status: string;
+		evidenceIds?: string[];
+	},
+): DoneRecoveryData {
+	const taskIds = parsed?.taskIds ?? [];
+	const taskId = parsed?.taskId ?? taskIds[0] ?? null;
+	return {
+		session: parsed?.session ?? null,
+		task_id: taskId,
+		task_ids: taskIds,
+		failed_step: options.failedStep,
+		status: options.status,
+		evidence_ids: options.evidenceIds ?? [],
+		next_command: repairHintForStep("done", {
+			...(parsed?.session ? { session: parsed.session } : {}),
+			...(taskId ? { taskId } : {}),
+		}),
+	};
+}
+
+function stringifyDoneJsonError(
+	error: unknown,
+	exitCode: number,
+	data: DoneRecoveryData,
+): string {
 	const message = error instanceof Error ? error.message : String(error);
-	return stringifyEnvelope(
-		envelopeErr("workbench.error", message, {
+	return stringifyEnvelope({
+		...envelopeErr("workbench.error", message, {
 			action: "workbench.done",
 			exitCode,
 		}),
-	);
+		data,
+	});
 }
 
 async function executeDoneLocked(
@@ -913,6 +953,7 @@ async function executeDoneLocked(
 				message: `--test failed with exit code ${verification.exitCode}`,
 				status: verification.status,
 				exitCode: 1,
+				evidenceIds: [observedCompletion.evidence.id],
 				warnings: observedCompletion.warnings,
 				legacyError: true,
 			};
@@ -947,6 +988,7 @@ async function executeDoneLocked(
 				message: `--test-shell failed with exit code ${verification.exitCode}`,
 				status: verification.status,
 				exitCode: 1,
+				evidenceIds: [observedCompletion.evidence.id],
 				legacyError: true,
 			};
 		}
@@ -1092,9 +1134,16 @@ async function runDoneBatch(
 								session: parsed.session,
 								tasks: parsed.taskIds,
 								status: observed.status,
+								failed_step: "verification",
+								task_id: parsed.taskId,
+								task_ids: parsed.taskIds,
 								evidence_ids: evidenceIds,
 								evidence_count: evidenceIds.length,
 								warnings,
+								next_command: repairHintForStep("done", {
+									session: parsed.session,
+									taskId: parsed.taskId,
+								}),
 							},
 						}),
 					);
@@ -1152,55 +1201,66 @@ export async function runDoneCommand(
 			console.error(value);
 		},
 	};
+	let parsed: DoneArgs | undefined;
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.done");
-		const parsed = parseDoneArgs(args, root);
-		if (parsed.taskIds.length > 1) {
-			return await runDoneBatch(root, parsed, ctx, output);
+		const doneArgs = parseDoneArgs(args, root);
+		parsed = doneArgs;
+		if (doneArgs.taskIds.length > 1) {
+			return await runDoneBatch(root, doneArgs, ctx, output);
 		}
 		const result = await withTaskCompletionLock(
 			root,
-			parsed.session,
-			parsed.taskId,
-			(lease) => executeDoneLocked(root, parsed, ctx, lease),
+			doneArgs.session,
+			doneArgs.taskId,
+			(lease) => executeDoneLocked(root, doneArgs, ctx, lease),
 		);
 		if (!result.ok) {
-			if (parsed.json) {
-				if (result.legacyError) {
-					output.stdout(
-						stringifyDoneJsonError(new Error(result.message), result.exitCode),
-					);
-				} else {
-					const envelope = {
-						...envelopeErr("workbench.verification_failed", result.message, {
-							action: "workbench.done",
-							exitCode: result.exitCode,
-						}),
-						data: {
-							status: result.status,
-							...(result.runId ? { verification_run_id: result.runId } : {}),
-							...(result.stepIndex ? { step_index: result.stepIndex } : {}),
-							...(result.stepCount ? { step_count: result.stepCount } : {}),
-							evidence_ids: result.evidenceIds ?? [],
-							evidence_count: result.evidenceIds?.length ?? 0,
-							warnings: result.warnings ?? [],
-						},
-					};
-					output.stdout(stringifyEnvelope(envelope));
-				}
+			if (doneArgs.json) {
+				const data = {
+					...doneRecoveryData(doneArgs, {
+						failedStep: "verification",
+						status: result.status,
+						...(result.evidenceIds ? { evidenceIds: result.evidenceIds } : {}),
+					}),
+					...(result.runId ? { verification_run_id: result.runId } : {}),
+					...(result.stepIndex ? { step_index: result.stepIndex } : {}),
+					...(result.stepCount ? { step_count: result.stepCount } : {}),
+					evidence_count: result.evidenceIds?.length ?? 0,
+					warnings: result.warnings ?? [],
+				};
+				output.stdout(
+					result.legacyError
+						? stringifyDoneJsonError(
+								new Error(result.message),
+								result.exitCode,
+								data,
+							)
+						: stringifyEnvelope({
+								...envelopeErr(
+									"workbench.verification_failed",
+									result.message,
+									{
+										action: "workbench.done",
+										exitCode: result.exitCode,
+									},
+								),
+								data,
+							}),
+				);
 			} else {
 				output.stderr(result.message);
 			}
 			return result.exitCode;
 		}
 		const completionWarnings = result.warnings;
-		if (parsed.json) {
+		if (doneArgs.json) {
 			output.stdout(
 				stringifyEnvelope(
 					envelopeOk(
 						{
-							session: parsed.session,
-							task: parsed.taskId,
+							session: doneArgs.session,
+							task: doneArgs.taskId,
 							status: completionWarnings.length
 								? "committed_with_warnings"
 								: "done",
@@ -1214,7 +1274,7 @@ export async function runDoneCommand(
 										evidence_count: result.evidenceIds?.length ?? 0,
 									}
 								: {}),
-							...pendingSpecFields(root, parsed.session, parsed.taskId),
+							...pendingSpecFields(root, doneArgs.session, doneArgs.taskId),
 						},
 						{ action: "workbench.done" },
 					),
@@ -1222,7 +1282,7 @@ export async function runDoneCommand(
 			);
 		} else {
 			const lines = [
-				`task done: ${parsed.taskId}`,
+				`task done: ${doneArgs.taskId}`,
 				`authorizing evidence: ${result.done.authorizingEvidenceId}`,
 			];
 			if (result.runId) {
@@ -1231,32 +1291,42 @@ export async function runDoneCommand(
 				);
 			}
 			lines.push(...completionWarnings.map((warning) => `warning: ${warning}`));
-			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			appendPendingSpecWarning(lines, root, doneArgs.session, doneArgs.taskId);
 			output.stdout(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {
 		if (hasJsonFlag(args)) {
+			const data = doneRecoveryData(parsed, {
+				failedStep: parsed === undefined ? "parse" : "completion",
+				status: "failed",
+			});
 			if (error instanceof TaskCompletionBusyError) {
 				output.stdout(
-					stringifyEnvelope(
-						envelopeErr("workbench.completion_busy", error.message, {
+					stringifyEnvelope({
+						...envelopeErr("workbench.completion_busy", error.message, {
 							action: "workbench.done",
 							exitCode: 2,
 						}),
-					),
+						data: { ...data, status: "busy", failed_step: "lock" },
+					}),
 				);
 			} else if (error instanceof VerificationRunConflictError) {
 				output.stdout(
-					stringifyEnvelope(
-						envelopeErr("workbench.stale_conflict", error.message, {
+					stringifyEnvelope({
+						...envelopeErr("workbench.stale_conflict", error.message, {
 							action: "workbench.done",
 							exitCode: 2,
 						}),
-					),
+						data: {
+							...data,
+							status: "stale_conflict",
+							failed_step: "verification",
+						},
+					}),
 				);
 			} else {
-				output.stdout(stringifyDoneJsonError(error));
+				output.stdout(stringifyDoneJsonError(error, 2, data));
 			}
 		} else {
 			output.stderr((error as Error).message);
