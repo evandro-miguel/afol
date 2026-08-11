@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { loadJsonObject } from "../../core/schema";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
-import { isSessionClosed } from "../workbench/lifecycle";
+import { isSessionClosed } from "../workbench/session-lifecycle-state";
 import { sessionPaths } from "../workbench/session-reader";
 import { type VerifyIssue, verifyWorkbenchTasks } from "../workbench/verify";
 import { resolveProjectPaths } from "./paths";

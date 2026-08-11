@@ -195,6 +195,52 @@ describe("Evolution canonical projection and concurrency", () => {
 		}
 	});
 
+	test("journal-only rebuild does not depend on preference module registration", async () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-journal-only-rebuild-"));
+		const dbPath = evolutionDbPath(root);
+		const db = openEvolutionDb(dbPath);
+		seedEvidence(root, "S-journal-only", "E-journal-only");
+		append(root, db, "S-journal-only", "E-journal-only");
+		db.close();
+		const journalModulePath = join(
+			import.meta.dir,
+			"../services/evolution/journal",
+		);
+		const dbModulePath = join(import.meta.dir, "../services/evolution/db");
+		const child = Bun.spawn(
+			[
+				"bun",
+				"-e",
+				`import { openEvolutionDb } from ${JSON.stringify(dbModulePath)}; import { rebuildProductionDayProjection } from ${JSON.stringify(journalModulePath)}; const db=openEvolutionDb(${JSON.stringify(dbPath)}); try { rebuildProductionDayProjection({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)}}); } finally { db.close(); }`,
+			],
+			{ stdout: "pipe", stderr: "pipe" },
+		);
+		try {
+			const exitCode = await child.exited;
+			if (exitCode !== 0) {
+				const stderr = child.stderr
+					? await new Response(child.stderr).text()
+					: "";
+				throw new Error(
+					`journal-only rebuild failed (${exitCode}): ${stderr.trim()}`,
+				);
+			}
+			const rebuilt = openEvolutionDb(dbPath);
+			try {
+				validateProductionDayProjection({
+					root,
+					db: rebuilt,
+					projectId: PROJECT_ID,
+					timezone: TIMEZONE,
+				});
+			} finally {
+				rebuilt.close();
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("health and status fail closed when the DB projection drifts", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-projection-drift-"));
 		const db = openEvolutionDb(evolutionDbPath(root));

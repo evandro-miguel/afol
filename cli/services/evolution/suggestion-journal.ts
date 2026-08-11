@@ -42,6 +42,10 @@ import {
 	type SuggestionAuthorityCapability,
 	suggestionDecisionForAuthority,
 } from "./suggestion-authority";
+import type {
+	SuggestionReceipt,
+	SuggestionReceiptStatus,
+} from "./suggestion-receipt";
 
 const GENESIS = "GENESIS";
 const LOCK = "__evolution-journal__";
@@ -56,12 +60,10 @@ export const SUGGESTION_JOURNAL_LIMITS = Object.freeze({
 	maxLineBytes: 32_768,
 });
 
-export type SuggestionReceiptStatus =
-	| "claimed"
-	| "shown"
-	| "skipped"
-	| "accepted"
-	| "rejected";
+export type {
+	SuggestionReceipt,
+	SuggestionReceiptStatus,
+} from "./suggestion-receipt";
 export type SuggestionReceiptEvent = {
 	sequence: number;
 	event_id: string;
@@ -79,21 +81,6 @@ export type SuggestionReceiptEvent = {
 	payload: Record<string, unknown>;
 	payload_digest: string;
 	event_digest: string;
-};
-
-export type SuggestionReceipt = {
-	project_id: string;
-	local_date: string;
-	suggestion_id: string;
-	receipt_status: SuggestionReceiptStatus;
-	claimed_by: string;
-	claim_token_digest: string;
-	generation: number;
-	claim_expires_at: string;
-	reject_reason: string | null;
-	evidence_digest: string;
-	journal_sequence: number;
-	journal_event_id: string;
 };
 
 type Context = { root: string; projectId: string; eventsDir?: string };

@@ -4,8 +4,8 @@ import {
 	type ObservationRecord,
 	observationRecordFromRow,
 } from "./observation-model";
-import type { SuggestionReceipt } from "./suggestion-journal";
 import { type SuggestionCluster, suggestionId } from "./suggestion-model";
+import type { SuggestionReceipt } from "./suggestion-receipt";
 
 export const MAX_ACTIVE_CLUSTERS = 256;
 export const MAX_OBSERVATIONS_PER_CLUSTER = 8;

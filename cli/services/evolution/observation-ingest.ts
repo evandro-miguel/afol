@@ -10,12 +10,12 @@ import {
 	readBoundedSourceFile,
 } from "../io/safe-source";
 import { readProjectConfig } from "../project/paths";
-import type { EvidenceEntry } from "../workbench/lifecycle";
 import {
 	MAX_SESSION_IDENTIFIER_LENGTH,
 	parseEvidenceEntries,
 	sessionPaths,
 } from "../workbench/session-reader";
+import type { EvidenceEntry } from "../workbench/types";
 import { verifyTaskText } from "../workbench/verify";
 import { validateEvolutionIdentity } from "./config";
 import { evolutionDbPath, openEvolutionDb } from "./db";
