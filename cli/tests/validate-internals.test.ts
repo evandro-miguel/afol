@@ -1299,7 +1299,7 @@ describe("validate registry", () => {
 			};
 			const withoutInitCoverage = withoutSurfaceCoverageFor(
 				"init",
-				"init --dry-run",
+				"init --dry-run [--json]",
 			);
 			expect(validateRegistryContract(withoutInitCoverage)).toContain(
 				"tool-coverage-missing:init",
@@ -1315,7 +1315,7 @@ describe("validate registry", () => {
 				"tool-subcommand-coverage-policy-missing",
 			);
 			expect(validateRegistryContract(withoutInitCoverage)).toContain(
-				"tool-subcommand-coverage-missing:init --dry-run",
+				"tool-subcommand-coverage-missing:init --dry-run [--json]",
 			);
 			const governanceScenarios =
 				snapshot.scenariosByPack["governance-history"];
@@ -1526,7 +1526,7 @@ describe("validate registry", () => {
 							scenario_id: "skipped-init-coverage",
 							coverage: {
 								commands: ["init"],
-								subcommands: ["init --dry-run"],
+								subcommands: ["init --dry-run [--json]"],
 								journeys: ["fixture-journey"],
 							},
 							implementation_status: "skipped",
@@ -1540,7 +1540,7 @@ describe("validate registry", () => {
 			);
 			expect(skippedCoverageIssues).toContain("tool-coverage-missing:init");
 			expect(skippedCoverageIssues).toContain(
-				"tool-subcommand-coverage-missing:init --dry-run",
+				"tool-subcommand-coverage-missing:init --dry-run [--json]",
 			);
 
 			const implementedScenarioWithoutJourney: RegistrySnapshot = {
