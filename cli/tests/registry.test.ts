@@ -514,4 +514,66 @@ describe("kernel registry", () => {
 			},
 		]);
 	});
+
+	test("keeps library, memory, health, and preflight runtime actions represented", () => {
+		const usages = (command: string): string[] =>
+			kernelRegistry.commands
+				.find((entry) => entry.command === command)
+				?.subcommands?.map((entry) => entry.usage) ?? [];
+
+		expect(usages("library")).toEqual([
+			"list|ls [--json]",
+			"topic <topic>|--topic <topic> [--json]",
+			"search <query>|--query <query> [--json]",
+			"graph [--json]",
+			"health [--json]",
+			"doctor [--json]",
+			"propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+			"add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+			"add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+			"invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+			"rebuild-index [--json]",
+		]);
+		expect(usages("memory")).toEqual([
+			"list|ls [--json]",
+			"show|get --id <id> [--json]",
+			"search|find --query <query> [--json]",
+			"render [--json]",
+			"recall --query <query> [--json]",
+			"add --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+			"update|set --id <id> [--title <title>] [--body <text>] [--tags <tag>[,<tag>...]] [--json]",
+			"archive --id <id> [--json]",
+			"propose --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+			"promote --id <id> [--json]",
+			"reject --id <id> --reason <text> [--json]",
+		]);
+		expect(usages("health")).toEqual([
+			"[core] [--json]",
+			"full [--json]",
+			"release|--release [--json]",
+			"--area <adm|pstr|wb|memory|library|state|ctx|evolution|token_budget> [--deep] [--json]",
+			"--deep [--json]",
+		]);
+		expect(usages("preflight")).toEqual(["<intent query> [--json]"]);
+
+		const byUsage = (command: string) =>
+			new Map(
+				(
+					kernelRegistry.commands.find((entry) => entry.command === command)
+						?.subcommands ?? []
+				).map((entry) => [entry.usage, entry.sideEffect]),
+			);
+		expect(byUsage("library").get("rebuild-index [--json]")).toBe("generated");
+		for (const usage of [
+			"propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+			"add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+			"add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+			"invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+		]) {
+			expect(byUsage("library").get(usage)).toBe("write");
+		}
+		for (const usage of usages("memory").slice(5)) {
+			expect(byUsage("memory").get(usage)).toBe("write");
+		}
+	});
 });

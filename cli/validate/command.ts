@@ -256,8 +256,12 @@ function collectBenchmarkPackResults(
 	snapshot: RegistrySnapshot,
 	packId: PackId,
 	timingMode: TimingMode,
+	scenarioId?: string,
 ): BenchmarkPackResults {
-	const scenarios = snapshot.scenariosByPack[packId] ?? [];
+	const packScenarios = snapshot.scenariosByPack[packId] ?? [];
+	const scenarios = scenarioId
+		? packScenarios.filter((scenario) => scenario.scenario_id === scenarioId)
+		: packScenarios;
 	const baselinePath = join(
 		projectRoot,
 		BASELINES_RELATIVE_PATH,
@@ -292,6 +296,28 @@ function collectBenchmarkPackResults(
 		),
 		notes: [],
 	};
+}
+
+function resolveBenchmarkScenario(
+	snapshot: RegistrySnapshot,
+	packId: PackId,
+	scenarioId: string,
+): Scenario {
+	const scenario = (snapshot.scenariosByPack[packId] ?? []).find(
+		(entry) => entry.scenario_id === scenarioId,
+	);
+	if (scenario) return scenario;
+	const owningPack = snapshot.packs.find((entry) =>
+		(snapshot.scenariosByPack[entry.pack_id] ?? []).some(
+			(entry) => entry.scenario_id === scenarioId,
+		),
+	);
+	if (owningPack) {
+		throw new Error(
+			`Scenario ${scenarioId} belongs to pack ${owningPack.pack_id}, not ${packId}`,
+		);
+	}
+	throw new Error(`Unknown --scenario-id value: ${scenarioId}`);
 }
 
 export function collectProfileCompatibilityNotes(
@@ -611,6 +637,7 @@ function handleBenchmark(
 	persist: boolean,
 	outputPath?: string,
 	timingMode: TimingMode = "enforce",
+	scenarioId?: string,
 ): number {
 	const { selectedPacks, selectionReasons, contractIssues } =
 		resolveValidationSelection(snapshot, scope, changedPaths, explicitPacks);
@@ -623,16 +650,40 @@ function handleBenchmark(
 		);
 		return 2;
 	}
+	if (scenarioId && selectedPacks.length !== 1) {
+		console.error("--scenario-id requires exactly one --pack");
+		return 2;
+	}
+	let selectedScenario: Scenario | undefined;
+	if (scenarioId) {
+		try {
+			selectedScenario = resolveBenchmarkScenario(
+				snapshot,
+				selectedPacks[0] as PackId,
+				scenarioId,
+			);
+		} catch (error) {
+			console.error((error as Error).message);
+			return 2;
+		}
+	}
 	const packResults = selectedPacks.map((packId) =>
-		collectBenchmarkPackResults(projectRoot, snapshot, packId, timingMode),
+		collectBenchmarkPackResults(
+			projectRoot,
+			snapshot,
+			packId,
+			timingMode,
+			scenarioId,
+		),
 	);
 	const results = packResults.flatMap((entry) => entry.results);
 	const benchmarkNotes = packResults.flatMap((entry) => entry.notes);
+	const scopedContractIssues = scenarioId ? [] : contractIssues;
 	const summary = summarizeBenchmarkResults(results);
 	const combinedTokenRuleNote = combinedProjectTokenRuleNote(results);
 	const status = combinedTokenRuleNote?.includes("combined-prohibitive")
 		? "failed"
-		: resolveBenchmarkRunStatus(summary, contractIssues.length);
+		: resolveBenchmarkRunStatus(summary, scopedContractIssues.length);
 	const notes =
 		status === "skipped"
 			? ["all-scenarios-skipped:not-implemented-live-runner", ...benchmarkNotes]
@@ -649,6 +700,9 @@ function handleBenchmark(
 		status,
 		pass: status === "passed",
 		selected_pack_ids: selectedPacks,
+		...(selectedScenario
+			? { selected_scenario_id: selectedScenario.scenario_id }
+			: {}),
 		selection_reasons: selectionReasons,
 		result_count: results.length,
 		notes,
@@ -660,8 +714,11 @@ function handleBenchmark(
 			baseline_missing: summary.baselineMissing,
 		},
 		results,
-		contract_issues: contractIssues,
+		contract_issues: scopedContractIssues,
 	};
+	if (scenarioId && status !== "passed") {
+		payload.rerun_command = `afol validate bench --pack ${selectedPacks[0]} --scenario-id ${scenarioId} --json`;
+	}
 	if (persist || outputPath) {
 		const savedResultPath = saveBenchmarkPayload(
 			projectRoot,
@@ -705,6 +762,7 @@ export function runValidationCommand(
 			parsed.save,
 			parsed.outputPath,
 			parsed.timingMode,
+			parsed.scenarioId,
 		);
 	}
 	if (parsed.mode === "select") {

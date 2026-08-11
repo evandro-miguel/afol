@@ -185,6 +185,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Run one benchmark pack with its configured gates",
 			},
 			{
+				usage: "bench --pack <pack-id> --scenario-id <scenario-id> --json",
+				sideEffect: "read",
+				description: "Rerun one scored scenario in a benchmark pack",
+			},
+			{
 				usage: "bench --pack governance-history --timing-mode observe --json",
 				sideEffect: "read",
 				description: "Observe timing; non-timing gates block",
@@ -921,6 +926,67 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect library entries",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list|ls [--json]",
+				sideEffect: "read",
+				description: "List library topics",
+			},
+			{
+				usage: "topic <topic>|--topic <topic> [--json]",
+				sideEffect: "read",
+				description: "Inspect one library topic",
+			},
+			{
+				usage: "search <query>|--query <query> [--json]",
+				sideEffect: "read",
+				description: "Search library topics and claims",
+			},
+			{
+				usage: "graph [--json]",
+				sideEffect: "read",
+				description: "Render the library topic and claim graph",
+			},
+			{
+				usage: "health [--json]",
+				sideEffect: "read",
+				description: "Run library health checks",
+			},
+			{
+				usage: "doctor [--json]",
+				sideEffect: "read",
+				description: "Show library remediation steps",
+			},
+			{
+				usage:
+					"propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+				sideEffect: "write",
+				description: "Propose a library topic with an optional source",
+			},
+			{
+				usage:
+					"add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+				sideEffect: "write",
+				description: "Add a source to a library topic",
+			},
+			{
+				usage:
+					"add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+				sideEffect: "write",
+				description: "Add a sourced claim to a library topic",
+			},
+			{
+				usage:
+					"invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+				sideEffect: "write",
+				description: "Invalidate a library claim with a reason",
+			},
+			{
+				usage: "rebuild-index [--json]",
+				sideEffect: "generated",
+				description: "Refresh the generated library index",
+			},
+		],
 	},
 	{
 		command: "memory",
@@ -929,6 +995,66 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect memory entries",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list|ls [--json]",
+				sideEffect: "read",
+				description: "List memory entries",
+			},
+			{
+				usage: "show|get --id <id> [--json]",
+				sideEffect: "read",
+				description: "Inspect one memory entry",
+			},
+			{
+				usage: "search|find --query <query> [--json]",
+				sideEffect: "read",
+				description: "Search memory entries",
+			},
+			{
+				usage: "render [--json]",
+				sideEffect: "read",
+				description: "Render the memory document",
+			},
+			{
+				usage: "recall --query <query> [--json]",
+				sideEffect: "read",
+				description: "Recall entries relevant to a query",
+			},
+			{
+				usage:
+					"add --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+				sideEffect: "write",
+				description: "Add an active memory entry",
+			},
+			{
+				usage:
+					"update|set --id <id> [--title <title>] [--body <text>] [--tags <tag>[,<tag>...]] [--json]",
+				sideEffect: "write",
+				description: "Update a memory entry",
+			},
+			{
+				usage: "archive --id <id> [--json]",
+				sideEffect: "write",
+				description: "Archive a memory entry",
+			},
+			{
+				usage:
+					"propose --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+				sideEffect: "write",
+				description: "Add a proposed memory entry",
+			},
+			{
+				usage: "promote --id <id> [--json]",
+				sideEffect: "write",
+				description: "Promote a proposed memory entry",
+			},
+			{
+				usage: "reject --id <id> --reason <text> [--json]",
+				sideEffect: "write",
+				description: "Reject a proposed memory entry",
+			},
+		],
 	},
 	{
 		command: "evolve",
@@ -1118,6 +1244,34 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect health checks",
 		category: "ops",
+		subcommands: [
+			{
+				usage: "[core] [--json]",
+				sideEffect: "read",
+				description: "Check core workbench health",
+			},
+			{
+				usage: "full [--json]",
+				sideEffect: "read",
+				description: "Check every health area",
+			},
+			{
+				usage: "release|--release [--json]",
+				sideEffect: "read",
+				description: "Run release-scoped health checks",
+			},
+			{
+				usage:
+					"--area <adm|pstr|wb|memory|library|state|ctx|evolution|token_budget> [--deep] [--json]",
+				sideEffect: "read",
+				description: "Check one named health area",
+			},
+			{
+				usage: "--deep [--json]",
+				sideEffect: "read",
+				description: "Check every health area in deep mode",
+			},
+		],
 	},
 	{
 		command: "db",
@@ -1333,6 +1487,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Search governance context before planning",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "<intent query> [--json]",
+				sideEffect: "read",
+				description: "Search specs, lessons, rules, and similar systems",
+			},
+		],
 	},
 	{
 		command: "adapter",

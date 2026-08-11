@@ -157,9 +157,7 @@ function wrapVerboseLine(prefix: string, content: string): string[] {
 
 function formatVerboseEntry(spec: CommandSpec): string[] {
 	const lines = [
-		`  ${spec.command}`,
-		`    effect: ${spec.sideEffect}`,
-		`    description: ${spec.description}`,
+		`  ${spec.command} [${spec.sideEffect}] - ${spec.description}`,
 	];
 	if (spec.aliases.length > 0)
 		lines.splice(1, 0, `    aliases: ${spec.aliases.join(", ")}`);
@@ -175,7 +173,7 @@ function formatVerboseEntry(spec: CommandSpec): string[] {
 			lines.push(
 				...wrapVerboseLine(
 					"      ",
-					`${subcommand.usage} [${subcommand.sideEffect}] - ${subcommand.description}`,
+					`${subcommand.usage} [${subcommand.sideEffect}]`,
 				),
 			);
 		}

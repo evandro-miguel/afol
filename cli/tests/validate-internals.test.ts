@@ -3654,6 +3654,27 @@ describe("scenario benchmark execution", () => {
 		expect(() =>
 			parseValidationArgs(["run", "--timing-mode", "enforce"]),
 		).toThrow("--timing-mode requires bench mode");
+		expect(
+			parseValidationArgs([
+				"bench",
+				"--pack",
+				"cli-kernel-local",
+				"--scenario-id",
+				"cli-status-json",
+			]).scenarioId,
+		).toBe("cli-status-json");
+		expect(() =>
+			parseValidationArgs(["bench", "--scenario-id", "cli-status-json"]),
+		).toThrow("--scenario-id requires exactly one --pack");
+		expect(() =>
+			parseValidationArgs([
+				"run",
+				"--pack",
+				"cli-kernel-local",
+				"--scenario-id",
+				"cli-status-json",
+			]),
+		).toThrow("--scenario-id requires bench mode");
 	});
 
 	test("fails mutation timing closed when the execution profile is incompatible", () => {
@@ -4319,6 +4340,105 @@ describe("validation command entrypoint", () => {
 			status: "passed",
 			pass: true,
 		});
+	}, 120_000);
+
+	test("reruns one scored scenario in its explicit pack", () => {
+		const root = createFixtureRoot();
+		try {
+			const selected = withCapturedStdout(() =>
+				runValidationCommand(root, [
+					"bench",
+					"--pack",
+					"cli-kernel-local",
+					"--scenario-id",
+					"cli-status-json",
+					"--json",
+				]),
+			);
+			expect(selected.result).toBe(0);
+			const selectedPayload = JSON.parse(selected.stdout[0] ?? "{}") as {
+				result_count?: number;
+				selected_pack_ids?: string[];
+				selected_scenario_id?: string;
+			};
+			expect(selectedPayload).toMatchObject({
+				result_count: 1,
+				selected_pack_ids: ["cli-kernel-local"],
+				selected_scenario_id: "cli-status-json",
+			});
+
+			const wrongPack = withCapturedConsoleError(() =>
+				runValidationCommand(root, [
+					"bench",
+					"--pack",
+					"cli-kernel-local",
+					"--scenario-id",
+					"evolution-status-contract",
+				]),
+			);
+			expect(wrongPack.result).toBe(2);
+			expect(wrongPack.stderr[0]).toContain(
+				"belongs to pack evolution-core, not cli-kernel-local",
+			);
+
+			const unknown = withCapturedConsoleError(() =>
+				runValidationCommand(root, [
+					"bench",
+					"--pack",
+					"cli-kernel-local",
+					"--scenario-id",
+					"missing-scenario",
+				]),
+			);
+			expect(unknown.result).toBe(2);
+			expect(unknown.stderr[0]).toContain(
+				"Unknown --scenario-id value: missing-scenario",
+			);
+
+			const scenarioPath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"scenarios",
+				"cli-kernel-local",
+				"cli-status-json.json",
+			);
+			const scenario = readJson(scenarioPath);
+			writeFileSync(
+				scenarioPath,
+				`${JSON.stringify(
+					{
+						...scenario,
+						thresholds: {
+							...(scenario.thresholds as Record<string, unknown>),
+							max_duration_ms: 0,
+						},
+					},
+					null,
+					2,
+				)}\n`,
+				"utf8",
+			);
+			const failed = withCapturedStdout(() =>
+				runValidationCommand(root, [
+					"bench",
+					"--pack",
+					"cli-kernel-local",
+					"--scenario-id",
+					"cli-status-json",
+					"--json",
+				]),
+			);
+			expect(failed.result).toBe(2);
+			expect(JSON.parse(failed.stdout[0] ?? "{}")).toMatchObject({
+				rerun_command:
+					"afol validate bench --pack cli-kernel-local --scenario-id cli-status-json --json",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	}, 120_000);
 
 	test("supports select, run, benchmark save, and argument failures", () => {

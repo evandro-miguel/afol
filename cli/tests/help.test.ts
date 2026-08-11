@@ -120,9 +120,8 @@ describe("help formatter", () => {
 		);
 		expect(help).toContain("  project-benchmark");
 		expect(help).toContain("    aliases: pb");
-		expect(help).toContain("    effect: generated");
 		expect(help).toContain(
-			"    description: Compare AFOL against curated reference projects",
+			"project-benchmark [generated] - Compare AFOL against curated reference projects",
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
