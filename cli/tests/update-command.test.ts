@@ -19,6 +19,7 @@ import {
 	loadMutationJournalStrict,
 	type MutationRecord,
 } from "../services/mutations/journal";
+import { checkTemplateUpdate } from "../services/update/check";
 import { newWorkstream, startTask } from "../services/workbench/lifecycle";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
@@ -205,6 +206,116 @@ function mkBoundUpdateContext(root: string): {
 }
 
 describe("update command", () => {
+	test("check creates missing baseline docs under project-owned roots", () => {
+		const root = mkRoot();
+		try {
+			writeFileSync(
+				join(root, ".agents", "lock.json"),
+				templateText(".agents/lock.json"),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".agents", "manifest.json"),
+				templateText(".agents/manifest.json"),
+				"utf8",
+			);
+
+			const result = checkTemplateUpdate(root);
+			const operations = new Map(
+				result.operations.map((operation) => [operation.path, operation]),
+			);
+			expect(
+				operations.get("docs/standards/user-journey-registry.md"),
+			).toMatchObject({ kind: "create", owner: "project-owned" });
+			expect(operations.get("docs/templates/ux-journey.md")).toMatchObject({
+				kind: "create",
+				owner: "project-owned",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("manages the project-owned completion-lock ignore and restores its exact prior bytes", async () => {
+		const root = mkRoot();
+		const gitignore = join(root, ".gitignore");
+		const before = Buffer.from("custom\r\nrule", "utf8");
+		try {
+			writeFileSync(gitignore, before);
+			const checked = checkTemplateUpdate(root);
+			expect(
+				checked.operations.find((operation) => operation.path === ".gitignore"),
+			).toMatchObject({
+				kind: "update-managed",
+				owner: "project-owned",
+				reason: "managed-lock-ignore",
+				nextContent: "custom\r\nrule\n.afol/wb/.locks/\n",
+			});
+			const preview = capture();
+			expect(
+				await runUpdateCommand(["preview", "--verbose"], root, preview.io),
+			).toBe(0);
+			expect(preview.stdout.join("\n")).toContain(".gitignore");
+			expect(readFileSync(gitignore)).toEqual(before);
+
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"lock ignore",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(0);
+			});
+			expect(readFileSync(gitignore, "utf8")).toBe(
+				"custom\r\nrule\n.afol/wb/.locks/\n",
+			);
+			const batchId =
+				(
+					JSON.parse(apply.stdout[0] ?? "{}") as {
+						data?: { batch_id?: string };
+					}
+				).data?.batch_id ?? "";
+			const rollback = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", batchId, "--reason", "restore", "--json"],
+					root,
+					rollback.io,
+				),
+			).toBe(0);
+			expect(readFileSync(gitignore)).toEqual(before);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed for a completion-lock gitignore symlink or non-regular target", () => {
+		for (const kind of ["symlink", "directory"] as const) {
+			const root = mkRoot();
+			try {
+				const gitignore = join(root, ".gitignore");
+				if (kind === "symlink")
+					symlinkSync(join(root, ".agents", "lock.json"), gitignore);
+				else mkdirSync(gitignore);
+				expect(
+					checkTemplateUpdate(root).operations.find(
+						(operation) => operation.path === ".gitignore",
+					),
+				).toMatchObject({ kind: "conflict" });
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
 	test("check reports source drift without writing files", async () => {
 		const root = mkRoot();
 		const sourceLock = templateJson<{ revision: string }>(".agents/lock.json");

@@ -5,10 +5,6 @@
   ],
   "skills": [
     {
-      "name": "agentic-scaffold-mcp",
-      "path": "skills/agentic-scaffold-mcp"
-    },
-    {
       "name": "afol-rules",
       "path": "skills/afol-rules"
     }

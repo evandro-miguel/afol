@@ -26,8 +26,10 @@ import {
 } from "../services/evolution/preference-authority";
 import { effectivePreferenceConfidence } from "../services/evolution/preference-decay";
 import {
+	preferenceDigest,
 	preferenceJournalPath,
 	readPreferenceJournal,
+	rebuildPreferenceProjection,
 	withPreferenceMutationLock,
 } from "../services/evolution/preference-journal";
 import {
@@ -184,7 +186,7 @@ describe("Evolution preference authority round 3", () => {
 		}
 	});
 
-	test("fails closed when an empty production rebuild would rewind reinforcement", () => {
+	test("fails closed when a direct preference rebuild sees a rewound production projection", () => {
 		const { root, db } = fixture();
 		try {
 			const evidenceDir = join(root, ".afol/wb/S-rewind");
@@ -227,16 +229,59 @@ describe("Evolution preference authority round 3", () => {
 			db.exec("DELETE FROM preference_evidence; DELETE FROM preferences;");
 			writeFileSync(productionDayJournalPath(root), "");
 			expect(() =>
-				rebuildProductionDayProjection({
+				rebuildPreferenceProjection({
 					root,
 					db,
 					projectId: PROJECT_ID,
 					timezone: "UTC",
 				}),
-			).toThrow(/exceeds canonical production ordinal/);
+			).toThrow(/production-day journal/);
 			expect(
 				db.query("SELECT COUNT(*) AS count FROM preferences").get(),
 			).toEqual({ count: 0 });
+		} finally {
+			db.close();
+		}
+	});
+
+	test("fails before mutation on a semantically invalid rehashed preference event", () => {
+		const { root, db } = fixture();
+		try {
+			createPreference({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				id: "P-semantic",
+				statement: "Keep semantic journal validation",
+				provenance: "explicit",
+				timezone: "UTC",
+				authority: issueAuthority({
+					preferenceId: "P-semantic",
+					action: "create",
+					provenance: "explicit",
+				}),
+				sourceRefs: [{ id: "S-semantic", kind: "session" }],
+			});
+			const event = readPreferenceJournal(root, PROJECT_ID)[0];
+			if (!event) throw new Error("missing preference journal event");
+			const invalid = { ...event, action: "reject" as const };
+			const { event_digest: _digest, ...withoutDigest } = invalid;
+			invalid.event_digest = preferenceDigest(withoutDigest);
+			writeFileSync(
+				preferenceJournalPath(root),
+				`${JSON.stringify(invalid)}\n`,
+			);
+			expect(() =>
+				rebuildPreferenceProjection({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					timezone: "UTC",
+				}),
+			).toThrow(/decision binding is invalid/);
+			expect(
+				db.query("SELECT COUNT(*) AS count FROM preferences").get(),
+			).toEqual({ count: 1 });
 		} finally {
 			db.close();
 		}

@@ -46,6 +46,10 @@ ledger evidence and an explicit evidence id.
   valid `evidence_id`, and no unresolved blocking failed evidence. Use explicit
   `N/A` only when validation truly does not apply.
 
+For a closed task missing observed evidence, append a real check with
+`afol evidence reverify -S <session> -T <task> -x "<command>"`; do not edit
+the ledger or State Board manually.
+
 **Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
 
 **State source:** lifecycle state belongs only in this `State Board` and AFOL

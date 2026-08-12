@@ -374,11 +374,19 @@ export function buildCoordinationRadar(
 	const workbench = normalizeWorkbenchSnapshot(rawWorkbench);
 	const mutations = options.mutations ?? loadMutationJournal(root);
 	const mutationByTask = mutationPaths(root, mutations);
+	const archivedSessions = new Set(
+		workbench.sessions
+			.filter((session) => session.archived === true)
+			.map((session) => session.session),
+	);
 	const warningAccumulator = new Map<string, WarningAccumulator>();
 	const taskWarningIds = new Map<string, Set<CoordinationWarningId>>();
 
 	const openTasks: CoordinationRadarTask[] = workbench.tasks
-		.filter((task) => OPEN_STATES.has(task.state))
+		.filter(
+			(task) =>
+				!archivedSessions.has(task.session) && OPEN_STATES.has(task.state),
+		)
 		.map((task) => {
 			const key = `${task.session}::${task.task_id}`;
 			const mutationData = mutationByTask.get(key);

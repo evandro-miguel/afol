@@ -119,6 +119,21 @@ export function resolveCanonicalAction(
 	}
 
 	if (resolution.kind === "evidence") {
+		if (args[0] === "transition-admit") {
+			const confirm = hasFlag(args, "--confirm") && !hasFlag(args, "--dry-run");
+			return confirm
+				? {
+						action: "workbench.evidence.transition_admit",
+						sideEffect: "write",
+					}
+				: {
+						action: "workbench.evidence.transition_admit.preview",
+						sideEffect: "preview",
+					};
+		}
+		if (args[0] === "reverify") {
+			return { action: "workbench.evidence.reverify", sideEffect: "write" };
+		}
 		if (args[0] === "admit") {
 			const confirm = hasFlag(args, "--confirm") && !hasFlag(args, "--dry-run");
 			return confirm
@@ -129,6 +144,18 @@ export function resolveCanonicalAction(
 					};
 		}
 		return { action: "workbench.evidence.record", sideEffect: "write" };
+	}
+	if (resolution.kind === "legacy") {
+		if (args[0] === "reconcile") {
+			const confirm = hasFlag(args, "--confirm") && !hasFlag(args, "--dry-run");
+			return confirm
+				? { action: "legacy.reconcile", sideEffect: "write" }
+				: {
+						action: "legacy.reconcile.preview",
+						sideEffect: "preview",
+					};
+		}
+		return { action: "legacy.reconcile.preview", sideEffect: "preview" };
 	}
 	if (resolution.kind === "done") {
 		if (hasFlag(args, "--test-shell")) {
@@ -159,14 +186,40 @@ export function resolveCanonicalAction(
 	if (resolution.kind === "subcommand") {
 		const group = resolution.group ?? "";
 		const action = resolution.action ?? "";
+		if (group === "evolve" && action === "candidates" && args[0] === "review") {
+			return { action: "evolve.candidates.review", sideEffect: "write" };
+		}
 		if (group === "evolve" && action === "observe") {
 			return { action: "evolve.observe", sideEffect: "write" };
 		}
 		if (
 			group === "evolve" &&
-			["status", "analyze", "weekly", "after-merge", "review"].includes(action)
+			[
+				"status",
+				"analyze",
+				"weekly",
+				"after-merge",
+				"review",
+				"candidates",
+				"backfill",
+			].includes(action)
 		) {
 			return { action: `evolve.${action}`, sideEffect: "read" };
+		}
+		if (group === "session" && action === "archive") {
+			if (hasFlag(args, "--candidates")) {
+				return { action: "session.archive.candidates", sideEffect: "read" };
+			}
+			return {
+				action: dryRun ? "session.archive.preview" : "session.archive.apply",
+				sideEffect: dryRun ? "preview" : "write",
+			};
+		}
+		if (group === "session" && action === "restore") {
+			return {
+				action: dryRun ? "session.restore.preview" : "session.restore.apply",
+				sideEffect: dryRun ? "preview" : "write",
+			};
 		}
 		if (group === "evolve" && action === "evaluate") {
 			return {

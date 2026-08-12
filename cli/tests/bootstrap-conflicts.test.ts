@@ -20,6 +20,24 @@ function templateFileMap(entries: Record<string, string>): TemplateFileMap {
 	return files;
 }
 
+const LEGACY_SPECS_INDEX = [
+	"---",
+	'id: "specs-index"',
+	'type: "index"',
+	'desc: "AFOL specs index"',
+	'created: "2026-06-20"',
+	'updated: "2026-06-20"',
+	"---",
+	"",
+	"# Specs INDEX",
+	"",
+	"- Parent spec:",
+	"- Child spec:",
+	"",
+	"Keep this index updated in downstream projects as new specs are added.",
+	"",
+].join("\n");
+
 describe("bootstrap planner conflict handling", () => {
 	test("marks conflict when managed file drifted from manifest hash", () => {
 		const templateFiles = templateFileMap({
@@ -79,5 +97,63 @@ describe("bootstrap planner conflict handling", () => {
 		expect(plan.operations).toHaveLength(1);
 		expect(plan.operations[0]?.path).toBe("safe/readme.md");
 		expect(plan.filteredForbiddenCount).toBe(2);
+	});
+
+	test("seeds missing project-owned baselines and migrates the untouched legacy index", () => {
+		const plan = planBootstrapOperations({
+			templateFiles: templateFileMap({
+				".afol/adm/specs/INDEX.md": "current index\n",
+				"docs/standards/user-journey-registry.md": "registry\n",
+				"docs/templates/ux-journey.md": "journey\n",
+			}),
+			currentFiles: {
+				".afol/adm/specs/INDEX.md": LEGACY_SPECS_INDEX,
+			},
+			manifest: {
+				".afol/adm/specs/INDEX.md": { owner: "project-owned" },
+				"docs/standards/user-journey-registry.md": {
+					owner: "project-owned",
+				},
+				"docs/templates/ux-journey.md": { owner: "project-owned" },
+			},
+		});
+
+		const operations = new Map(
+			plan.operations.map((operation) => [operation.path, operation]),
+		);
+		expect(
+			operations.get("docs/standards/user-journey-registry.md"),
+		).toMatchObject({
+			kind: "create",
+			owner: "project-owned",
+		});
+		expect(operations.get("docs/templates/ux-journey.md")).toMatchObject({
+			kind: "create",
+			owner: "project-owned",
+		});
+		expect(operations.get(".afol/adm/specs/INDEX.md")).toMatchObject({
+			kind: "update-managed",
+			owner: "generated",
+			reason: "legacy-template-index",
+		});
+	});
+
+	test("preserves a project-owned index with local changes", () => {
+		const plan = planBootstrapOperations({
+			templateFiles: templateFileMap({
+				".afol/adm/specs/INDEX.md": "current index\n",
+			}),
+			currentFiles: {
+				".afol/adm/specs/INDEX.md": `${LEGACY_SPECS_INDEX}local change\n`,
+			},
+			manifest: {
+				".afol/adm/specs/INDEX.md": { owner: "project-owned" },
+			},
+		});
+
+		expect(plan.operations[0]).toMatchObject({
+			kind: "preserve-project-owned",
+			path: ".afol/adm/specs/INDEX.md",
+		});
 	});
 });

@@ -23,6 +23,15 @@ import {
 const TASK_SELECTOR_ITEM_RE = /^T-(\d{2,3})(?:\.\.T-(\d{2,3}))?$/;
 const TASK_SELECTOR_MAX_TASKS = 100;
 
+export class DoneArgumentError extends Error {
+	readonly code = "workbench.invalid_arguments";
+
+	constructor(message: string) {
+		super(message);
+		this.name = "DoneArgumentError";
+	}
+}
+
 function parseTaskSelector(selector: string): string[] {
 	const taskIds: string[] = [];
 	const seen = new Set<string>();
@@ -171,6 +180,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let allowNoReport = false;
 	let reason = "";
 	let summary = "";
+	let admitLegacyBaseline = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -188,6 +198,10 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		}
 		if (arg === "--allow-no-report") {
 			allowNoReport = true;
+			continue;
+		}
+		if (arg === "--admit-legacy-baseline") {
+			admitLegacyBaseline = true;
 			continue;
 		}
 		if (arg === "--summary" || arg === "-m") {
@@ -225,6 +239,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		allowNoReport,
 		reason,
 		summary,
+		admitLegacyBaseline,
 	};
 }
 
@@ -592,7 +607,12 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	if (!taskId) {
 		throw new Error("Missing --task-id for done.");
 	}
-	const taskIds = parseTaskSelector(taskId);
+	let taskIds: string[];
+	try {
+		taskIds = parseTaskSelector(taskId);
+	} catch {
+		throw new DoneArgumentError("Invalid done task selector.");
+	}
 	if (
 		(evidenceCommand && !evidenceResult) ||
 		(!evidenceCommand && evidenceResult)
@@ -663,10 +683,15 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 	let strict = false;
 	let sessionPath = "";
 	let json = false;
+	let verbose = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
 			json = true;
+			continue;
+		}
+		if (arg === "--verbose" || arg === "-v") {
+			verbose = true;
 			continue;
 		}
 		if (arg === "--strict") {
@@ -683,7 +708,9 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 			continue;
 		}
 		if (arg === "-h" || arg === "--help") {
-			throw new Error("Usage: afol verify-tasks [session-path] [--strict]");
+			throw new Error(
+				"Usage: afol verify-tasks [session-path] [--strict] [--verbose]",
+			);
 		}
 		if (arg?.startsWith("-")) {
 			throw new Error(`Unknown verify argument: ${arg}`);
@@ -699,5 +726,5 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 		sessionPath = resolveProjectPaths(root).abs.wbDir;
 	}
 
-	return { sessionPath, strict, json };
+	return { sessionPath, strict, json, verbose };
 }

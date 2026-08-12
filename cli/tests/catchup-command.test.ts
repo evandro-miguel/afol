@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	utimesSync,
 	writeFileSync,
@@ -11,10 +13,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { formatCatchup, runCatchupCommand } from "../commands/catchup";
 import {
+	agentOperationContext,
+	defaultOperationContext,
+} from "../core/operation-context";
+import {
+	applyCatchupRepair,
 	combineGitChangedFiles,
 	computeCatchup,
 	readGitChangedFiles,
 } from "../services/workbench/catchup";
+import {
+	bindSession,
+	listBindings,
+	resolveContextSession,
+	resolveSession,
+} from "../services/workbench/session-context";
 
 type CapturedIo = {
 	stdout: string[];
@@ -603,6 +616,285 @@ describe("catchup command text output with degraded overflow", () => {
 			const text = formatCatchup(report);
 			expect(text).toContain(`session: ${session} (active)`);
 			expect(text).toContain("changed_files: 50+ (degraded)");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+function writePendingSpecs(
+	root: string,
+	entries: Array<{
+		session_id: string;
+		status: "open" | "resolved" | "waived";
+	}>,
+): void {
+	mkdirSync(join(root, ".afol", "data", "governance"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "data", "governance", "pending-specs.json"),
+		`${JSON.stringify(
+			{
+				schema_version: 1,
+				entries: entries.map((entry) => ({
+					session_id: entry.session_id,
+					created_at: "2026-06-14T12:00:00.000Z",
+					updated_at: "2026-06-14T12:00:00.000Z",
+					status: entry.status,
+					theme: "catchup",
+					task_ids: ["T-01"],
+					missing: ["roadmap_feature"],
+					resolution_hint: "run afol governance pending",
+				})),
+			},
+			null,
+			2,
+		)}\n`,
+		"utf8",
+	);
+}
+
+function currentGitBranch(root: string): string {
+	const result = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+		cwd: root,
+		encoding: "utf8",
+	});
+	if (result.status !== 0) {
+		throw new Error(
+			result.stderr || result.stdout || "git branch lookup failed",
+		);
+	}
+	return result.stdout.trim();
+}
+
+describe("catchup --fix session repair", () => {
+	test("read-only catchup still works and does not mutate bindings", async () => {
+		const { root, session } = createRoot("260614_1400_readonly-fix-guard");
+		try {
+			const branch = currentGitBranch(root);
+			bindSession(root, {
+				session: "MISSING-BOUND",
+				branch,
+				worktree: root,
+			});
+			const before = listBindings(root);
+			expect(before.some((item) => item.session === "MISSING-BOUND")).toBe(
+				true,
+			);
+
+			const out = captureIo();
+			const code = await runCatchupCommand([], root, out.io);
+			expect(code).toBe(0);
+			expect(out.stdout.join("\n")).toContain(session);
+			expect(out.stdout.join("\n")).toContain("pending_spec_open:");
+			expect(listBindings(root)).toHaveLength(before.length);
+			expect(
+				listBindings(root).some((item) => item.session === "MISSING-BOUND"),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("--fix removes corrupt binding and rebinds usable active when fixtures allow", async () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-fix-repair-"));
+		const active = "260614_1401_active-open";
+		const corrupt = "CORRUPT-CONTEXT";
+		const saved = {
+			AFOL_CI: process.env.AFOL_CI,
+			CI: process.env.CI,
+			AFOL_SESSION: process.env.AFOL_SESSION,
+		};
+		try {
+			// Disable global fallback so rebind is required after unbinding the
+			// corrupt context target (matches CI multi-agent effective path).
+			process.env.AFOL_CI = "1";
+			delete process.env.CI;
+			delete process.env.AFOL_SESSION;
+
+			mkdirSync(join(root, ".agents"), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb"), { recursive: true });
+			createSessionArtifacts(root, active);
+			// Corrupt: session dir exists but canonical task file is missing.
+			mkdirSync(join(root, ".afol", "wb", corrupt), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				`${active}\n`,
+				"utf8",
+			);
+			initGitRoot(root);
+			commitAll(root, "fix repair fixture");
+
+			const branch = currentGitBranch(root);
+			bindSession(root, {
+				session: corrupt,
+				branch,
+				worktree: root,
+			});
+			expect(() => resolveSession(root, {})).toThrow(/corrupt/i);
+
+			const out = captureIo();
+			const code = await runCatchupCommand(
+				["--fix", "--json"],
+				root,
+				out.io,
+				defaultOperationContext(),
+			);
+			expect(code).toBe(0);
+			expect(out.stderr).toEqual([]);
+
+			const payload = JSON.parse(out.stdout.join("\n")) as {
+				ok: boolean;
+				action: string;
+				data: {
+					session: string | null;
+					repair?: {
+						applied: boolean;
+						mutated: boolean;
+						unbound: Array<{ session: string; state: string }>;
+						rebound: string | null;
+					};
+				};
+			};
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("catchup.fix");
+			expect(payload.data.repair?.applied).toBe(true);
+			expect(payload.data.repair?.mutated).toBe(true);
+			expect(payload.data.repair?.unbound).toEqual([
+				{ session: corrupt, state: "corrupt" },
+			]);
+			expect(payload.data.repair?.rebound).toBe(active);
+			expect(payload.data.session).toBe(active);
+
+			expect(listBindings(root).some((item) => item.session === corrupt)).toBe(
+				false,
+			);
+			expect(resolveContextSession(root)).toBe(active);
+			expect(resolveSession(root, {})).toEqual({
+				session: active,
+				source: "context",
+			});
+			// Never delete session dirs.
+			expect(existsSync(join(root, ".afol", "wb", corrupt))).toBe(true);
+			expect(existsSync(join(root, ".afol", "wb", active))).toBe(true);
+		} finally {
+			if (saved.AFOL_CI === undefined) delete process.env.AFOL_CI;
+			else process.env.AFOL_CI = saved.AFOL_CI;
+			if (saved.CI === undefined) delete process.env.CI;
+			else process.env.CI = saved.CI;
+			if (saved.AFOL_SESSION === undefined) delete process.env.AFOL_SESSION;
+			else process.env.AFOL_SESSION = saved.AFOL_SESSION;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("--fix unbinds missing bindings without claiming pending_spec resolution", async () => {
+		const { root, session } = createRoot("260614_1402_pending-guard");
+		try {
+			const branch = currentGitBranch(root);
+			bindSession(root, {
+				session: "MISSING-BOUND",
+				branch,
+				worktree: root,
+			});
+			writePendingSpecs(root, [
+				{ session_id: session, status: "open" },
+				{ session_id: "other-open", status: "open" },
+			]);
+
+			const out = captureIo();
+			const code = await runCatchupCommand(
+				["--fix", "--json"],
+				root,
+				out.io,
+				defaultOperationContext(),
+			);
+			expect(code).toBe(0);
+			const payload = JSON.parse(out.stdout.join("\n")) as {
+				action: string;
+				data: {
+					pending_spec_open: number;
+					next_step: string;
+					freshness: { notes: string[] };
+					repair?: {
+						unbound: Array<{ session: string; state: string }>;
+						rebound: string | null;
+					};
+				};
+			};
+			expect(payload.action).toBe("catchup.fix");
+			expect(payload.data.repair?.unbound).toEqual([
+				{ session: "MISSING-BOUND", state: "missing" },
+			]);
+			// Active session already effective via global — rebind not required.
+			expect(payload.data.pending_spec_open).toBe(2);
+			expect(payload.data.freshness.notes.join(" ")).toContain(
+				"open pending_spec: 2",
+			);
+			expect(payload.data.freshness.notes.join(" ")).toContain(
+				"not auto-resolved",
+			);
+			// Pending is diagnostic only; operational next_step may still prefer
+			// freshness (e.g. log unsynced) while notes carry governance pending.
+			expect(payload.data.freshness.notes.join(" ")).toContain(
+				"afol governance pending",
+			);
+			// Index left intact (no resolve/waive).
+			const index = JSON.parse(
+				readFileSync(
+					join(root, ".afol", "data", "governance", "pending-specs.json"),
+					"utf8",
+				),
+			) as { entries: Array<{ status: string }> };
+			expect(
+				index.entries.filter((entry) => entry.status === "open"),
+			).toHaveLength(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("--fix requires local interactive approval for restricted callers", async () => {
+		const { root } = createRoot("260614_1403_approval");
+		try {
+			const out = captureIo();
+			const code = await runCatchupCommand(
+				["--fix"],
+				root,
+				out.io,
+				agentOperationContext(),
+			);
+			expect(code).toBe(2);
+			expect(out.stderr.join("\n")).toContain(
+				"catchup --fix requires local interactive approval",
+			);
+			// No JSON envelope side channel on approval fail for text mode.
+			expect(out.stdout).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("applyCatchupRepair is fail-closed when context file is unreadable", () => {
+		const root = mkdtempSync(join(tmpdir(), "catchup-fix-unreadable-"));
+		try {
+			mkdirSync(join(root, ".afol", "wb"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", "session-context.json"),
+				"{broken",
+				"utf8",
+			);
+			const repair = applyCatchupRepair(root);
+			expect(repair.applied).toBe(true);
+			expect(repair.mutated).toBe(false);
+			expect(repair.unbound).toEqual([]);
+			expect(repair.rebound).toBeNull();
+			expect(
+				repair.skipped.some((item) => item.reason.includes("unreadable")),
+			).toBe(true);
+			// Original corrupt file remains (fail-closed; no overwrite).
+			expect(
+				readFileSync(join(root, ".afol", "wb", "session-context.json"), "utf8"),
+			).toBe("{broken");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -9,6 +9,7 @@ import { productionDayJournalPath } from "./journal";
 import { observationJournalPath } from "./observation-journal";
 import {
 	deriveRecurrenceDecision,
+	OBSERVATION_FINGERPRINT_VERSION,
 	type ObservationRecord,
 	observationRecordFromRow,
 	type Scorecard,
@@ -28,6 +29,7 @@ import {
 	type SuggestionCandidate,
 	type SuggestionCluster,
 	selectEvaluationBaselineObservations,
+	suggestionClusterKey,
 	suppressRejectedSuggestion,
 } from "./suggestion-model";
 import {
@@ -104,8 +106,15 @@ export type EvolutionAnalysisTarget = {
 	metrics: Readonly<Record<string, number | null>>;
 };
 
+export type EvolutionProposalTargetKind =
+	| "governance"
+	| "behavior"
+	| "documentation"
+	| "code";
+
 export type EvolutionProposalPreview = {
 	id: string;
+	fingerprint_version: number;
 	rank: number;
 	cluster_id: string;
 	task_type: string;
@@ -127,6 +136,13 @@ export type EvolutionProposalPreview = {
 	evidence_refs: readonly Record<string, string>[];
 	evidence_ref_count: number;
 	evidence_digest: string;
+	/** General F30 proposal routing; this is never an adoption destination. */
+	target_kind: EvolutionProposalTargetKind;
+	target_refs: readonly Record<string, string>[];
+	provenance_digest: string;
+	classification: "classified" | "needs_review";
+	approval_required: true;
+	execution_surface: "governed_workbench";
 	baseline: EvolutionAnalysisBaseline;
 	targets: EvolutionAnalysisTarget;
 	/** Stable shorthand consumed by the CLI preview envelope. */
@@ -160,6 +176,7 @@ export type EvolutionAnalysis = {
 	critical_alerts: readonly EvolutionCriticalAlert[];
 	critical_alert_count: number;
 	critical_alert_pending_count: number;
+	legacy_cluster_count: number;
 	digest: string;
 };
 
@@ -270,6 +287,20 @@ function targetMetrics(
 	};
 }
 
+function classifyProposalTarget(taskType: string): {
+	targetKind: EvolutionProposalTargetKind;
+	classification: "classified" | "needs_review";
+} {
+	const normalized = taskType.trim().toLowerCase();
+	if (/governance|policy|rule/.test(normalized))
+		return { targetKind: "governance", classification: "classified" };
+	if (/documentation|docs|readme/.test(normalized))
+		return { targetKind: "documentation", classification: "classified" };
+	if (/code|implementation|typescript|javascript|python/.test(normalized))
+		return { targetKind: "code", classification: "classified" };
+	return { targetKind: "behavior", classification: "needs_review" };
+}
+
 function publicSourceRefs(
 	refs: ReadonlyArray<Record<string, string>>,
 ): Array<Record<string, string>> {
@@ -370,9 +401,14 @@ export function analyzeEvolution(
 					? "evolution derived state is stale"
 					: "evolution state is unhealthy"))
 			: null;
+	const legacyClusterCount = (input.candidates ?? []).filter(
+		(candidate) =>
+			candidate.fingerprint_version !== OBSERVATION_FINGERPRINT_VERSION,
+	).length;
 	const candidates = [...(input.candidates ?? [])]
 		.filter(
 			(candidate) =>
+				candidate.fingerprint_version === OBSERVATION_FINGERPRINT_VERSION &&
 				!candidate.critical &&
 				candidate.state === "available" &&
 				candidateInCommitScope(candidate.source_refs),
@@ -408,6 +444,7 @@ export function analyzeEvolution(
 				if (!taskType)
 					throw new Error("evolution proposal requires a task type");
 				const metrics = targetMetrics(candidate);
+				const proposalTarget = classifyProposalTarget(taskType);
 				const baselineObservations = selectEvaluationBaselineObservations({
 					candidate: { cluster_id: candidate.cluster_id, task_type: taskType },
 					observations,
@@ -428,6 +465,7 @@ export function analyzeEvolution(
 				});
 				return {
 					id: proposalId(input.projectId, candidate),
+					fingerprint_version: candidate.fingerprint_version,
 					rank: index + 1,
 					cluster_id: candidate.cluster_id,
 					task_type: taskType,
@@ -452,6 +490,12 @@ export function analyzeEvolution(
 					evidence_refs: publicSourceRefs(candidate.source_refs),
 					evidence_ref_count: candidate.source_refs.length,
 					evidence_digest: candidate.evidence_digest,
+					target_kind: proposalTarget.targetKind,
+					target_refs: publicSourceRefs(candidate.source_refs),
+					provenance_digest: candidate.evidence_digest,
+					classification: proposalTarget.classification,
+					approval_required: true,
+					execution_surface: "governed_workbench",
 					baseline,
 					targets: {
 						minimum_comparable_sessions: EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
@@ -491,6 +535,7 @@ export function analyzeEvolution(
 			0,
 			scopedCriticalAlerts.length - MAX_EVOLUTION_CRITICAL_ALERTS,
 		),
+		legacy_cluster_count: legacyClusterCount,
 	};
 	return {
 		...content,
@@ -751,15 +796,32 @@ function scopedClusters(
 ) {
 	const byFingerprint = new Map<string, ObservationRecord[]>();
 	for (const observation of observations) {
-		const rows = byFingerprint.get(observation.fingerprint) ?? [];
+		const key = suggestionClusterKey(
+			observation.fingerprint_version,
+			observation.fingerprint,
+		);
+		const rows = byFingerprint.get(key) ?? [];
 		rows.push(observation);
-		byFingerprint.set(observation.fingerprint, rows);
+		byFingerprint.set(key, rows);
 	}
 	return {
 		clusters: clusters
-			.filter((cluster) => byFingerprint.has(cluster.fingerprint))
+			.filter((cluster) =>
+				byFingerprint.has(
+					suggestionClusterKey(
+						cluster.fingerprint_version,
+						cluster.fingerprint,
+					),
+				),
+			)
 			.map((cluster) => {
-				const rows = byFingerprint.get(cluster.fingerprint) ?? [];
+				const rows =
+					byFingerprint.get(
+						suggestionClusterKey(
+							cluster.fingerprint_version,
+							cluster.fingerprint,
+						),
+					) ?? [];
 				const recurrence = deriveRecurrenceDecision(rows, false, thresholds);
 				return {
 					...cluster,
@@ -880,6 +942,16 @@ export function analyzeEvolutionProject(
 						observationsByFingerprint:
 							rangeProjection.observationsByFingerprint,
 					});
+		const coarseV2Fingerprints = new Set(
+			analysisObservations
+				.filter(
+					(observation) =>
+						observation.fingerprint_version ===
+							OBSERVATION_FINGERPRINT_VERSION &&
+						/^[^\s]+$/.test(observation.normalized_fields.command),
+				)
+				.map((observation) => observation.fingerprint),
+		);
 		const rangeProductionDays = new Set(
 			analysisObservations
 				.map((observation) => observation.production_day_sequence)
@@ -909,6 +981,7 @@ export function analyzeEvolutionProject(
 				})
 			: null;
 		const suggestions = derivation.suggestions
+			.filter((candidate) => !coarseV2Fingerprints.has(candidate.cluster_id))
 			.filter(
 				(candidate) =>
 					!receipts.some(
@@ -962,7 +1035,9 @@ export function analyzeEvolutionProject(
 						: [],
 			},
 			candidates: suggestions,
-			criticalAlerts: derivation.critical_alerts,
+			criticalAlerts: derivation.critical_alerts.filter(
+				(candidate) => !coarseV2Fingerprints.has(candidate.cluster_id),
+			),
 			observations: analysisObservations,
 			scorecard: recorded.scorecard,
 			observationCount: recorded.observationCount,

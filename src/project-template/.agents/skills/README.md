@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: project-skills
+theme: skills
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-08-10T00:00:00Z'
+---
+
 # Skills
 
 Project-local provider skills live here.

@@ -364,6 +364,38 @@ describe("template forbidden-content policy", () => {
 		expect(managedHashes).toEqual([]);
 		expect(lockManagedHashes).toEqual([]);
 	});
+
+	test("live repo and template exclude retired agentic-scaffold-mcp seed", async () => {
+		const projectRoot = process.cwd();
+		const forbiddenPaths = [
+			".agents/skills/agentic-scaffold-mcp",
+			".afol/adm/source/universal-skills/skills/agentic-scaffold-mcp",
+			"src/project-template/.agents/skills/agentic-scaffold-mcp",
+			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-scaffold-mcp",
+		];
+		expect(
+			forbiddenPaths.filter((path) => existsSync(join(projectRoot, path))),
+		).toEqual([]);
+
+		const metadataFiles = [
+			".agents/manifest.json",
+			".agents/lock.json",
+			".afol/adm/source/universal-skills/index.json",
+			".afol/adm/source/universal-skills/profiles/core.json",
+			"src/project-template/.agents/manifest.json",
+			"src/project-template/.agents/lock.json",
+			"src/project-template/.afol/adm/source/universal-skills/index.json",
+			"src/project-template/.afol/adm/source/universal-skills/profiles/core.json",
+		];
+		const matches: string[] = [];
+		for (const relativePath of metadataFiles) {
+			const content = await readFile(join(projectRoot, relativePath), "utf8");
+			if (content.includes("agentic-scaffold-mcp")) {
+				matches.push(relativePath);
+			}
+		}
+		expect(matches).toEqual([]);
+	});
 });
 
 describe("scanTemplateToolchainClaims", () => {

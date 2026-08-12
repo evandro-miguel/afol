@@ -50,3 +50,44 @@ Rules:
 - Optional filters: `--issue-type`, `--baseline-id`, `--cutoff-session-id`
   (create only), `--issue <url>` (appended into approval), `--approval`
   (alias for reason).
+
+## Legacy reconcile path (atomic admit + close)
+
+`evidence admit` requires the session to be already closed. A pre-cutoff
+session whose all-done tasks carry unrecoverable historical evidence
+(e.g. branch state altered by later work, so no current artifact can prove
+the historical fact) cannot close, because `close` runs strict verify and
+demands the missing evidence. `afol legacy reconcile` breaks that ordering
+deadlock by admitting the debt AND closing the session in one transaction.
+
+```bash
+# preview (default): planned admissions + projected close, writes nothing
+afol legacy reconcile --session <id> --reason "<text>" --issue <url>
+
+# write: baseline + durable close atomically
+afol legacy reconcile --session <id> --reason "<text>" --issue <url> --confirm
+```
+
+Rules:
+
+- Use only for pre-cutoff (`session_id < cutoff`) sessions with all tasks
+  done and no acceptable evidence. It is the legacy-compatibility escape for
+  historical-unverifiable work, not a way to bypass evidence on current work.
+- `--reason` and `--issue` are always required (explicit per-admission
+  approval). Default is dry-run; `--confirm` writes.
+- Under the session lock (outer) and baseline lock (inner), it writes
+  hash-bound admissions via the same core as `evidence admit`, then closes
+  with `admitLegacyBaseline` so the just-written baseline waives the issues
+  in the strict verify. `closeSession` consults the baseline only when that
+  option is set; the normal close path is unchanged.
+- Refuses `invalid_evidence` / `invalid_task_state`, post-cutoff sessions,
+  sessions with open tasks, and already-closed sessions.
+- Like `evidence admit`, it records compatibility debt. It never rewrites
+  execution as `artifact` or `passed`, and never claims historical
+  verification. The raw `verify-tasks --strict` still reports the admitted
+  issues by design; the project gate (`session_evidence`) is what waives them.
+- On a close failure after the baseline is written, it returns
+  `baseline_written_close_failed` with the baseline path; a retry
+  `close --admit-legacy-baseline` (or re-running reconcile) then succeeds
+  because the baseline exists.
+- Optional: `--task-id <id>` (restrict), `--summary "<text>"` (close summary).

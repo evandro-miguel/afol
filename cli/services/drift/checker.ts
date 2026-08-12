@@ -3,8 +3,8 @@ import { basename, join, relative } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
 import { boundedSpawn } from "../../core/subprocess";
 import { validateAdmMigration } from "../adm";
+import { collectFreshnessReport } from "../local-state/freshness";
 import { resolveProjectPaths } from "../project/paths";
-import { buildPstrIndexSnapshot, getPstrIndex } from "../pstr/builder";
 import { openDb } from "../state/db";
 import type { DriftFinding, DriftReport } from "./types";
 
@@ -212,88 +212,26 @@ function hasDocTypeFrontmatter(path: string): boolean {
 }
 
 export function checkPstrDrift(root: string): DriftFinding[] {
-	const live = buildPstrIndexSnapshot(root);
-	const stored = getPstrIndex(root);
-	const findings: DriftFinding[] = [];
-	const storedMaps = stored && Array.isArray(stored.maps) ? stored.maps : [];
-	const storedById = new Map(
-		storedMaps.map((entry) => [entry.id, entry] as const),
+	const report = collectFreshnessReport(root, {
+		localState: false,
+		pstr: true,
+	});
+	const pstrFindings = report.findings.filter(
+		(finding) => finding.surface === "pstr",
 	);
-
-	if (!stored) {
-		if (live.maps.length === 0) {
-			return [
-				makeFinding(
-					"pstr:index:missing",
-					"warn",
-					"pstr",
-					"missing stored PSTR index",
-					"run afol pstr rebuild",
-				),
-			];
-		}
-		return live.maps.map((entry) =>
-			makeFinding(
-				`pstr:map:${entry.id}:missing`,
-				"warn",
-				"pstr",
-				`missing stored map ${entry.id}`,
-				"run afol pstr rebuild",
-				entry.source_hash,
-				"missing",
-			),
-		);
-	}
-
-	for (const entry of live.maps) {
-		const storedEntry = storedById.get(entry.id);
-		if (!storedEntry) {
-			findings.push(
-				makeFinding(
-					`pstr:map:${entry.id}:missing`,
-					"warn",
-					"pstr",
-					`missing stored map ${entry.id}`,
-					"run afol pstr rebuild",
-					entry.source_hash,
-					"missing",
-				),
-			);
-			continue;
-		}
-		if (storedEntry.source_hash !== entry.source_hash) {
-			findings.push(
-				makeFinding(
-					`pstr:map:${entry.id}:stale`,
-					"warn",
-					"pstr",
-					`stale map ${entry.id}`,
-					"run afol pstr rebuild",
-					entry.source_hash,
-					storedEntry.source_hash,
-				),
-			);
-		}
-	}
-
-	for (const storedEntry of stored.maps) {
-		if (live.maps.some((entry) => entry.id === storedEntry.id)) {
-			continue;
-		}
-		findings.push(
-			makeFinding(
-				`pstr:map:${storedEntry.id}:missing`,
-				"warn",
-				"pstr",
-				`missing live map ${storedEntry.id}`,
-				"run afol pstr rebuild",
-				storedEntry.source_hash,
-				"missing",
-			),
-		);
-	}
-
-	return findings;
+	const staleMaps = pstrFindings.filter((finding) =>
+		finding.id.startsWith("pstr:map:"),
+	);
+	const findingsToReport = staleMaps.length > 0 ? staleMaps : pstrFindings;
+	return findingsToReport.map((finding) =>
+		makeFinding(
+			finding.ok ? finding.id : `${finding.id}:${finding.state}`,
+			"warn",
+			"pstr",
+			finding.message,
+			finding.remediation,
+		),
+	);
 }
 
 export function checkStateDrift(

@@ -37,6 +37,8 @@ const WORKBENCH_EVENT_TYPES = new Set([
 	"workbench.mark_done",
 	"workbench.append_log",
 	"workbench.close",
+	"workbench.archive",
+	"workbench.restore",
 ]);
 const TELEMETRY_EVENT_TYPES = new Set([
 	"session_start",

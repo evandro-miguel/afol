@@ -15,6 +15,7 @@ import { join } from "node:path";
 import {
 	appendProductionDayAllocation,
 	checkEvolutionDbHealth,
+	EVOLUTION_SCHEMA_VERSION,
 	normalizeObservationRecord,
 } from "../services/evolution";
 import { analyzeEvolutionProject } from "../services/evolution/analysis";
@@ -304,7 +305,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(8);
+			).toBe(EVOLUTION_SCHEMA_VERSION);
 			expect(
 				db
 					.query("SELECT value FROM evolution_metadata WHERE key='legacy'")

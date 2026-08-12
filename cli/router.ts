@@ -11,6 +11,7 @@ export type CommandResolution =
 	| { kind: "new"; args: string[] }
 	| { kind: "start"; args: string[] }
 	| { kind: "evidence"; args: string[] }
+	| { kind: "legacy"; args: string[] }
 	| { kind: "done"; args: string[] }
 	| { kind: "transition"; args: string[] }
 	| { kind: "close"; args: string[] }
@@ -229,6 +230,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "evidence") {
 		return { kind: "evidence", args: normalizeScopedFlags("evidence", rest) };
+	}
+
+	if (topLevelKind === "legacy") {
+		return { kind: "legacy", args: normalizeScopedFlags("legacy", rest) };
 	}
 
 	if (topLevelKind === "done") {

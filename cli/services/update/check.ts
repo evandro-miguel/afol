@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createPatch } from "diff";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
@@ -11,7 +11,9 @@ import {
 	type BootstrapManifestEntry,
 	type ManagedOwnership,
 	planBootstrapOperations,
+	planCompletionLockGitignoreOperation,
 } from "../bootstrap/planner";
+import { resolveProjectWritePath } from "../project/root";
 import {
 	isTemplatePathMatch,
 	manifestTemplatePatterns,
@@ -112,6 +114,70 @@ function zeroOwnershipCounts(): OwnershipCounts {
 
 function readText(path: string): string {
 	return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+function planCompletionLockGitignore(projectRoot: string): UpdateOperation {
+	const resolved = resolveProjectWritePath(projectRoot, ".gitignore");
+	if (!resolved.ok) {
+		return toUpdateGitignoreOperation(
+			planCompletionLockGitignoreOperation({
+				state: "unsafe",
+				reason: "project-owned-gitignore-unsafe-path",
+			}),
+		);
+	}
+	try {
+		const stats = lstatSync(resolved.value.path);
+		return toUpdateGitignoreOperation(
+			planCompletionLockGitignoreOperation(
+				stats.isFile()
+					? {
+							state: "regular",
+							content: readFileSync(resolved.value.path, "utf8"),
+						}
+					: {
+							state: "unsafe",
+							reason: stats.isSymbolicLink()
+								? "project-owned-gitignore-symlink"
+								: "project-owned-gitignore-non-regular",
+						},
+			),
+		);
+	} catch (error) {
+		return toUpdateGitignoreOperation(
+			planCompletionLockGitignoreOperation(
+				(error as { code?: string }).code === "ENOENT"
+					? { state: "absent" }
+					: { state: "unsafe", reason: "project-owned-gitignore-unreadable" },
+			),
+		);
+	}
+}
+
+function toUpdateGitignoreOperation(
+	operation: ReturnType<typeof planCompletionLockGitignoreOperation>,
+): UpdateOperation {
+	if (operation.kind === "update-managed") {
+		return {
+			...operation,
+			kind: "update-managed",
+			nextContent: operation.nextContent ?? "",
+			diff: operation.diffPreview ?? "",
+		};
+	}
+	if (operation.kind === "conflict") {
+		return {
+			...operation,
+			kind: "conflict",
+			diff: operation.diffPreview ?? "",
+		};
+	}
+	return {
+		kind: "skip-identical",
+		path: operation.path,
+		owner: operation.owner,
+		reason: operation.reason,
+	};
 }
 
 function readJsonText(content: string): RawManifest | null {
@@ -910,7 +976,9 @@ export function checkTemplateUpdate(
 		sourceManifestContent,
 		currentFiles,
 		updateTargets,
-	).concat(collectRemovedTemplateOperations(projectRoot, removedPaths));
+	)
+		.concat(collectRemovedTemplateOperations(projectRoot, removedPaths))
+		.concat(planCompletionLockGitignore(projectRoot));
 
 	const hasSource = updateTargets.length > 0;
 	const currentRevision = revisionOf(currentLock);

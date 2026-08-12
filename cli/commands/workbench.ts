@@ -12,13 +12,18 @@ import {
 } from "../services/governance/pending-specs";
 import { beginHotPathMeasurement } from "../services/hot-path/instrumentation";
 import {
+	TRANSITION_ADMISSION_POLICY,
+	transitionAdmitEvidence,
+} from "../services/project/evidence-transition-admission";
+import { admitLegacyEvidenceIssues } from "../services/project/legacy-evidence-baseline";
+import {
 	TaskCompletionBusyError,
 	type TaskCompletionLease,
 	withTaskCompletionLock,
 } from "../services/workbench/completion-lock";
-import { admitLegacyEvidenceIssues } from "../services/project/legacy-evidence-baseline";
 import {
 	appendTimelineEntry,
+	assertClosedTaskReverificationEligible,
 	assertObservedBatchTasksReady,
 	closeSession,
 	completeObservedTask,
@@ -29,8 +34,10 @@ import {
 	type LifecycleAuxiliaryRuntime,
 	newWorkstream,
 	prepareVerificationRun,
+	recordClosedTaskReverification,
 	recordEvidence,
 	recordVerificationRunStep,
+	sanitizeEvidenceText,
 	startTask,
 	startTasks,
 	type TaskState,
@@ -55,6 +62,7 @@ import {
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
 import {
+	DoneArgumentError,
 	hasJsonFlag,
 	parseCloseArgs,
 	parseDoneArgs,
@@ -64,6 +72,7 @@ import {
 	parseSessionTaskArgs,
 	parseVerifyArgs,
 } from "./workbench/args";
+import { repairHintForStep } from "./workbench/hints";
 import { writeJsonError } from "./workbench/shared";
 import type { DoneArgs, VerificationSpec } from "./workbench/types";
 import {
@@ -227,16 +236,6 @@ export async function runStartCommand(
 		if (parsed.taskIds.length > 1 && parsed.brief) {
 			throw new Error("Batch start does not support --brief.");
 		}
-		const pending = getSessionPendingSpecNotice(
-			root,
-			parsed.session,
-			parsed.taskId,
-		);
-		if (pending) {
-			throw new Error(
-				`pending_spec blocks start for session ${parsed.session}; ${pending.resolutionHint.replace("<session>", parsed.session)}`,
-			);
-		}
 		const warnings =
 			parsed.taskIds.length === 1
 				? startTask(root, parsed, runtime)
@@ -345,6 +344,10 @@ export async function runEvidenceCommand(
 	if (args[0] === "admit") {
 		return runEvidenceAdmitCommand(args.slice(1), root, ctx);
 	}
+	if (args[0] === "reverify")
+		return runEvidenceReverifyCommand(args.slice(1), root, ctx);
+	if (args[0] === "transition-admit")
+		return runEvidenceTransitionAdmitCommand(args.slice(1), root, ctx);
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.evidence");
 		const parsed = parseEvidenceArgs(args, root);
@@ -387,6 +390,185 @@ export async function runEvidenceCommand(
 		} else {
 			console.error((error as Error).message);
 		}
+		return 2;
+	}
+}
+
+function requiredEvidenceOption(
+	args: string[],
+	name: string,
+	short?: string,
+): string {
+	const index = args.findIndex((arg) => arg === name || arg === short);
+	const value = index < 0 ? "" : (args[index + 1] ?? "");
+	if (!value || value.startsWith("-"))
+		throw new Error(`Missing value for ${name}.`);
+	return value;
+}
+
+export async function runEvidenceReverifyCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
+	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.evidence.reverify");
+		const session = resolveSession(
+			root,
+			requiredEvidenceOption(args, "--session", "-S"),
+			"evidence reverify",
+		);
+		const taskId = requiredEvidenceOption(args, "--task-id", "-T");
+		const command = requiredEvidenceOption(args, "--execute", "-x");
+		const allowed = new Set([
+			"--session",
+			"-S",
+			"--task-id",
+			"-T",
+			"--execute",
+			"-x",
+			"--json",
+			"-j",
+		]);
+		for (let i = 0; i < args.length; i += 1) {
+			if (allowed.has(args[i] ?? "")) {
+				if (
+					["--session", "-S", "--task-id", "-T", "--execute", "-x"].includes(
+						args[i] ?? "",
+					)
+				)
+					i += 1;
+				continue;
+			}
+			throw new Error(`Unknown evidence reverify argument: ${args[i]}`);
+		}
+		assertClosedTaskReverificationEligible(root, { session, taskId, command });
+		const observed = await runVerificationAsync(root, {
+			mode: "shell",
+			command,
+		});
+		const evidence = recordClosedTaskReverification(root, {
+			session,
+			taskId,
+			command,
+			result: observed.exitCode === 0 ? "passed" : "failed",
+			exitCode: observed.exitCode,
+			...(observed.signal ? { signal: observed.signal } : {}),
+			approvalContext: ctx,
+		});
+		if (hasJsonFlag(args))
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							session,
+							task: taskId,
+							evidence_id: evidence.id,
+							provenance: "observed",
+							status: observed.status,
+						},
+						{ action: "workbench.evidence.reverify" },
+					),
+				),
+			);
+		else console.log(`evidence reverified: ${evidence.id}`);
+		return observed.status === "passed" ? 0 : 1;
+	} catch (error) {
+		if (hasJsonFlag(args)) writeJsonError("workbench.evidence.reverify", error);
+		else console.error((error as Error).message);
+		return 2;
+	}
+}
+
+export async function runEvidenceTransitionAdmitCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
+	try {
+		const session = resolveSession(
+			root,
+			requiredEvidenceOption(args, "--session", "-S"),
+			"evidence transition-admit",
+		);
+		const taskId = requiredEvidenceOption(args, "--task-id", "-T");
+		const policy =
+			requiredEvidenceOption(args, "--policy") || TRANSITION_ADMISSION_POLICY;
+		const issue = requiredEvidenceOption(args, "--issue");
+		const approval = requiredEvidenceOption(args, "--approval");
+		const confirm = args.includes("--confirm") && !args.includes("--dry-run");
+		const known = new Set([
+			"--session",
+			"-S",
+			"--task-id",
+			"-T",
+			"--policy",
+			"--issue",
+			"--approval",
+			"--confirm",
+			"--dry-run",
+			"--json",
+			"-j",
+		]);
+		for (let i = 0; i < args.length; i += 1) {
+			const arg = args[i] ?? "";
+			if (!known.has(arg))
+				throw new Error(`Unknown evidence transition-admit argument: ${arg}`);
+			if (
+				[
+					"--session",
+					"-S",
+					"--task-id",
+					"-T",
+					"--policy",
+					"--issue",
+					"--approval",
+				].includes(arg)
+			)
+				i += 1;
+		}
+		if (confirm)
+			assertWorkbenchMutationAllowed(
+				ctx,
+				"workbench.evidence.transition_admit",
+			);
+		if (
+			confirm &&
+			(ctx.callerType !== "local" ||
+				!ctx.interactive ||
+				ctx.trustLevel !== "trusted")
+		) {
+			throw new Error(
+				"transition-admit --confirm requires a trusted interactive local context.",
+			);
+		}
+		const result = transitionAdmitEvidence(root, {
+			sessionId: session,
+			taskId,
+			policy,
+			issue,
+			approval,
+			confirm,
+		});
+		if (hasJsonFlag(args))
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(result, {
+						action: result.written
+							? "workbench.evidence.transition_admit"
+							: "workbench.evidence.transition_admit.preview",
+					}),
+				),
+			);
+		else
+			console.log(
+				`evidence transition-admit ${result.written ? "admitted" : "preview (dry-run)"}: ${taskId}`,
+			);
+		return 0;
+	} catch (error) {
+		if (hasJsonFlag(args))
+			writeJsonError("workbench.evidence.transition_admit", error);
+		else console.error((error as Error).message);
 		return 2;
 	}
 }
@@ -470,9 +652,7 @@ function parseEvidenceAdmitArgs(
 		}
 		if (arg === "--reason" || arg === "-r" || arg === "--approval") {
 			if (!value || value.startsWith("-")) {
-				throw new Error(
-					`Missing value for ${arg} in evidence admit.`,
-				);
+				throw new Error(`Missing value for ${arg} in evidence admit.`);
 			}
 			reason = value;
 			i += 1;
@@ -513,9 +693,7 @@ function parseEvidenceAdmitArgs(
 		);
 	}
 	if (!allMissing && taskIds.length === 0) {
-		throw new Error(
-			"evidence admit requires --task-id <id> or --all-missing.",
-		);
+		throw new Error("evidence admit requires --task-id <id> or --all-missing.");
 	}
 
 	return {
@@ -726,7 +904,6 @@ type DoneLockedFailure = {
 	stepCount?: number;
 	evidenceIds?: string[];
 	warnings?: string[];
-	legacyError?: boolean;
 };
 
 type DoneLockedResult = DoneLockedSuccess | DoneLockedFailure;
@@ -736,14 +913,79 @@ type DoneOutput = {
 	stderr: (value: string) => void;
 };
 
-function stringifyDoneJsonError(error: unknown, exitCode = 2): string {
-	const message = error instanceof Error ? error.message : String(error);
-	return stringifyEnvelope(
-		envelopeErr("workbench.error", message, {
-			action: "workbench.done",
-			exitCode,
+type DoneRecoveryData = {
+	session: string | null;
+	task_id: string | null;
+	task_ids: string[];
+	failed_step: string;
+	status: string;
+	evidence_ids: string[];
+	next_command: string;
+};
+
+const DONE_DIAGNOSTIC_MAX_BYTES = 512;
+const DONE_DIAGNOSTIC_CONTROL = /\p{Cc}/gu;
+
+function boundDoneDiagnostic(value: unknown): string {
+	const message = value instanceof Error ? value.message : String(value);
+	const sanitized = sanitizeEvidenceText(message)
+		.replace(DONE_DIAGNOSTIC_CONTROL, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (Buffer.byteLength(sanitized, "utf8") <= DONE_DIAGNOSTIC_MAX_BYTES) {
+		return sanitized || "Done command failed.";
+	}
+	let bounded = "";
+	for (const character of sanitized) {
+		const candidate = `${bounded}${character}`;
+		if (Buffer.byteLength(candidate, "utf8") > DONE_DIAGNOSTIC_MAX_BYTES - 3)
+			break;
+		bounded = candidate;
+	}
+	return `${bounded}...`;
+}
+
+function doneRecoveryData(
+	parsed: DoneArgs | undefined,
+	options: {
+		failedStep: string;
+		status: string;
+		evidenceIds?: string[];
+	},
+): DoneRecoveryData {
+	const taskIds = parsed?.taskIds ?? [];
+	const taskId = parsed?.taskId ?? taskIds[0] ?? null;
+	return {
+		session: parsed?.session ?? null,
+		task_id: taskId,
+		task_ids: taskIds,
+		failed_step: options.failedStep,
+		status: options.status,
+		evidence_ids: options.evidenceIds ?? [],
+		next_command: repairHintForStep("done", {
+			...(parsed?.session ? { session: parsed.session } : {}),
+			...(taskId ? { taskId } : {}),
 		}),
-	);
+	};
+}
+
+function stringifyDoneJsonError(
+	error: unknown,
+	exitCode: number,
+	data: DoneRecoveryData,
+	options: { code?: string; message?: string } = {},
+): string {
+	return stringifyEnvelope({
+		...envelopeErr(
+			options.code ?? "workbench.completion_failed",
+			options.message ?? boundDoneDiagnostic(error),
+			{
+				action: "workbench.done",
+				exitCode,
+			},
+		),
+		data,
+	});
 }
 
 async function executeDoneLocked(
@@ -764,7 +1006,6 @@ async function executeDoneLocked(
 				message: `spec check failed: ${specCheck.spec_id || parsed.taskId}`,
 				status: "spec_conflict",
 				exitCode: 1,
-				...(parsed.testCommands.length < 2 ? { legacyError: true } : {}),
 			};
 		}
 	}
@@ -927,8 +1168,8 @@ async function executeDoneLocked(
 				message: `--test failed with exit code ${verification.exitCode}`,
 				status: verification.status,
 				exitCode: 1,
+				evidenceIds: [observedCompletion.evidence.id],
 				warnings: observedCompletion.warnings,
-				legacyError: true,
 			};
 		}
 	}
@@ -961,7 +1202,7 @@ async function executeDoneLocked(
 				message: `--test-shell failed with exit code ${verification.exitCode}`,
 				status: verification.status,
 				exitCode: 1,
-				legacyError: true,
+				evidenceIds: [observedCompletion.evidence.id],
 			};
 		}
 	}
@@ -1106,9 +1347,16 @@ async function runDoneBatch(
 								session: parsed.session,
 								tasks: parsed.taskIds,
 								status: observed.status,
+								failed_step: "verification",
+								task_id: parsed.taskId,
+								task_ids: parsed.taskIds,
 								evidence_ids: evidenceIds,
 								evidence_count: evidenceIds.length,
 								warnings,
+								next_command: repairHintForStep("done", {
+									session: parsed.session,
+									taskId: parsed.taskId,
+								}),
 							},
 						}),
 					);
@@ -1166,55 +1414,58 @@ export async function runDoneCommand(
 			console.error(value);
 		},
 	};
+	let parsed: DoneArgs | undefined;
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.done");
-		const parsed = parseDoneArgs(args, root);
-		if (parsed.taskIds.length > 1) {
-			return await runDoneBatch(root, parsed, ctx, output);
+		const doneArgs = parseDoneArgs(args, root);
+		parsed = doneArgs;
+		if (doneArgs.taskIds.length > 1) {
+			return await runDoneBatch(root, doneArgs, ctx, output);
 		}
 		const result = await withTaskCompletionLock(
 			root,
-			parsed.session,
-			parsed.taskId,
-			(lease) => executeDoneLocked(root, parsed, ctx, lease),
+			doneArgs.session,
+			doneArgs.taskId,
+			(lease) => executeDoneLocked(root, doneArgs, ctx, lease),
 		);
 		if (!result.ok) {
-			if (parsed.json) {
-				if (result.legacyError) {
-					output.stdout(
-						stringifyDoneJsonError(new Error(result.message), result.exitCode),
-					);
-				} else {
-					const envelope = {
-						...envelopeErr("workbench.verification_failed", result.message, {
-							action: "workbench.done",
-							exitCode: result.exitCode,
-						}),
-						data: {
-							status: result.status,
-							...(result.runId ? { verification_run_id: result.runId } : {}),
-							...(result.stepIndex ? { step_index: result.stepIndex } : {}),
-							...(result.stepCount ? { step_count: result.stepCount } : {}),
-							evidence_ids: result.evidenceIds ?? [],
-							evidence_count: result.evidenceIds?.length ?? 0,
-							warnings: result.warnings ?? [],
+			if (doneArgs.json) {
+				const data = {
+					...doneRecoveryData(doneArgs, {
+						failedStep: "verification",
+						status: result.status,
+						...(result.evidenceIds ? { evidenceIds: result.evidenceIds } : {}),
+					}),
+					...(result.runId ? { verification_run_id: result.runId } : {}),
+					...(result.stepIndex ? { step_index: result.stepIndex } : {}),
+					...(result.stepCount ? { step_count: result.stepCount } : {}),
+					evidence_count: result.evidenceIds?.length ?? 0,
+					warnings: result.warnings ?? [],
+				};
+				output.stdout(
+					stringifyDoneJsonError(
+						new Error(result.message),
+						result.exitCode,
+						data,
+						{
+							code: "workbench.verification_failed",
+							message: boundDoneDiagnostic(result.message),
 						},
-					};
-					output.stdout(stringifyEnvelope(envelope));
-				}
+					),
+				);
 			} else {
 				output.stderr(result.message);
 			}
 			return result.exitCode;
 		}
 		const completionWarnings = result.warnings;
-		if (parsed.json) {
+		if (doneArgs.json) {
 			output.stdout(
 				stringifyEnvelope(
 					envelopeOk(
 						{
-							session: parsed.session,
-							task: parsed.taskId,
+							session: doneArgs.session,
+							task: doneArgs.taskId,
 							status: completionWarnings.length
 								? "committed_with_warnings"
 								: "done",
@@ -1228,7 +1479,7 @@ export async function runDoneCommand(
 										evidence_count: result.evidenceIds?.length ?? 0,
 									}
 								: {}),
-							...pendingSpecFields(root, parsed.session, parsed.taskId),
+							...pendingSpecFields(root, doneArgs.session, doneArgs.taskId),
 						},
 						{ action: "workbench.done" },
 					),
@@ -1236,7 +1487,7 @@ export async function runDoneCommand(
 			);
 		} else {
 			const lines = [
-				`task done: ${parsed.taskId}`,
+				`task done: ${doneArgs.taskId}`,
 				`authorizing evidence: ${result.done.authorizingEvidenceId}`,
 			];
 			if (result.runId) {
@@ -1245,32 +1496,55 @@ export async function runDoneCommand(
 				);
 			}
 			lines.push(...completionWarnings.map((warning) => `warning: ${warning}`));
-			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			appendPendingSpecWarning(lines, root, doneArgs.session, doneArgs.taskId);
 			output.stdout(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {
 		if (hasJsonFlag(args)) {
+			const data = doneRecoveryData(parsed, {
+				failedStep: parsed === undefined ? "parse" : "completion",
+				status: "failed",
+			});
 			if (error instanceof TaskCompletionBusyError) {
 				output.stdout(
-					stringifyEnvelope(
-						envelopeErr("workbench.completion_busy", error.message, {
+					stringifyEnvelope({
+						...envelopeErr("workbench.completion_busy", error.message, {
 							action: "workbench.done",
 							exitCode: 2,
 						}),
-					),
+						data: { ...data, status: "busy", failed_step: "lock" },
+					}),
 				);
 			} else if (error instanceof VerificationRunConflictError) {
 				output.stdout(
-					stringifyEnvelope(
-						envelopeErr("workbench.stale_conflict", error.message, {
+					stringifyEnvelope({
+						...envelopeErr("workbench.stale_conflict", error.message, {
 							action: "workbench.done",
 							exitCode: 2,
 						}),
-					),
+						data: {
+							...data,
+							status: "stale_conflict",
+							failed_step: "verification",
+						},
+					}),
+				);
+			} else if (parsed === undefined) {
+				output.stdout(
+					stringifyDoneJsonError(error, 2, data, {
+						code:
+							error instanceof DoneArgumentError
+								? error.code
+								: "workbench.invalid_arguments",
+						message:
+							error instanceof DoneArgumentError
+								? error.message
+								: "Invalid done arguments.",
+					}),
 				);
 			} else {
-				output.stdout(stringifyDoneJsonError(error));
+				output.stdout(stringifyDoneJsonError(error, 2, data));
 			}
 		} else {
 			output.stderr((error as Error).message);
@@ -1324,7 +1598,9 @@ export async function runVerifyTasksCommand(
 ): Promise<number> {
 	try {
 		if (args.length === 1 && (args[0] === "-h" || args[0] === "--help")) {
-			console.log("Usage: afol verify-tasks [session-path] [--strict]");
+			console.log(
+				"Usage: afol verify-tasks [session-path] [--strict] [--verbose]",
+			);
 			return 0;
 		}
 		const parsed = parseVerifyArgs(args, root);
@@ -1354,7 +1630,7 @@ export async function runVerifyTasksCommand(
 				);
 			}
 		} else {
-			console.log(formatVerifyReport(result).trimEnd());
+			console.log(formatVerifyReport(result, parsed.verbose).trimEnd());
 		}
 		return result.allCompleted ? 0 : 1;
 	} catch (error) {
@@ -1379,6 +1655,7 @@ export async function runCloseCommand(
 			allowNoReport: parsed.allowNoReport,
 			reason: parsed.reason,
 			summary: parsed.summary,
+			admitLegacyBaseline: parsed.admitLegacyBaseline,
 		});
 		try {
 			removeBinding(root, parsed.session);

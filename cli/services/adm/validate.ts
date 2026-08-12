@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { computeSourceHash } from "../../core/source-hash";
-import type { DriftFinding } from "../drift";
+import type { DriftFinding } from "../drift/types";
 import { resolveProjectWritePath } from "../project/root";
 import { buildAdmMigrationPlan } from "./planner";
 

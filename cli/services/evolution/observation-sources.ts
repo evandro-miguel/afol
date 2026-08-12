@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import type { TelemetryEvent } from "../events/telemetry";
 import type { FeedbackReport } from "../feedback";
-import type { ObservationInput } from "./observation-model";
+import {
+	type ObservationInput,
+	redactSensitiveText,
+} from "./observation-model";
 
 export type ObservationSourceContext = {
 	projectId: string;
@@ -39,9 +42,20 @@ function digest(value: unknown): string {
 	return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
-function firstToken(value: string | undefined): string {
-	const tokens = value?.trim().split(/\s+/) ?? [];
-	return tokens.find((token) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) ?? "";
+/** Bounded, redacted command identity for recurrence; not a shell replay string. */
+export function commandSignature(value: string | undefined): string {
+	const tokens = (value?.trim().split(/\s+/) ?? [])
+		.filter((token) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token))
+		.slice(0, 6)
+		.map((token) =>
+			token
+				.replace(/(?:^|=)\d{4,}(?:$|\b)/g, "<n>")
+				.replace(/[a-f0-9]{16,}/gi, "<id>"),
+		);
+	return redactSensitiveText(tokens.join(" "), { redactPaths: true }).slice(
+		0,
+		256,
+	);
 }
 
 function observationId(kind: string, source: unknown): string {
@@ -126,7 +140,7 @@ export function observationFromEvidence(
 		created_at: evidence.created_at,
 		result: evidence.result ?? null,
 		exit_code: evidence.exit_code ?? null,
-		command: firstToken(evidence.command),
+		command: commandSignature(evidence.command),
 	};
 	return {
 		...baseInput(
@@ -140,7 +154,7 @@ export function observationFromEvidence(
 		),
 		...(evidence.error_code ? { errorCode: evidence.error_code } : {}),
 		...(evidence.test ? { test: evidence.test } : {}),
-		command: firstToken(evidence.command),
+		command: commandSignature(evidence.command),
 		...(evidence.path ? { pathModule: evidence.path } : {}),
 		operation: evidence.operation ?? "verify",
 		workflowStep: evidence.workflow_step ?? "evidence",

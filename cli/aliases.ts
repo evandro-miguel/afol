@@ -40,10 +40,12 @@ export const SUBCOMMAND_ACTION_ALIASES = Object.freeze({
 		ud: "undo",
 	}),
 	governance: Object.freeze({
+		bw: "bulk-waive",
 		ls: "pending",
 		p: "pending",
 		resolve: "resolve-spec",
 		rs: "resolve-spec",
+		"waive-open": "bulk-waive",
 	}),
 	ctx: Object.freeze({
 		b: "build",
@@ -231,6 +233,14 @@ export const FLAG_ALIASES = Object.freeze({
 		"-t": "--topic",
 		"-T": "--title",
 		"-u": "--url",
+	}),
+	legacy: Object.freeze({
+		"-D": "--dry-run",
+		"-S": "--session",
+		"-T": "--task-id",
+		"-j": "--json",
+		"-m": "--summary",
+		"-r": "--reason",
 	}),
 	log: Object.freeze({
 		"-S": "--session",

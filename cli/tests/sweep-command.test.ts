@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { runSweepCommand } from "../commands/sweep";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { writeMemory as writeProjectMemory } from "../services/memory/crud";
+import { rebuildPstrIndex } from "../services/pstr/builder";
 import { openDb } from "../services/state/db";
 
 function initGitRepo(root: string): void {
@@ -26,11 +27,23 @@ function initGitRepo(root: string): void {
 
 function createHealthyFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "sweep-healthy-"));
+	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
 	mkdirSync(join(root, ".afol", "state"), { recursive: true });
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+	mkdirSync(join(root, "cli"), { recursive: true });
+	mkdirSync(join(root, "docs"), { recursive: true });
+	mkdirSync(join(root, "src", "project-template"), { recursive: true });
+	writeFileSync(join(root, ".agents", "config.json"), '{"version":"0.1.0"}');
+	writeFileSync(join(root, ".agents", "lock.json"), '{"version":"0.1.0"}');
+	writeFileSync(join(root, ".agents", "manifest.json"), '{"commands":[]}');
+	writeFileSync(join(root, "cli", "main.ts"), "export const cli = true;\n");
+	writeFileSync(
+		join(root, "src", "project-template", "index.ts"),
+		"export const template = true;\n",
+	);
+	writeFileSync(join(root, "docs", "readme.md"), "# Docs\n");
 	openDb(root).close();
-	const now = new Date().toISOString();
 	const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 	writeProjectMemory(root, {
 		updated_at: future,
@@ -46,66 +59,7 @@ function createHealthyFixture(): string {
 			},
 		],
 	});
-	writeFileSync(
-		join(root, ".afol", "pstr", "index.json"),
-		`${JSON.stringify({
-			kind: "pstr_index_v1",
-			version: 1,
-			generated_at: now,
-			source: { project_root: root, pstr_dir: join(root, ".afol", "pstr") },
-			maps: [
-				{
-					id: "cli",
-					scope: "cli",
-					status: "current",
-					authority: "observed",
-					source_paths: ["cli/main.ts"],
-					source_hash: "hash-1",
-					file_count: 1,
-					updated_at: now,
-					stale_after: future,
-					tags: ["pstr"],
-				},
-				{
-					id: "template",
-					scope: "template",
-					status: "current",
-					authority: "observed",
-					source_paths: ["src/project-template/index.ts"],
-					source_hash: "hash-2",
-					file_count: 1,
-					updated_at: now,
-					stale_after: future,
-					tags: ["pstr"],
-				},
-				{
-					id: "docs",
-					scope: "docs",
-					status: "current",
-					authority: "observed",
-					source_paths: ["docs/readme.md"],
-					source_hash: "hash-3",
-					file_count: 1,
-					updated_at: now,
-					stale_after: future,
-					tags: ["pstr"],
-				},
-				{
-					id: "config",
-					scope: "config",
-					status: "current",
-					authority: "observed",
-					source_paths: [".afol/config.json"],
-					source_hash: "hash-4",
-					file_count: 1,
-					updated_at: now,
-					stale_after: future,
-					tags: ["pstr"],
-				},
-			],
-		})}\n`,
-		"utf8",
-	);
+	rebuildPstrIndex(root);
 	rebuildWorkBenchIndex(root);
 	initGitRepo(root);
 	return root;

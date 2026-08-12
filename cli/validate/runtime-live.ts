@@ -27,11 +27,11 @@ const LIVE_BENCHMARK_SCENARIO_IDS: Record<string, string> = {
 	"file-inspection-vs-command": "live-implement-next-governance-preflight",
 	"validation-flow": "live-tools-benchmark-discovery",
 };
-const LIVE_BENCHMARK_REFRESH_COMMAND = "afol bench run --all --save";
+const LIVE_BENCHMARK_REFRESH_COMMAND = "external fixed harness receipt";
 const LIVE_BENCHMARK_VALIDATE_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
 const LIVE_BENCHMARK_REFRESH_GUIDANCE = `run:${LIVE_BENCHMARK_REFRESH_COMMAND};then:${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
-const LIVE_BENCHMARK_REFRESH_NOTE = `refresh live benchmark artifacts with ${LIVE_BENCHMARK_REFRESH_COMMAND}; then validate with ${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
+const LIVE_BENCHMARK_REFRESH_NOTE = `obtain a fresh receipt from the external fixed harness, place it at ${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH}, then validate with ${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
 
 interface LiveRunnerProfile {
 	runtime: string;

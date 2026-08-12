@@ -71,6 +71,84 @@ describe("evidence completion authorization", () => {
 			]),
 		).toEqual({ status: "passed", evidenceId: "E-passed" });
 	});
+
+	test("does not authorize shell no-op commands", () => {
+		for (const command of [
+			"true",
+			" /bin/true ",
+			" : ",
+			"true # verification",
+			": # verification",
+			"env true",
+			"/bin/env true",
+			"/usr/bin/env true",
+			"env -i 'true'",
+			"env -C /tmp true",
+			"env --chdir=/tmp true",
+			"command -- true",
+			"command -p true",
+			"command -v true",
+			"command -V true",
+			"exec :",
+			"exec -c true",
+			"exec -l true",
+			"exec -cl true",
+			"exec -a afol true",
+			"exec -- true",
+			"sh -c true",
+			"bash -lc 'true'",
+			"zsh -c ':'",
+			"/bin/sh -c true",
+			"/usr/bin/bash -lc true",
+			"/usr/bin/zsh -c :",
+			"/bin/dash -c true",
+			"bash -c",
+			"eval true",
+			"eval 'true",
+			"true && :",
+			"true || :",
+			"true; :",
+			"true | :",
+			"true & :",
+		]) {
+			expect(
+				evidenceCompletionAuthorization([
+					{
+						id: `E-${command.trim()}`,
+						command,
+						result: "passed",
+						exit_code: 0,
+						provenance: "observed",
+					},
+				]),
+			).toEqual({ status: "missing" });
+		}
+	});
+
+	test("keeps runnable wrapper commands authorizing", () => {
+		for (const command of [
+			"env CI=1 bun test --filter workbench",
+			"command bun test",
+			"exec bun test",
+			"bash -lc 'bun test'",
+			"/usr/bin/bash -lc 'bun test'",
+			"/opt/custom/bash -lc true",
+			"eval bun test",
+			"bun test && bun run typecheck",
+		]) {
+			expect(
+				evidenceCompletionAuthorization([
+					{
+						id: `E-${command}`,
+						command,
+						result: "passed",
+						exit_code: 0,
+						provenance: "observed",
+					},
+				]),
+			).toEqual({ status: "passed", evidenceId: `E-${command}` });
+		}
+	});
 });
 
 test("strict verification rejects duplicate task ids across task files", () => {

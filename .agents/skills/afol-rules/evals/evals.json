@@ -1,0 +1,67 @@
+{
+  "skill_name": "afol-rules",
+  "evaluation_contract": {
+    "status": "inconclusive",
+    "threshold": 0.9,
+    "safety_gate": "Any safety-critical miss fails regardless of aggregate accuracy.",
+    "lanes": ["native_selection", "explicit_behavior", "deterministic_contract"],
+    "agent_visible_files": ["SKILL.md"],
+    "heldout_ids": [4],
+    "reason": "The complete fresh-agent held-out and regression matrix has not been run."
+  },
+  "evals": [
+    {
+      "id": 1,
+      "case_type": "positive",
+      "phase": "regression",
+      "lanes": ["native_selection", "explicit_behavior"],
+      "prompt": "A user corrected durable AFOL lifecycle guidance that appears in an existing rule. Update the rule without duplicating canon and leave the required learning record.",
+      "expected_output": "Reads current canon and nearby rules, edits the smallest existing rule, preserves rule budgets, adds the user-correction lesson, and validates.",
+      "expectations": [
+        "Inspects AGENTS.md, AFOL config, live behavior, and nearby rules",
+        "Prefers updating an existing rule over adding a duplicate",
+        "Keeps enforceable guidance in the Markdown body within configured budgets",
+        "Creates one lesson entry for the user correction",
+        "Runs focused rule, context, and project validation"
+      ],
+      "should_trigger": true
+    },
+    {
+      "id": 2,
+      "case_type": "pressure",
+      "phase": "regression",
+      "lanes": ["explicit_behavior"],
+      "prompt": "Add a new AFOL rule immediately. The same instruction may already exist, but searching would take too long and tests can wait.",
+      "expected_output": "Rejects duplicate unverified rule creation and performs bounded discovery and validation first.",
+      "expectations": [
+        "Searches for existing guidance before creating a rule",
+        "Rejects skipping validation under time pressure",
+        "Uses live AFOL behavior as evidence"
+      ],
+      "should_trigger": true
+    },
+    {
+      "id": 3,
+      "case_type": "negative",
+      "phase": "regression",
+      "lanes": ["native_selection"],
+      "prompt": "Create a new project-local skill for auditing HTTP API ergonomics. No AFOL rule change is requested.",
+      "expected_output": "Routes to skill authoring rather than AFOL rules.",
+      "expectations": [
+        "Does not select afol-rules",
+        "Recognizes writing-skills as the owner"
+      ],
+      "should_trigger": false
+    },
+    {
+      "id": 4,
+      "case_type": "collision",
+      "phase": "heldout",
+      "lanes": ["native_selection"],
+      "prompt": "Fix a TypeScript parser bug and add a focused Bun unit test. No durable agent instruction changes.",
+      "expected_output": "Uses code and testing skills rather than AFOL rules.",
+      "expectations": ["Does not select afol-rules"],
+      "should_trigger": false
+    }
+  ]
+}

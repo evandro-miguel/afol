@@ -21,7 +21,10 @@ import {
 	rebuildObservationProjection,
 	validateObservationProjection,
 } from "../services/evolution/observation-journal";
-import { normalizeObservationRecord } from "../services/evolution/observation-model";
+import {
+	normalizeObservationRecord,
+	OBSERVATION_FINGERPRINT_VERSION,
+} from "../services/evolution/observation-model";
 import { writeEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import { dispatchRecurrenceDecision } from "../services/evolution/recurrence-authority";
 
@@ -137,10 +140,11 @@ describe("observation journal", () => {
 			expect(
 				db
 					.query(
-						"SELECT state, occurrence_count, distinct_session_count, distinct_production_day_count FROM issue_clusters WHERE project_id = ?",
+						"SELECT fingerprint_version, state, occurrence_count, distinct_session_count, distinct_production_day_count FROM issue_clusters WHERE project_id = ?",
 					)
 					.get(PROJECT_ID),
 			).toMatchObject({
+				fingerprint_version: OBSERVATION_FINGERPRINT_VERSION,
 				state: "recurring",
 				occurrence_count: 3,
 				distinct_session_count: 2,
@@ -283,7 +287,7 @@ describe("observation journal", () => {
 
 			const authority = dispatchRecurrenceDecision({
 				projectId: PROJECT_ID,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				fingerprint: first.fingerprint,
 				action: "confirm",
 				observationIds: ["01"],
@@ -299,7 +303,7 @@ describe("observation journal", () => {
 					clusterId: first.fingerprint,
 					action: "confirm",
 					authority,
-					fingerprintVersion: 1,
+					fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 					observationIds: ["01"],
 					sourceDecisionRef: "U-checkpoint",
 					sourceRefs: [{ id: "U-checkpoint", kind: "decision" }],
@@ -376,7 +380,7 @@ describe("observation journal", () => {
 			const fingerprint = observation("01", "S-01", 1).fingerprint;
 			const authority = dispatchRecurrenceDecision({
 				projectId: PROJECT_ID,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				fingerprint,
 				action: "confirm",
 				observationIds: ["01"],
@@ -391,7 +395,7 @@ describe("observation journal", () => {
 				clusterId: fingerprint,
 				action: "confirm",
 				authority,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				observationIds: ["01"],
 				sourceDecisionRef: "U-01",
 				sourceRefs: [{ id: "U-01", kind: "decision" }],
@@ -419,7 +423,7 @@ describe("observation journal", () => {
 			] as const) {
 				const nextAuthority = dispatchRecurrenceDecision({
 					projectId: PROJECT_ID,
-					fingerprintVersion: 1,
+					fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 					fingerprint,
 					action,
 					observationIds: ["01"],
@@ -434,7 +438,7 @@ describe("observation journal", () => {
 					clusterId: fingerprint,
 					action,
 					authority: nextAuthority,
-					fingerprintVersion: 1,
+					fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 					observationIds: ["01"],
 					sourceDecisionRef: ref,
 					sourceRefs: [{ id: ref, kind: "decision" }],
@@ -553,7 +557,7 @@ describe("observation journal", () => {
 			).fingerprint;
 			const authority = dispatchRecurrenceDecision({
 				projectId: PROJECT_ID,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				fingerprint,
 				action: "dismiss",
 				observationIds: ["missing-observation"],
@@ -568,7 +572,7 @@ describe("observation journal", () => {
 					clusterId: fingerprint,
 					action: "dismiss",
 					authority,
-					fingerprintVersion: 1,
+					fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 					observationIds: ["missing-observation"],
 					sourceDecisionRef: "U-stale",
 					sourceRefs: [{ id: "U-stale", kind: "decision" }],
@@ -593,7 +597,7 @@ describe("observation journal", () => {
 			});
 			const authority = dispatchRecurrenceDecision({
 				projectId: PROJECT_ID,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				fingerprint: first.fingerprint,
 				action: "dismiss",
 				observationIds: [first.id],
@@ -608,7 +612,7 @@ describe("observation journal", () => {
 				clusterId: first.fingerprint,
 				action: "dismiss",
 				authority,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				observationIds: [first.id],
 				sourceDecisionRef: "U-dismiss",
 				sourceRefs: [{ id: "U-dismiss", kind: "decision" }],
@@ -661,7 +665,7 @@ describe("observation journal", () => {
 			});
 			const authority = dispatchRecurrenceDecision({
 				projectId: PROJECT_ID,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				fingerprint: first.fingerprint,
 				action: "confirm",
 				observationIds: [first.id],
@@ -676,7 +680,7 @@ describe("observation journal", () => {
 				clusterId: first.fingerprint,
 				action: "confirm" as const,
 				authority,
-				fingerprintVersion: 1,
+				fingerprintVersion: OBSERVATION_FINGERPRINT_VERSION,
 				observationIds: [first.id],
 				sourceDecisionRef: "U-retry",
 				sourceRefs: [{ id: "U-retry", kind: "decision" }],

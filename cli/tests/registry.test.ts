@@ -129,8 +129,8 @@ describe("kernel registry", () => {
 		expect(byCommand.get("bench")?.sideEffect).toBe("read");
 		expect(byCommand.get("project-benchmark")?.sideEffect).toBe("generated");
 		expect(byCommand.get("spec")?.sideEffect).toBe("read");
-		expect(byCommand.get("adr")?.sideEffect).toBe("read");
-		expect(byCommand.get("changelog")?.sideEffect).toBe("read");
+		expect(byCommand.get("adr")?.sideEffect).toBe("write");
+		expect(byCommand.get("changelog")?.sideEffect).toBe("append");
 		expect(byCommand.get("health")?.sideEffect).toBe("read");
 		expect(byCommand.get("db")?.sideEffect).toBe("read");
 		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
@@ -140,6 +140,28 @@ describe("kernel registry", () => {
 		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
 
+		const adr = byCommand.get("adr");
+		expect(adr?.sideEffect).toBe("write");
+		expect(adr?.subcommands?.map((entry) => entry.usage)).toEqual([
+			"new|create <topic>",
+			"accept|ac <id>",
+			"supersede|sp <old-id> <new-id>",
+			"abandon|ab <id> --reason <text>",
+			"archive|ar <id> --reason <text>",
+		]);
+		expect(
+			adr?.subcommands?.every((entry) => entry.sideEffect === "write"),
+		).toBe(true);
+
+		const changelog = byCommand.get("changelog");
+		expect(changelog?.sideEffect).toBe("append");
+		expect(changelog?.subcommands?.map((entry) => entry.usage)).toEqual([
+			"add|a --type <type> --message <text>",
+		]);
+		expect(
+			changelog?.subcommands?.every((entry) => entry.sideEffect === "append"),
+		).toBe(true);
+
 		for (const entry of kernelRegistry.commands) {
 			expect(["read", "write", "append", "generated"]).toContain(
 				entry.sideEffect,
@@ -147,6 +169,20 @@ describe("kernel registry", () => {
 			expect(entry.command.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeLessThanOrEqual(80);
+		}
+	});
+
+	test("publishes verify report flags while preserving aliases and JSON usage", () => {
+		for (const command of ["verify", "verify-tasks"] as const) {
+			const spec = kernelRegistry.commands.find(
+				(entry) => entry.command === command,
+			);
+			expect(spec?.kind).toBe("verifyTasks");
+			expect(spec?.aliases).toEqual(command === "verify" ? ["vf"] : ["vt"]);
+			expect(spec?.subcommands?.map((entry) => entry.usage)).toEqual([
+				"[session-path] [--strict] [--verbose]",
+				"--session <session-id> --json",
+			]);
 		}
 	});
 
@@ -499,5 +535,67 @@ describe("kernel registry", () => {
 				description: "Export filtered telemetry events",
 			},
 		]);
+	});
+
+	test("keeps library, memory, health, and preflight runtime actions represented", () => {
+		const usages = (command: string): string[] =>
+			kernelRegistry.commands
+				.find((entry) => entry.command === command)
+				?.subcommands?.map((entry) => entry.usage) ?? [];
+
+		expect(usages("library")).toEqual([
+			"list|ls [--json]",
+			"topic <topic>|--topic <topic> [--json]",
+			"search <query>|--query <query> [--json]",
+			"graph [--json]",
+			"health [--json]",
+			"doctor [--json]",
+			"propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+			"add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+			"add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+			"invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+			"rebuild-index [--json]",
+		]);
+		expect(usages("memory")).toEqual([
+			"list|ls [--json]",
+			"show|get --id <id> [--json]",
+			"search|find --query <query> [--json]",
+			"render [--json]",
+			"recall --query <query> [--json]",
+			"add --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+			"update|set --id <id> [--title <title>] [--body <text>] [--tags <tag>[,<tag>...]] [--json]",
+			"archive --id <id> [--json]",
+			"propose --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+			"promote --id <id> [--json]",
+			"reject --id <id> --reason <text> [--json]",
+		]);
+		expect(usages("health")).toEqual([
+			"[core] [--json]",
+			"full [--json]",
+			"release|--release [--json]",
+			"--area <adm|pstr|wb|memory|library|state|ctx|evolution|token_budget> [--deep] [--json]",
+			"--deep [--json]",
+		]);
+		expect(usages("preflight")).toEqual(["<intent query> [--json]"]);
+
+		const byUsage = (command: string) =>
+			new Map(
+				(
+					kernelRegistry.commands.find((entry) => entry.command === command)
+						?.subcommands ?? []
+				).map((entry) => [entry.usage, entry.sideEffect]),
+			);
+		expect(byUsage("library").get("rebuild-index [--json]")).toBe("generated");
+		for (const usage of [
+			"propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+			"add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+			"add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+			"invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+		]) {
+			expect(byUsage("library").get(usage)).toBe("write");
+		}
+		for (const usage of usages("memory").slice(5)) {
+			expect(byUsage("memory").get(usage)).toBe("write");
+		}
 	});
 });

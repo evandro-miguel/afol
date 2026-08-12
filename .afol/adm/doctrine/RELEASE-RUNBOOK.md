@@ -11,30 +11,37 @@ updated_at: "2026-07-13T00:00:00+00:00"
 
 ## Purpose
 
-`bun run validate:release` is the distribution/release artifact gate. It proves:
+`bun run validate:release` is the repository-local distribution/release gate.
+Its current package-script chain runs:
 
-- All tests pass with coverage ≥80% lines and functions (`bun run coverage:check`)
-- Deterministic build succeeds (`bun run build:deterministic`)
-- Distribution binary smokes (`bun run smoke:dist`)
-- Security scans execute and pass (`bun run validate:security:release`)
-- Release provenance is generated (`bun run release:provenance:release`)
+- version, manifest, Biome, Oxlint, Knip, and toolchain-diff checks;
+- local-state rebuild, project validation, and the blocking
+  `bun run typecheck` step;
+- template, bootstrap, project-benchmark, UX-governance, token-economy, and
+  local-kernel benchmark checks;
+- the configured failure-focused test step (`bun run test:full`, currently
+  `bun test --only-failures`) and `bun run coverage:check` (≥80% lines and
+  functions);
+- the deterministic build, release security scan, release provenance,
+  distribution smoke, and clean-checkout smoke.
 
 The release claim is limited to the observed Linux x64 path. CI is pinned to
 an Ubuntu 24.04 x64 runner. WSL2 smoke is a separate observed local check and
 must be recorded independently; neither static checks nor Ubuntu CI establish
 Windows, macOS, or ARM support.
 
-It does not currently run the AFOL project hygiene gate, the AFOL release
-health check, or the TypeScript typecheck as standalone preflights, so those
-are explicit release preflight commands in this runbook. The manifest check is
-also run explicitly so command registry drift is caught before release.
+The gate includes project validation and the TypeScript typecheck; standalone
+preflight invocations remain useful for faster diagnosis. It does not include
+the release-scoped AFOL health check or the observed WSL2 smoke, so this
+runbook keeps those as separate local checks. The manifest check is also part
+of `validate:toolchain` and may be run early to catch registry drift sooner.
 
 ## Required Tools on PATH
 
 | Tool | Purpose | Required for Real Release |
-|------|---------|---------------------------|
+| --- | --- | --- |
 | `bun` | Runtime, test runner, bundler | Yes |
-| `afol` | Compiled global CLI at `$HOME/.local/bin/afol` | Yes |
+| `afol` | Post-install global smoke | No; authorized `main` only |
 | `osv-scanner` (or `osv`) | Dependency vulnerability scan | Yes |
 | `gitleaks` | Secret scan | Yes |
 
@@ -49,48 +56,53 @@ also run explicitly so command registry drift is caught before release.
 
 ## Release Flow
 
-Use this order before any global update/install or release promotion:
+Use the repository-local kernel and `dist/afol` candidate for every
+pre-promotion step. This flow does not install or replace the global binary.
+Global installation is a separate operation allowed only after the exact
+artifact is integrated into `main` and the user explicitly authorizes it.
 
-1. Check the installed binary with `command -v afol`, verify it is not a
-   symlink, and compare `afol --version` to the repo release metadata. `./afol`
-   and `dist/afol` are repository-local development/build surfaces only.
-2. Verify generated version metadata with `bun run version:check`.
-3. Install dependencies with `bun install --frozen-lockfile`.
-4. Run `bun run typecheck`.
-5. Check CLI manifest drift with `bun run manifest:check`.
-6. Rebuild AFOL local state with `afol local-state rebuild --json`.
-7. Validate the project with `afol validate project --json`.
-8. Check release health with `afol health --release --json`.
-9. Run `bun run validate:release` from a clean checkout of the exact product
-   commit; it generates the final security and provenance artifacts.
+1. Start from a clean checkout of the exact product commit and record its
+   branch and SHA.
+2. Install dependencies with `bun install --frozen-lockfile`.
+3. Verify generated version metadata with `bun run version:check`.
+4. Check CLI manifest drift with `bun run manifest:check`.
+5. Run the blocking standalone typecheck with `bun run typecheck` for early
+   diagnostics; `validate:release` runs it again in its own chain.
+6. Rebuild AFOL local state with `bun run local-state:rebuild`.
+7. Validate the project with `bun run validate:project`.
+8. Check release health with the local kernel:
+   `bun run kernel -- health --release --json`.
+9. Run `bun run validate:release`; it generates the final candidate, security,
+   checksum, and provenance artifacts.
 10. On an observed WSL2 shell, run `bun run smoke:wsl2` separately and retain
     its output as WSL2 evidence; do not merge it with Ubuntu CI evidence.
 11. Record the observed exit code and retained log/artifact as AFOL evidence.
-12. Install `dist/afol` as a real executable only after the artifact gate.
-13. Verify installed/artifact SHA-256 equality, non-symlink status, version,
-    and an outside-repository help smoke.
-14. Close the session only after evidence is attached and no tasks remain open.
+12. After authorized `main` integration and installation of that exact
+    candidate, verify the global binary's non-symlink status, version, SHA-256
+    equality, and an outside-checkout help smoke. This is the only global
+    smoke step; it is not a `dev` validation shortcut.
+13. Close the session only after evidence is attached and no tasks remain open.
 
-Do not run global update/install when `afol --version` diverges from the repo
-version and that version has no registered release provenance. Keep the work
-local until the repo release path is proven.
+A different global `afol` version or hash while working on `dev` is expected.
+Do not repair it from a development worktree or use it as the candidate gate.
 
 ```bash
 bun install --frozen-lockfile
-bun run typecheck
+bun run version:check
 bun run manifest:check
-afol local-state rebuild --json
-afol validate project --json
-afol health --release --json
+bun run typecheck
+bun run local-state:rebuild
+bun run validate:project
+bun run kernel -- health --release --json
 bun run validate:release
-bun run smoke:clean
-test ! -L "$(command -v afol)"
-afol --version
+# Run separately on an observed WSL2 shell when WSL2 evidence is required.
+bun run smoke:wsl2
 ```
 
 ### Artifacts Produced
 
 - `dist/afol` — standalone binary
+- `dist/afol.build.json` — checksum-bound compiled-build receipt
 - `dist/afol.sha256` — checksum (format: `<sha256>  dist/afol`)
 - `dist/afol.provenance.json` — provenance including version, commit, lockfile hash, template hash, platform, arch, Bun target, disabled standalone `.env`/`bunfig.toml` autoload policy, and security scanner outcomes
 - `dist/security-scan.release.json` — release scanner versions and pass/waiver

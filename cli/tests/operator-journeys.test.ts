@@ -148,7 +148,7 @@ describe("operator UX journeys", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				"true",
+				"test -d .afol",
 				"--json",
 			]);
 			expect(doneProc.status).toBe(0);

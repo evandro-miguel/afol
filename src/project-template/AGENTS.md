@@ -86,10 +86,19 @@ afol local-state rebuild --json
 - Roadmap feature -> map to one governing parent spec under `.afol/adm/specs/`.
 - Implementation decomposition needed -> use child specs.
 - Workbench sessions must carry `roadmap_feature` and `parent_spec`.
-- Current `pending_spec` sessions may continue with warnings, but new sessions
-  are blocked while any pending spec is open. Resolve with
-  `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
-  or waive with `--no-spec-required --reason "<reason>"`.
+- `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings
+  (allowed); open pending specs do not block other new sessions.
+- A `pending_spec` session may continue lifecycle (`start`, `evidence`,
+  `done`, `close`) with warnings, and close is allowed; `afol status` and
+  `afol validate project` warn while pending specs are open.
+- Prefer `afol qt` for micro one-shot work; hygiene warnings (health,
+  maintenance, open pending) do not stop mid-delivery lifecycle. Repair corrupt
+  context with `afol catchup --fix`.
+- Resolve with short path: `afol gov rs -S <id> -F <F-id> -P <spec-id>`
+  (`-S` optional when active/bound) or waive
+  `afol gov rs -S <id> --no-spec-required -r "<reason>"`.
+- Optional debt cleanup only: `afol gov bulk-waive -r "<reason>" [--limit 20]
+  [--dry-run]` — do not require bulk cleanup to ship one feature.
 - Plans/tasks execute approved intent. They do not replace roadmap/spec
   definition.
 - Non-trivial work -> use `.afol/wb/` for durable execution artifacts.
@@ -164,8 +173,8 @@ afol local-state rebuild --json
 
 - Use Caveman-style updates by default: concise, no filler, no repeated setup.
   Keep full precise prose when compression could hide risk, order, or evidence.
-- Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
-  CLI, and existing `.afol/pstr/` maps before broad scans.
+- Start narrow: `rg`, `fd`, focused reads, Project RAG through `ragctl`, and
+  existing `.afol/pstr/` maps before broad scans.
 - Prefer repo-local configured plan state and `.afol/memory/` records
   before broad historical reads.
 - Use RTK only for noisy shell output:
@@ -178,10 +187,35 @@ afol local-state rebuild --json
 
 - Exact search/config: `rg`, `fd`, `jq`.
 - Current structure: `.afol/pstr/` when present.
-- Indexed/structured: use MCPs only when configured and narrower than local
-  tools.
+- Semantic repository navigation: Project RAG only. Use the global
+  `evandro-rag-system` skill when available, verify with
+  `ragctl project verify --project <project-slug-or-id> --json`, then search
+  with `ragctl project search --project <project-slug-or-id> "<query>" --json`.
+  Confirm findings with focused local reads. If the project is unregistered or
+  stale, use that skill's bounded registration or ingestion flow before relying
+  on semantic results.
+- Verify the live Project RAG index immediately before trusting a result. A
+  stale, failed, missing, or out-of-scope result is orientation only, never
+  proof of current code or governance.
+- Project RAG scopes may exclude leading-dot directories. Treat `.afol/adm/**`
+  and `.agents/**` as a deliberate hidden-administration gap when they are not
+  registered: read those paths directly from the checkout instead of inferring
+  their contents or absence from search.
+- For an existing registered project with stale indexed files, use a bounded
+  manual delta reingest from the selected `rag-v2` checkout, then verify again:
+
+  ```bash
+  bun run ingest-project \
+    --root <absolute-project-root> \
+    --include <include-roots> --max-files 100
+  ragctl project verify --project <project-slug-or-id> --json
+  ```
+
+  Repeat only as needed, and reserve `--force` for an explicitly owned full
+  rebuild. Project RAG watchers are removed; no watcher or resident MCP/core
+  startup is required for retrieval or freshness repair.
 - Syntax search: `sg`/`ast-grep`.
-- Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
+- Repo history/context: `git`/`gh`.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
   `lightpanda`.
 - Runtime/tasks: `bun`/`node`/`npm`, `afol`, and project-specific toolchains
@@ -198,8 +232,10 @@ afol local-state rebuild --json
 - Workbench task state lives in the `State Board` and AFOL lifecycle commands.
   Do not use `T-xx` checklist markers or checkbox-done language for lifecycle
   state.
-- Governed sessions may enter `pending_spec`, but new sessions are blocked
-  while open pending specs exist until they are resolved or waived.
+- `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings; open
+  pending specs do not block other new sessions, and a `pending_spec` session
+  may continue lifecycle (`start`, `evidence`, `done`, `close`) with warnings
+  until the spec is resolved or waived.
 - Use `afol start`, `afol evidence`, `afol done`, and `afol close`; `done`
   requires valid task-scoped evidence.
 - Finalize optional artifacts before closure.

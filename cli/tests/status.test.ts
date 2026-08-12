@@ -449,7 +449,7 @@ describe("status command", () => {
 		}
 	});
 
-	test("supports --json with simple payload and read paths", () => {
+	test("supports --json with one canonical payload and required legacy keys", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
@@ -458,32 +458,62 @@ describe("status command", () => {
 			expect(captured.stderr).toEqual([]);
 			expect(captured.stdout.length).toBe(1);
 
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				schema: string;
-				ok: boolean;
-				exit_code: number;
-				status: string;
-				task: string;
-				paths: Record<string, unknown>;
-				data?: {
-					status?: string;
-					task?: string;
-					paths?: Record<string, unknown>;
-				};
-			};
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
 			expect(payload.exit_code).toBe(0);
+			expect(Object.keys(payload).sort()).toEqual(
+				[
+					"action",
+					"data",
+					"exit_code",
+					"files_written",
+					"validation_or_checks",
+					"blockers",
+					"next",
+					"ok",
+					"paths",
+					"schema",
+					"session_count",
+					"session_health_warnings",
+					"status",
+					"task",
+				].sort(),
+			);
 			expect(payload.status).toBe("in_progress");
 			expect(payload.task).toBe("T-01");
-			expect(payload.data?.status).toBe("in_progress");
-			expect(payload.data?.task).toBe("T-01");
-			const paths = payload.paths;
+			const data = payload.data as Record<string, unknown>;
+			expect(data).toMatchObject({
+				status: "in_progress",
+				task: "T-01",
+				files_written: ["cli/commands/status.ts"],
+				validation_or_checks: ["bun test cli/tests/status.test.ts"],
+				blockers: ["none"],
+				next: ["implement validate"],
+				session_count: 0,
+				session_health_warnings: [],
+			});
+			const paths = payload.paths as Record<string, unknown>;
 			expect(typeof paths.config).toBe("string");
 			expect(paths.config_source).toBe("canonical");
 			expect(typeof paths.lock).toBe("string");
 			expect(typeof paths.active_session).toBe("string");
 			expect(typeof paths.task_file).toBe("string");
+			expect(payload.session_count).toBe(data.session_count);
+			expect(payload.session_health_warnings).toEqual(
+				data.session_health_warnings,
+			);
+			for (const key of [
+				"files_written",
+				"validation_or_checks",
+				"blockers",
+				"next",
+			]) {
+				expect(payload[key]).toEqual(data[key]);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -520,7 +550,7 @@ describe("status command", () => {
 			expect(text).toContain("BLOCKERS:");
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
-			expect(text).not.toContain("BLOCKERS:\n- none");
+			expect(text).toContain("BLOCKERS:\n- none");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -592,10 +622,14 @@ describe("status command", () => {
 			expect(code).toBe(1);
 			expect(captured.stderr).toEqual([]);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema?: string;
+				action?: string;
 				ok?: boolean;
 				exit_code?: number;
 				error?: { code?: string; message?: string };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.action).toBe("status");
 			expect(payload.ok).toBe(false);
 			expect(payload.exit_code).toBe(1);
 			expect(payload.error?.code).toBe("task-not-found");
@@ -615,9 +649,9 @@ describe("status command", () => {
 			expect(findings).toHaveLength(1);
 			expect(findings[0]).toMatchObject({
 				validation: "local-state: 5 index snapshots need rebuild",
-				blocker: "local-state: 5 index snapshots need rebuild",
 				next: "run afol local-state rebuild",
 			});
+			expect(findings[0]).not.toHaveProperty("blocker");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

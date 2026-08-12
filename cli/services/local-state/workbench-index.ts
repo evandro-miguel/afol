@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 import {
 	appendValidatedEventLedgerRecords,
 	assertValidEventLedger,
+	type DurableJsonlIo,
 	type EventLedgerInspection,
 	EventLedgerValidationError,
 	inspectEventLedger,
@@ -48,6 +49,8 @@ export type WorkbenchIndexSession = {
 	problem: number;
 	touched_at: string;
 	degraded?: boolean;
+	archived?: boolean;
+	archived_at?: string;
 };
 
 export type WorkbenchIndexSnapshot = {
@@ -274,9 +277,20 @@ function sessionHasArchiveDir(root: string, session: string): boolean {
 function collectSessionLifecycleEvents(
 	root: string,
 	validatedRecords?: readonly Record<string, unknown>[],
-): Map<string, { started: boolean; closed: boolean }> {
+): Map<
+	string,
+	{ started: boolean; closed: boolean; archived: boolean; archivedAt?: string }
+> {
 	const eventLog = resolveWorkbenchEventLogPath(root);
-	const lifecycle = new Map<string, { started: boolean; closed: boolean }>();
+	const lifecycle = new Map<
+		string,
+		{
+			started: boolean;
+			closed: boolean;
+			archived: boolean;
+			archivedAt?: string;
+		}
+	>();
 	if (!existsSync(eventLog)) {
 		return lifecycle;
 	}
@@ -293,6 +307,7 @@ function collectSessionLifecycleEvents(
 			const state = lifecycle.get(workbenchSession) ?? {
 				started: false,
 				closed: false,
+				archived: false,
 			};
 			if (workbenchType === "workbench.new") {
 				state.started = true;
@@ -301,6 +316,18 @@ function collectSessionLifecycleEvents(
 			if (workbenchType === "workbench.close") {
 				state.closed = true;
 			}
+			if (workbenchType === "workbench.archive") {
+				state.archived = true;
+				if (typeof raw.ts === "string") {
+					state.archivedAt = raw.ts;
+				} else {
+					delete state.archivedAt;
+				}
+			}
+			if (workbenchType === "workbench.restore") {
+				state.archived = false;
+				delete state.archivedAt;
+			}
 			lifecycle.set(workbenchSession, state);
 		}
 
@@ -308,6 +335,7 @@ function collectSessionLifecycleEvents(
 			const state = lifecycle.get(telemetrySession) ?? {
 				started: false,
 				closed: false,
+				archived: false,
 			};
 			if (telemetryType === "session_start") {
 				state.started = true;
@@ -791,6 +819,7 @@ function parseTaskRows(
 function summarizeSession(
 	session: string,
 	tasks: WorkbenchIndexTask[],
+	archive?: { archived: boolean; archivedAt?: string },
 ): WorkbenchIndexSession {
 	const completed = tasks.filter((task) => task.state === "done").length;
 	const problem = tasks.filter((task) => task.state === "problem").length;
@@ -811,6 +840,9 @@ function summarizeSession(
 			tasks.length > 0 && touchedAt > 0
 				? new Date(touchedAt).toISOString()
 				: ZERO_TIME,
+		...(archive?.archived
+			? { archived: true, archived_at: archive.archivedAt }
+			: {}),
 	};
 }
 
@@ -841,6 +873,7 @@ function buildSessionsSnapshot(
 	const wbRoot = resolveWorkbenchRoot(root);
 	const allTasks: WorkbenchIndexTask[] = [];
 	const snapshotSessions: WorkbenchIndexSession[] = [];
+	const lifecycle = collectSessionLifecycleEvents(root);
 
 	for (const session of sessions) {
 		const sessionDir = resolve(wbRoot, session);
@@ -869,7 +902,11 @@ function buildSessionsSnapshot(
 		}
 
 		// If task files exist but no tasks could be parsed, the session is degraded.
-		const summary = summarizeSession(session, sessionTasks);
+		const summary = summarizeSession(
+			session,
+			sessionTasks,
+			lifecycle.get(session),
+		);
 		if (
 			readError ||
 			parseError ||
@@ -1009,7 +1046,12 @@ function isWorkbenchIndexSession(
 		isNonNegativeInteger(value.problem) &&
 		typeof value.touched_at === "string" &&
 		isIsoDate(value.touched_at) &&
-		(value.degraded === undefined || typeof value.degraded === "boolean")
+		(value.degraded === undefined || typeof value.degraded === "boolean") &&
+		(value.archived === undefined || typeof value.archived === "boolean") &&
+		(value.archived_at === undefined ||
+			(typeof value.archived_at === "string" &&
+				isIsoDate(value.archived_at))) &&
+		(value.archived !== true || typeof value.archived_at === "string")
 	);
 }
 
@@ -1331,14 +1373,26 @@ export function rebuildWorkBenchIndex(
 
 export function appendEventsAndRebuildWorkBenchIndex(
 	root: string,
-	sessionScope: string,
+	sessionScope: string | undefined,
 	records: readonly Record<string, unknown>[],
+	options: {
+		ledgerIo?: DurableJsonlIo;
+		beforeIndexRebuild?: () => void;
+	} = {},
 ): WorkbenchIndexSnapshot {
 	return withSessionLock(root, WORKBENCH_INDEX_LOCK_SESSION, () => {
-		appendValidatedEventLedgerRecords(root, records);
-		return rebuildWorkBenchIndex(root, sessionScope, {
-			ledgerValidationCapability: LEDGER_VALIDATION_CAPABILITY,
-		});
+		appendValidatedEventLedgerRecords(root, records, options.ledgerIo);
+		try {
+			options.beforeIndexRebuild?.();
+			return rebuildWorkBenchIndex(root, sessionScope, {
+				ledgerValidationCapability: LEDGER_VALIDATION_CAPABILITY,
+			});
+		} catch (error) {
+			throw new Error(
+				`event ledger committed; workbench index repair required (run afol local-state rebuild): ${(error as Error).message}`,
+				{ cause: error },
+			);
+		}
 	});
 }
 

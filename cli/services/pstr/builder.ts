@@ -1089,11 +1089,13 @@ export function checkPstrStale(
 		}));
 	}
 
-	const now = Date.now();
+	const liveById = new Map(liveEntries.map((entry) => [entry.id, entry]));
 	return snapshot.maps.map((entry) => {
-		const stale = Number.isFinite(Date.parse(entry.stale_after))
-			? Date.parse(entry.stale_after) <= now
-			: true;
+		const liveEntry = liveById.get(entry.id);
+		const stale =
+			snapshotEntryIsStale(root, entry) ||
+			!liveEntry ||
+			!mapEntriesMatch(entry, liveEntry);
 		return {
 			id: entry.id,
 			stale,

@@ -7,10 +7,6 @@ import {
 	boundedSpawn,
 	spawnFailureDetail,
 } from "../core/subprocess";
-import {
-	_classifySpawnForBench,
-	_collectCodexFailureNotes,
-} from "../services/benchmark/live-runner";
 
 describe("boundedSpawn", () => {
 	test("returns ok for successful command", () => {
@@ -161,7 +157,7 @@ describe("boundedSpawn EACCES primitive", () => {
 	});
 });
 
-describe("_classifySpawnForBench", () => {
+describe("boundedSpawn diagnostics", () => {
 	test("preserves the EPERM code during spawn-error normalization", () => {
 		expect(
 			_formatCodedSpawnError({
@@ -169,91 +165,6 @@ describe("_classifySpawnForBench", () => {
 				message: "operation not permitted",
 			}),
 		).toBe("EPERM: operation not permitted");
-	});
-
-	test("classifies ENOENT as missing", () => {
-		const result = boundedSpawn("nonexistent-binary-xyz-999", [], {
-			timeoutMs: 5_000,
-		});
-		expect(_classifySpawnForBench(result)).toBe("missing");
-	});
-
-	test("classifies EACCES as blocked", () => {
-		const testDir = mkdtempSync(join(tmpdir(), "classify-eacces-"));
-		try {
-			const scriptPath = join(testDir, "nonexec.sh");
-			writeFileSync(scriptPath, "#!/usr/bin/env bash\necho hello\n", {
-				mode: 0o644,
-			});
-			const result = boundedSpawn(scriptPath, [], {
-				timeoutMs: 5_000,
-				cwd: testDir,
-			});
-			expect(_classifySpawnForBench(result)).toBe("blocked");
-		} finally {
-			rmSync(testDir, { recursive: true, force: true });
-		}
-	});
-
-	test("classifies EPERM spawn errors as blocked", () => {
-		expect(
-			_classifySpawnForBench({
-				ok: false,
-				status: null,
-				timedOut: false,
-				signal: null,
-				spawnError: "EPERM: operation not permitted",
-			}),
-		).toBe("blocked");
-	});
-
-	test("classifies non-permission spawn errors as failed", () => {
-		expect(
-			_classifySpawnForBench({
-				ok: false,
-				status: null,
-				timedOut: false,
-				signal: null,
-				spawnError: "ENOBUFS: stdout maxBuffer exceeded",
-			}),
-		).toBe("failed");
-	});
-
-	test("preserves non-permission spawn errors in failed benchmark notes", () => {
-		expect(
-			_collectCodexFailureNotes({
-				status: null,
-				timedOut: false,
-				spawnError: "ENOBUFS: stdout maxBuffer exceeded",
-				stderr: "",
-			}),
-		).toEqual(["spawn-error:ENOBUFS: stdout maxBuffer exceeded"]);
-	});
-
-	test("classifies zero exit as ok", () => {
-		const result = boundedSpawn("bash", ["-c", "exit 0"], {
-			timeoutMs: 5_000,
-		});
-		expect(_classifySpawnForBench(result)).toBe("ok");
-	});
-
-	test("classifies nonzero exit as failed", () => {
-		const result = boundedSpawn("bash", ["-c", "exit 1"], {
-			timeoutMs: 5_000,
-		});
-		expect(_classifySpawnForBench(result)).toBe("failed");
-	});
-
-	test("classifies timeout as failed", () => {
-		const result = boundedSpawn("sleep", ["30"], { timeoutMs: 200 });
-		expect(_classifySpawnForBench(result)).toBe("failed");
-	});
-
-	test("classifies external SIGKILL as failed", () => {
-		const result = boundedSpawn("bash", ["-c", "kill -9 $$"], {
-			timeoutMs: 10_000,
-		});
-		expect(_classifySpawnForBench(result)).toBe("failed");
 	});
 });
 
@@ -271,6 +182,5 @@ describe("boundedSpawn maxBuffer diagnostics", () => {
 		expect(result.timedOut).toBe(false);
 		expect(result.spawnError).not.toBeNull();
 		expect(result.spawnError).toMatch(/maxBuffer|ENOBUFS|stdout/iu);
-		expect(_classifySpawnForBench(result)).toBe("failed");
 	});
 });

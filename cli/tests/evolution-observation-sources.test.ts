@@ -65,7 +65,7 @@ describe("evolution observation source adapters", () => {
 			input as NonNullable<typeof input>,
 		);
 		expect(record.kind).toBe("test_failure");
-		expect(record.normalized_fields.command).toBe("bun");
+		expect(record.normalized_fields.command).toBe("bun test --filter unsafe");
 		expect(JSON.stringify(record)).not.toContain("sk-secret-value");
 		expect(record.id).toBe(
 			normalizeObservationRecord(
@@ -97,9 +97,35 @@ describe("evolution observation source adapters", () => {
 				CONTEXT,
 			) as NonNullable<ReturnType<typeof observationFromEvidence>>,
 		);
-		expect(changedSensitiveFields.source_refs[0]?.digest).toBe(
-			record.source_refs[0]?.digest,
+		expect(changedSensitiveFields.normalized_fields.error_code).toBe(
+			"authorization=<redacted>",
 		);
+	});
+
+	test("separates meaningful bun command families while normalizing equivalent forms", () => {
+		const make = (command: string) =>
+			normalizeObservationRecord(
+				observationFromEvidence(
+					{
+						id: "E-02",
+						created_at: "2026-07-17T00:00:00.000Z",
+						result: "failed",
+						exit_code: 1,
+						command,
+					},
+					CONTEXT,
+				) as NonNullable<ReturnType<typeof observationFromEvidence>>,
+			);
+		const test = make("TOKEN=secret bun test cli/tests/a.test.ts");
+		const check = make("bun run check --trace-id 123456789");
+		const build = make("bun run build /private/path");
+		expect(
+			new Set([test.fingerprint, check.fingerprint, build.fingerprint]).size,
+		).toBe(3);
+		expect(make("TOKEN=other bun   test cli/tests/a.test.ts").fingerprint).toBe(
+			test.fingerprint,
+		);
+		expect(JSON.stringify(build)).not.toContain("/private/path");
 	});
 
 	test("converts already-redacted linked feedback without persisting its message", () => {

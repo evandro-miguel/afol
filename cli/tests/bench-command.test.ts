@@ -8,17 +8,17 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runBenchCommand, saveRuntimeLiveSnapshot } from "../commands/bench";
+import { runBenchCommand } from "../commands/bench";
 import { runCliMicroBenchmark } from "../services/benchmark/cli-micro";
 import {
 	collectExpectationNotes,
 	commandMatchesExpected,
+	runLiveBenchmark,
 } from "../services/benchmark/live-runner";
 import {
 	classifyCommand,
 	parseEventStream,
 } from "../services/benchmark/metrics";
-import { buildReport } from "../services/benchmark/report";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
 import type { BenchResult, BenchScenario } from "../services/benchmark/types";
 
@@ -336,12 +336,12 @@ describe("bench command surfaces", () => {
 		const root = process.cwd();
 		const captured = captureIo();
 		const code = await runBenchCommand("cli", ["--json"], root, captured.io);
-		expect(code).toBe(0);
 		expect(captured.stdout.length).toBe(1);
 		const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 			schema: string;
 			ok: boolean;
 			action: string;
+			exit_code: number;
 			data: {
 				pack_id: string;
 				results: Array<{
@@ -352,8 +352,9 @@ describe("bench command surfaces", () => {
 			};
 		};
 		expect(payload.schema).toBe("afol.result/v1");
-		expect(payload.ok).toBe(true);
 		expect(payload.action).toBe("bench.cli");
+		expect(payload.ok).toBe(code === 0);
+		expect(payload.exit_code).toBe(code);
 		expect(payload.data.pack_id).toBe("cli-micro");
 		expect(payload.data.results).toHaveLength(7);
 		expect(
@@ -361,7 +362,7 @@ describe("bench command surfaces", () => {
 		).toBe(true);
 	});
 
-	test("runtime-live action exposes dry-run metadata without execution", async () => {
+	test("runtime-live action requires an externally produced receipt", async () => {
 		const captured = captureIo();
 		const code = await runBenchCommand(
 			"runtime-live",
@@ -374,18 +375,18 @@ describe("bench command surfaces", () => {
 			action: string;
 			data: {
 				mode: string;
-				live_execution: boolean;
-				live_execution_entrypoint: string;
+				receipt_required: boolean;
+				receipt_path: string;
 				benchmark_profile: { model: string; reasoning_effort: string };
 				scenario_count: number;
 				validation_command: string;
 			};
 		};
 		expect(payload.action).toBe("bench.runtime-live");
-		expect(payload.data.mode).toBe("dry-run");
-		expect(payload.data.live_execution).toBe(false);
-		expect(payload.data.live_execution_entrypoint).toBe(
-			"afol bench run --all --save",
+		expect(payload.data.mode).toBe("receipt-required");
+		expect(payload.data.receipt_required).toBe(true);
+		expect(payload.data.receipt_path).toBe(
+			".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json",
 		);
 		expect(payload.data.benchmark_profile.model).toBe("gpt-5.4-mini");
 		expect(payload.data.benchmark_profile.reasoning_effort).toBe("medium");
@@ -395,7 +396,7 @@ describe("bench command surfaces", () => {
 		);
 	});
 
-	test("runtime-live dry-run reports malformed snapshot without executing", async () => {
+	test("runtime-live receipt preview reports malformed snapshots", async () => {
 		const root = createProjectRoot();
 		try {
 			mkdirSync(join(root, ".afol", "data", "benchmarks", "snapshots"), {
@@ -423,13 +424,13 @@ describe("bench command surfaces", () => {
 			expect(code).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				data: {
-					live_execution: boolean;
+					receipt_required: boolean;
 					snapshot_exists: boolean;
 					snapshot_parse_error: string | null;
 					note: string;
 				};
 			};
-			expect(payload.data.live_execution).toBe(false);
+			expect(payload.data.receipt_required).toBe(true);
 			expect(payload.data.snapshot_exists).toBe(true);
 			expect(payload.data.snapshot_parse_error).toBeTruthy();
 			expect(payload.data.note).toContain("snapshot parse failed");
@@ -438,31 +439,38 @@ describe("bench command surfaces", () => {
 		}
 	});
 
-	test("saved all-scenario runs write a compliant runtime-live snapshot", () => {
+	test("live benchmark runner blocks instead of executing a model", () => {
+		const scenario = listBenchScenarios()[0];
+		expect(scenario).toBeDefined();
+		const result = runLiveBenchmark(process.cwd(), scenario as BenchScenario);
+		expect(result).toMatchObject({
+			status: "blocked",
+			pass: false,
+			notes: [expect.stringContaining("external-receipt-required")],
+		});
+	});
+
+	test("saved all-scenario runs preserve an external runtime-live receipt", async () => {
 		const root = createProjectRoot();
 		try {
-			const result = validSavedBenchResult({
-				scenario_id: "governed-task-lifecycle",
-			}) as BenchResult;
-			const report = buildReport([result], null);
-			const snapshotPath = saveRuntimeLiveSnapshot(
+			const receiptPath = join(
 				root,
-				report,
-				".afol/data/benchmarks/results/run.json",
+				".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json",
 			);
-			const snapshot = JSON.parse(
-				readFileSync(join(root, snapshotPath), "utf8"),
-			) as Record<string, unknown>;
-			expect(snapshot.schema_version).toBe("1.0.0");
-			expect(snapshot.stale_after_days).toBe(7);
-			expect(Date.parse(String(snapshot.generated_at))).not.toBeNaN();
-			expect(snapshot.scenarios).toEqual(
-				expect.arrayContaining([
-					expect.objectContaining({
-						id: "live-implement-start-complete-evidence",
-					}),
-				]),
+			mkdirSync(join(root, ".afol/data/benchmarks/snapshots"), {
+				recursive: true,
+			});
+			const receiptBytes = '{"external":"receipt","preserve":true}\n';
+			writeFileSync(receiptPath, receiptBytes, "utf8");
+			const captured = captureIo();
+			await runBenchCommand(
+				"run",
+				["--all", "--save", "--json"],
+				root,
+				captured.io,
+				() => [validSavedBenchResult() as BenchResult],
 			);
+			expect(readFileSync(receiptPath, "utf8")).toBe(receiptBytes);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -545,6 +553,102 @@ describe("bench command surfaces", () => {
 					message: expect.stringContaining("missing-run.json"),
 				},
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("non-passing benchmarks emit failure envelopes", async () => {
+		const root = createProjectRoot();
+		const failedRunner = () => [
+			validSavedBenchResult({
+				status: "failed",
+				pass: false,
+			}) as BenchResult,
+		];
+		const failedCliRunner = () => [
+			{
+				command: "afol",
+				args: ["status"],
+				exit_code: 1,
+				wall_clock_ms: 1,
+				output_bytes: 0,
+				estimated_output_tokens: 0,
+				status: "failed" as const,
+				notes: ["fixture failure"],
+			},
+		];
+		try {
+			const cases: Array<[string, string[]]> = [
+				["cli", ["--json"]],
+				["run", ["--json"]],
+				["baseline", ["--save", "--json"]],
+			];
+			for (const [action, args] of cases) {
+				const captured = captureIo();
+				const code = await runBenchCommand(
+					action,
+					args,
+					root,
+					captured.io,
+					failedRunner,
+					failedCliRunner,
+				);
+				expect(code).toBe(1);
+				expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+					schema: "afol.result/v1",
+					ok: false,
+					action: `bench.${action}`,
+					exit_code: 1,
+					error: {
+						code:
+							action === "cli" ? "BENCH_CLI_FAILED" : "BENCH_SCENARIOS_FAILED",
+					},
+				});
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("blocked benchmarks preserve automation exit semantics", async () => {
+		const root = createProjectRoot();
+		try {
+			for (const [label, notes] of [
+				["codex missing", ["codex-missing:ENOENT: codex"]],
+				["permission blocked", ["spawn-error:EACCES: codex"]],
+			] as const) {
+				const blockedRunner = () => [
+					validSavedBenchResult({
+						status: "blocked",
+						pass: false,
+						notes,
+					}) as BenchResult,
+				];
+				for (const [action, args] of [
+					["run", ["--json"]],
+					["baseline", ["--save", "--json"]],
+				] as const) {
+					const captured = captureIo();
+					const code = await runBenchCommand(
+						action,
+						[...args],
+						root,
+						captured.io,
+						blockedRunner,
+					);
+					expect(code, `${label}: ${action}`).toBe(3);
+					expect(JSON.parse(captured.stdout[0] ?? "{}"), label).toMatchObject({
+						schema: "afol.result/v1",
+						ok: false,
+						action: `bench.${action}`,
+						exit_code: 3,
+						error: {
+							code: "BENCH_SCENARIOS_BLOCKED",
+						},
+					});
+				}
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

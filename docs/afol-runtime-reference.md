@@ -200,19 +200,32 @@ projection in a later observation flow.
 
 ## Governance
 
-- Governed sessions may enter `pending_spec` when roadmap feature or parent
-  spec linkage is missing.
+- `afol new` without `--feature-id`/`--parent-spec` creates the session with
+  `pending_spec` plus warnings; open `pending_spec` entries do not block other
+  new sessions.
 - The current `pending_spec` session can continue through `start`, `evidence`,
   `done`, and `close`; lifecycle commands emit warnings until the pending spec
-  is resolved or waived.
-- Open `pending_spec` entries block new session creation until they are
-  resolved or waived.
+  is resolved or waived, and `close` remains allowed.
+- `afol status` and `afol validate project` warn while open pending specs
+  exist; resolving or waiving is still recommended.
+- Prefer `afol qt` for micro one-shot work; multi-task slices may use repeated
+  `-t` with one `-c`, or the `n` / `st` / `d -x` / `c` path when qt is not enough.
+- Hygiene warnings (`afol health`, maintenance, open pending, stale reviews)
+  must not stop feature lifecycle mid-delivery. Lifecycle hard blocks remain:
+  done without observed evidence, close with open tasks, CI ambiguous session,
+  and corrupt context binding (`afol catchup --fix` for safe unbind/rebind).
 
 ```bash
 afol governance pending --json
-afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
-afol governance resolve-spec --session <session-id> --no-spec-required --reason "<reason>"
+afol gov rs -S <session-id> -F <F-id> -P <spec-id>
+afol gov rs -S <session-id> --no-spec-required -r "<reason>"
+afol gov bulk-waive -r "<reason>" [--limit 20] [--dry-run]
+afol catchup
+afol catchup --fix
 ```
+
+Bulk waive is optional cemetery cleanup only. Shipping one feature never
+requires bulk-waiving historical pending entries.
 
 ## Rule Injection
 

@@ -70,6 +70,42 @@ describe("task completion lock", () => {
 		}
 	});
 
+	test("done rejects a same-task nested completion attempt with a typed busy error", async () => {
+		const projectRoot = root("nested-same-task");
+		let nestedActionRan = false;
+		try {
+			await withTaskCompletionLock(
+				projectRoot,
+				"session-a",
+				"T-01",
+				async () => {
+					await expect(
+						withTaskCompletionLock(
+							projectRoot,
+							"session-a",
+							"T-01",
+							async () => {
+								nestedActionRan = true;
+							},
+							{ timeoutMs: 40, heartbeatMs: 10 },
+						),
+					).rejects.toMatchObject({
+						code: "task_completion_busy",
+					});
+				},
+				{ heartbeatMs: 10 },
+			);
+			expect(nestedActionRan).toBe(false);
+			expect(
+				existsSync(
+					resolveTaskCompletionLockPath(projectRoot, "session-a", "T-01"),
+				),
+			).toBe(false);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("recovers only a provably dead local owner and advances fencing", async () => {
 		const projectRoot = root("dead-owner");
 		try {

@@ -228,7 +228,7 @@ describe("workbench command parity", () => {
 				"-T",
 				"T-01",
 				"--test",
-				"true",
+				"test -d .afol",
 			]);
 			expect(doneProc.status).toBe(0);
 
@@ -246,7 +246,7 @@ describe("workbench command parity", () => {
 			});
 			expect(evidence[1]).toMatchObject({
 				task_id: "T-01",
-				command: "true",
+				command: "test -d .afol",
 				result: "passed",
 				provenance: "observed",
 			});

@@ -12,7 +12,11 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { buildReleaseArtifact } from "../dev/build-release";
+import {
+	buildReleaseArtifact,
+	compiledReleaseBuildArgs,
+	readMinifiedCompiledReleaseBuildReceipt,
+} from "../dev/build-release";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const scratchRoot = join(repoRoot, ".tmp");
@@ -39,6 +43,20 @@ function copyCleanSourceRoot(target: string): void {
 }
 
 describe("deterministic release build", () => {
+	test("uses the native minified compiler contract without bytecode", () => {
+		expect(compiledReleaseBuildArgs("cli/main.ts", "dist/afol")).toEqual([
+			"build",
+			"--compile",
+			"--minify",
+			"--format=esm",
+			"--no-compile-autoload-dotenv",
+			"--no-compile-autoload-bunfig",
+			"cli/main.ts",
+			"--outfile",
+			"dist/afol",
+		]);
+	});
+
 	test("two independent clean source roots produce identical SHA-256", () => {
 		const sandbox = projectScratch("reproducible-build-");
 		try {
@@ -60,6 +78,16 @@ describe("deterministic release build", () => {
 			expect(second.outfile).toBe(join(secondRoot, "dist", "afol"));
 			expect(fileSha256(first.outfile)).toBe(first.sha256);
 			expect(first.sha256).toBe(second.sha256);
+			expect(existsSync(first.receiptPath)).toBe(true);
+			expect(
+				readMinifiedCompiledReleaseBuildReceipt(
+					first.outfile,
+					compiledReleaseBuildArgs("cli/main.ts", "dist/afol"),
+				),
+			).toEqual({
+				artifact_sha256: first.sha256,
+				build_args: compiledReleaseBuildArgs("cli/main.ts", "dist/afol"),
+			});
 
 			const version = spawnSync(first.outfile, ["--version"], {
 				cwd: firstRoot,

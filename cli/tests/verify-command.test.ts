@@ -218,6 +218,64 @@ describe("verify-tasks command", () => {
 		}
 	});
 
+	test("compacts strict issue output by default and exposes full details with --verbose", () => {
+		const root = mkProjectRoot("compact-report");
+		const session = "260701_0800_compact-report";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			const rows = Array.from(
+				{ length: 12 },
+				(_, index) =>
+					`| T-${String(index + 1).padStart(2, "0")} | done | worker | historical task ${index + 1} |`,
+			);
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					...rows,
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const compact = runKernel(root, [
+				"verify-tasks",
+				`.afol/wb/${session}`,
+				"--strict",
+			]);
+			expect(compact.status).toBe(1);
+			expect(compact.stdout as string).toContain("Issues: 12");
+			expect(compact.stdout as string).toContain("missing_evidence: 12");
+			expect(compact.stdout as string).toContain(
+				"T-01 marked done but lacks passed evidence",
+			);
+			expect(compact.stdout as string).not.toContain(
+				"T-06 marked done but lacks passed evidence",
+			);
+			expect(compact.stdout as string).toContain("7 more issue(s) omitted");
+
+			const verbose = runKernel(root, [
+				"verify-tasks",
+				`.afol/wb/${session}`,
+				"--strict",
+				"--verbose",
+			]);
+			expect(verbose.status).toBe(1);
+			expect(verbose.stdout as string).toContain(
+				"T-12 marked done but lacks passed evidence",
+			);
+			expect(verbose.stdout as string).not.toContain("issue(s) omitted");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("direct strict verification remains strict for closed sessions", () => {
 		const root = mkProjectRoot("closed-strict");
 		try {

@@ -6,6 +6,7 @@ import {
 	parseSessionTaskArgs,
 } from "../commands/workbench/args";
 import {
+	DEFAULT_VERIFICATION_TIMEOUT_MS,
 	MAX_VERIFICATION_TIMEOUT_MS,
 	resolveVerificationTimeoutMs,
 	runVerification,
@@ -94,6 +95,36 @@ describe("workbench parseCloseArgs", () => {
 				process.cwd(),
 			),
 		).toThrow("Cannot combine --summary with --allow-no-report.");
+	});
+
+	test("accepts --admit-legacy-baseline and defaults it to false", () => {
+		const parsed = parseCloseArgs(
+			["--session", "260530_2256_cli-native", "--admit-legacy-baseline"],
+			process.cwd(),
+		);
+		expect(parsed.session).toBe("260530_2256_cli-native");
+		expect(parsed.admitLegacyBaseline).toBe(true);
+		expect(parsed.allowNoReport).toBe(false);
+
+		const strict = parseCloseArgs(
+			["--session", "260530_2256_cli-native"],
+			process.cwd(),
+		);
+		expect(strict.admitLegacyBaseline).toBe(false);
+	});
+
+	test("rejects unknown close flags next to --admit-legacy-baseline", () => {
+		expect(() =>
+			parseCloseArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"--admit-legacy-baseline",
+					"--unknown-flag",
+				],
+				process.cwd(),
+			),
+		).toThrow("Unknown close argument: --unknown-flag");
 	});
 });
 
@@ -212,7 +243,22 @@ describe("parseDoneArgs", () => {
 		]);
 	});
 
-	test("accepts a bounded verification timeout above the legacy two-minute cap", () => {
+	test("defaults verification timeout to the bounded maximum and preserves explicit values", () => {
+		const defaultParsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test",
+				"bun test --only-failures",
+			],
+			process.cwd(),
+		);
+		expect(defaultParsed.verificationTimeoutMs).toBe(
+			DEFAULT_VERIFICATION_TIMEOUT_MS,
+		);
+		expect(DEFAULT_VERIFICATION_TIMEOUT_MS).toBe(MAX_VERIFICATION_TIMEOUT_MS);
+
 		const parsed = parseDoneArgs(
 			[
 				"--session",
@@ -227,6 +273,9 @@ describe("parseDoneArgs", () => {
 		);
 
 		expect(parsed.verificationTimeoutMs).toBe(120001);
+		expect(resolveVerificationTimeoutMs(MAX_VERIFICATION_TIMEOUT_MS)).toBe(
+			MAX_VERIFICATION_TIMEOUT_MS,
+		);
 		expect(() =>
 			parseDoneArgs(
 				[

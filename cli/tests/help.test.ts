@@ -14,6 +14,11 @@ import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
+const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 550;
+
+function estimateOutputTokens(output: string): number {
+	return Math.ceil(Buffer.byteLength(output, "utf8") / 4);
+}
 
 describe("help formatter", () => {
 	test("formats compact deterministic help text", () => {
@@ -26,6 +31,10 @@ describe("help formatter", () => {
 		expect(help).toBe(copy);
 		expect(help.split("\n").length).toBeLessThanOrEqual(70);
 		expect(help).toContain("Usage: afol");
+		expect(help).toContain("Agent fast path (active session)");
+		expect(help).toContain(
+			'afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+		);
 		expect(help).toContain("Commands");
 		expect(help).toContain("\n  s/status");
 		expect(help).toContain("s/status");
@@ -41,12 +50,21 @@ describe("help formatter", () => {
 			"pb/project-benchmark[generated] - compare references",
 		);
 		expect(help).toContain("Side effects");
-		expect(help).toContain("write=changes files/state");
-		expect(help).toContain("afol help <command>");
-		expect(help).toContain("afol help --verbose");
+		expect(help).toMatch(/write=[^;\n]*files\/state/);
+		expect(help).toContain("  afol help --verbose");
+		expect(help).toContain("  afol help <command>");
+		expect(help).not.toContain("afol help --verbose|help <command>");
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
 		expect(help).not.toContain("ma/maintenance");
+	});
+
+	test("keeps root help within the agent output token budget", () => {
+		const output = `${formatHelpText()}\n`;
+
+		expect(estimateOutputTokens(output)).toBeLessThanOrEqual(
+			ROOT_HELP_OUTPUT_TOKEN_BUDGET,
+		);
 	});
 
 	test("keeps compact help lines scan-friendly", () => {
@@ -71,6 +89,7 @@ describe("help formatter", () => {
 		expect(planning).toContain("evolve");
 		expect(planning).not.toContain("qt/quick-task");
 		expect(execution).toContain("Commands for execution");
+		expect(execution).toContain("Agent fast path (active session)");
 		expect(execution).toContain("n/new");
 		expect(execution).toContain("qt/quick-task");
 		expect(execution).not.toContain("ma/maintenance");
@@ -95,19 +114,18 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(420);
+		expect(lines.length).toBeLessThanOrEqual(450);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
 		expect(help).toContain("  project-benchmark");
 		expect(help).toContain("    aliases: pb");
-		expect(help).toContain("    effect: generated");
 		expect(help).toContain(
-			"    description: Compare AFOL against curated reference projects",
+			"project-benchmark [generated] - Compare AFOL against curated reference projects",
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
-		expect(help).toContain("  --verbose  Show subcommands");
+		expect(help).toContain("  --verbose  details");
 	});
 
 	test("formats per-command help from registry metadata", () => {
@@ -124,6 +142,18 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("advertises compact and verbose verify-task report options", () => {
+		const help = formatCommandHelp("verify-tasks", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected verify-tasks command help");
+		}
+		expect(help).toContain("Aliases: vt");
+		expect(help).toContain("[session-path] [--strict] [--verbose] [read]");
+		expect(help).toContain("--session <session-id> --json [read]");
 	});
 
 	test("routes command group help before subcommand parsers", () => {
@@ -466,7 +496,10 @@ describe("help formatter", () => {
 		).toBe(true);
 		expect(
 			parsed.find((entry) => entry.command === "evolve")?.capabilities,
-		).toEqual(["evolution.suggest.first-session/v1"]);
+		).toEqual([
+			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
+		]);
 		expect(
 			parsed.find((entry) => entry.command === "status"),
 		).not.toHaveProperty("capabilities");
@@ -478,12 +511,16 @@ describe("help formatter", () => {
 
 		expect(evolve?.capabilities).toEqual([
 			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
 		]);
 		evolve?.capabilities?.push("test-only");
 		expect(
 			kernelRegistry.commands.find((entry) => entry.command === "evolve")
 				?.capabilities,
-		).toEqual(["evolution.suggest.first-session/v1"]);
+		).toEqual([
+			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
+		]);
 	});
 
 	test("builds intent-filtered catalog json", () => {
@@ -541,23 +578,27 @@ describe("help formatter", () => {
 	test("projects evolve capabilities in single-command json only", () => {
 		expect(buildCommandHelpJson("evolve", kernelRegistry)).toMatchObject({
 			command: "evolve",
-			capabilities: ["evolution.suggest.first-session/v1"],
+			capabilities: [
+				"evolution.suggest.first-session/v1",
+				"evolution.candidates/v1",
+			],
 		});
 		expect(buildCommandHelpJson("status", kernelRegistry)).not.toHaveProperty(
 			"capabilities",
 		);
 	});
 
-	test("does not advertise unsupported init json output", () => {
+	test("advertises init json preview output", () => {
 		const help = buildCommandHelpJson("init", kernelRegistry);
 
 		expect(help).not.toBeNull();
 		expect(help?.subcommands).toEqual([
 			{
-				usage: "--dry-run",
+				usage: "--dry-run [--json]",
 				sideEffect: "read",
 				requires_approval: false,
-				description: "Preview scaffold install without writing",
+				description:
+					"Preview scaffold install without writing; --json emits a result envelope",
 			},
 		]);
 	});

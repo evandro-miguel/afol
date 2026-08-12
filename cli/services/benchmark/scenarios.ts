@@ -106,6 +106,7 @@ function seedGovernedLifecycleFixture(root: string): void {
 		join(specsDir, "spec-01.md"),
 		[
 			"---",
+			"doc_type: spec",
 			"id: spec-01",
 			"status: active",
 			"roadmap_feature: F-01",
@@ -124,15 +125,19 @@ export const BENCH_SCENARIOS: BenchScenario[] = [
 		description:
 			"Create, start, test, complete, and close a governed workbench task.",
 		prompt:
-			'Execute exactly these four commands, in order: `afol new lifecycle --feature-id F-01 --parent-spec spec-01 --task "exercise T-01"`; `afol start T-01`; `afol d T-01 -x "echo hello"`; `afol close`. The fixture already contains the governed F-01/spec-01 pair. Do not call `afol evidence`, use `--command` or `--result`, inspect or edit `.afol/wb`, or edit the evidence ledger.',
+			'Execute exactly one command: `afol qt lifecycle -F F-01 -P spec-01 -t "exercise T-01" -c "echo hello"`. The fixture already contains the governed F-01/spec-01 pair. Do not call separate `afol new`, `afol start`, `afol evidence`, `afol d`, or `afol close` commands; use the compact `afol qt` lifecycle so its observed verification remains the evidence.',
 		setup(root) {
 			seedProjectSkeleton(root);
 			seedGovernedLifecycleFixture(root);
 		},
 		expected: {
-			commands_used: ["afol new", "afol start", "afol d", "afol close"],
+			commands_used: ["afol qt"],
 			forbidden_commands: [
+				"afol new",
+				"afol start",
 				"afol evidence",
+				"afol d",
+				"afol close",
 				"--command",
 				"--result",
 				".afol/wb",

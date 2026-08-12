@@ -91,8 +91,8 @@ Replace this section after bootstrap with real product context.
 
 - Use Caveman-style updates by default: concise, no filler, no repeated setup.
   Keep full precise prose when compression could hide risk, order, or evidence.
-- Start narrow with `rg`, `fd`, focused reads, repo-analysis, Project RAG,
-  GitNexus CLI, and existing `.afol/pstr/` maps before broad scans.
+- Start narrow with `rg`, `fd`, focused reads, Project RAG through `ragctl`,
+  and existing `.afol/pstr/` maps before broad scans.
 - Use RTK only for noisy output. Use `RTK.md` when present for detailed policy.
 - Stop discovery when more context will not change decisions.
 
@@ -100,8 +100,13 @@ Replace this section after bootstrap with real product context.
 
 - Exact search/config: `rg`, `fd`, `jq`.
 - Current structure: `.afol/pstr/` when present.
-- Indexed/structured: use MCPs only when configured and narrower than local
-  tools.
+- Semantic repository navigation: Project RAG only. Use the global
+  `evandro-rag-system` skill when available, verify with
+  `ragctl project verify --project <project-slug-or-id> --json`, then search
+  with `ragctl project search --project <project-slug-or-id> "<query>" --json`.
+  Confirm findings with focused local reads. If the project is unregistered or
+  stale, use that skill's bounded registration or ingestion flow before relying
+  on semantic results.
 - Syntax: `sg`/`ast-grep`.
 - Validation/docs/tasks: `afol` and project-local package commands.
 

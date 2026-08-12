@@ -172,6 +172,49 @@ function formatEntries(entries: UxJourneyEntry[], verbose: boolean): string {
 		.join("\n");
 }
 
+function formatEntryGroups(
+	entries: UxJourneyEntry[],
+	field: "status" | "source",
+): string {
+	const groups = new Map<string, number>();
+	for (const entry of entries) {
+		const value = entry[field] || "unknown";
+		groups.set(value, (groups.get(value) ?? 0) + 1);
+	}
+	return groups.size === 0
+		? "none"
+		: [...groups.entries()]
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([value, count]) => `${value}=${count}`)
+				.join(" ");
+}
+
+function formatIssueState(issues: { severity: "error" | "warning" }[]): string {
+	if (issues.length === 0) {
+		return "none";
+	}
+	const errors = issues.filter((issue) => issue.severity === "error").length;
+	const warnings = issues.length - errors;
+	return `${issues.length} (errors=${errors}, warnings=${warnings})`;
+}
+
+function formatListSummary(
+	entries: UxJourneyEntry[],
+	issues: { severity: "error" | "warning" }[],
+): string {
+	const next =
+		issues.length > 0
+			? "run afol ux validate to inspect issues"
+			: "use afol ux list --verbose for paths/details";
+	return [
+		`ux journeys: ${entries.length}`,
+		`statuses: ${formatEntryGroups(entries, "status")}`,
+		`sources: ${formatEntryGroups(entries, "source")}`,
+		`issues: ${formatIssueState(issues)}`,
+		`next: ${next}`,
+	].join("\n");
+}
+
 function writeJson(
 	io: CommandIo,
 	action: UxAction,
@@ -222,11 +265,13 @@ export async function runUxCommand(
 				writeJson(io, uxAction, data);
 			} else {
 				io.stdout(
-					[
-						`ux journeys: ${snapshot.entries.length}`,
-						`issues: ${snapshot.issues.length}`,
-						formatEntries(snapshot.entries, parsed.verbose),
-					].join("\n"),
+					parsed.verbose
+						? [
+								`ux journeys: ${snapshot.entries.length}`,
+								`issues: ${snapshot.issues.length}`,
+								formatEntries(snapshot.entries, true),
+							].join("\n")
+						: formatListSummary(snapshot.entries, snapshot.issues),
 				);
 			}
 			return 0;

@@ -1,0 +1,1 @@
+{"id":"E-20260811171625402-a74ef4","task_id":"T-01","created_at":"2026-08-11T22:16:25.402Z","command":"bun run template:check","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"project_id":"db97afff-2026-4eb1-a799-5d34fd505267","session_id":"260811_1716_template-parity-fallout","exit_code":0}

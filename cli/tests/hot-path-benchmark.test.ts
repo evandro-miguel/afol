@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseDoneArgs } from "../commands/workbench/args";
+import { runVerificationAsync } from "../commands/workbench/verify";
+import { sha256 } from "../services/evolution/imports/digest";
 import {
 	declaredHotPathArgs,
+	executionProfile,
+	F32_CONFIG_VERIFICATION_COMMAND,
 	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
@@ -21,7 +32,7 @@ function runScenario(config: HotPathScenarioConfig) {
 						? "afol status --catchup --session fixture"
 						: "afol status --json"
 				: config.operation === "done"
-					? "afol done T-01 --test-shell true --json"
+					? `afol done T-01 --test ${JSON.stringify(F32_CONFIG_VERIFICATION_COMMAND)} --json`
 					: `afol ${config.operation} --json`;
 		const scenario: Scenario = {
 			schema_version: "1.0.0",
@@ -104,6 +115,38 @@ describe("F-32 hot-path benchmark runner", () => {
 		expect(result.profile.artifact_sha256).not.toBe("source");
 	}, 30_000);
 
+	test("source runtime reports the source execution profile unchanged", () => {
+		const profile = executionProfile("/repo/cli/main.ts");
+		expect(profile.execution_mode).toBe("source");
+		expect(profile.artifact_mode).toBe("source");
+		expect(profile.artifact_sha256).toBe("source");
+		expect(profile.runtime_version).toBe(Bun.version);
+	});
+
+	test("compiled runtime reports compiled-release provenance with a real artifact SHA-256", () => {
+		const root = mkdtempSync(join(tmpdir(), "f32-hot-path-profile-"));
+		try {
+			const artifactPath = join(root, "afol");
+			writeFileSync(artifactPath, "compiled benchmark binary bytes");
+			const profile = executionProfile(
+				"/$bunfs/root/cli/main.ts",
+				artifactPath,
+			);
+			expect(profile.execution_mode).toBe("compiled-release");
+			expect(profile.artifact_mode).toBe("bun-compile");
+			expect(profile.artifact_sha256).toMatch(/^[a-f0-9]{64}$/);
+			expect(profile.artifact_sha256).toBe(sha256(readFileSync(artifactPath)));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("compiled runtime fails closed when the running executable cannot be hashed", () => {
+		expect(() =>
+			executionProfile("/$bunfs/root/cli/main.ts", "/nonexistent/afol"),
+		).toThrow(/compiled-runtime-artifact-hash-failed/);
+	});
+
 	test("executes lifecycle catalog argv without synthesizing --session", () => {
 		const session = "fixture-session";
 		expect(
@@ -116,10 +159,16 @@ describe("F-32 hot-path benchmark runner", () => {
 		expect(
 			declaredHotPathArgs(
 				{ operation: "done", mode: "default" },
-				"afol done T-01 --test-shell true --json",
+				`afol done T-01 --test ${JSON.stringify(F32_CONFIG_VERIFICATION_COMMAND)} --json`,
 				session,
 			),
-		).toEqual(["done", "T-01", "--test-shell", "true", "--json"]);
+		).toEqual([
+			"done",
+			"T-01",
+			"--test",
+			F32_CONFIG_VERIFICATION_COMMAND,
+			"--json",
+		]);
 		expect(
 			declaredHotPathArgs(
 				{ operation: "close", mode: "default" },
@@ -127,6 +176,55 @@ describe("F-32 hot-path benchmark runner", () => {
 				session,
 			),
 		).toEqual(["close", "--json"]);
+	});
+
+	test("done config verification requires the F-32 fixture schema and project", async () => {
+		const root = mkdtempSync(join(tmpdir(), "f32-config-verification-"));
+		try {
+			const parsed = parseDoneArgs(
+				[
+					"T-01",
+					"--session",
+					"fixture",
+					"--test",
+					F32_CONFIG_VERIFICATION_COMMAND,
+					"--json",
+				],
+				root,
+			);
+			expect(parsed.verifications).toEqual([
+				{
+					mode: "argv",
+					executable: "bun",
+					args: [
+						"-e",
+						'let c=await Bun.file(".afol/config.json").json().catch(()=>null);process.exit(c?.schema_version===1&&c?.project?.name==="f32-hot-path-fixture"?0:1)',
+					],
+				},
+			]);
+			const verification = parsed.verifications[0];
+			expect(verification).toBeDefined();
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				'{"schema_version":1,"project":{"name":"f32-hot-path-fixture"}}\n',
+			);
+			expect(
+				await runVerificationAsync(
+					root,
+					verification as NonNullable<typeof verification>,
+				),
+			).toMatchObject({ exitCode: 0, status: "passed" });
+			writeFileSync(join(root, ".afol", "config.json"), "{malformed\n");
+			expect(
+				await runVerificationAsync(
+					root,
+					verification as NonNullable<typeof verification>,
+				),
+			).toMatchObject({ exitCode: 1, status: "failed" });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test.each([
@@ -140,6 +238,9 @@ describe("F-32 hot-path benchmark runner", () => {
 		expect(result.metrics.derived_work_calls).toBe(0);
 		expect(result.metrics.telemetry_append_count).toBe(0);
 		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+		expect(result.profile.execution_mode).toBe("source");
+		expect(result.profile.artifact_mode).toBe("source");
+		expect(result.profile.artifact_sha256).toBe("source");
 		if (operation !== "status") {
 			expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
 		}

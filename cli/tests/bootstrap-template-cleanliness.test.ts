@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
 	DEFAULT_TEMPLATE_FILES,
@@ -102,6 +103,52 @@ describe("generated template cleanliness", () => {
 		expect(config.paths.rules_dir).toBe(".afol/adm/rules");
 		expect(config.paths.skills_dir).toBe(".agents/skills");
 		expect(config.skills_sync.project_dir).toBe(".agents/skills");
+	});
+
+	test("exported project skills keep valid discovery metadata and root parity", () => {
+		const skillPaths = Object.keys(DEFAULT_TEMPLATE_FILES)
+			.filter((path) => /^\.agents\/skills\/[^/]+\/SKILL\.md$/.test(path))
+			.sort();
+
+		expect(skillPaths).toEqual([
+			".agents/skills/afol-library/SKILL.md",
+			".agents/skills/afol-maintenance/SKILL.md",
+			".agents/skills/afol-memory/SKILL.md",
+			".agents/skills/afol-rules/SKILL.md",
+			".agents/skills/ux-design/SKILL.md",
+		]);
+
+		for (const path of skillPaths) {
+			const entry = DEFAULT_TEMPLATE_FILES[path];
+			expect(
+				entry,
+				`${path} must exist in the generated template`,
+			).toBeDefined();
+			if (!entry) {
+				throw new Error(`${path} is missing from the generated template`);
+			}
+			const content = Buffer.from(entry.contentBase64, "base64").toString(
+				"utf8",
+			);
+			const match = /^---\n([\s\S]*?)\n---\n/.exec(content);
+			expect(match, `${path} must have YAML frontmatter`).not.toBeNull();
+
+			const frontmatter = Bun.YAML.parse(match?.[1] ?? "") as {
+				name?: string;
+				description?: string;
+				metadata?: Record<string, unknown>;
+			};
+			const expectedName = path.split("/").at(-2);
+			expect(frontmatter.name).toBe(expectedName);
+			expect(frontmatter.description?.startsWith("Use when")).toBe(true);
+			expect(typeof frontmatter.metadata?.tags).toBe("string");
+			expect(typeof frontmatter.metadata?.triggers).toBe("string");
+			expect(typeof frontmatter.metadata?.version).toBe("string");
+			expect(typeof frontmatter.metadata?.updated_at).toBe("string");
+			expect(frontmatter.metadata?.target_provider).toBe("universal");
+
+			expect(content).toBe(readFileSync(join(process.cwd(), path), "utf8"));
+		}
 	});
 
 	test("bootstrap planner never emits forbidden operations", () => {

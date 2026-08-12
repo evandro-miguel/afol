@@ -23,15 +23,10 @@ type ValidationReport = {
 
 type ValidationJsonData = {
 	report: ValidationReport;
-	ok: boolean;
-	checks: ValidationCheck[];
 };
 
 type DriftJsonData = {
 	report: DriftReport;
-	ok: boolean;
-	findings: DriftReport["findings"];
-	checked_at: string;
 };
 
 type ValidateRunner = (
@@ -101,8 +96,6 @@ function formatDriftReport(report: DriftReport): string {
 function writeValidationJson(io: CommandIo, report: ValidationReport): void {
 	const data: ValidationJsonData = {
 		report,
-		ok: report.ok,
-		checks: report.checks,
 	};
 	const envelope = report.ok
 		? envelopeOk(data, { action: "validate", exitCode: 0 })
@@ -111,19 +104,14 @@ function writeValidationJson(io: CommandIo, report: ValidationReport): void {
 				exitCode: 1,
 			}) as ResultEnvelope<ValidationJsonData>);
 	envelope.data = data;
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, ["report", "ok", "checks"]),
-		),
-	);
+	const output = envelopeWithLegacyKeys(envelope, ["report"]);
+	(output as Record<string, unknown>).checks = report.checks;
+	io.stdout(stringifyEnvelope(output));
 }
 
 function writeDriftJson(io: CommandIo, report: DriftReport): void {
 	const data: DriftJsonData = {
 		report,
-		ok: report.ok,
-		findings: report.findings,
-		checked_at: report.checked_at,
 	};
 	const envelope = report.ok
 		? envelopeOk(data, { action: "validate.drift", exitCode: 0 })
@@ -132,16 +120,11 @@ function writeDriftJson(io: CommandIo, report: DriftReport): void {
 				exitCode: 1,
 			}) as ResultEnvelope<DriftJsonData>);
 	envelope.data = data;
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, [
-				"report",
-				"ok",
-				"findings",
-				"checked_at",
-			]),
-		),
-	);
+	const output = envelopeWithLegacyKeys(envelope, ["report"]);
+	const legacyOutput = output as Record<string, unknown>;
+	legacyOutput.findings = report.findings;
+	legacyOutput.checked_at = report.checked_at;
+	io.stdout(stringifyEnvelope(output));
 }
 
 function failureReport(error: unknown): ValidationReport {

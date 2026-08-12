@@ -638,13 +638,26 @@ describe("pstr command", () => {
 		}
 	});
 
-	test("stale returns 0 when all current", async () => {
+	test("stale returns 0 while governed sources remain unchanged before expiry", async () => {
 		const root = createFixture();
 		try {
 			rebuildPstrIndex(root);
 			const io = captureIo();
 			expect(await runPstrCommand("stale", [], root, io.io)).toBe(0);
 			expect(io.stdout[0] ?? "").toContain("all current");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("stale returns 1 when source changes before expiry", async () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			writeFileSync(join(root, "cli", "test.ts"), "export const x = 2;\n");
+			const io = captureIo();
+			expect(await runPstrCommand("stale", [], root, io.io)).toBe(1);
+			expect(io.stdout[0] ?? "").toContain("stale areas found");
 		} finally {
 			cleanup(root);
 		}

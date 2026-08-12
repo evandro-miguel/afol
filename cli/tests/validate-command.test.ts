@@ -13,8 +13,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
 import type { BoundedSpawnResult } from "../core/subprocess";
+import { collectFreshnessReport } from "../services/local-state/freshness";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import { rebuildPstrIndex } from "../services/pstr/builder";
 import { resolveValidateInvocation } from "../validate/command";
 import {
 	runValidationCommands,
@@ -200,6 +202,7 @@ describe("validate command", () => {
 				exit_code: number;
 				ok: boolean;
 				findings: Array<{ hint?: string }>;
+				data: { findings?: unknown; checked_at?: unknown };
 			};
 			expect(payload).toMatchObject({
 				schema: "afol.result/v1",
@@ -207,6 +210,8 @@ describe("validate command", () => {
 				ok: false,
 			});
 			expect(payload.findings.length).toBeGreaterThan(0);
+			expect(payload.data).not.toHaveProperty("findings");
+			expect(payload.data).not.toHaveProperty("checked_at");
 
 			const human = captureIo();
 			expect(
@@ -240,6 +245,7 @@ describe("validate command", () => {
 			expect(payload.report).toBeDefined();
 			const data = payload.data as { report?: { ok?: boolean } };
 			expect(data.report?.ok).toBe(true);
+			expect(data).not.toHaveProperty("checks");
 			const checks = payload.checks as Array<Record<string, unknown>>;
 			expect(Array.isArray(checks)).toBe(true);
 			expect(
@@ -930,6 +936,200 @@ describe("validate command", () => {
 				expect(check?.ok).toBe(false);
 				expect(check?.message).toContain("run afol local-state rebuild");
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project validation preserves canonical local-state classifications", async () => {
+		const root = createValidationFixture();
+		try {
+			const canonical = collectFreshnessReport(root, {
+				localState: true,
+				pstr: false,
+			});
+			expect(canonical.findings).toHaveLength(5);
+			expect(
+				canonical.findings.every(
+					(finding) =>
+						finding.surface === "local-state" &&
+						finding.state === "missing" &&
+						finding.remediation === "run afol local-state rebuild",
+				),
+			).toBe(true);
+
+			const captured = captureIo();
+			await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			for (const finding of canonical.findings) {
+				const name = finding.id.replace("local-state:", "");
+				const check = payload.checks.find(
+					(entry) =>
+						entry.id ===
+						(name === "workbench"
+							? "wb_local_state_index"
+							: `${name}_local_state_index`),
+				);
+				expect(check).toMatchObject({ ok: false });
+				expect(check?.message).toBe(finding.message);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project drift reports stale PSTR without changing ordinary validation", async () => {
+		const root = createValidationFixture();
+		try {
+			mkdirSync(join(root, "cli"), { recursive: true });
+			writeFileSync(join(root, "cli", "main.ts"), "export const cli = true;\n");
+			rebuildPstrIndex(root);
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				"export const cli = false;\n",
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+
+			const ordinary = captureIo();
+			expect(await runValidateCommand(root, ["--json"], ordinary.io)).toBe(0);
+			const ordinaryPayload = JSON.parse(ordinary.stdout[0] ?? "{}") as {
+				checks: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			expect(
+				ordinaryPayload.checks.some((check) => check.id === "index_drift"),
+			).toBe(false);
+
+			const drift = captureIo();
+			expect(
+				await runValidateCommand(root, ["--check-drift", "--json"], drift.io),
+			).toBe(1);
+			const driftPayload = JSON.parse(drift.stdout[0] ?? "{}") as {
+				checks: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const indexDrift = driftPayload.checks.find(
+				(check) => check.id === "index_drift",
+			);
+			expect(indexDrift).toMatchObject({ ok: false });
+			expect(indexDrift?.message).toContain("pstr");
+			expect(indexDrift?.message).toContain("run afol pstr rebuild");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project drift preserves an invalid PSTR index", async () => {
+		const root = createValidationFixture();
+		try {
+			mkdirSync(join(root, "cli"), { recursive: true });
+			writeFileSync(join(root, "cli", "main.ts"), "export const cli = true;\n");
+			rebuildPstrIndex(root);
+			writeFileSync(join(root, ".afol", "pstr", "index.json"), "{", "utf8");
+			rebuildValidationFixtureIndexes(root);
+
+			const captured = captureIo();
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--json"],
+					captured.io,
+				),
+			).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const indexDrift = payload.checks.find(
+				(check) => check.id === "index_drift",
+			);
+			expect(indexDrift).toMatchObject({ ok: false });
+			expect(indexDrift?.message).toContain("pstr:index");
+			expect(indexDrift?.message).toContain("invalid pstr index snapshot");
+			expect(indexDrift?.message).not.toContain("pstr:map:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project drift ignores an unmaterialized PSTR surface", async () => {
+		const root = createValidationFixture();
+		try {
+			const configPath = join(root, ".afol", "config.json");
+			const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<
+				string,
+				unknown
+			>;
+			config.pstr = { areas: [] };
+			writeFileSync(configPath, `${JSON.stringify(config)}\n`, "utf8");
+			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "pstr", "README.md"),
+				"# PSTR definitions\n",
+				"utf8",
+			);
+			const specsDir = join(root, ".afol", "adm", "specs");
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(
+				join(specsDir, "spec-a.md"),
+				[
+					"---",
+					"id: spec-a",
+					"theme: alpha",
+					"status: active",
+					"owners:",
+					"- worker",
+					"---",
+					"",
+					"# Spec A",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(specsDir, "INDEX.md"),
+				[
+					"---",
+					"doc_type: specs_index",
+					"id: specs_index",
+					"status: active",
+					"---",
+					"",
+					"# SPECS INDEX",
+					"",
+					"| Total | Count |",
+					"|--------|-------|",
+					"| Total | 1 |",
+					"| Draft | 0 |",
+					"| Active | 1 |",
+					"| Final | 0 |",
+					"| Superseded | 0 |",
+					"",
+					"| SPEC ID | Theme | Status | Owner | Links |",
+					"|--------:|-------|--------|-------|------|",
+					"| spec-a | alpha | active | worker | |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+
+			const captured = captureIo();
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--json"],
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			expect(payload.checks).toContainEqual({
+				id: "index_drift",
+				ok: true,
+				message: "no index drift",
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

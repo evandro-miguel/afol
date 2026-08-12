@@ -101,6 +101,36 @@ describe("operation-context", () => {
 		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
 	});
 
+	test("closed evidence repair keeps preview readable and mutations approval-gated", () => {
+		const reverify = resolveCanonicalAction({
+			kind: "evidence",
+			args: ["reverify", "-S", "S-01", "-T", "T-01", "-x", "bun test"],
+		});
+		const preview = resolveCanonicalAction({
+			kind: "evidence",
+			args: ["transition-admit", "-S", "S-01", "-T", "T-01"],
+		});
+		const confirm = resolveCanonicalAction({
+			kind: "evidence",
+			args: ["transition-admit", "--confirm"],
+		});
+		expect(reverify).toEqual({
+			action: "workbench.evidence.reverify",
+			sideEffect: "write",
+		});
+		expect(preview).toEqual({
+			action: "workbench.evidence.transition_admit.preview",
+			sideEffect: "preview",
+		});
+		expect(confirm).toEqual({
+			action: "workbench.evidence.transition_admit",
+			sideEffect: "write",
+		});
+		expect(isActionAllowed(agentOperationContext(), reverify)).toBe(false);
+		expect(isActionAllowed(agentOperationContext(), preview)).toBe(true);
+		expect(isActionAllowed(agentOperationContext(), confirm)).toBe(false);
+	});
+
 	test.each([
 		["note", "annotate"],
 		["clear", "purge"],
@@ -130,6 +160,8 @@ describe("operation-context", () => {
 		"weekly",
 		"after-merge",
 		"review",
+		"candidates",
+		"backfill",
 	])("evolve %s is explicitly read-only", (action) => {
 		const policy = resolveCanonicalAction({
 			kind: "subcommand",
@@ -143,6 +175,69 @@ describe("operation-context", () => {
 		});
 		expect(isActionAllowed(agentOperationContext(), policy)).toBe(true);
 		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(true);
+	});
+
+	test("session archive candidates is read-only while archive and restore mutations require approval", () => {
+		const candidates = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "session",
+			action: "archive",
+			args: ["--candidates"],
+		});
+		const archive = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "session",
+			action: "archive",
+			args: ["S-01", "--reason", "retention"],
+		});
+		const restorePreview = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "session",
+			action: "restore",
+			args: ["S-01", "--reason", "review", "--dry-run"],
+		});
+
+		expect(candidates).toEqual({
+			action: "session.archive.candidates",
+			sideEffect: "read",
+		});
+		expect(archive).toEqual({
+			action: "session.archive.apply",
+			sideEffect: "write",
+		});
+		expect(restorePreview).toEqual({
+			action: "session.restore.preview",
+			sideEffect: "preview",
+		});
+		expect(isActionAllowed(agentOperationContext(), candidates)).toBe(true);
+		expect(isActionAllowed(agentOperationContext(), archive)).toBe(false);
+		expect(isActionAllowed(agentOperationContext(), restorePreview)).toBe(true);
+	});
+
+	test("evolve candidate discovery is read-only while review is approval-gated", () => {
+		const discovery = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "candidates",
+			args: ["--session", "S-01"],
+		});
+		const review = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "candidates",
+			args: ["review", "--session", "S-01"],
+		});
+
+		expect(discovery).toEqual({
+			action: "evolve.candidates",
+			sideEffect: "read",
+		});
+		expect(review).toEqual({
+			action: "evolve.candidates.review",
+			sideEffect: "write",
+		});
+		expect(isActionAllowed(agentOperationContext(), discovery)).toBe(true);
+		expect(isActionAllowed(agentOperationContext(), review)).toBe(false);
 	});
 
 	test.each([

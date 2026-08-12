@@ -1,15 +1,7 @@
-import {
-	validateFilesIndex,
-	validateRulesIndex,
-	validateSkillsIndex,
-	validateSpecsIndex,
-} from "../local-state/project-indexes";
-import { validateWorkBenchIndex } from "../local-state/workbench-index";
-import { validatePstrIndex } from "../pstr/builder";
+import { collectFreshnessReport } from "../local-state/freshness";
 
 export type GlobalStatusFinding = {
 	validation: string;
-	blocker: string;
 	next: string;
 };
 
@@ -30,50 +22,38 @@ export function collectGlobalStatusFindings(
 	projectRoot: string,
 ): GlobalStatusFinding[] {
 	const findings: GlobalStatusFinding[] = [];
-	const addFinding = (
-		scope: string,
-		result: { ok: boolean; message: string },
-		fallbackNext: string | null = null,
-	): void => {
-		if (result.ok) {
-			return;
-		}
-		const normalized = normalizeGlobalMessage(result.message);
-		findings.push({
-			validation: `${scope}: ${normalized.validation}`,
-			blocker: `${scope}: ${normalized.validation}`,
-			next: normalized.next ?? fallbackNext ?? "review failing project checks",
-		});
-	};
-
-	const localStateResults = [
-		validateRulesIndex(projectRoot),
-		validateSkillsIndex(projectRoot),
-		validateSpecsIndex(projectRoot),
-		validateFilesIndex(projectRoot),
-		validateWorkBenchIndex(projectRoot),
-	];
-	const localStateFailureCount = localStateResults.filter(
-		(result) => !result.ok,
-	).length;
-	const pstrResult = validatePstrIndex(projectRoot);
-	if (localStateFailureCount > 0 && !pstrResult.ok) {
+	const report = collectFreshnessReport(projectRoot);
+	const localStateFailures = report.findings.filter(
+		(finding) => finding.surface === "local-state",
+	);
+	const pstrFailures = report.findings.filter(
+		(finding) => finding.surface === "pstr",
+	);
+	if (localStateFailures.length > 0 && pstrFailures.length > 0) {
 		findings.push({
 			validation: "project indexes need rebuild",
-			blocker: "project indexes need rebuild",
 			next: "run afol local-state rebuild; afol pstr rebuild",
 		});
 		return findings;
 	}
-	if (localStateFailureCount > 0) {
+	if (localStateFailures.length > 0) {
 		const subject =
-			localStateFailureCount === 1 ? "index snapshot" : "index snapshots";
-		addFinding("local-state", {
-			ok: false,
-			message: `${localStateFailureCount} ${subject} need rebuild; run afol local-state rebuild`,
+			localStateFailures.length === 1 ? "index snapshot" : "index snapshots";
+		findings.push({
+			validation: `local-state: ${localStateFailures.length} ${subject} need rebuild`,
+			next: "run afol local-state rebuild",
 		});
 	}
-	addFinding("pstr", pstrResult, "run afol pstr rebuild");
+	if (pstrFailures.length > 0) {
+		const first = pstrFailures[0];
+		if (first) {
+			const normalized = normalizeGlobalMessage(first.message);
+			findings.push({
+				validation: `pstr: ${normalized.validation}`,
+				next: first.remediation,
+			});
+		}
+	}
 
 	return findings;
 }

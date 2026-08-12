@@ -23,6 +23,7 @@ links:
   - .afol/adm/specs/260726_event-ledger-durability_spec-child_01.md
   - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
   - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
+  - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
 risk_level: high
 ---
 
@@ -58,6 +59,9 @@ AFOL-only downstream boundary.
 - `260806_release-promotion-remediation_spec-child_01` owns the bounded
   correction of release-blocking dependency, evidence-compatibility, and
   compiled-artifact reproducibility defects discovered after final audit.
+- `260727_release-benchmark-timing-and-baseline-contract_spec-child_01` is
+  final and owns the compiled-artifact timing, host-profile, and baseline
+  compatibility contract without claiming a passing full release gate.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.
@@ -152,13 +156,6 @@ validation, typecheck, formatting, manifest, redacted Gitleaks history/worktree,
 and OSV dependency scans. These bounded results do not create a new full-suite,
 build, release, deployment, or global-install claim.
 
-The finalization session `260801_1641_project-finalization` reconciled the F-29
-parent with F-31/F-32, refreshed PSTR and local-state indexes, and recorded the
-current full-suite, security, benchmark, and project-validation evidence. The
-Linux x64 release gate passed on candidate commit `aa6892c` in a clean checkout;
-unsupported platforms, global installation, deployment, and remote CI remain
-unclaimed.
-
 F-29 is reopened after the final audit found two release-contract defects: F-32
 hot-path scenarios marked `compiled_binary` were executed as source, and
 project readiness suppressed missing or failed evidence for every session with
@@ -173,6 +170,11 @@ RED/GREEN tests and observed compiled-artifact benchmark evidence
 `compiled-release` / `bun-compile` provenance, and current closed sessions
 remain strict when evidence is missing or failed. The global binary was not
 installed or changed from `dev`.
+
+The release-benchmark timing child is final, but no persisted formal
+`validate:release` evidence authorizes the finalization HEAD. The historical
+`aa6892c` pass assertion is excluded from release and provenance claims; a
+fresh `bun run validate:release` gate is required before finalization can close.
 
 ## Verification Plan
 

@@ -21,11 +21,11 @@ const runtimeLiveBenchmarkProfile = {
 	model: "gpt-5.4-mini",
 	reasoning_effort: "medium",
 };
-const runtimeLiveBenchmarkRefreshCommand = "afol bench run --all --save";
+const runtimeLiveBenchmarkRefreshCommand = "external fixed harness receipt";
 const runtimeLiveBenchmarkValidationCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand}`;
-const runtimeLiveBenchmarkRefreshNote = `refresh live benchmark artifacts with ${runtimeLiveBenchmarkRefreshCommand}; then validate with ${runtimeLiveBenchmarkValidationCommand}`;
+const runtimeLiveBenchmarkRefreshNote = `obtain a fresh receipt from the external fixed harness, place it at .afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json, then validate with ${runtimeLiveBenchmarkValidationCommand}`;
 const slowValidationTestTimeoutMs = 60_000;
 const cliKernelValidationTestTimeoutMs = 60_000;
 const cliKernelRunTestTimeoutMs = 120_000;

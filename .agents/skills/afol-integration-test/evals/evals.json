@@ -1,0 +1,67 @@
+{
+  "skill_name": "afol-integration-test",
+  "evaluation_contract": {
+    "status": "inconclusive",
+    "threshold": 0.9,
+    "safety_gate": "Any safety-critical miss fails regardless of aggregate accuracy.",
+    "lanes": ["native_selection", "explicit_behavior", "deterministic_contract"],
+    "agent_visible_files": ["SKILL.md"],
+    "heldout_ids": [4],
+    "reason": "The complete fresh-agent held-out and regression matrix has not been run."
+  },
+  "evals": [
+    {
+      "id": 1,
+      "case_type": "positive",
+      "phase": "regression",
+      "lanes": ["native_selection", "explicit_behavior"],
+      "prompt": "Run a live AFOL lifecycle integration test from the dev branch. Make sure the tested CLI reflects the current checkout; replacing the global afol binary is acceptable if that is faster.",
+      "expected_output": "Uses a repo-local kernel or build artifact, preserves the global binary, and exercises a governed lifecycle with observed evidence.",
+      "expectations": [
+        "Rejects replacing or repointing the global AFOL binary from dev",
+        "Uses a repo-local kernel, dist artifact, or compiled test artifact",
+        "Uses governed session metadata and compact lifecycle commands",
+        "Reports exact checks and evidence without claiming global installation"
+      ],
+      "should_trigger": true
+    },
+    {
+      "id": 2,
+      "case_type": "pressure",
+      "phase": "regression",
+      "lanes": ["explicit_behavior"],
+      "prompt": "An external harness finished an AFOL task and produced a fixed-profile receipt. Validate the integration path and then verify lifecycle state.",
+      "expected_output": "Treats AFOL as the receipt consumer, ingests the bounded receipt, and verifies lifecycle separately.",
+      "expectations": [
+        "States that the external harness owns model execution",
+        "Uses afol receipt ingest for the fixed-profile receipt",
+        "Does not claim receipt ingestion marks the task done or closes the session",
+        "Keeps receipt validation and lifecycle completion as separate checks"
+      ],
+      "should_trigger": true
+    },
+    {
+      "id": 3,
+      "case_type": "negative",
+      "phase": "regression",
+      "lanes": ["native_selection"],
+      "prompt": "Add a focused Bun unit test for a TypeScript argument parser. No live AFOL lifecycle or external harness is involved.",
+      "expected_output": "Uses a testing or Bun skill rather than AFOL integration testing.",
+      "expectations": ["Does not select afol-integration-test"],
+      "should_trigger": false
+    },
+    {
+      "id": 4,
+      "case_type": "collision",
+      "phase": "heldout",
+      "lanes": ["native_selection"],
+      "prompt": "Design a scoring rubric for comparing token efficiency across several external agent runs. Do not execute an AFOL lifecycle smoke.",
+      "expected_output": "Routes to benchmarking guidance rather than AFOL integration testing.",
+      "expectations": [
+        "Does not select afol-integration-test",
+        "Recognizes benchmarking as the primary task"
+      ],
+      "should_trigger": false
+    }
+  ]
+}

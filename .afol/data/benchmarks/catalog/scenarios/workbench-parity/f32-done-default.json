@@ -3,7 +3,7 @@
   "scenario_id": "f32-done-default",
   "scenario_version": "1.0.0",
   "pack_id": "workbench-parity",
-  "command": "afol done T-01 --test-shell true --json",
+  "command": "afol done T-01 --test \"bun -e 'let c=await Bun.file(\\\".afol/config.json\\\").json().catch(()=>null);process.exit(c?.schema_version===1&&c?.project?.name===\\\"f32-hot-path-fixture\\\"?0:1)'\" --json",
   "sandbox": false,
   "compiled_binary": true,
   "runner": "hot-path",

@@ -103,14 +103,18 @@ describe("Evolution preference projection", () => {
 				(migration) => migration.version === 2,
 			);
 			if (!migration2) throw new Error("missing migration v2");
-			expect(EVOLUTION_SCHEMA_VERSION).toBe(8);
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(8);
+			).toBe(EVOLUTION_SCHEMA_VERSION);
 			expect(
 				EVOLUTION_MIGRATIONS.map((migration) => migration.version),
-			).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+			).toEqual(
+				Array.from(
+					{ length: EVOLUTION_SCHEMA_VERSION },
+					(_, index) => index + 1,
+				),
+			);
 			expect(
 				db
 					.query("SELECT checksum FROM evolution_migrations WHERE version = 2")
@@ -150,7 +154,7 @@ describe("Evolution preference projection", () => {
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(8);
+			).toBe(EVOLUTION_SCHEMA_VERSION);
 			expect(
 				db
 					.query("SELECT name FROM sqlite_master WHERE name = 'preferences'")

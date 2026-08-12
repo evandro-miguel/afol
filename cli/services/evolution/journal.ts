@@ -22,7 +22,11 @@ import {
 } from "./db";
 import { applyMigrations } from "./migrations";
 import { refreshPreferenceDecayProjection } from "./preference-decay";
-import { readPreferenceJournal } from "./preference-journal";
+import { preferenceReinforcementExceedsProductionOrdinal } from "./preference-reinforcement-reader";
+import {
+	type ProductionDayProjectionValidationDependencies,
+	validateProductionDayProjection as validateProductionDayProjectionLeaf,
+} from "./production-day-validation";
 import {
 	allocateProductionDay,
 	allocateProductionDayInTransaction,
@@ -404,53 +408,21 @@ function validateProductionDayProjectionUnlocked(
 export function validateProductionDayProjection(
 	context: EvolutionJournalContext & { db: Database },
 ): void {
-	let lastError: unknown;
-	for (let attempt = 0; attempt < READ_RETRIES; attempt += 1) {
-		try {
-			const before = readProductionDayJournal(
-				context.root,
-				context.projectId,
-				context.timezone,
-				context.evolutionEventsDir,
-			);
-			const expected = replayProjection(context.projectId, before);
-			const actual = projectionRows(context.db, context.projectId);
-			const after = readProductionDayJournal(
-				context.root,
-				context.projectId,
-				context.timezone,
-				context.evolutionEventsDir,
-			);
-			const actualAfter = projectionRows(context.db, context.projectId);
-			if (
-				digest(before) !== digest(after) ||
-				digest(actual) !== digest(actualAfter)
-			) {
-				lastError = new Error("evolution state changed during read");
-				Bun.sleepSync(25);
-				continue;
-			}
-			if (digest(actual) !== digest(expected)) {
-				lastError = new Error(
-					"evolution db projection differs from canonical production-day journal",
-				);
-				Bun.sleepSync(25);
-				continue;
-			}
-			return;
-		} catch (error) {
-			lastError = error;
-			if (
-				!(
-					error instanceof Error &&
-					error.message === "evolution state changed during read"
-				)
-			)
-				throw error;
-		}
-	}
-	throw lastError;
+	validateProductionDayProjectionLeaf(
+		context,
+		productionDayValidationDependencies,
+	);
 }
+
+export const productionDayValidationDependencies: ProductionDayProjectionValidationDependencies<
+	ProductionDayJournalEvent,
+	ProductionDay
+> = {
+	read: readProductionDayJournal,
+	replay: replayProjection,
+	rows: projectionRows,
+	digest,
+};
 export function appendProductionDayAllocation(
 	input: AppendProductionDayAllocationInput,
 ): ProductionDay {
@@ -610,17 +582,16 @@ function rebuildProductionDayProjectionUnlocked(
 	);
 	const canonicalProjection = replayProjection(input.projectId, events);
 	const canonicalMax = canonicalProjection.at(-1)?.ordinal_sequence ?? 0;
-	const reinforcementBeyondCanonical = readPreferenceJournal(
-		input.root,
-		input.projectId,
-		input.evolutionEventsDir,
-	).find(
-		(event) =>
-			event.payload.preference.last_reinforced_production_day > canonicalMax,
-	);
+	const reinforcementBeyondCanonical =
+		preferenceReinforcementExceedsProductionOrdinal(
+			input.root,
+			input.projectId,
+			canonicalMax,
+			input.evolutionEventsDir,
+		);
 	if (reinforcementBeyondCanonical) {
 		throw new Error(
-			`preference reinforcement ordinal exceeds canonical production ordinal: ${reinforcementBeyondCanonical.payload.preference.id}`,
+			`preference reinforcement ordinal exceeds canonical production ordinal: ${reinforcementBeyondCanonical}`,
 		);
 	}
 	assertWalEnabled(input.db);

@@ -7,6 +7,7 @@ export type CommandKind =
 	| "new"
 	| "start"
 	| "evidence"
+	| "legacy"
 	| "done"
 	| "transition"
 	| "close"
@@ -184,6 +185,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Run one benchmark pack with its configured gates",
 			},
 			{
+				usage: "bench --pack <pack-id> --scenario-id <scenario-id> --json",
+				sideEffect: "read",
+				description: "Rerun one scored scenario in a benchmark pack",
+			},
+			{
 				usage: "bench --pack governance-history --timing-mode observe --json",
 				sideEffect: "read",
 				description: "Observe timing; non-timing gates block",
@@ -209,9 +215,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "core",
 		subcommands: [
 			{
-				usage: "--dry-run",
+				usage: "--dry-run [--json]",
 				sideEffect: "read",
-				description: "Preview scaffold install without writing",
+				description:
+					"Preview scaffold install without writing; --json emits a result envelope",
 			},
 		],
 	},
@@ -254,10 +261,21 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Complete a task session",
 		category: "workflow",
 		guidance: [
-			"Record evidence first, or repeat --test for up to eight ordered fail-fast checks.",
+			'Prefer -x / batch T-01..T-n: afol d T-01 -x "<cmd>" verifies and completes in one step.',
+			"Separate evidence is diagnostic when you need a receipt without completing.",
 			"Batch selectors run one shared check for execution-policy tasks.",
 		],
 		subcommands: [
+			{
+				usage: 'd T-01 -x "<cmd>"',
+				sideEffect: "write",
+				description: "Verify with -x and complete one task (preferred)",
+			},
+			{
+				usage: 'd T-01..T-n -x "<cmd>"',
+				sideEffect: "write",
+				description: "One shared check for a batch range, then complete each",
+			},
 			{
 				usage: "--session <session-id> --task-id <task-id>",
 				sideEffect: "write",
@@ -272,7 +290,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "--verification-timeout-ms <milliseconds>",
 				sideEffect: "write",
-				description: "Bound each step (default 300000ms; max 600000ms)",
+				description: "Bound each step (default 600000ms; max 600000ms)",
 			},
 			{
 				usage: "-- <argv...>",
@@ -362,17 +380,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "quickTask",
 		sideEffect: "write",
 		description:
-			"Run one lifecycle; missing governance stays pending with a next step",
+			"One-shot lifecycle (single or multi-task); missing governance stays pending",
 		category: "workflow",
 		subcommands: [
 			{
-				usage: '<theme> --task <summary> --command "<cmd>"',
+				usage: '<theme> -t <summary> -c "<cmd>"',
 				sideEffect: "write",
 				description:
-					"Create, start, verify, record evidence, and close one task",
+					"Create, start, verify once, record evidence, and close one task",
 			},
 			{
-				usage: "--feature-id <F-id> --parent-spec <spec-id>",
+				usage: '<theme> -t <a> -t <b> [-t ...] -c "<cmd>"',
+				sideEffect: "write",
+				description:
+					"One-shot multi-task: shared verification across all -t summaries (max 100)",
+			},
+			{
+				usage: "-F <F-id> -P <spec-id>",
 				sideEffect: "write",
 				description: "Create the quick task as a governed session",
 			},
@@ -397,15 +421,25 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "List open pending_spec entries",
 			},
 			{
-				usage:
-					"resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+				usage: "gov rs -S <id> -F <F-id> -P <spec-id>",
 				sideEffect: "write",
-				description: "Link roadmap feature/spec",
+				description: "Link roadmap feature/spec (session optional if bound)",
 			},
 			{
-				usage: "resolve-spec --session <id> --no-spec-required --reason <text>",
+				usage: 'gov rs -S <id> --no-spec-required -r "<reason>"',
 				sideEffect: "write",
 				description: "Waive with an explicit reason",
+			},
+			{
+				usage: 'bulk-waive --reason "<text>" [--limit N] [--dry-run] [--json]',
+				sideEffect: "write",
+				description: "Waive open pending_spec entries (default limit 20)",
+			},
+			{
+				usage:
+					'bulk-waive --reason "<text>" --session <id> [--session <id2>...]',
+				sideEffect: "write",
+				description: "Waive explicit open sessions (max 100)",
 			},
 			{
 				usage: "repair-index",
@@ -419,7 +453,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["e"],
 		kind: "evidence",
 		sideEffect: "append",
-		description: "Record task evidence or admit legacy compatibility debt",
+		description: "Record, reverify, or narrowly admit task evidence debt",
 		category: "workflow",
 		subcommands: [
 			{
@@ -443,11 +477,42 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Emit machine-readable evidence result",
 			},
 			{
+				usage: 'reverify -S <id> -T <id> -x "<cmd>" [--json]',
+				sideEffect: "append",
+				description:
+					"Run and append observed evidence for a closed terminal task without reopening it",
+			},
+			{
+				usage:
+					'transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval "<text>" [--dry-run|--confirm] [--json]',
+				sideEffect: "write",
+				description:
+					"Hash-bind closed post-cutoff missing/failed evidence debt under the registered no-op policy (preview by default)",
+			},
+			{
 				usage:
 					'admit --session <id> --all-missing|--task-id <id> --reason "<text>" [--dry-run|--confirm] [--json]',
 				sideEffect: "write",
 				description:
 					"Admit hash-bound missing/failed evidence for a closed pre-cutoff session (preview by default; --confirm writes)",
+			},
+		],
+	},
+	{
+		command: "legacy",
+		aliases: ["lg"],
+		kind: "legacy",
+		sideEffect: "write",
+		description:
+			"Reconcile legacy pre-cutoff evidence debt and close deadlocked sessions",
+		category: "workflow",
+		subcommands: [
+			{
+				usage:
+					'reconcile --session <id> --reason "<text>" --issue <url> [--task-id <id>] [--dry-run|--confirm] [--summary "<text>"] [--json]',
+				sideEffect: "write",
+				description:
+					"Admit legacy evidence debt and close a pre-cutoff all-done session in one transaction (preview by default; --confirm writes and closes)",
 			},
 		],
 	},
@@ -543,6 +608,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--allow-no-report --reason <text>",
 				sideEffect: "write",
 				description: "Close without a report with an explicit waiver",
+			},
+			{
+				usage: "--admit-legacy-baseline",
+				sideEffect: "write",
+				description:
+					"Retry close waiving issues admitted by the legacy evidence baseline",
 			},
 			{
 				usage: "--json",
@@ -657,7 +728,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "[session-path] --strict",
+				usage: "[session-path] [--strict] [--verbose]",
 				sideEffect: "read",
 				description: "Require all tasks in a session path to be complete",
 			},
@@ -677,7 +748,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "[session-path] --strict",
+				usage: "[session-path] [--strict] [--verbose]",
 				sideEffect: "read",
 				description: "Require all tasks in a session path to be complete",
 			},
@@ -869,6 +940,67 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect library entries",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list|ls [--json]",
+				sideEffect: "read",
+				description: "List library topics",
+			},
+			{
+				usage: "topic <topic>|--topic <topic> [--json]",
+				sideEffect: "read",
+				description: "Inspect one library topic",
+			},
+			{
+				usage: "search <query>|--query <query> [--json]",
+				sideEffect: "read",
+				description: "Search library topics and claims",
+			},
+			{
+				usage: "graph [--json]",
+				sideEffect: "read",
+				description: "Render the library topic and claim graph",
+			},
+			{
+				usage: "health [--json]",
+				sideEffect: "read",
+				description: "Run library health checks",
+			},
+			{
+				usage: "doctor [--json]",
+				sideEffect: "read",
+				description: "Show library remediation steps",
+			},
+			{
+				usage:
+					"propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+				sideEffect: "write",
+				description: "Propose a library topic with an optional source",
+			},
+			{
+				usage:
+					"add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+				sideEffect: "write",
+				description: "Add a source to a library topic",
+			},
+			{
+				usage:
+					"add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+				sideEffect: "write",
+				description: "Add a sourced claim to a library topic",
+			},
+			{
+				usage:
+					"invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+				sideEffect: "write",
+				description: "Invalidate a library claim with a reason",
+			},
+			{
+				usage: "rebuild-index [--json]",
+				sideEffect: "generated",
+				description: "Refresh the generated library index",
+			},
+		],
 	},
 	{
 		command: "memory",
@@ -877,6 +1009,66 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect memory entries",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list|ls [--json]",
+				sideEffect: "read",
+				description: "List memory entries",
+			},
+			{
+				usage: "show|get --id <id> [--json]",
+				sideEffect: "read",
+				description: "Inspect one memory entry",
+			},
+			{
+				usage: "search|find --query <query> [--json]",
+				sideEffect: "read",
+				description: "Search memory entries",
+			},
+			{
+				usage: "render [--json]",
+				sideEffect: "read",
+				description: "Render the memory document",
+			},
+			{
+				usage: "recall --query <query> [--json]",
+				sideEffect: "read",
+				description: "Recall entries relevant to a query",
+			},
+			{
+				usage:
+					"add --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+				sideEffect: "write",
+				description: "Add an active memory entry",
+			},
+			{
+				usage:
+					"update|set --id <id> [--title <title>] [--body <text>] [--tags <tag>[,<tag>...]] [--json]",
+				sideEffect: "write",
+				description: "Update a memory entry",
+			},
+			{
+				usage: "archive --id <id> [--json]",
+				sideEffect: "write",
+				description: "Archive a memory entry",
+			},
+			{
+				usage:
+					"propose --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+				sideEffect: "write",
+				description: "Add a proposed memory entry",
+			},
+			{
+				usage: "promote --id <id> [--json]",
+				sideEffect: "write",
+				description: "Promote a proposed memory entry",
+			},
+			{
+				usage: "reject --id <id> --reason <text> [--json]",
+				sideEffect: "write",
+				description: "Reject a proposed memory entry",
+			},
+		],
 	},
 	{
 		command: "evolve",
@@ -884,12 +1076,34 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "evolve",
 		sideEffect: "read",
 		description: "Analyze project evolution state and proposals",
-		capabilities: ["evolution.suggest.first-session/v1"],
+		capabilities: [
+			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
+		],
 		category: "inspect",
 		guidance: [
 			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",
 		],
 		subcommands: [
+			{
+				usage: "backfill [--offset <n>] [--limit <1-10>] [--json]",
+				sideEffect: "read",
+				description:
+					"Preview bounded historical observation and adoption coverage without writes",
+			},
+			{
+				usage: "candidates [--session <id>] [--limit <1-10>] [--json]",
+				sideEffect: "read",
+				description:
+					"Derive bounded Memory and Library adoption candidates from completed sessions",
+			},
+			{
+				usage:
+					"candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
+				sideEffect: "write",
+				description:
+					"Append an explicit approval-gated learning review decision",
+			},
 			{
 				usage: "evaluate <id> [--record] [--superseded-by <id>] [-j]",
 				sideEffect: "preview",
@@ -1047,17 +1261,51 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		command: "adr",
 		aliases: [],
 		kind: "adr",
-		sideEffect: "read",
-		description: "Inspect ADRs",
+		sideEffect: "write",
+		description: "Create and manage ADRs",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "new|create <topic>",
+				sideEffect: "write",
+				description: "Create an ADR",
+			},
+			{
+				usage: "accept|ac <id>",
+				sideEffect: "write",
+				description: "Accept an ADR",
+			},
+			{
+				usage: "supersede|sp <old-id> <new-id>",
+				sideEffect: "write",
+				description: "Supersede an ADR",
+			},
+			{
+				usage: "abandon|ab <id> --reason <text>",
+				sideEffect: "write",
+				description: "Abandon an ADR with a reason",
+			},
+			{
+				usage: "archive|ar <id> --reason <text>",
+				sideEffect: "write",
+				description: "Archive an ADR with a reason",
+			},
+		],
 	},
 	{
 		command: "changelog",
 		aliases: ["cl"],
 		kind: "changelog",
-		sideEffect: "read",
-		description: "Inspect changelog entries",
+		sideEffect: "append",
+		description: "Append changelog entries",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "add|a --type <type> --message <text>",
+				sideEffect: "append",
+				description: "Append a changelog entry",
+			},
+		],
 	},
 	{
 		command: "health",
@@ -1066,6 +1314,34 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect health checks",
 		category: "ops",
+		subcommands: [
+			{
+				usage: "[core] [--json]",
+				sideEffect: "read",
+				description: "Check core workbench health",
+			},
+			{
+				usage: "full [--json]",
+				sideEffect: "read",
+				description: "Check every health area",
+			},
+			{
+				usage: "release|--release [--json]",
+				sideEffect: "read",
+				description: "Run release-scoped health checks",
+			},
+			{
+				usage:
+					"--area <adm|pstr|wb|memory|library|state|ctx|evolution|token_budget> [--deep] [--json]",
+				sideEffect: "read",
+				description: "Check one named health area",
+			},
+			{
+				usage: "--deep [--json]",
+				sideEffect: "read",
+				description: "Check every health area in deep mode",
+			},
+		],
 	},
 	{
 		command: "db",
@@ -1259,6 +1535,20 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description:
 			"Compare active session artifacts against git state and report unsynced context",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "[--session <id>] [--json]",
+				sideEffect: "read",
+				description:
+					"Read-only report of session artifacts, git freshness, and pending_spec",
+			},
+			{
+				usage: "--fix [--json]",
+				sideEffect: "write",
+				description:
+					"Safe repair: unbind corrupt/missing bindings; rebind usable active",
+			},
+		],
 	},
 	{
 		command: "preflight",
@@ -1267,6 +1557,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Search governance context before planning",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "<intent query> [--json]",
+				sideEffect: "read",
+				description: "Search specs, lessons, rules, and similar systems",
+			},
+		],
 	},
 	{
 		command: "adapter",
@@ -1340,7 +1637,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["ss"],
 		kind: "session",
 		sideEffect: "write",
-		description: "List, bind, switch, and unbind workbench sessions",
+		description: "List, bind, switch, archive, restore, and unbind sessions",
 		category: "workflow",
 		subcommands: [
 			{
@@ -1372,6 +1669,22 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "unbind <session-id>",
 				sideEffect: "write",
 				description: "Remove a session context binding",
+			},
+			{
+				usage:
+					"archive --candidates [--older-than-days <days>] [--offset <n>] [--limit <n>] [--json]",
+				sideEffect: "read",
+				description: "List closed sessions eligible for logical archiving",
+			},
+			{
+				usage: "archive <id>... --reason <text> [--dry-run] [--json]",
+				sideEffect: "write",
+				description: "Logically archive closed workbench sessions",
+			},
+			{
+				usage: "restore <id>... --reason <text> [--dry-run] [--json]",
+				sideEffect: "write",
+				description: "Restore logically archived workbench sessions",
 			},
 		],
 	},

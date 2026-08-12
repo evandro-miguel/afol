@@ -261,11 +261,13 @@ function validateEvent(
 			!observation ||
 			observation.id !== event.subject_id ||
 			observation.project_id !== projectId ||
-			observation.fingerprint_version !== 1 ||
+			(observation.fingerprint_version !== 1 &&
+				observation.fingerprint_version !== 2) ||
 			observation.journal_event_id !== event.event_id ||
 			observation.fingerprint !==
 				observationFingerprint(
 					observation.normalized_fields as ObservationRecord["normalized_fields"],
+					Number(observation.fingerprint_version),
 				) ||
 			observation.occurrence_identity !==
 				occurrenceIdentity(observation as never) ||
@@ -293,7 +295,8 @@ function validateEvent(
 			decision.id !== event.subject_id ||
 			decision.projectId !== projectId ||
 			decision.fingerprint !== event.payload.fingerprint ||
-			decision.fingerprintVersion !== 1 ||
+			(decision.fingerprintVersion !== 1 &&
+				decision.fingerprintVersion !== 2) ||
 			decision.action !== event.action ||
 			!Array.isArray(decision.observationIds) ||
 			decision.observationMembershipDigest !==
@@ -316,13 +319,14 @@ function validateEvent(
 		throw new Error(`observation event digest mismatch at line ${index + 1}`);
 }
 
-export function readObservationJournal(
-	root: string,
+/**
+ * Validate and parse one already-captured journal snapshot. Callers that
+ * impose their own source bounds must use this instead of reopening the path.
+ */
+export function parseObservationJournalText(
+	text: string | null,
 	projectId: string,
-	eventsDir?: string,
 ): ObservationJournalEvent[] {
-	const path = observationJournalPath(root, eventsDir);
-	const text = readText(path);
 	if (text === null || text.trim() === "") return [];
 	const events: ObservationJournalEvent[] = [];
 	const eventIds = new Set<string>();
@@ -366,6 +370,15 @@ export function readObservationJournal(
 		previous = event.event_digest;
 	}
 	return events;
+}
+
+export function readObservationJournal(
+	root: string,
+	projectId: string,
+	eventsDir?: string,
+): ObservationJournalEvent[] {
+	const path = observationJournalPath(root, eventsDir);
+	return parseObservationJournalText(readText(path), projectId);
 }
 
 function validateObservationProductionDays(
@@ -486,7 +499,7 @@ function insertEvent(
 			id: String(observation.id),
 			kind: String(observation.kind),
 			fingerprint: String(observation.fingerprint),
-			fingerprint_version: 1,
+			fingerprint_version: Number(observation.fingerprint_version),
 			occurrence_identity: String(observation.occurrence_identity),
 			session_id: String(observation.session_id),
 			production_day_sequence: Number(observation.production_day_sequence ?? 0),
@@ -503,6 +516,7 @@ function insertEvent(
 			db,
 			String(payload.project_id),
 			String(observation.fingerprint),
+			Number(observation.fingerprint_version),
 			event.timestamp,
 			thresholds,
 		);
@@ -512,9 +526,13 @@ function insertEvent(
 		const projectedIds = (
 			db
 				.query(
-					"SELECT id FROM observations WHERE project_id = ? AND fingerprint_version = 1 AND fingerprint = ? ORDER BY id",
+					"SELECT id FROM observations WHERE project_id = ? AND fingerprint_version = ? AND fingerprint = ? ORDER BY id",
 				)
-				.all(String(payload.project_id), fingerprint) as Array<{ id: string }>
+				.all(
+					String(payload.project_id),
+					Number(receipt.fingerprintVersion),
+					fingerprint,
+				) as Array<{ id: string }>
 		).map((row) => row.id);
 		const receiptIds = [...(receipt.observationIds as string[])].sort();
 		if (stableJson(projectedIds) !== stableJson(receiptIds))
@@ -544,6 +562,7 @@ function insertEvent(
 			db,
 			String(payload.project_id),
 			fingerprint,
+			Number(receipt.fingerprintVersion),
 			event.timestamp,
 			thresholds,
 		);
@@ -556,7 +575,7 @@ function rowToObservation(row: Record<string, unknown>): ObservationRecord {
 		id: String(row.id),
 		kind: String(row.kind),
 		fingerprint: String(row.fingerprint),
-		fingerprint_version: 1,
+		fingerprint_version: Number(row.fingerprint_version),
 		occurrence_identity: String(row.occurrence_identity),
 		session_id: String(row.session_id),
 		production_day_sequence: Number(row.production_day_sequence),
@@ -574,23 +593,24 @@ function refreshCluster(
 	db: Database,
 	projectId: string,
 	fingerprint: string,
+	fingerprintVersion: number,
 	now: string,
 	thresholds?: RecurrenceThresholds,
 ): void {
 	const rows = db
 		.query(
-			"SELECT * FROM observations WHERE project_id = ? AND fingerprint_version = 1 AND fingerprint = ? ORDER BY journal_sequence",
+			"SELECT * FROM observations WHERE project_id = ? AND fingerprint_version = ? AND fingerprint = ? ORDER BY journal_sequence",
 		)
-		.all(projectId, fingerprint)
+		.all(projectId, fingerprintVersion, fingerprint)
 		.map((row) => rowToObservation(row as Record<string, unknown>));
 	if (rows.length === 0) return;
 	const automatic = deriveRecurrenceDecision(rows, false, thresholds);
 	const latestObservation = rows.at(-1);
 	const latestDecision = db
 		.query(
-			"SELECT action, journal_event_id, journal_sequence FROM recurrence_decisions WHERE project_id = ? AND fingerprint_version = 1 AND fingerprint = ? ORDER BY journal_sequence DESC LIMIT 1",
+			"SELECT action, journal_event_id, journal_sequence FROM recurrence_decisions WHERE project_id = ? AND fingerprint_version = ? AND fingerprint = ? ORDER BY journal_sequence DESC LIMIT 1",
 		)
-		.get(projectId, fingerprint) as {
+		.get(projectId, fingerprintVersion, fingerprint) as {
 		action?: unknown;
 		journal_event_id?: unknown;
 		journal_sequence?: unknown;
@@ -640,7 +660,7 @@ function refreshCluster(
 		updated_at=excluded.updated_at, journal_event_id=excluded.journal_event_id`,
 	).run(
 		projectId,
-		1,
+		fingerprintVersion,
 		fingerprint,
 		state,
 		automatic.occurrence_count,

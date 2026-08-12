@@ -64,6 +64,53 @@ export interface BenchmarkExecutionProfile {
 	artifact_sha256: string;
 }
 
+export interface ScenarioExecutionMetrics {
+	duration_ms: number;
+	timing_p50_ms: number;
+	timing_p95_ms: number;
+	error_count: number;
+	retry_count: number;
+	context_tokens: number;
+	prompt_tokens: number;
+	output_tokens: number;
+	context_bytes: number;
+	output_bytes: number;
+	argv_chars?: number;
+	tool_call_count: number;
+	tool_success_rate: number;
+	sample_count: number;
+	warmup_count: number;
+	canonical_write_count?: number;
+	telemetry_append_count?: number;
+	derived_work_calls?: number;
+	instrumented_duration_ms?: number;
+	instrumented_output_bytes?: number;
+	fixture_creation_duration_ms?: number;
+	setup_duration_ms?: number;
+	recovery_duration_ms?: number;
+}
+
+export interface ScenarioExecutionResult {
+	metrics: ScenarioExecutionMetrics;
+	notes: string[];
+	passed: boolean;
+	profile: BenchmarkExecutionProfile;
+	timestamp: string;
+	git_commit: string;
+	source_state_sha256?: string;
+	source_dirty?: boolean | null;
+}
+
+export interface PreparedCompiledReleaseArtifact {
+	binaryPath: string;
+	profile: BenchmarkExecutionProfile;
+	timestamp: string;
+	git_commit: string;
+	source_state_sha256: string;
+	source_dirty: boolean | null;
+	cleanup: () => void;
+}
+
 export interface Scenario {
 	schema_version: string;
 	scenario_id: string;

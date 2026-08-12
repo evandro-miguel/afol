@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runUxCommand } from "../commands/ux";
 import { agentOperationContext } from "../core/operation-context";
+import { loadUxRegistry } from "../services/ux/journeys";
 
 type CapturedIo = {
 	stdout: string[];
@@ -96,7 +97,7 @@ Entry is a changed maintenance cadence. Exit is validated UX and benchmark evide
 
 1. Run \`afol maintenance weekly --dry-run\`.
 2. Run \`afol ux coverage --tool maintenance\`.
-3. Run \`a mt review --area memory --dry-run\`.
+3. Run \`afol mt review --area memory --dry-run\`.
 
 ## Expected Result
 
@@ -144,6 +145,139 @@ describe("ux command", () => {
 		const validatePayload = parsePayload(validate);
 		expect(validatePayload.ok).toBe(true);
 		expect(validatePayload.error_count).toBe(0);
+	});
+
+	test("keeps default list compact and exposes paths in verbose mode", async () => {
+		const compact = captureIo();
+		expect(await runUxCommand("list", [], root, compact.io)).toBe(0);
+		const compactOutput = compact.stdout.join("\n");
+		expect(compactOutput).toContain("ux journeys: 2");
+		expect(compactOutput).toContain("statuses: active=2");
+		expect(compactOutput).toContain("sources: spec=1 ux-journey=1");
+		expect(compactOutput).toContain("issues: none");
+		expect(compactOutput).toContain(
+			"next: use afol ux list --verbose for paths/details",
+		);
+		expect(compactOutput).not.toContain("path=");
+		expect(Buffer.byteLength(compactOutput, "utf8")).toBeLessThan(500);
+		expect(
+			Math.ceil(Buffer.byteLength(compactOutput, "utf8") / 4),
+		).toBeLessThan(125);
+		expect(compactOutput.split("\n")).toHaveLength(5);
+
+		const verbose = captureIo();
+		expect(await runUxCommand("list", ["--verbose"], root, verbose.io)).toBe(0);
+		const verboseOutput = verbose.stdout.join("\n");
+		expect(verboseOutput).toContain(
+			"path=.afol/adm/ux/fixture-maintenance_ux-journey_01.md",
+		);
+		expect(Buffer.byteLength(verboseOutput, "utf8")).toBeGreaterThan(
+			Buffer.byteLength(compactOutput, "utf8"),
+		);
+	});
+
+	test("keeps compact list JSON entries and full verbose entries", async () => {
+		const compact = captureIo();
+		expect(await runUxCommand("list", ["--json"], root, compact.io)).toBe(0);
+		const payload = parsePayload(compact);
+		expect(Object.keys(payload).sort()).toEqual([
+			"action",
+			"count",
+			"data",
+			"detail_hint",
+			"entries",
+			"exit_code",
+			"generated_at",
+			"issue_count",
+			"issues",
+			"ok",
+			"schema",
+			"verbose",
+		]);
+		expect(payload).toMatchObject({
+			schema: "afol.result/v1",
+			ok: true,
+			action: "ux.list",
+			exit_code: 0,
+			count: 2,
+			issue_count: 0,
+			verbose: false,
+		});
+		const data = payload.data as Record<string, unknown>;
+		expect(data).toMatchObject({
+			ok: true,
+			count: 2,
+			issue_count: 0,
+			verbose: false,
+		});
+		expect(payload.entries).toEqual(data.entries);
+		const entry = (payload.entries as Record<string, unknown>[]).find(
+			(candidate) => candidate.id === "fixture-maintenance_ux-journey_01",
+		);
+		expect(entry).toBeDefined();
+		expect(Object.keys(entry ?? {}).sort()).toEqual([
+			"doc_type",
+			"id",
+			"source",
+			"status",
+		]);
+		expect(entry).toMatchObject({
+			id: "fixture-maintenance_ux-journey_01",
+			doc_type: "ux-journey",
+			status: "active",
+			source: "ux-journey",
+		});
+
+		const verbose = captureIo();
+		expect(
+			await runUxCommand("list", ["--json", "--verbose"], root, verbose.io),
+		).toBe(0);
+		const verbosePayload = parsePayload(verbose);
+		const verboseEntry = (
+			verbosePayload.entries as Record<string, unknown>[]
+		).find((candidate) => candidate.id === "fixture-maintenance_ux-journey_01");
+		expect(Object.keys(verboseEntry ?? {}).sort()).toEqual([
+			"commands",
+			"doc_type",
+			"id",
+			"missing_fields",
+			"parent_spec",
+			"path",
+			"roadmap_feature",
+			"source",
+			"status",
+			"title",
+		]);
+		expect(verboseEntry).toMatchObject({
+			path: ".afol/adm/ux/fixture-maintenance_ux-journey_01.md",
+			title: "UX Journey: Maintenance Warning UX",
+			commands: expect.any(Array),
+			missing_fields: [],
+			roadmap_feature: "F-TEST",
+			parent_spec: "fixture-parent_spec_01",
+		});
+	});
+
+	test("summarizes issue severity and points to validation", async () => {
+		write(
+			".afol/adm/ux/incomplete_ux-journey_01.md",
+			`
+---
+doc_type: ux-journey
+id: incomplete_ux-journey_01
+theme: Incomplete
+status: draft
+---
+
+# Incomplete UX Journey
+`,
+		);
+		const captured = captureIo();
+		expect(await runUxCommand("list", [], root, captured.io)).toBe(0);
+		const output = captured.stdout.join("\n");
+		expect(output).toMatch(/issues: [1-9].*errors=[1-9]/);
+		expect(output).toContain("next: run afol ux validate to inspect issues");
+		expect(output).not.toContain("incomplete_ux-journey_01");
 	});
 
 	test("shows coverage for one AFOL tool", async () => {
@@ -199,6 +333,60 @@ describe("ux command", () => {
 		expect(payload.count).toBe(1);
 		expect(JSON.stringify(payload)).toContain("afol maintenance review");
 		expect(JSON.stringify(payload)).not.toContain("a mt review");
+	});
+
+	test.each([
+		{
+			name: "canonical command in inline code",
+			id: "canonical-inline",
+			body: "Run `afol status --json`.",
+			expected: ["afol status"],
+		},
+		{
+			name: "documented command alias in inline code",
+			id: "documented-alias",
+			body: "Run `afol mt review --dry-run`.",
+			expected: ["afol maintenance review"],
+		},
+		{
+			name: "local executable in a fenced code block",
+			id: "local-executable",
+			body: "```sh\n./afol v project --json\n```",
+			expected: ["afol validate project"],
+		},
+		{
+			name: "bare prose alias",
+			id: "prose-alias",
+			body: "A prose sentence mentions a mt review without a code span.",
+			expected: [],
+		},
+		{
+			name: "unknown command in inline code",
+			id: "unknown-command",
+			body: "The invalid invocation is `afol not-a-command inspect`.",
+			expected: [],
+		},
+		{
+			name: "known executable in prose",
+			id: "known-executable-prose",
+			body: "The prose says afol ux user journey without documenting a command.",
+			expected: [],
+		},
+	])("extracts $name without indexing prose or unknown commands", ({
+		body,
+		expected,
+		id: fixtureId,
+	}) => {
+		const id = `fixture-extraction-${fixtureId}_spec-child_01`;
+		write(
+			`.afol/adm/specs/${id}.md`,
+			`\n---\ndoc_type: spec-child\nid: ${id}\ntheme: UX extraction\nstatus: active\nroadmap_feature: F-TEST\nparent_spec: fixture-parent_spec_01\n---\n\n# Extraction fixture\n\n${body}\n`,
+		);
+
+		const entry = loadUxRegistry(root).entries.find(
+			(candidate) => candidate.id === id,
+		);
+		expect(entry?.commands).toEqual([...expected]);
 	});
 
 	test("previews spec-linked UX journey registration", async () => {

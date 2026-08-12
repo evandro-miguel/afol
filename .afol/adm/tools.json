@@ -22,6 +22,7 @@
           "quick-task",
           "governance",
           "evidence",
+          "legacy",
           "hook",
           "rule",
           "skill",
@@ -73,17 +74,12 @@
           "verify",
           "verify-tasks",
           "state",
-          "library",
-          "memory",
           "adm",
-          "adr",
-          "changelog",
           "health",
           "db",
           "doctor",
           "sweep",
           "bench",
-          "catchup",
           "preflight",
           "telemetry"
         ]
@@ -100,17 +96,12 @@
           "verify",
           "verify-tasks",
           "state",
-          "library",
-          "memory",
           "adm",
-          "adr",
-          "changelog",
           "health",
           "db",
           "doctor",
           "sweep",
           "bench",
-          "catchup",
           "preflight",
           "telemetry"
         ]
@@ -130,6 +121,7 @@
           "quick-task",
           "governance",
           "evidence",
+          "legacy",
           "close",
           "bootstrap",
           "verify",
@@ -164,17 +156,12 @@
           "verify",
           "verify-tasks",
           "state",
-          "library",
-          "memory",
           "adm",
-          "adr",
-          "changelog",
           "health",
           "db",
           "doctor",
           "sweep",
           "bench",
-          "catchup",
           "preflight",
           "telemetry"
         ]
@@ -306,6 +293,11 @@
           "description": "Run one benchmark pack with its configured gates"
         },
         {
+          "usage": "bench --pack <pack-id> --scenario-id <scenario-id> --json",
+          "side_effect": "read",
+          "description": "Rerun one scored scenario in a benchmark pack"
+        },
+        {
           "usage": "bench --pack governance-history --timing-mode observe --json",
           "side_effect": "read",
           "description": "Observe timing; non-timing gates block"
@@ -337,9 +329,9 @@
       "description": "Install scaffold; use --dry-run to preview writes",
       "subcommands": [
         {
-          "usage": "--dry-run",
+          "usage": "--dry-run [--json]",
           "side_effect": "read",
-          "description": "Preview scaffold install without writing"
+          "description": "Preview scaffold install without writing; --json emits a result envelope"
         }
       ]
     },
@@ -394,6 +386,16 @@
       "description": "Complete a task session",
       "subcommands": [
         {
+          "usage": "d T-01 -x \"<cmd>\"",
+          "side_effect": "write",
+          "description": "Verify with -x and complete one task (preferred)"
+        },
+        {
+          "usage": "d T-01..T-n -x \"<cmd>\"",
+          "side_effect": "write",
+          "description": "One shared check for a batch range, then complete each"
+        },
+        {
           "usage": "--session <session-id> --task-id <task-id>",
           "side_effect": "write",
           "description": "Mark a task complete"
@@ -406,7 +408,7 @@
         {
           "usage": "--verification-timeout-ms <milliseconds>",
           "side_effect": "write",
-          "description": "Bound each step (default 300000ms; max 600000ms)"
+          "description": "Bound each step (default 600000ms; max 600000ms)"
         },
         {
           "usage": "-- <argv...>",
@@ -518,15 +520,20 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Run one lifecycle; missing governance stays pending with a next step",
+      "description": "One-shot lifecycle (single or multi-task); missing governance stays pending",
       "subcommands": [
         {
-          "usage": "<theme> --task <summary> --command \"<cmd>\"",
+          "usage": "<theme> -t <summary> -c \"<cmd>\"",
           "side_effect": "write",
-          "description": "Create, start, verify, record evidence, and close one task"
+          "description": "Create, start, verify once, record evidence, and close one task"
         },
         {
-          "usage": "--feature-id <F-id> --parent-spec <spec-id>",
+          "usage": "<theme> -t <a> -t <b> [-t ...] -c \"<cmd>\"",
+          "side_effect": "write",
+          "description": "One-shot multi-task: shared verification across all -t summaries (max 100)"
+        },
+        {
+          "usage": "-F <F-id> -P <spec-id>",
           "side_effect": "write",
           "description": "Create the quick task as a governed session"
         },
@@ -557,14 +564,24 @@
           "description": "List open pending_spec entries"
         },
         {
-          "usage": "resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+          "usage": "gov rs -S <id> -F <F-id> -P <spec-id>",
           "side_effect": "write",
-          "description": "Link roadmap feature/spec"
+          "description": "Link roadmap feature/spec (session optional if bound)"
         },
         {
-          "usage": "resolve-spec --session <id> --no-spec-required --reason <text>",
+          "usage": "gov rs -S <id> --no-spec-required -r \"<reason>\"",
           "side_effect": "write",
           "description": "Waive with an explicit reason"
+        },
+        {
+          "usage": "bulk-waive --reason \"<text>\" [--limit N] [--dry-run] [--json]",
+          "side_effect": "write",
+          "description": "Waive open pending_spec entries (default limit 20)"
+        },
+        {
+          "usage": "bulk-waive --reason \"<text>\" --session <id> [--session <id2>...]",
+          "side_effect": "write",
+          "description": "Waive explicit open sessions (max 100)"
         },
         {
           "usage": "repair-index",
@@ -585,7 +602,7 @@
       "type": "workflow",
       "side_effect": "append",
       "execution_mode": "on-demand",
-      "description": "Record task evidence",
+      "description": "Record, reverify, or narrowly admit task evidence debt",
       "subcommands": [
         {
           "usage": "--session <session-id> --task-id <task-id>",
@@ -606,6 +623,42 @@
           "usage": "--json",
           "side_effect": "append",
           "description": "Emit machine-readable evidence result"
+        },
+        {
+          "usage": "reverify -S <id> -T <id> -x \"<cmd>\" [--json]",
+          "side_effect": "append",
+          "description": "Run and append observed evidence for a closed terminal task without reopening it"
+        },
+        {
+          "usage": "transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval \"<text>\" [--dry-run|--confirm] [--json]",
+          "side_effect": "write",
+          "description": "Hash-bind closed post-cutoff missing/failed evidence debt under the registered no-op policy (preview by default)"
+        },
+        {
+          "usage": "admit --session <id> --all-missing|--task-id <id> --reason \"<text>\" [--dry-run|--confirm] [--json]",
+          "side_effect": "write",
+          "description": "Admit hash-bound missing/failed evidence for a closed pre-cutoff session (preview by default; --confirm writes)"
+        }
+      ]
+    },
+    {
+      "id": "legacy",
+      "name": "AFOL Legacy",
+      "tool": "afol",
+      "wrapper_command": "afol legacy",
+      "aliases": [
+        "lg"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Reconcile legacy pre-cutoff evidence debt and close deadlocked sessions",
+      "subcommands": [
+        {
+          "usage": "reconcile --session <id> --reason \"<text>\" --issue <url> [--task-id <id>] [--dry-run|--confirm] [--summary \"<text>\"] [--json]",
+          "side_effect": "write",
+          "description": "Admit legacy evidence debt and close a pre-cutoff all-done session in one transaction (preview by default; --confirm writes and closes)"
         }
       ]
     },
@@ -725,6 +778,11 @@
           "usage": "--allow-no-report --reason <text>",
           "side_effect": "write",
           "description": "Close without a report with an explicit waiver"
+        },
+        {
+          "usage": "--admit-legacy-baseline",
+          "side_effect": "write",
+          "description": "Retry close waiving issues admitted by the legacy evidence baseline"
         },
         {
           "usage": "--json",
@@ -856,7 +914,7 @@
       "description": "Verify workbench tasks",
       "subcommands": [
         {
-          "usage": "[session-path] --strict",
+          "usage": "[session-path] [--strict] [--verbose]",
           "side_effect": "read",
           "description": "Require all tasks in a session path to be complete"
         },
@@ -882,7 +940,7 @@
       "description": "Verify workbench tasks",
       "subcommands": [
         {
-          "usage": "[session-path] --strict",
+          "usage": "[session-path] [--strict] [--verbose]",
           "side_effect": "read",
           "description": "Require all tasks in a session path to be complete"
         },
@@ -1100,9 +1158,65 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect library entries",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list|ls [--json]",
+          "side_effect": "read",
+          "description": "List library topics"
+        },
+        {
+          "usage": "topic <topic>|--topic <topic> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one library topic"
+        },
+        {
+          "usage": "search <query>|--query <query> [--json]",
+          "side_effect": "read",
+          "description": "Search library topics and claims"
+        },
+        {
+          "usage": "graph [--json]",
+          "side_effect": "read",
+          "description": "Render the library topic and claim graph"
+        },
+        {
+          "usage": "health [--json]",
+          "side_effect": "read",
+          "description": "Run library health checks"
+        },
+        {
+          "usage": "doctor [--json]",
+          "side_effect": "read",
+          "description": "Show library remediation steps"
+        },
+        {
+          "usage": "propose --topic <topic> --title <title> [--url <url>] [--source <id>] [--json]",
+          "side_effect": "write",
+          "description": "Propose a library topic with an optional source"
+        },
+        {
+          "usage": "add-source --topic <topic> --url <url> [--title <title>] [--source <id>] [--json]",
+          "side_effect": "write",
+          "description": "Add a source to a library topic"
+        },
+        {
+          "usage": "add-claim --topic <topic> --claim <text> --source <id>[,<id>...] [--json]",
+          "side_effect": "write",
+          "description": "Add a sourced claim to a library topic"
+        },
+        {
+          "usage": "invalidate --topic <topic> --claim <claim-id> --reason <text> [--json]",
+          "side_effect": "write",
+          "description": "Invalidate a library claim with a reason"
+        },
+        {
+          "usage": "rebuild-index [--json]",
+          "side_effect": "generated",
+          "description": "Refresh the generated library index"
+        }
+      ]
     },
     {
       "id": "memory",
@@ -1115,9 +1229,65 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect memory entries",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list|ls [--json]",
+          "side_effect": "read",
+          "description": "List memory entries"
+        },
+        {
+          "usage": "show|get --id <id> [--json]",
+          "side_effect": "read",
+          "description": "Inspect one memory entry"
+        },
+        {
+          "usage": "search|find --query <query> [--json]",
+          "side_effect": "read",
+          "description": "Search memory entries"
+        },
+        {
+          "usage": "render [--json]",
+          "side_effect": "read",
+          "description": "Render the memory document"
+        },
+        {
+          "usage": "recall --query <query> [--json]",
+          "side_effect": "read",
+          "description": "Recall entries relevant to a query"
+        },
+        {
+          "usage": "add --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+          "side_effect": "write",
+          "description": "Add an active memory entry"
+        },
+        {
+          "usage": "update|set --id <id> [--title <title>] [--body <text>] [--tags <tag>[,<tag>...]] [--json]",
+          "side_effect": "write",
+          "description": "Update a memory entry"
+        },
+        {
+          "usage": "archive --id <id> [--json]",
+          "side_effect": "write",
+          "description": "Archive a memory entry"
+        },
+        {
+          "usage": "propose --id <id> --title <title> --body <text> [--tags <tag>[,<tag>...]] [--json]",
+          "side_effect": "write",
+          "description": "Add a proposed memory entry"
+        },
+        {
+          "usage": "promote --id <id> [--json]",
+          "side_effect": "write",
+          "description": "Promote a proposed memory entry"
+        },
+        {
+          "usage": "reject --id <id> --reason <text> [--json]",
+          "side_effect": "write",
+          "description": "Reject a proposed memory entry"
+        }
+      ]
     },
     {
       "id": "evolve",
@@ -1131,6 +1301,21 @@
       "execution_mode": "on-demand",
       "description": "Analyze project evolution state and proposals",
       "subcommands": [
+        {
+          "usage": "backfill [--offset <n>] [--limit <1-10>] [--json]",
+          "side_effect": "read",
+          "description": "Preview bounded historical observation and adoption coverage without writes"
+        },
+        {
+          "usage": "candidates [--session <id>] [--limit <1-10>] [--json]",
+          "side_effect": "read",
+          "description": "Derive bounded Memory and Library adoption candidates from completed sessions"
+        },
+        {
+          "usage": "candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
+          "side_effect": "write",
+          "description": "Append an explicit approval-gated learning review decision"
+        },
         {
           "usage": "evaluate <id> [--record] [--superseded-by <id>] [-j]",
           "side_effect": "preview",
@@ -1306,10 +1491,36 @@
       "aliases": [],
       "category": "inspect",
       "type": "inspect",
-      "side_effect": "read",
-      "execution_mode": "read-only",
-      "description": "Inspect ADRs",
-      "subcommands": []
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Create and manage ADRs",
+      "subcommands": [
+        {
+          "usage": "new|create <topic>",
+          "side_effect": "write",
+          "description": "Create an ADR"
+        },
+        {
+          "usage": "accept|ac <id>",
+          "side_effect": "write",
+          "description": "Accept an ADR"
+        },
+        {
+          "usage": "supersede|sp <old-id> <new-id>",
+          "side_effect": "write",
+          "description": "Supersede an ADR"
+        },
+        {
+          "usage": "abandon|ab <id> --reason <text>",
+          "side_effect": "write",
+          "description": "Abandon an ADR with a reason"
+        },
+        {
+          "usage": "archive|ar <id> --reason <text>",
+          "side_effect": "write",
+          "description": "Archive an ADR with a reason"
+        }
+      ]
     },
     {
       "id": "changelog",
@@ -1321,10 +1532,16 @@
       ],
       "category": "inspect",
       "type": "inspect",
-      "side_effect": "read",
-      "execution_mode": "read-only",
-      "description": "Inspect changelog entries",
-      "subcommands": []
+      "side_effect": "append",
+      "execution_mode": "on-demand",
+      "description": "Append changelog entries",
+      "subcommands": [
+        {
+          "usage": "add|a --type <type> --message <text>",
+          "side_effect": "append",
+          "description": "Append a changelog entry"
+        }
+      ]
     },
     {
       "id": "health",
@@ -1339,7 +1556,33 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Inspect health checks",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "[core] [--json]",
+          "side_effect": "read",
+          "description": "Check core workbench health"
+        },
+        {
+          "usage": "full [--json]",
+          "side_effect": "read",
+          "description": "Check every health area"
+        },
+        {
+          "usage": "release|--release [--json]",
+          "side_effect": "read",
+          "description": "Run release-scoped health checks"
+        },
+        {
+          "usage": "--area <adm|pstr|wb|memory|library|state|ctx|evolution|token_budget> [--deep] [--json]",
+          "side_effect": "read",
+          "description": "Check one named health area"
+        },
+        {
+          "usage": "--deep [--json]",
+          "side_effect": "read",
+          "description": "Check every health area in deep mode"
+        }
+      ]
     },
     {
       "id": "db",
@@ -1574,9 +1817,20 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Compare active session artifacts against git state and report unsynced context",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "[--session <id>] [--json]",
+          "side_effect": "read",
+          "description": "Read-only report of session artifacts, git freshness, and pending_spec"
+        },
+        {
+          "usage": "--fix [--json]",
+          "side_effect": "write",
+          "description": "Safe repair: unbind corrupt/missing bindings; rebind usable active"
+        }
+      ]
     },
     {
       "id": "preflight",
@@ -1591,7 +1845,13 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Search governance context before planning",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "<intent query> [--json]",
+          "side_effect": "read",
+          "description": "Search specs, lessons, rules, and similar systems"
+        }
+      ]
     },
     {
       "id": "adapter",
@@ -1686,7 +1946,7 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "List, bind, switch, and unbind workbench sessions",
+      "description": "List, bind, switch, archive, restore, and unbind sessions",
       "subcommands": [
         {
           "usage": "list",
@@ -1717,6 +1977,21 @@
           "usage": "unbind <session-id>",
           "side_effect": "write",
           "description": "Remove a session context binding"
+        },
+        {
+          "usage": "archive --candidates [--older-than-days <days>] [--offset <n>] [--limit <n>] [--json]",
+          "side_effect": "read",
+          "description": "List closed sessions eligible for logical archiving"
+        },
+        {
+          "usage": "archive <id>... --reason <text> [--dry-run] [--json]",
+          "side_effect": "write",
+          "description": "Logically archive closed workbench sessions"
+        },
+        {
+          "usage": "restore <id>... --reason <text> [--dry-run] [--json]",
+          "side_effect": "write",
+          "description": "Restore logically archived workbench sessions"
         }
       ]
     }

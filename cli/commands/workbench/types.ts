@@ -53,6 +53,7 @@ export type CloseArgs = {
 	allowNoReport: boolean;
 	reason: string;
 	summary: string;
+	admitLegacyBaseline: boolean;
 };
 
 export type LogArgs = {
@@ -65,4 +66,5 @@ export type VerifyArgs = {
 	sessionPath: string;
 	strict: boolean;
 	json: boolean;
+	verbose: boolean;
 };

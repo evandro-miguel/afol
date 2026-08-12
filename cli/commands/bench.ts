@@ -1,12 +1,11 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { isAbsolute, join, resolve } from "node:path";
 import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
+	envelopeErr,
+	envelopeOk,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
 import {
 	type CliMicroResult,
 	runCliMicroBenchmark,
@@ -21,11 +20,7 @@ import {
 	saveRunArchive,
 } from "../services/benchmark/report";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
-import type {
-	BenchReport,
-	BenchResult,
-	BenchScenario,
-} from "../services/benchmark/types";
+import type { BenchResult, BenchScenario } from "../services/benchmark/types";
 import { DEFAULT_BENCH_PACK_ID } from "../services/benchmark/types";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -41,14 +36,8 @@ const RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH =
 	".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json";
 const RUNTIME_LIVE_VALIDATE_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
-const RUNTIME_LIVE_EXECUTION_COMMAND = "afol bench run --all --save";
-const RUNTIME_LIVE_SNAPSHOT_SCHEMA_VERSION = "1.0.0";
-const RUNTIME_LIVE_STALE_AFTER_DAYS = 7;
-const RUNTIME_LIVE_SCENARIO_IDS: Record<string, string> = {
-	"governed-task-lifecycle": "live-implement-start-complete-evidence",
-	"file-inspection-vs-command": "live-implement-next-governance-preflight",
-	"validation-flow": "live-tools-benchmark-discovery",
-};
+const RUNTIME_LIVE_RECEIPT_GUIDANCE =
+	"run the fixed harness outside AFOL and provide its receipt at .afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json";
 
 type ParsedArgs = {
 	json: boolean;
@@ -175,15 +164,14 @@ function runtimeLiveDryRun(projectRoot: string): Record<string, unknown> {
 				.filter((entry): entry is string => Boolean(entry))
 		: [];
 	const note = loadedSnapshot.error
-		? `dry-run only; snapshot parse failed: ${loadedSnapshot.error}`
-		: "dry-run only; no codex exec or network execution was started";
+		? `receipt validation preview; snapshot parse failed: ${loadedSnapshot.error}`
+		: "receipt validation preview; AFOL does not execute benchmark agents";
 	return {
 		pack_id: "runtime-live-agent",
 		live_pack_id: snapshot?.pack_id ?? "runtime-flow-live-agent-v4",
-		mode: "dry-run",
-		live_execution: false,
-		live_execution_entrypoint: RUNTIME_LIVE_EXECUTION_COMMAND,
-		snapshot_path: RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH,
+		mode: "receipt-required",
+		receipt_required: true,
+		receipt_path: RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH,
 		snapshot_exists: snapshotExists,
 		saved_result_path: snapshot?.saved_result_path ?? null,
 		benchmark_profile: runtimeLiveProfile(snapshot),
@@ -191,6 +179,7 @@ function runtimeLiveDryRun(projectRoot: string): Record<string, unknown> {
 		scenario_count: scenarioIds.length,
 		scenario_ids: scenarioIds,
 		validation_command: RUNTIME_LIVE_VALIDATE_COMMAND,
+		receipt_guidance: RUNTIME_LIVE_RECEIPT_GUIDANCE,
 		note,
 	};
 }
@@ -199,12 +188,12 @@ function formatRuntimeLiveDryRun(data: Record<string, unknown>): string {
 	const profile = runtimeLiveProfile(asRecord(data));
 	return [
 		`bench runtime-live: ${data.mode}`,
-		`live_execution: ${data.live_execution}`,
-		`live_entrypoint: ${data.live_execution_entrypoint}`,
-		`snapshot: ${data.snapshot_path} exists=${data.snapshot_exists}`,
+		`receipt_required: ${data.receipt_required}`,
+		`receipt: ${data.receipt_path} exists=${data.snapshot_exists}`,
 		`profile: ${profile.model}/${profile.reasoning_effort}`,
 		`scenarios: ${data.scenario_count}`,
 		`validate: ${data.validation_command}`,
+		`receipt guidance: ${data.receipt_guidance}`,
 		String(data.note),
 	].join("\n");
 }
@@ -282,50 +271,19 @@ function runLiveScenarios(
 	);
 }
 
-export function saveRuntimeLiveSnapshot(
+type LiveScenarioRunner = (
 	projectRoot: string,
-	report: BenchReport,
-	savedResultPath: string,
-): string {
-	const snapshotPath = join(projectRoot, RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH);
-	const scenarios = report.results.map((result) => ({
-		id: RUNTIME_LIVE_SCENARIO_IDS[result.scenario_id] ?? result.scenario_id,
-		pass: result.pass,
-		duration_ms: result.timing.wall_clock_ms,
-		tool_call_count: result.tools.total_calls,
-		tool_success_rate: result.tools.success_rate,
-		error_count: result.tools.error_count,
-		token_usage: {
-			input_tokens: result.tokens.input,
-			output_tokens: result.tokens.output,
-			total_tokens: result.tokens.total,
-		},
-	}));
-	const payload = {
-		schema_version: RUNTIME_LIVE_SNAPSHOT_SCHEMA_VERSION,
-		pack_id: "runtime-flow-live-agent-v4",
-		generated_at: report.timestamp,
-		stale_after_days: RUNTIME_LIVE_STALE_AFTER_DAYS,
-		saved_result_path: savedResultPath,
-		benchmark_profile: {
-			runtime: "codex",
-			model: "gpt-5.4-mini",
-			reasoning_effort: "medium",
-		},
-		summary: {
-			pass: scenarios.every((scenario) => scenario.pass),
-			duration_ms: report.summary.total_time_ms,
-			tool_call_count: scenarios.reduce(
-				(sum, row) => sum + row.tool_call_count,
-				0,
-			),
-			error_count: scenarios.reduce((sum, row) => sum + row.error_count, 0),
-		},
-		scenarios,
-	};
-	mkdirSync(dirname(snapshotPath), { recursive: true });
-	writeFileSync(snapshotPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-	return relative(projectRoot, snapshotPath).replaceAll("\\", "/");
+	scenarios: BenchScenario[],
+	keepArtifacts: boolean,
+) => BenchResult[];
+
+type CliMicroRunner = (projectRoot: string) => CliMicroResult[];
+
+function reportExitCode(results: BenchResult[]): 0 | 1 | 3 {
+	if (results.some((result) => result.status === "blocked")) {
+		return 3;
+	}
+	return results.some((result) => result.status !== "passed") ? 1 : 0;
 }
 
 function emitJson(
@@ -334,6 +292,35 @@ function emitJson(
 	data: Record<string, unknown>,
 ): void {
 	io.stdout(stringifyEnvelope(envelopeOk(data, { action })));
+}
+
+function emitReportJson(
+	io: CommandIo,
+	action: string,
+	data: Record<string, unknown>,
+	exitCode: 0 | 1 | 3,
+	failure: { code: string; message: string } = {
+		code: "BENCH_SCENARIOS_FAILED",
+		message: "benchmark scenarios failed",
+	},
+): void {
+	if (exitCode === 0) {
+		emitJson(io, action, data);
+		return;
+	}
+	const blocked = exitCode === 3;
+	const error = blocked
+		? {
+				code: "BENCH_SCENARIOS_BLOCKED",
+				message: "benchmark scenarios blocked",
+			}
+		: failure;
+	const envelope = envelopeErr(error.code, error.message, {
+		action,
+		exitCode,
+	}) as ResultEnvelope<Record<string, unknown>>;
+	envelope.data = data;
+	io.stdout(stringifyEnvelope(envelope));
 }
 
 function emitFailure(
@@ -360,6 +347,8 @@ export async function runBenchCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	runScenarios: LiveScenarioRunner = runLiveScenarios,
+	runCliMicro: CliMicroRunner = runCliMicroBenchmark,
 ): Promise<number> {
 	try {
 		const benchAction = action as BenchAction;
@@ -389,14 +378,20 @@ export async function runBenchCommand(
 				return 0;
 			}
 			case "cli": {
-				const results = runCliMicroBenchmark(projectRoot);
+				const results = runCliMicro(projectRoot);
 				const summary = summarizeCliMicro(results);
+				const exitCode = results.some((result) => result.status !== "passed")
+					? 1
+					: 0;
 				if (parsed.json) {
-					emitJson(io, "bench.cli", { ...summary, results });
+					emitReportJson(io, "bench.cli", { ...summary, results }, exitCode, {
+						code: "BENCH_CLI_FAILED",
+						message: "cli microbenchmark failed",
+					});
 				} else {
 					io.stdout(formatCliMicroText(results));
 				}
-				return 0;
+				return exitCode;
 			}
 			case "report": {
 				const runPath = parsed.runPath
@@ -430,7 +425,7 @@ export async function runBenchCommand(
 			}
 			case "baseline": {
 				if (parsed.save) {
-					const results = runLiveScenarios(projectRoot, scenarios, false);
+					const results = runScenarios(projectRoot, scenarios, false);
 					const baseline = loadBaseline(projectRoot, DEFAULT_BENCH_PACK_ID);
 					const report = buildReport(results, baseline);
 					const runPath = saveRunArchive(projectRoot, report);
@@ -439,12 +434,18 @@ export async function runBenchCommand(
 						DEFAULT_BENCH_PACK_ID,
 						report,
 					);
+					const exitCode = reportExitCode(results);
 					if (parsed.json) {
-						emitJson(io, "bench.baseline", {
-							run_path: runPath,
-							baseline_path: baselinePath,
-							...report.json,
-						});
+						emitReportJson(
+							io,
+							"bench.baseline",
+							{
+								run_path: runPath,
+								baseline_path: baselinePath,
+								...report.json,
+							},
+							exitCode,
+						);
 					} else {
 						io.stdout(
 							[
@@ -454,11 +455,7 @@ export async function runBenchCommand(
 							].join("\n"),
 						);
 					}
-					return report.results.some((result) => result.status === "blocked")
-						? 3
-						: report.results.some((result) => result.status !== "passed")
-							? 1
-							: 0;
+					return exitCode;
 				}
 				const baseline = loadBaseline(projectRoot, DEFAULT_BENCH_PACK_ID);
 				if (!baseline) {
@@ -478,7 +475,7 @@ export async function runBenchCommand(
 			}
 			case "run": {
 				const selectedScenarios = selectScenarios(scenarios, parsed);
-				const results = runLiveScenarios(
+				const results = runScenarios(
 					projectRoot,
 					selectedScenarios,
 					parsed.keepArtifacts,
@@ -486,37 +483,27 @@ export async function runBenchCommand(
 				const baseline = loadBaseline(projectRoot, DEFAULT_BENCH_PACK_ID);
 				const report = buildReport(results, baseline);
 				let runPath: string | null = null;
-				let runtimeSnapshotPath: string | null = null;
+				const runtimeSnapshotPath: string | null = null;
 				if (parsed.save) {
 					runPath = saveRunArchive(projectRoot, report);
-					if (parsed.all) {
-						runtimeSnapshotPath = saveRuntimeLiveSnapshot(
-							projectRoot,
-							report,
-							runPath,
-						);
-					}
 				}
+				const exitCode = reportExitCode(results);
 				if (parsed.json) {
-					emitJson(io, "bench.run", {
-						...report.json,
-						run_path: runPath,
-						runtime_snapshot_path: runtimeSnapshotPath,
-					});
+					emitReportJson(
+						io,
+						"bench.run",
+						{
+							...report.json,
+							run_path: runPath,
+							runtime_snapshot_path: runtimeSnapshotPath,
+						},
+						exitCode,
+					);
 				} else {
 					const extra = runPath ? `\nsaved run: ${runPath}` : "";
 					io.stdout(`${report.text}${extra}`);
 				}
-				if (
-					results.some(
-						(result) =>
-							result.status === "blocked" &&
-							result.notes.some((note) => note.startsWith("codex-missing:")),
-					)
-				) {
-					return 3;
-				}
-				return results.some((result) => result.status !== "passed") ? 1 : 0;
+				return exitCode;
 			}
 			default:
 				return emitFailure(

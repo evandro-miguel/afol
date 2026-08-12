@@ -13,7 +13,9 @@ export type WorkbenchEventKind =
 	| "workbench.record_evidence"
 	| "workbench.mark_done"
 	| "workbench.append_log"
-	| "workbench.close";
+	| "workbench.close"
+	| "workbench.archive"
+	| "workbench.restore";
 
 export type WorkbenchEvent = {
 	id: string;

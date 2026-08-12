@@ -28,6 +28,7 @@ import {
 	recordMaintenanceReview,
 	scanLegacyReferences,
 } from "../services/health/maintenance-review";
+import { collectFreshnessReport } from "../services/local-state/freshness";
 import {
 	detectSessionHealth,
 	rebuildWorkBenchIndex,
@@ -307,6 +308,57 @@ describe("health system", () => {
 			expect(report.findings.every((finding) => finding.area === "pstr")).toBe(
 				true,
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkHealth detects PSTR source drift before expiry", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				"export const cli = false;\n",
+			);
+			const report = checkHealth(root, { area: "pstr" });
+			const canonical = collectFreshnessReport(root, {
+				localState: false,
+				pstr: true,
+			}).findings.find((finding) => finding.id === "pstr:map:cli");
+			expect(canonical).toMatchObject({
+				surface: "pstr",
+				state: "stale",
+			});
+			expect(
+				report.findings.some((finding) =>
+					finding.message.includes("stale pstr map: cli"),
+				),
+			).toBe(true);
+			expect(
+				report.findings.some(
+					(finding) =>
+						finding.area === "pstr" &&
+						finding.severity === "fail" &&
+						finding.hint === "run afol pstr rebuild",
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkHealth reports an invalid PSTR index without synthesized map failures", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(join(root, ".afol", "pstr", "index.json"), "{", "utf8");
+			const report = checkHealth(root, { area: "pstr" });
+			expect(report.findings).toEqual([
+				expect.objectContaining({
+					area: "pstr",
+					message: expect.stringContaining("invalid pstr index snapshot"),
+				}),
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

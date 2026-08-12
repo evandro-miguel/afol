@@ -23,6 +23,7 @@ import { readMemory } from "../services/memory/crud";
 import { resolveProjectPaths } from "../services/project/paths";
 import { checkPstrStale, validatePstrIndex } from "../services/pstr/builder";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
+import { resolveSession as resolveVerifySession } from "./workbench/verify";
 
 const jsonOutput = createJsonWriters("ctx");
 
@@ -209,6 +210,24 @@ function parseArgs(args: string[]): ParsedArgs {
 		throw new Error(`Unknown ctx argument: ${value}`);
 	}
 	return parsed;
+}
+
+function resolveBundleSession(
+	root: string,
+	explicit?: string,
+): string | undefined {
+	if (explicit) return explicit;
+	try {
+		return resolveVerifySession(root, "", "ctx bundle");
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message.startsWith("Missing --session for ctx bundle;")
+		) {
+			return undefined;
+		}
+		throw error;
+	}
 }
 
 function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
@@ -469,8 +488,12 @@ export async function runContextCommand(
 				}
 				return 2;
 			}
+			const bundleSession =
+				ctxAction === "bundle"
+					? resolveBundleSession(projectRoot, parsed.session)
+					: parsed.session;
 			bundle = buildContextBundle(projectRoot, {
-				...(parsed.session ? { session: parsed.session } : {}),
+				...(bundleSession ? { session: bundleSession } : {}),
 				...(parsed.task ? { task: parsed.task } : {}),
 				...(parsed.role ? { role: parsed.role } : {}),
 				...(parsed.surface ? { surface: parsed.surface } : {}),

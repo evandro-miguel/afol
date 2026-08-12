@@ -16,8 +16,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runBootstrapCommand } from "../commands/bootstrap";
 import { agentOperationContext } from "../core/operation-context";
+import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
-import { planBootstrapOperations } from "../services/bootstrap/planner";
+import {
+	planBootstrapOperations,
+	planCompletionLockGitignoreOperation,
+} from "../services/bootstrap/planner";
 import { resolveExternalPathLockPath } from "../services/io/session-lock";
 import type { TemplateFileMap } from "../services/template/payload";
 
@@ -37,6 +41,24 @@ function templateFileMap(entries: Record<string, string>): TemplateFileMap {
 	}
 	return files;
 }
+
+const LEGACY_SPECS_INDEX = [
+	"---",
+	'id: "specs-index"',
+	'type: "index"',
+	'desc: "AFOL specs index"',
+	'created: "2026-06-20"',
+	'updated: "2026-06-20"',
+	"---",
+	"",
+	"# Specs INDEX",
+	"",
+	"- Parent spec:",
+	"- Child spec:",
+	"",
+	"Keep this index updated in downstream projects as new specs are added.",
+	"",
+].join("\n");
 
 function mkCliRuntimeRoot(
 	options: {
@@ -106,6 +128,79 @@ function treeState(root: string): string[] {
 }
 
 describe("bootstrap planner ownership policy", () => {
+	test("plans the project-owned completion-lock ignore policy without writing in dry-run", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-gitignore-policy-"));
+		const gitignore = join(target, ".gitignore");
+		try {
+			writeFileSync(gitignore, "custom-rule\n", "utf8");
+			const before = readFileSync(gitignore);
+			const logs: string[] = [];
+			const originalLog = console.log;
+			console.log = (...values: unknown[]) => logs.push(values.join(" "));
+			try {
+				expect(
+					await runBootstrapCommand([target, "--dry-run", "--verbose"]),
+				).toBe(0);
+			} finally {
+				console.log = originalLog;
+			}
+			expect(logs.join("\n")).toContain(
+				"update-managed .gitignore managed-lock-ignore",
+			);
+			expect(readFileSync(gitignore)).toEqual(before);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves project-owned gitignore line order and final-newline semantics", () => {
+		for (const [content, expected] of [
+			["alpha\n", "alpha\n.afol/wb/.locks/\n"],
+			["alpha", "alpha\n.afol/wb/.locks/\n"],
+			["", ".afol/wb/.locks/\n"],
+		]) {
+			const operation = planCompletionLockGitignoreOperation({
+				state: "regular",
+				content: content ?? "",
+			});
+			expect(operation).toMatchObject({
+				kind: "update-managed",
+				path: ".gitignore",
+				owner: "project-owned",
+				nextContent: expected,
+			});
+		}
+		expect(
+			planCompletionLockGitignoreOperation({
+				state: "regular",
+				content: ".afol/wb/.locks/\n.afol/wb/.locks/\n",
+			}),
+		).toMatchObject({ kind: "skip-identical" });
+		expect(
+			planCompletionLockGitignoreOperation({ state: "unsafe" }),
+		).toMatchObject({ kind: "conflict" });
+	});
+
+	test("fails closed for a symlink or non-regular completion-lock gitignore", async () => {
+		for (const kind of ["symlink", "directory"] as const) {
+			const target = mkdtempSync(
+				join(tmpdir(), `bootstrap-gitignore-${kind}-`),
+			);
+			try {
+				const gitignore = join(target, ".gitignore");
+				if (kind === "symlink")
+					symlinkSync(join(target, "missing-target"), gitignore);
+				else mkdirSync(gitignore);
+				expect(await runBootstrapCommand([target, "--dry-run"])).toBe(4);
+				expect(
+					await runBootstrapCommand([target, "--dry-run", "--force-managed"]),
+				).toBe(4);
+			} finally {
+				rmSync(target, { recursive: true, force: true });
+			}
+		}
+	});
+
 	test("plans create/skip-identical/update-managed/preserve-project-owned", () => {
 		const managedCurrent = "managed-old";
 		const templateFiles = templateFileMap({
@@ -418,6 +513,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 			});
 			expect(exitCode).toBe(0);
 			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
+			expect(readFileSync(join(target, ".gitignore"), "utf8")).toBe(
+				".afol/wb/.locks/\n",
+			);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });
@@ -631,6 +729,28 @@ describe("bootstrap provider-compatible mutable state", () => {
 				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as { project: { id: string; timezone: string } };
 			expect(secondConfig.project).toEqual(firstConfig.project);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("migrates an untouched legacy specs index through bootstrap apply", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-legacy-index-"));
+		const indexPath = join(target, ".afol", "adm", "specs", "INDEX.md");
+		try {
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+			writeFileSync(indexPath, LEGACY_SPECS_INDEX, "utf8");
+
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+			const expected = DEFAULT_TEMPLATE_FILES[".afol/adm/specs/INDEX.md"];
+			expect(expected).toBeDefined();
+			expect(readFileSync(indexPath, "utf8")).toBe(
+				Buffer.from(expected?.contentBase64 ?? "", "base64").toString("utf8"),
+			);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}
@@ -892,6 +1012,98 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(output).not.toContain("provider-compatible-cleanup-removed");
 		} finally {
 			console.log = originalLog;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("dry-run json emits one preview envelope without writes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-json-"));
+		const logs: string[] = [];
+		const errors: string[] = [];
+		const originalLog = console.log;
+		const originalError = console.error;
+		try {
+			console.log = (...values: unknown[]) => {
+				logs.push(values.map(String).join(" "));
+			};
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+
+			const before = readdirSync(target);
+			expect(await runBootstrapCommand([target, "--dry-run", "--json"])).toBe(
+				0,
+			);
+			expect(errors).toEqual([]);
+			expect(logs).toHaveLength(1);
+			const payload = JSON.parse(logs[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				data?: {
+					target?: string;
+					mode?: string;
+					dry_run?: boolean;
+					conflicts?: number;
+				};
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("bootstrap.preview");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data).toMatchObject({
+				target,
+				mode: "dry-run",
+				dry_run: true,
+				conflicts: 0,
+			});
+			expect(readdirSync(target)).toEqual(before);
+		} finally {
+			console.log = originalLog;
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("dry-run json preserves conflict exit 4 and reports no writes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-json-conflict-"));
+		const targetFile = join(target, "AGENTS.md");
+		writeFileSync(targetFile, "project-owned\n", "utf8");
+		const logs: string[] = [];
+		const errors: string[] = [];
+		const originalLog = console.log;
+		const originalError = console.error;
+		try {
+			console.log = (...values: unknown[]) => {
+				logs.push(values.map(String).join(" "));
+			};
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+
+			const before = readFileSync(targetFile, "utf8");
+			expect(await runBootstrapCommand([target, "--dry-run", "--json"])).toBe(
+				4,
+			);
+			expect(errors).toEqual([]);
+			expect(logs).toHaveLength(1);
+			const payload = JSON.parse(logs[0] ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				action?: string;
+				exit_code?: number;
+				data?: { conflicts?: number };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("bootstrap.preview");
+			expect(payload.exit_code).toBe(4);
+			expect(payload.data?.conflicts).toBeGreaterThan(0);
+			expect(readFileSync(targetFile, "utf8")).toBe(before);
+		} finally {
+			console.log = originalLog;
+			console.error = originalError;
 			rmSync(target, { recursive: true, force: true });
 		}
 	});

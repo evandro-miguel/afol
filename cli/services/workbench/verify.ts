@@ -50,6 +50,24 @@ const SUCCESS_RESULTS = new Set([
 ]);
 const FAILURE_RESULT_RE =
 	/\b(?:fail|failed|failure|error|fatal|blocked|exit code [1-9])\b/i;
+const NOOP_EXECUTION_COMMANDS = new Set([
+	"true",
+	"/bin/true",
+	"/usr/bin/true",
+	":",
+]);
+const ENV_WRAPPERS = new Set(["env", "/usr/bin/env", "/bin/env"]);
+const ENV_FLAGS_WITHOUT_ARGUMENT = new Set([
+	"-i",
+	"--ignore-environment",
+	"-0",
+	"--null",
+]);
+const ENV_FLAGS_WITH_ARGUMENT = new Set(["-C", "--chdir", "-u", "--unset"]);
+const COMMAND_WRAPPERS = new Set(["command", "builtin"]);
+const EXEC_WRAPPER = "exec";
+const SHELL_WRAPPERS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+const EVAL_WRAPPER = "eval";
 
 type CountedTaskState =
 	| "done"
@@ -437,8 +455,245 @@ function hasRunnableSuccessEvidence(entry: EvidenceVerificationEntry): boolean {
 	return (
 		evidenceEntryIsSuccess(entry) &&
 		typeof entry.command === "string" &&
-		entry.command.trim().length > 0
+		entry.command.trim().length > 0 &&
+		!isNoopExecutionCommand(entry.command)
 	);
+}
+
+/** A successful shell no-op is evidence of execution, not task verification. */
+export function isNoopExecutionCommand(command: string): boolean {
+	const segments = splitSimpleControlChain(stripShellComment(command));
+	if (!segments) return true;
+	return segments.every(isNoopExecutionSegment);
+}
+
+function isNoopExecutionSegment(command: string): boolean {
+	const normalized = command.trim();
+	if (normalized.length === 0) return true;
+	if (/[()<>`$\n]/.test(normalized)) return false;
+	const words = shellWords(normalized);
+	if (!words) return true;
+	let index = 0;
+	while (ENV_WRAPPERS.has(words[index] ?? "")) {
+		const commandIndex = consumeEnvPrefix(words, index + 1);
+		if (commandIndex === null) return true;
+		index = commandIndex;
+	}
+	while (
+		COMMAND_WRAPPERS.has(words[index] ?? "") ||
+		words[index] === EXEC_WRAPPER
+	) {
+		const commandIndex =
+			words[index] === EXEC_WRAPPER
+				? consumeExecPrefix(words, index + 1)
+				: consumeCommandPrefix(words, index + 1);
+		if (commandIndex === null) return true;
+		index = commandIndex;
+	}
+	if (isShellWrapper(words[index] ?? "")) {
+		const script = shellScriptArgument(words, index + 1);
+		return script === null
+			? true
+			: script === undefined
+				? false
+				: isNoopExecutionCommand(script);
+	}
+	if (words[index] === EVAL_WRAPPER) {
+		const expression = words
+			.slice(index + 1)
+			.join(" ")
+			.trim();
+		return expression.length === 0 || isNoopExecutionCommand(expression);
+	}
+	return NOOP_EXECUTION_COMMANDS.has(words[index] ?? "");
+}
+
+function isShellWrapper(command: string): boolean {
+	if (SHELL_WRAPPERS.has(command)) return true;
+	const match = command.match(/^\/(?:bin|usr\/bin)\/([^/]+)$/);
+	return match !== null && SHELL_WRAPPERS.has(match[1] ?? "");
+}
+
+function splitSimpleControlChain(command: string): string[] | null {
+	const segments: string[] = [];
+	let segment = "";
+	let quote: "'" | '"' | null = null;
+	for (let index = 0; index < command.length; index += 1) {
+		const character = command[index] ?? "";
+		if (quote) {
+			if (quote === '"' && character === "\\") {
+				if (index + 1 >= command.length) return null;
+				segment += character + (command[index + 1] ?? "");
+				index += 1;
+			} else {
+				if (character === quote) quote = null;
+				segment += character;
+			}
+			continue;
+		}
+		if (character === "'" || character === '"') {
+			quote = character;
+			segment += character;
+			continue;
+		}
+		if (character === "\\") {
+			if (index + 1 >= command.length) return null;
+			segment += character + (command[index + 1] ?? "");
+			index += 1;
+			continue;
+		}
+		if (";|&".includes(character)) {
+			segments.push(segment);
+			segment = "";
+			if (
+				(character === "|" || character === "&") &&
+				command[index + 1] === character
+			)
+				index += 1;
+			continue;
+		}
+		segment += character;
+	}
+	if (quote) return null;
+	segments.push(segment);
+	return segments;
+}
+
+function shellScriptArgument(
+	words: string[],
+	index: number,
+): string | null | undefined {
+	while (index < words.length) {
+		const word = words[index] ?? "";
+		if (word === "--") return undefined;
+		if (/^-[A-Za-z]*c[A-Za-z]*$/.test(word)) {
+			return words[index + 1] ?? null;
+		}
+		if (word.startsWith("-")) return null;
+		return undefined;
+	}
+	return undefined;
+}
+
+function consumeEnvPrefix(words: string[], index: number): number | null {
+	while (index < words.length) {
+		const word = words[index] ?? "";
+		if (word === "--") return index + 1;
+		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(word)) {
+			index += 1;
+			continue;
+		}
+		if (ENV_FLAGS_WITHOUT_ARGUMENT.has(word)) {
+			index += 1;
+			continue;
+		}
+		if (ENV_FLAGS_WITH_ARGUMENT.has(word)) {
+			if (index + 1 >= words.length) return null;
+			index += 2;
+			continue;
+		}
+		if (/^(?:-C|--chdir|-u|--unset)=/.test(word)) {
+			index += 1;
+			continue;
+		}
+		if (word.startsWith("-")) return null;
+		return index;
+	}
+	return index;
+}
+
+function consumeCommandPrefix(words: string[], index: number): number | null {
+	while (index < words.length) {
+		const word = words[index] ?? "";
+		if (word === "--") return index + 1;
+		if (word === "-p") {
+			index += 1;
+			continue;
+		}
+		// Lookup-only forms do not execute their operands.
+		if (word === "-v" || word === "-V") return null;
+		if (word.startsWith("-")) return null;
+		return index;
+	}
+	return index;
+}
+
+function consumeExecPrefix(words: string[], index: number): number | null {
+	while (index < words.length) {
+		const word = words[index] ?? "";
+		if (word === "--") return index + 1;
+		if (/^-[cl]+$/.test(word)) {
+			index += 1;
+			continue;
+		}
+		if (word === "-a") {
+			if (index + 1 >= words.length) return null;
+			index += 2;
+			continue;
+		}
+		if (word.startsWith("-")) return null;
+		return index;
+	}
+	return index;
+}
+
+function shellWords(command: string): string[] | null {
+	const words: string[] = [];
+	let word = "";
+	let quote: "'" | '"' | null = null;
+	for (let index = 0; index < command.length; index += 1) {
+		const character = command[index] ?? "";
+		if (quote) {
+			if (quote === '"' && character === "\\") {
+				if (index + 1 >= command.length) return null;
+				word += command[index + 1];
+				index += 1;
+			} else if (character === quote) quote = null;
+			else word += character;
+			continue;
+		}
+		if (character === "'" || character === '"') {
+			quote = character;
+			continue;
+		}
+		if (character === "\\") {
+			if (index + 1 >= command.length) return null;
+			word += command[index + 1];
+			index += 1;
+			continue;
+		}
+		if (/\s/.test(character)) {
+			if (word) words.push(word);
+			word = "";
+			continue;
+		}
+		word += character;
+	}
+	if (quote) return null;
+	if (word) words.push(word);
+	return words;
+}
+
+function stripShellComment(command: string): string {
+	let quote: "'" | '"' | null = null;
+	for (let index = 0; index < command.length; index += 1) {
+		const character = command[index];
+		if (quote) {
+			if (quote === '"' && character === "\\") index += 1;
+			else if (character === quote) quote = null;
+			continue;
+		}
+		if (character === "'" || character === '"') {
+			quote = character;
+			continue;
+		}
+		if (
+			character === "#" &&
+			(index === 0 || /\s/.test(command[index - 1] ?? ""))
+		)
+			return command.slice(0, index);
+	}
+	return command;
 }
 
 export type EvidenceCompletionStatus = "missing" | "passed" | "failed";
@@ -677,7 +932,10 @@ export function verifyWorkbenchTasks(
 	return result;
 }
 
-export function formatVerifyReport(result: VerifyResult): string {
+export function formatVerifyReport(
+	result: VerifyResult,
+	verbose = false,
+): string {
 	const sessionLabel = relative(process.cwd(), result.sessionPath) || ".";
 	const lines = [
 		"Task Verification Report",
@@ -709,23 +967,49 @@ export function formatVerifyReport(result: VerifyResult): string {
 	}
 
 	if (result.openTasks.length > 0) {
-		lines.push("", "Open Tasks:");
-		for (const task of result.openTasks) {
+		const visibleTasks = verbose
+			? result.openTasks
+			: result.openTasks.slice(0, VERIFY_REPORT_DETAIL_LIMIT);
+		lines.push("", `Open Tasks: ${result.openTasks.length}`);
+		for (const task of visibleTasks) {
 			const file = relative(result.sessionPath, task.file);
 			lines.push(
 				`  ${task.id} | ${file}:${task.line} | ${task.state} | ${task.description}`,
 			);
 		}
+		appendReportOmission(
+			lines,
+			result.openTasks.length - visibleTasks.length,
+			"open task(s)",
+			verbose,
+		);
 	}
 
 	if (result.issues.length > 0) {
-		lines.push("", "Issues:");
+		const counts = new Map<VerifyIssue["type"], number>();
 		for (const issue of result.issues) {
+			counts.set(issue.type, (counts.get(issue.type) ?? 0) + 1);
+		}
+		lines.push("", `Issues: ${result.issues.length}`);
+		for (const [type, count] of counts) {
+			lines.push(`  ${type}: ${count}`);
+		}
+		const visibleIssues = verbose
+			? result.issues
+			: result.issues.slice(0, VERIFY_REPORT_DETAIL_LIMIT);
+		lines.push("", verbose ? "Issue details:" : "Issue examples:");
+		for (const issue of visibleIssues) {
 			const location = issue.file
 				? ` ${relative(result.sessionPath, issue.file)}:${issue.line}`
 				: "";
 			lines.push(`  ${issue.type}${location} - ${issue.message}`);
 		}
+		appendReportOmission(
+			lines,
+			result.issues.length - visibleIssues.length,
+			"issue(s)",
+			verbose,
+		);
 	}
 
 	lines.push(
@@ -733,6 +1017,20 @@ export function formatVerifyReport(result: VerifyResult): string {
 		result.allCompleted ? "All tasks completed." : "Verification failed.",
 	);
 	return `${lines.join("\n")}\n`;
+}
+
+const VERIFY_REPORT_DETAIL_LIMIT = 5;
+
+function appendReportOmission(
+	lines: string[],
+	remaining: number,
+	label: string,
+	verbose: boolean,
+): void {
+	if (verbose || remaining <= 0) return;
+	lines.push(
+		`  ... ${remaining} more ${label} omitted; rerun with --verbose for full details.`,
+	);
 }
 
 export function verifyAllSessions(

@@ -8,6 +8,7 @@ export interface ParsedValidationArgs {
 	scope: ValidationScope;
 	changedPaths: string[];
 	explicitPacks: PackId[];
+	scenarioId?: string;
 	save: boolean;
 	outputPath?: string;
 }
@@ -72,6 +73,12 @@ function consumeValidationArg(
 				throw new Error(`Unknown --pack value: ${nextArg}`);
 			}
 			state.explicitPacks.push(nextArg as PackId);
+			return 2;
+		case "--scenario-id":
+			if (!nextArg) {
+				throw new Error("Missing value for --scenario-id");
+			}
+			state.scenarioId = nextArg;
 			return 2;
 		case "--save":
 			state.save = true;
@@ -139,6 +146,12 @@ export function parseValidationArgs(args: string[]): ParsedValidationArgs {
 	}
 	if (parsed.mode !== "bench" && args.includes("--timing-mode")) {
 		throw new Error("--timing-mode requires bench mode");
+	}
+	if (parsed.scenarioId && parsed.mode !== "bench") {
+		throw new Error("--scenario-id requires bench mode");
+	}
+	if (parsed.scenarioId && parsed.explicitPacks.length !== 1) {
+		throw new Error("--scenario-id requires exactly one --pack");
 	}
 
 	return parsed;

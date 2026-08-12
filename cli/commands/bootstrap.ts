@@ -13,6 +13,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	defaultOperationContext,
 	type OperationContext,
@@ -28,7 +29,10 @@ import type {
 	BootstrapManifestEntry,
 	ManagedOwnership,
 } from "../services/bootstrap/planner";
-import { planBootstrapOperations } from "../services/bootstrap/planner";
+import {
+	planBootstrapOperations,
+	planCompletionLockGitignoreOperation,
+} from "../services/bootstrap/planner";
 import {
 	isValidIanaTimezone,
 	isValidProjectUuid,
@@ -50,6 +54,7 @@ import type { TemplateFileMap } from "../services/template/payload";
 type BootstrapArgs = {
 	targetRoot: string;
 	dryRun: boolean;
+	json: boolean;
 	forceManaged: boolean;
 	cleanupObsolete: boolean;
 	cleanupProviderCompatibleMutable: boolean;
@@ -226,6 +231,7 @@ function sha256Hex(content: Buffer): string {
 function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	let targetRoot = "";
 	let dryRun = false;
+	let json = false;
 	let forceManaged = false;
 	let cleanupObsolete = false;
 	let cleanupProviderCompatibleMutable = false;
@@ -241,6 +247,10 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		}
 		if (arg === "--dry-run") {
 			dryRun = true;
+			continue;
+		}
+		if (arg === "--json" || arg === "-j") {
+			json = true;
 			continue;
 		}
 		if (arg === "--provider-compatible") {
@@ -304,10 +314,16 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	if (!targetRoot) {
 		throw new Error("Missing bootstrap target path");
 	}
+	if (json && !dryRun) {
+		throw new Error(
+			"Unsupported bootstrap argument: --json requires --dry-run",
+		);
+	}
 
 	return {
 		targetRoot: resolve(targetRoot),
 		dryRun,
+		json,
 		forceManaged,
 		cleanupObsolete,
 		cleanupProviderCompatibleMutable,
@@ -670,6 +686,42 @@ function readTargetFiles(
 	return files;
 }
 
+function planCompletionLockGitignore(targetRoot: string) {
+	if (!existsSync(targetRoot)) {
+		return planCompletionLockGitignoreOperation({ state: "absent" });
+	}
+	const resolved = resolveProjectWritePath(targetRoot, ".gitignore");
+	if (!resolved.ok) {
+		return planCompletionLockGitignoreOperation({
+			state: "unsafe",
+			reason: "project-owned-gitignore-unsafe-path",
+		});
+	}
+	try {
+		const stats = lstatSync(resolved.value.path);
+		if (!stats.isFile()) {
+			return planCompletionLockGitignoreOperation({
+				state: "unsafe",
+				reason: stats.isSymbolicLink()
+					? "project-owned-gitignore-symlink"
+					: "project-owned-gitignore-non-regular",
+			});
+		}
+		return planCompletionLockGitignoreOperation({
+			state: "regular",
+			content: readFileSync(resolved.value.path, "utf8"),
+		});
+	} catch (error) {
+		if ((error as { code?: string }).code !== "ENOENT") {
+			return planCompletionLockGitignoreOperation({
+				state: "unsafe",
+				reason: "project-owned-gitignore-unreadable",
+			});
+		}
+		return planCompletionLockGitignoreOperation({ state: "absent" });
+	}
+}
+
 function hasOwnershipOwner(value: unknown): value is ManagedOwnership {
 	return (
 		value === "managed" ||
@@ -755,6 +807,9 @@ function writeTemplateFile(
 	templateFiles: TemplateFileMap,
 ): Promise<void> {
 	const entry = templateFiles[path];
+	if (path === ".gitignore") {
+		throw new Error(".gitignore requires its named policy merge payload");
+	}
 	if (!entry) {
 		throw new Error(`Missing generated template entry: ${path}`);
 	}
@@ -819,6 +874,7 @@ export async function runBootstrapCommand(
 				currentFiles,
 				manifest,
 			});
+			plan.operations.push(planCompletionLockGitignore(parsed.targetRoot));
 			const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
 			const mutableBaselinePlan = planMutableBaselines(
 				parsed.targetRoot,
@@ -833,27 +889,43 @@ export async function runBootstrapCommand(
 			const conflicts = plan.operations.filter(
 				(operation) => operation.kind === "conflict",
 			);
+			const policyConflicts = conflicts.filter(
+				(operation) => operation.path === ".gitignore",
+			);
 			const writable = plan.operations.filter(
 				(operation) =>
 					operation.kind === "create" || operation.kind === "update-managed",
 			);
 
-			console.log(
-				[
-					`bootstrap: target=${parsed.targetRoot}`,
-					`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
-					`mutable=${parsed.mutableDir}`,
-					`without-claude=${parsed.withoutClaude}`,
-					`files=${Object.keys(templateFiles).length}`,
-					`operations=${plan.operations.length}`,
-					`conflicts=${conflicts.length}`,
-					`cleanup=${cleanupPlan.candidates.length}`,
-					`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
-					parsed.verbose ? "details=verbose" : "details=run-with---verbose",
-				].join(" "),
-			);
+			const resultData = {
+				target: parsed.targetRoot,
+				mode: "dry-run",
+				dry_run: parsed.dryRun,
+				mutable: parsed.mutableDir,
+				without_claude: parsed.withoutClaude,
+				files: Object.keys(templateFiles).length,
+				operations: plan.operations.length,
+				conflicts: conflicts.length,
+				cleanup: cleanupPlan.candidates.length,
+				provider_cleanup: providerCompatibleCleanupPlan.length,
+			};
+			if (!parsed.json)
+				console.log(
+					[
+						`bootstrap: target=${parsed.targetRoot}`,
+						`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
+						`mutable=${parsed.mutableDir}`,
+						`without-claude=${parsed.withoutClaude}`,
+						`files=${Object.keys(templateFiles).length}`,
+						`operations=${plan.operations.length}`,
+						`conflicts=${conflicts.length}`,
+						`cleanup=${cleanupPlan.candidates.length}`,
+						`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
+						parsed.verbose ? "details=verbose" : "details=run-with---verbose",
+					].join(" "),
+				);
 
-			if (parsed.verbose) {
+			if (!parsed.json && parsed.verbose) {
 				for (const operation of plan.operations) {
 					console.log(
 						`${operation.kind} ${operation.path} ${operation.reason}`,
@@ -874,9 +946,38 @@ export async function runBootstrapCommand(
 				}
 			}
 
-			if (parsed.dryRun) return conflicts.length > 0 ? 4 : 0;
+			if (parsed.dryRun) {
+				const exitCode = conflicts.length > 0 ? 4 : 0;
+				if (parsed.json) {
+					console.log(
+						stringifyEnvelope(
+							exitCode === 0
+								? envelopeOk(resultData, {
+										action: "bootstrap.preview",
+										exitCode,
+									})
+								: {
+										schema: "afol.result/v1",
+										ok: false,
+										action: "bootstrap.preview",
+										exit_code: exitCode,
+										data: resultData,
+										error: {
+											code: "BOOTSTRAP_CONFLICT",
+											message:
+												"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
+										},
+									},
+						),
+					);
+				}
+				return exitCode;
+			}
 
-			if (conflicts.length > 0 && !parsed.forceManaged) {
+			if (
+				conflicts.length > 0 &&
+				(!parsed.forceManaged || policyConflicts.length > 0)
+			) {
 				console.error(
 					"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
 				);
@@ -914,11 +1015,19 @@ export async function runBootstrapCommand(
 					mkdirSync(parsed.targetRoot, { recursive: true });
 				}
 				for (const operation of writable) {
-					await writeTemplateFile(
-						parsed.targetRoot,
-						operation.path,
-						templateFiles,
-					);
+					if (operation.path === ".gitignore") {
+						const target = resolveBootstrapWritePath(
+							parsed.targetRoot,
+							operation.path,
+						);
+						await Bun.write(target, operation.nextContent ?? "");
+					} else {
+						await writeTemplateFile(
+							parsed.targetRoot,
+							operation.path,
+							templateFiles,
+						);
+					}
 					if (runtime.failAfterTemplateWrite)
 						throw new Error("Injected bootstrap failure after template write");
 				}
@@ -936,6 +1045,7 @@ export async function runBootstrapCommand(
 				}
 				if (parsed.forceManaged) {
 					for (const operation of conflicts) {
+						if (operation.path === ".gitignore") continue;
 						await writeTemplateFile(
 							parsed.targetRoot,
 							operation.path,
@@ -1003,7 +1113,17 @@ export async function runBootstrapCommand(
 			? await execute()
 			: await withExternalPathLock(initialCanonicalTarget, execute);
 	} catch (error) {
-		console.error((error as Error).message);
+		const message = (error as Error).message;
+		if (args.includes("--json") || args.includes("-j")) {
+			console.log(
+				stringifyEnvelope(
+					envelopeErr("BOOTSTRAP_ERROR", message, {
+						action: "bootstrap",
+						exitCode: 2,
+					}),
+				),
+			);
+		} else console.error(message);
 		return 2;
 	}
 }

@@ -32,7 +32,9 @@ assignment or model-orchestration authority.
   separate in roadmap, spec, decision, and workbench bindings.
 - External harnesses select/call/schedule/retry/supervise models; AFOL only
   validates their bounded receipts and fixed profile metadata.
-- After a governance allocation changes, refresh the Project RAG and GitNexus
-  indexes so retrieval matches the current canon.
+- After a governance allocation changes, verify or reindex the registered
+  Project RAG through `ragctl` so retrieval matches the current canon.
+- GitNexus index maintenance is historical guidance and is superseded; current
+  semantic retrieval follows `evandro-rag-system` and `ragctl` Project RAG.
 - Do not resolve a collision by overwriting an index row; update the governing
   artifacts together and retain the historical entry as superseded.

@@ -13,6 +13,8 @@ const CATEGORY_ORDER: readonly CommandCategory[] = [
 	"ops",
 ];
 
+const HELP_LINE_LIMIT = 120;
+
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
 	core: "Core",
 	workflow: "Workflow",
@@ -32,6 +34,8 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	"quick-task": "one-task lifecycle",
 	governance: "spec gaps",
 	evidence: "record/admit evidence",
+	legacy: "legacy reconcile/close",
+	transition: "transition task",
 	close: "close session",
 	bootstrap: "install elsewhere",
 	verify: "verify tasks",
@@ -50,22 +54,23 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	evolve: "evolution status",
 	adm: "inspect adm",
 	spec: "inspect specs",
-	adr: "inspect ADRs",
-	changelog: "inspect changelog",
+	adr: "manage ADRs",
+	changelog: "append entries",
 	bench: "run benchmarks",
 	"project-benchmark": "compare references",
-	catchup: "unsynced context",
-	preflight: "planning preflight",
+	catchup: "recover context",
+	preflight: "plan checks",
 	telemetry: "inspect telemetry",
 	file: "append/move/archive",
 	update: "update scaffold",
 	health: "health checks",
 	db: "database state",
-	doctor: "doctor checks",
+	doctor: "run doctor",
 	maintenance: "maintenance checks",
 	sweep: "repo sweep",
-	schema: "schema review/apply",
+	schema: "review schema",
 	adapter: "manage adapters",
+	receipt: "ingest receipt",
 };
 
 export type HelpIntent = "planning" | "execution" | "maintenance";
@@ -91,6 +96,7 @@ const HELP_INTENT_COMMANDS: Record<HelpIntent, readonly string[]> = {
 		"new",
 		"start",
 		"evidence",
+		"legacy",
 		"done",
 		"log",
 		"close",
@@ -131,11 +137,27 @@ function formatEntry(spec: CommandSpec): string {
 	}`;
 }
 
+function wrapVerboseLine(prefix: string, content: string): string[] {
+	const lines: string[] = [];
+	let line = prefix;
+	for (const word of content.split(/\s+/)) {
+		const separator = line === prefix ? "" : " ";
+		if (
+			line !== prefix &&
+			line.length + separator.length + word.length > HELP_LINE_LIMIT
+		) {
+			lines.push(line);
+			line = `${prefix}${word}`;
+			continue;
+		}
+		line += `${separator}${word}`;
+	}
+	return [...lines, line];
+}
+
 function formatVerboseEntry(spec: CommandSpec): string[] {
 	const lines = [
-		`  ${spec.command}`,
-		`    effect: ${spec.sideEffect}`,
-		`    description: ${spec.description}`,
+		`  ${spec.command} [${spec.sideEffect}] - ${spec.description}`,
 	];
 	if (spec.aliases.length > 0)
 		lines.splice(1, 0, `    aliases: ${spec.aliases.join(", ")}`);
@@ -149,7 +171,10 @@ function formatVerboseEntry(spec: CommandSpec): string[] {
 		lines.push("    subcommands:");
 		for (const subcommand of spec.subcommands) {
 			lines.push(
-				`      ${subcommand.usage} [${subcommand.sideEffect}] - ${subcommand.description}`,
+				...wrapVerboseLine(
+					"      ",
+					`${subcommand.usage} [${subcommand.sideEffect}]`,
+				),
 			);
 		}
 	}
@@ -324,6 +349,13 @@ export function formatHelpText(
 			? `Usage: afol help --for ${options.intent}`
 			: "Usage: afol [command] [options]",
 		"",
+		...(options.intent === undefined || options.intent === "execution"
+			? [
+					"Agent fast path (active session)",
+					'  afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+					"",
+				]
+			: []),
 		options.intent ? `Commands for ${options.intent}` : "Commands",
 	];
 	for (const category of CATEGORY_ORDER) {
@@ -353,14 +385,14 @@ export function formatHelpText(
 	lines.push(
 		"",
 		"Flags",
-		"  -j, --json  JSON output",
-		"  --for <intent>  Filter: planning, execution, maintenance",
-		"  --verbose  Show subcommands",
-		"  afol help <command>",
+		"  -j, --json  JSON",
+		"  --for <intent>  planning|execution|maintenance",
+		"  --verbose  details",
 		"  afol help --verbose",
+		"  afol help <command>",
 		"  a=afol",
 		"Side effects",
-		"  read=no writes; generated=derived; append=adds rows; write=changes files/state",
+		"  read=no writes; generated=derived; append=rows; write=files/state",
 	);
 	return lines.join("\n");
 }

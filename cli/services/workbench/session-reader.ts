@@ -7,7 +7,7 @@ import {
 } from "../io/safe-source";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
-import type { EvidenceEntry } from "./lifecycle";
+import type { EvidenceEntry } from "./types";
 
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 export const MAX_SESSION_IDENTIFIER_LENGTH = 128;

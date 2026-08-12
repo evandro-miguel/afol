@@ -33,10 +33,11 @@ import {
 	validateFilesIndex,
 } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
+import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 import {
-	rebuildWorkBenchIndex,
-	validateWorkBenchIndex,
-} from "../services/local-state/workbench-index";
+	admitsEvidenceTransitionIssue,
+	transitionAdmitEvidence,
+} from "../services/project/evidence-transition-admission";
 import { resolveProjectPaths } from "../services/project/paths";
 import { resolveTaskCompletionLockPath } from "../services/workbench/completion-lock";
 import {
@@ -51,8 +52,10 @@ import {
 	newWorkstream,
 	prepareVerificationRun,
 	type RecordEvidenceInput,
+	recordClosedTaskReverification,
 	recordEvidence as recordEvidenceRaw,
 	recordVerificationRunStep,
+	sanitizeEvidenceText,
 	startTask,
 	taskAttemptSnapshot,
 	transitionTask,
@@ -798,7 +801,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("cli pending_spec blocks its own start while unrelated new remains allowed", () => {
+	test("cli pending_spec allows start with warning while unrelated new remains allowed", () => {
 		const root = mkRoot("pending-spec");
 		try {
 			writeCliProjectContract(root);
@@ -818,8 +821,8 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 			]);
-			expect(start.status).toBe(2);
-			expect(start.stderr as string).toContain("pending_spec blocks start");
+			expect(start.status).toBe(0);
+			expect(start.stdout as string).toContain("warning: pending_spec");
 
 			const evidence = runKernel(root, [
 				"evidence",
@@ -841,9 +844,9 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				"true",
+				"bun --version",
 			]);
-			expect(done.status).toBe(2);
+			expect(done.status).toBe(0);
 
 			const unrelated = runKernel(root, [
 				"new",
@@ -931,7 +934,7 @@ describe("workbench lifecycle service", () => {
 				"quick-task",
 				"quick missing spec",
 				"--command",
-				"true",
+				"bun --version",
 				"--json",
 			]);
 			expect(quickTask.status).toBe(0);
@@ -948,7 +951,7 @@ describe("workbench lifecycle service", () => {
 				"quick-task",
 				"human pending spec",
 				"--command",
-				"true",
+				"bun --version",
 			]);
 			expect(human.status).toBe(0);
 			expect(human.stdout as string).toContain(
@@ -1058,9 +1061,17 @@ describe("workbench lifecycle service", () => {
 				"spec check failed",
 			);
 			expect((payload.error as Record<string, unknown>).code).toBe(
-				"workbench.error",
+				"workbench.verification_failed",
 			);
-			expect((payload as Record<string, unknown>).data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "spec_conflict",
+				evidence_ids: [],
+				next_command: expect.any(String),
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1092,10 +1103,109 @@ describe("workbench lifecycle service", () => {
 				exit_code: 1,
 			});
 			expect(payload.error).toMatchObject({
-				code: "workbench.error",
+				code: "workbench.verification_failed",
 				message: "--test failed with exit code 3",
 			});
-			expect(payload.data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "failed",
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done parser diagnostics are classified, bounded, and sanitized", () => {
+		const root = mkRoot("done-parser-diagnostic");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done parser diagnostic");
+			const invalidTaskSelector = `I008_PARSE_CANARY_${"x".repeat(800)}`;
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				invalidTaskSelector,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(2);
+			const payload = parseEnvelope(proc.stdout as string);
+			const error = payload.error as {
+				code?: unknown;
+				message?: unknown;
+			};
+			const message = typeof error?.message === "string" ? error.message : "";
+			expect({
+				generic_code: error?.code === "workbench.error",
+				bounded_utf8: Buffer.byteLength(message, "utf8") <= 512,
+				raw_input_reflected: message.includes(invalidTaskSelector),
+				failed_step: (payload.data as Record<string, unknown> | undefined)
+					?.failed_step,
+			}).toEqual({
+				generic_code: false,
+				bounded_utf8: true,
+				raw_input_reflected: false,
+				failed_step: "parse",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done child failures retain a bounded classification without child output", () => {
+		const root = mkRoot("done-child-diagnostic");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done child diagnostic");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const rawChildDiagnostic = `I008_CHILD_DIAGNOSTIC_${"secret".repeat(120)}`;
+			const codePoints = Array.from(rawChildDiagnostic, (char) =>
+				char.charCodeAt(0),
+			);
+			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.exit(7)`;
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				`bun -e ${JSON.stringify(script)}`,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string);
+			const error = payload.error as {
+				code?: unknown;
+				message?: unknown;
+			};
+			const data = payload.data as Record<string, unknown>;
+			const message = typeof error?.message === "string" ? error.message : "";
+			const persistedEvidence = readFileSync(created.evidencePath, "utf8");
+			expect({
+				classified: error?.code === "workbench.verification_failed",
+				bounded_utf8: Buffer.byteLength(message, "utf8") <= 512,
+				status: data?.status,
+				raw_child_output_reflected:
+					message.includes(rawChildDiagnostic) ||
+					String(data?.diagnostic ?? "").includes(rawChildDiagnostic) ||
+					persistedEvidence.includes(rawChildDiagnostic) ||
+					String(proc.stdout).includes(rawChildDiagnostic) ||
+					String(proc.stderr).includes(rawChildDiagnostic),
+			}).toEqual({
+				classified: true,
+				bounded_utf8: true,
+				status: "failed",
+				raw_child_output_reflected: false,
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1126,10 +1236,18 @@ describe("workbench lifecycle service", () => {
 				exit_code: 1,
 			});
 			expect(payload.error).toMatchObject({
-				code: "workbench.error",
+				code: "workbench.verification_failed",
 				message: "--test-shell failed with exit code 1",
 			});
-			expect(payload.data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "failed",
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
 			expect(
 				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
 			).toBe(false);
@@ -1165,10 +1283,18 @@ describe("workbench lifecycle service", () => {
 				exit_code: 1,
 			});
 			expect(payload.error).toMatchObject({
-				code: "workbench.error",
+				code: "workbench.verification_failed",
 				message: "--test failed with exit code 4",
 			});
-			expect(payload.data).toBeUndefined();
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				task_id: "T-01",
+				task_ids: ["T-01"],
+				failed_step: "verification",
+				status: "failed",
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
 			expect(
 				existsSync(join(created.sessionDir, ".verification-runs.jsonl")),
 			).toBe(false);
@@ -1240,6 +1366,81 @@ describe("workbench lifecycle service", () => {
 				(event) => event.event_type === "tool_exec",
 			);
 			expect(toolEvents).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("declared evidence retries do not duplicate no-exit rows", () => {
+		const root = mkRoot("declared-evidence-retry");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "declared evidence retry");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const args = [
+				"evidence",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--command",
+				"bun test",
+				"--result",
+				"passed",
+				"--json",
+			];
+
+			const first = runKernel(root, args);
+			const second = runKernel(root, args);
+
+			expect(first.status).toBe(0);
+			expect(second.status).toBe(0);
+			const evidence = loadEvidenceEntries(created.evidencePath);
+			expect(evidence).toHaveLength(1);
+			expect(evidence[0]).toMatchObject({
+				task_id: "T-01",
+				command: "bun test",
+				result: "passed",
+				provenance: "declared",
+			});
+			expect(evidence[0]?.exit_code).toBeUndefined();
+			expect(
+				readLocalStateEvents(root).filter(
+					(event) => event.type === "workbench.record_evidence",
+				),
+			).toHaveLength(1);
+
+			const completion = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				"bun --version",
+				"--json",
+			]);
+			expect(completion.status).toBe(0);
+			const close = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--json",
+			]);
+			expect(close.status).toBe(0);
+			const report = readFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"utf8",
+			);
+			expect(
+				report.match(/declared passed \(bun test; exit_code=n\/a\)/g) ?? [],
+			).toHaveLength(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1557,6 +1758,38 @@ describe("workbench lifecycle service", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("redacts curl user credentials without redacting user-agent options", () => {
+		for (const [command, expected] of [
+			[
+				"curl -u alice:REDACTION_CURL_SHORT_CANARY https://example.test",
+				"curl -u [REDACTED] https://example.test",
+			],
+			[
+				"curl --user alice:REDACTION_CURL_LONG_CANARY https://example.test",
+				"curl --user [REDACTED] https://example.test",
+			],
+			[
+				"curl --user=alice:REDACTION_CURL_EQUALS_CANARY https://example.test",
+				"curl --user=[REDACTED] https://example.test",
+			],
+			[
+				"curl -ualice:REDACTION_CURL_ATTACHED_CANARY https://example.test",
+				"curl -u[REDACTED] https://example.test",
+			],
+			[
+				"curl -u alice:REDACTION_CURL_FIRST_CANARY --user=alice:REDACTION_CURL_SECOND_CANARY https://example.test",
+				"curl -u [REDACTED] --user=[REDACTED] https://example.test",
+			],
+		] as const) {
+			expect(sanitizeEvidenceText(command)).toBe(expected);
+		}
+		expect(
+			sanitizeEvidenceText(
+				"curl --user-agent 'AFOL test client' https://example.test",
+			),
+		).toBe("curl --user-agent 'AFOL test client' https://example.test");
 	});
 
 	test("automatic observation requires autonomy.auto_observe", () => {
@@ -2325,8 +2558,6 @@ describe("workbench lifecycle service", () => {
 			doneTask(root, { session: second.session, taskId: "T-01" });
 			closeSession(root, second.session);
 
-			expect(validateWorkBenchIndex(root).ok).toBe(false);
-			rebuildWorkBenchIndex(root);
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(true);
 			expect(readFileSync(filesIndexPath, "utf8")).toBe(filesIndexBefore);
@@ -2393,6 +2624,66 @@ describe("workbench lifecycle service", () => {
 
 			const taskDoc = readFileSync(created.taskPath, "utf8");
 			expect(taskDoc).toContain("| T-01 | done | worker |");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("no-op evidence cannot authorize task completion or session closure", () => {
+		const root = mkRoot("no-op-evidence");
+		try {
+			for (const command of [
+				"env true # verification",
+				"/usr/bin/env true",
+				"env -C /tmp true",
+				"env --chdir=/tmp true",
+				"command -p true",
+				"command -v true",
+				"command -V true",
+				"exec -c true",
+				"exec -l true",
+				"exec -cl true",
+				"exec -a afol true",
+				"exec -- true",
+				"sh -c true",
+				"bash -lc 'true'",
+				"zsh -c ':'",
+				"/bin/sh -c true",
+				"/usr/bin/bash -lc true",
+				"/usr/bin/zsh -c :",
+				"/bin/dash -c true",
+				"bash -c",
+				"eval true",
+				"true && :",
+				"true || :",
+				"true; :",
+				"true | :",
+				"true & :",
+			]) {
+				const created = newWorkstream(root, "no-op evidence");
+				recordObservedCompletion(root, {
+					session: created.session,
+					taskId: "T-01",
+					command,
+					result: "passed",
+				});
+
+				expect(() =>
+					doneTask(root, { session: created.session, taskId: "T-01" }),
+				).toThrow("requires passed evidence");
+
+				writeFileSync(
+					created.taskPath,
+					readFileSync(created.taskPath, "utf8").replace(
+						"| T-01 | tested_needs_spec_validation |",
+						"| T-01 | done |",
+					),
+					"utf8",
+				);
+				expect(() => closeSession(root, created.session)).toThrow(
+					"failed strict verification",
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2901,8 +3192,6 @@ describe("workbench lifecycle service", () => {
 			expect(validateWorkBenchIndex(root).ok).toBe(false);
 
 			expect(() => closeSession(root, created.session)).not.toThrow();
-			expect(validateWorkBenchIndex(root).ok).toBe(false);
-			rebuildWorkBenchIndex(root);
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(false);
 			rebuildFilesIndex(root);
@@ -3343,6 +3632,9 @@ describe("workbench lifecycle service", () => {
 			});
 			const report = readFileSync(reportPath, "utf8");
 			expect(report).toContain("declared: close verified");
+			expect(report).toMatch(
+				/- T-01 attempt=\d+ evidence_id=E-[^ ]+ authorizing: passed \(bun test; exit_code=0\)/,
+			);
 			expect(report).not.toContain("close auto report");
 			expect(
 				readFileSync(created.logPath, "utf8").match(/^## Summary$/gm) ?? [],
@@ -3363,7 +3655,7 @@ describe("workbench lifecycle service", () => {
 			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
-				command: "true",
+				command: "bun --version",
 				result: "passed",
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
@@ -3377,31 +3669,14 @@ describe("workbench lifecycle service", () => {
 				`${created.session}_report_01.md`,
 			);
 			const report = readFileSync(reportPath, "utf8");
-			const legacyReport = [
-				`# Report: ${created.session}`,
-				"",
-				"## Summary",
-				"Strict verification passed for 1 task.",
-				"",
-				"## Tasks",
-				`- T-01: done — ${taskIntent}`,
-				"",
-				"## Evidence",
-				"- T-01: passed (true; exit_code=0)",
-				"",
-			].join("\n");
-			const reportBytes = Buffer.byteLength(report, "utf8");
-			const legacyBytes = Buffer.byteLength(legacyReport, "utf8");
-
 			expect(report).not.toContain(taskIntent);
 			expect(report).not.toContain("Strict verification passed");
 			expect(report).toContain(
 				"closed: 1 task; evidence: 1 observed, 0 failed",
 			);
 			expect(report).toContain("- T-01: done");
-			expect(report).toContain("- T-01: passed (true; exit_code=0)");
-			expect(Math.ceil(reportBytes / 4)).toBeLessThanOrEqual(
-				Math.ceil(legacyBytes / 4) * 0.6,
+			expect(report).toMatch(
+				/- T-01 attempt=\d+ evidence_id=E-[^ ]+ authorizing: passed \(bun --version; exit_code=0\)/,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -3412,14 +3687,14 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("close-factual-failure-count");
 		try {
 			const created = newWorkstream(root, "close factual failure count");
-			recordRawEvidence(root, {
+			const declared = recordRawEvidence(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "manual review",
 				result: "passed",
 				provenance: "declared",
 			});
-			recordRawEvidence(root, {
+			const failed = recordRawEvidence(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -3427,7 +3702,7 @@ describe("workbench lifecycle service", () => {
 				exitCode: 0,
 				provenance: "observed",
 			});
-			recordObservedCompletion(root, {
+			const passed = recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -3450,10 +3725,17 @@ describe("workbench lifecycle service", () => {
 			expect(report).toContain(
 				"closed: 1 task; evidence: 2 observed, 1 failed",
 			);
+			expect(report).toContain("- T-01 attempt=");
+			expect(report).toContain(`evidence_id=${declared.id}`);
+			expect(report).toContain(`evidence_id=${failed.id}`);
+			expect(report).toContain(`evidence_id=${passed.id} authorizing`);
 			expect(report).toContain(
-				"- T-01: declared passed (manual review; exit_code=n/a)",
+				"declared passed (manual review; exit_code=n/a)",
 			);
-			expect(report).toContain("- T-01: blocked (bun test; exit_code=0)");
+			expect(report).toContain("blocked (bun test; exit_code=0)");
+			expect(report).toMatch(
+				/- T-01 attempt=\d+ evidence_id=E-[^ ]+ authorizing: passed \(bun test; exit_code=0\)/,
+			);
 			expect(report).not.toContain("verified");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -3891,7 +4173,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("start, observed done, and close skip derived refresh and telemetry", () => {
+	test("start, observed done, and close keep the scoped workbench index current without derived refresh", () => {
 		const root = mkRoot("hot-path-no-derived-work");
 		try {
 			const created = newWorkstream(root, "hot path", {
@@ -3911,6 +4193,7 @@ describe("workbench lifecycle service", () => {
 				"workbench.local_state_refresh": 0,
 				"workbench.telemetry": 0,
 			});
+			expect(validateWorkBenchIndex(root)).toMatchObject({ ok: true });
 			for (const operation of ["start", "close"] as const) {
 				expect(readHotPathMeasurementsForTests()[operation]).toMatchObject({
 					calls: 1,
@@ -4162,6 +4445,46 @@ describe("workbench lifecycle service", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("close keeps durable state when local-state refresh fails", () => {
+		const root = mkRoot("close-refresh-failure");
+		try {
+			const created = newWorkstream(root, "close refresh failure", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			const result = closeSession(
+				root,
+				created.session,
+				{},
+				{
+					beforeAuxiliary: (label) => {
+						if (label === "local-state refresh") {
+							throw new Error("injected refresh");
+						}
+					},
+				},
+			);
+
+			expect(result).toContain(
+				"local-state refresh failed after durable commit: injected refresh",
+			);
+			expect(isSessionClosed(root, created.session)).toBe(true);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("sequential done verification runs", () => {
@@ -4285,7 +4608,7 @@ describe("sequential done verification runs", () => {
 				"-T",
 				"T-01",
 				"-x",
-				"true",
+				"bun --version",
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
@@ -4296,7 +4619,7 @@ describe("sequential done verification runs", () => {
 				.map((line) => JSON.parse(line) as Record<string, unknown>);
 			expect(evidence).toHaveLength(2);
 			expect(evidence.at(-1)).toMatchObject({
-				command: "true",
+				command: "bun --version",
 				provenance: "observed",
 				exit_code: 0,
 			});
@@ -5537,9 +5860,11 @@ describe("task completion authorization and transitions", () => {
 				action: "workbench.done",
 				data: {
 					session: created.session,
-					tasks: ["T-01", "T-02"],
+					task_ids: ["T-01", "T-02"],
+					failed_step: "verification",
 					status: "failed",
 					evidence_count: 2,
+					next_command: expect.any(String),
 				},
 			});
 			const data = envelope.data as { evidence_ids: string[] };
@@ -5855,7 +6180,7 @@ describe("task completion authorization and transitions", () => {
 					session: created.session,
 					taskIds: ["T-01", "T-02"],
 					taskAttemptSnapshots,
-					command: "true",
+					command: "bun --version",
 					exitCode: 0,
 					approvalContext: defaultOperationContext(),
 				},
@@ -6080,7 +6405,7 @@ describe("task completion authorization and transitions", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				"true",
+				"bun --version",
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
@@ -6392,6 +6717,178 @@ describe("durable lifecycle auxiliary failures", () => {
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 			}
+		}
+	});
+
+	test("appends observed reverification to a closed terminal task without reopening it", () => {
+		const root = mkRoot("closed-reverify");
+		try {
+			const created = newWorkstream(root, "closed reverify", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+			unlinkSync(created.evidencePath);
+			const appended = recordClosedTaskReverification(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+				exitCode: 0,
+			});
+			expect(appended.provenance).toBe("observed");
+			expect(isSessionClosed(root, created.session)).toBe(true);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("refuses reverification for an open task", () => {
+		const root = mkRoot("open-reverify");
+		try {
+			const created = newWorkstream(root, "open reverify", {
+				noSpecRequiredReason: "fixture",
+			});
+			expect(() =>
+				recordClosedTaskReverification(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result: "passed",
+					exitCode: 0,
+				}),
+			).toThrow("not closed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("refuses a no-op command before closed-task reverification", () => {
+		const root = mkRoot("closed-reverify-noop");
+		try {
+			const created = newWorkstream(root, "closed reverify noop", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+			unlinkSync(created.evidencePath);
+			expect(() =>
+				recordClosedTaskReverification(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "true",
+					result: "passed",
+					exitCode: 0,
+				}),
+			).toThrow("shell no-op");
+			expect(existsSync(created.evidencePath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition admission is policy-bound and stale hashes stop admitting debt", () => {
+		const root = mkRoot("transition-admit");
+		try {
+			const created = newWorkstream(root, "transition admission", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+			const original = loadEvidenceEntries(created.evidencePath)[0];
+			writeFileSync(
+				created.evidencePath,
+				`${JSON.stringify({ ...original, result: "failed", command: "bun test", provenance: "declared", exit_code: undefined })}\n${JSON.stringify({ ...original, id: `${original?.id}-noop`, command: "true" })}\n`,
+			);
+			expect(() =>
+				transitionAdmitEvidence(root, {
+					sessionId: created.session,
+					taskId: "T-01",
+					policy: "generic-waiver",
+					issue: "https://example.invalid/issues/1",
+					approval: "trusted review",
+					confirm: false,
+				}),
+			).toThrow("Unsupported transition policy");
+			const admitted = transitionAdmitEvidence(root, {
+				sessionId: created.session,
+				taskId: "T-01",
+				policy: "no-op-evidence-v1",
+				issue: "https://example.invalid/issues/1",
+				approval: "trusted review",
+				confirm: true,
+			});
+			expect(admitted.written).toBe(true);
+			expect(admitted.admission.issue_type).toBe("failed_evidence");
+			const issue = verifyWorkbenchTasks(created.sessionDir, true).issues[0];
+			if (!issue) throw new Error("fixture must retain missing_evidence");
+			expect(
+				admitsEvidenceTransitionIssue(root, created.sessionDir, issue, false),
+			).toBe(true);
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8").replace(
+					"| T-01 | done |",
+					"| T-01 | done | worker | changed |",
+				),
+			);
+			expect(
+				admitsEvidenceTransitionIssue(root, created.sessionDir, issue, false),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 });

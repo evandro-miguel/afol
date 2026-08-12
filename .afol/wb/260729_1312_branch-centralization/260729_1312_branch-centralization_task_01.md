@@ -28,4 +28,4 @@ closed_at: "2026-08-01T22:23:21.943Z"
 |------|-------|-------|-------|
 | T-01 | done | worker | Integrate factual close-report commits into dev attempt=1 |
 | T-02 | done | worker | Port and verify git-aware file indexing onto current dev attempt=1 |
-| T-03 | moved | worker | Remove obsolete branches/worktrees and verify only dev/main remain completion_policy=waiver attempt=1 |
+| T-03 | moved | worker | Remove obsolete branches/worktrees and verify only dev/main remain completion_policy=waiver destination=new-session-if-reopened reason=branch-cleanup-deferred attempt=1 |

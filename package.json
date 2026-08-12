@@ -57,12 +57,12 @@
 		"benchmark:multitask:json": "bun run cli/dev/multitask-throughput-benchmark.ts --json",
 		"validate:project-benchmarks": "bun run validate:mutation-performance && bun run coverage:project-benchmarks && bun run kernel -- pb validate --strict --json && bun run kernel -- pb generate --check --json && bun run benchmark:multitask",
 		"validate:ux-governance": "bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --timing-mode observe --json",
-		"validate:release": "bun run validate:toolchain && bun run local-state:rebuild && bun run validate:project && bun run typecheck && bun run validate:template && bun run validate:bootstrap && bun run validate:project-benchmarks && bun run validate:ux-governance && bun run test:full && bun run coverage:check && bun run build:deterministic && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
+		"validate:release": "bun run validate:toolchain && bun run local-state:rebuild && bun run validate:project && bun run typecheck && bun run validate:template && bun run validate:bootstrap && bun run validate:project-benchmarks && bun run validate:ux-governance && bun run kernel -- v bench --pack token-economy --pack cli-kernel-local --json && bun run test:full && bun run coverage:check && bun run build:deterministic && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
 		"release:provenance": "bun run cli/dev/release-provenance.ts",
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
 		"smoke:dist": "bun run cli/dev/dist-smoke.ts",
 		"smoke:wsl2": "bun run cli/dev/dist-smoke.ts --wsl2",
-		"smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
+		"smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude-vcs-ignores --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
 	},
 	"dependencies": {
 		"diff": "^9.0.0"

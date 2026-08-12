@@ -58,10 +58,12 @@ Removed legacy surfaces:
 - `agents.config`
 - `legacy:` delegate routing
 
-Governed sessions may enter `pending_spec`, but new sessions are blocked while
-open pending specs exist until they are resolved or waived. The current session
-can continue with lifecycle warnings so the user can finish the work and then
-link or waive the missing spec.
+`afol new` without `--feature-id`/`--parent-spec` creates a session with
+`pending_spec` plus warnings; open pending specs do not block other new
+sessions. The current session can continue through `start`, `evidence`, `done`,
+and `close` with lifecycle warnings so the user can finish the work and then
+link or waive the missing spec. `afol status` and `afol validate project` warn
+while pending specs are open; close is allowed.
 
 ## Commands
 
@@ -75,12 +77,19 @@ afol start --session <session-id> --task-id <task-id>
 afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
 afol close --session <session-id> --summary "<summary>"
 afol governance pending --json
-afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
+afol gov rs -S <session-id> -F <F-id> -P <spec-id>
+afol gov rs -S <session-id> --no-spec-required -r "<reason>"
+afol gov bulk-waive -r "<reason>" [--limit 20] [--dry-run]
 afol evolve status --json
 afol update check
 afol update preview
 afol update apply --dry-run
 ```
+
+Micro one-shot work should prefer `afol qt <theme> -t "<task>" -c "<cmd>"`
+(repeat `-t` for multi-task with one shared verify). Hygiene signals from
+`afol health`, maintenance, or open `pending_spec` are warnings—not mid-delivery
+stops. Corrupt session context: `afol catchup --fix`.
 
 When one active or bound session is unambiguous, agents should prefer the
 compact path:

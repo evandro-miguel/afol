@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import * as nodeFs from "node:fs";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -17,6 +18,22 @@ import {
 	defaultOperationContext,
 	remoteOperationContext,
 } from "../core/operation-context";
+import { readEventLedgerRecords } from "../services/events/ledger";
+import {
+	appendAdoptionReviewEvent,
+	learningReviewStatus,
+	readAdoptionReviewEvents,
+} from "../services/evolution/adoption-candidates";
+import {
+	DEFAULT_EVOLUTION_PATHS,
+	DEFAULT_EVOLUTION_SETTINGS,
+} from "../services/evolution/config";
+import { loadWorkBenchIndexSnapshot } from "../services/local-state/workbench-index";
+import {
+	archiveSessions,
+	readArchivedSessionState,
+	restoreSessions,
+} from "../services/workbench/archive";
 import { readActiveSession } from "../services/workbench/lifecycle";
 import {
 	bindSession,
@@ -129,6 +146,73 @@ function createClosedSession(root: string, session: string): void {
 		].join("\n"),
 		"utf8",
 	);
+}
+
+const LEARNING_PROJECT_ID = "6b7d91ca-496f-4f0c-8537-5c4993810d15";
+
+function enableLearningCandidate(root: string, session: string): void {
+	mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "data", "events", "events.jsonl"),
+		"",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "config.json"),
+		JSON.stringify({
+			schema_version: 1,
+			project: {
+				name: "session-learning",
+				id: LEARNING_PROJECT_ID,
+				timezone: "UTC",
+			},
+			paths: {
+				external_dir: DEFAULT_EVOLUTION_PATHS.externalDir,
+				evolution_db: DEFAULT_EVOLUTION_PATHS.evolutionDb,
+				evolution_data_dir: DEFAULT_EVOLUTION_PATHS.evolutionDataDir,
+				evolution_events_dir: DEFAULT_EVOLUTION_PATHS.evolutionEventsDir,
+			},
+			evolution: DEFAULT_EVOLUTION_SETTINGS,
+		}),
+		"utf8",
+	);
+	const taskPath = join(root, ".afol", "wb", session, `${session}_task_01.md`);
+	writeFileSync(
+		taskPath,
+		`${readFileSync(taskPath, "utf8")}\nDecision: retain the bounded learning review gate.\n`,
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", session, ".evidence.jsonl"),
+		`${JSON.stringify({
+			id: "E-LEARNING-01",
+			task_id: "T-01",
+			result: "passed",
+			provenance: "observed",
+			command: "bun test",
+			exit_code: 0,
+			created_at: "2026-08-11T12:00:00.000Z",
+		})}\n`,
+		"utf8",
+	);
+}
+
+function recordLearningReview(
+	root: string,
+	session: string,
+	decision: "approved" | "rejected",
+): void {
+	const status = learningReviewStatus(root, session);
+	const candidate = status.required[0];
+	if (!candidate)
+		throw new Error("learning candidate fixture was not discovered");
+	appendAdoptionReviewEvent(root, session, {
+		candidate_id: candidate.id,
+		fingerprint: candidate.fingerprint,
+		decision,
+		reason: `fixture ${decision}`,
+		created_at: "2026-08-11T13:00:00.000Z",
+	});
 }
 
 function initGitRepo(root: string, branch = "parallel-session-test"): void {
@@ -406,6 +490,590 @@ describe("session resolution contract", () => {
 });
 
 describe("afol session command", () => {
+	test("archives closed candidates logically and restores their index state", async () => {
+		const root = createProjectRoot("archive-restore");
+		try {
+			createClosedSession(root, "OLD");
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(join(root, ".afol", "data", "events", "events.jsonl"), "");
+			const taskPath = join(root, ".afol", "wb", "OLD", "OLD_task_01.md");
+			writeFileSync(
+				taskPath,
+				readFileSync(taskPath, "utf8").replaceAll("2026-07-09", "2025-07-09"),
+				"utf8",
+			);
+			const preview = captureIo();
+			const previewCode = await runSessionCommand(
+				"archive",
+				["--candidates", "--older-than-days", "90", "--json"],
+				root,
+				preview.io,
+			);
+			expect(previewCode).toBe(0);
+			const previewPayload = JSON.parse(preview.stdout[0] ?? "{}") as {
+				data: {
+					read_only: boolean;
+					candidates: Array<{
+						session: string;
+						learning_review_state: string;
+					}>;
+				};
+			};
+			expect(previewPayload.data.read_only).toBe(true);
+			expect(previewPayload.data.candidates).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						session: "OLD",
+						learning_review_state: "no_candidate",
+					}),
+				]),
+			);
+
+			const archive = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["OLD", "--reason", "monthly retention", "--json"],
+					root,
+					archive.io,
+				),
+			).toBe(0);
+			expect(
+				readFileSync(
+					join(root, ".afol", "wb", "OLD", "OLD_task_01.md"),
+					"utf8",
+				),
+			).toContain("closed_at");
+			expect(loadWorkBenchIndexSnapshot(root)?.sessions).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ session: "OLD", archived: true }),
+				]),
+			);
+			const archiveEvent = readEventLedgerRecords(root).find(
+				(record) => record.type === "workbench.archive",
+			);
+			expect(archiveEvent?.detail).toMatchObject({
+				learning_review: "no_candidate",
+			});
+
+			const restore = captureIo();
+			expect(
+				await runSessionCommand(
+					"restore",
+					["OLD", "--reason", "retention exception", "--json"],
+					root,
+					restore.io,
+				),
+			).toBe(0);
+			expect(loadWorkBenchIndexSnapshot(root)?.sessions).toEqual(
+				expect.arrayContaining([
+					expect.not.objectContaining({ session: "OLD", archived: true }),
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive rejects open, active, bound, and corrupt sessions", async () => {
+		const root = createProjectRoot("archive-rejections");
+		try {
+			createSessionFixture(root, "OPEN");
+			createClosedSession(root, "ACTIVE");
+			createClosedSession(root, "BOUND");
+			mkdirSync(join(root, ".afol", "wb", "BROKEN"), { recursive: true });
+			writeFileSync(join(root, ".afol", "wb", ".active_session"), "ACTIVE\n");
+			bindSession(root, { session: "BOUND" });
+			for (const [session, expected] of [
+				["OPEN", "session open: OPEN"],
+				["ACTIVE", "session active: ACTIVE"],
+				["BOUND", "session bound: BOUND"],
+				["BROKEN", "session corrupt: BROKEN"],
+			] as const) {
+				const io = captureIo();
+				expect(
+					await runSessionCommand(
+						"archive",
+						[session, "--reason", "retention"],
+						root,
+						io.io,
+					),
+				).toBe(2);
+				expect(io.stderr.join("\n")).toContain(expected);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive dry-run uses apply preconditions and does not claim invalid targets", async () => {
+		const root = createProjectRoot("archive-dry-run-preflight");
+		try {
+			createSessionFixture(root, "OPEN");
+			createClosedSession(root, "ACTIVE");
+			createClosedSession(root, "BOUND");
+			createClosedSession(root, "ARCHIVED");
+			mkdirSync(join(root, ".afol", "wb", "BROKEN"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(join(root, ".afol", "data", "events", "events.jsonl"), "");
+			expect(
+				await runSessionCommand(
+					"archive",
+					["ARCHIVED", "--reason", "retention"],
+					root,
+					captureIo().io,
+				),
+			).toBe(0);
+			writeFileSync(join(root, ".afol", "wb", ".active_session"), "ACTIVE\n");
+			bindSession(root, { session: "BOUND" });
+			for (const [session, expected] of [
+				["OPEN", "session open: OPEN"],
+				["ACTIVE", "session active: ACTIVE"],
+				["BOUND", "session bound: BOUND"],
+				["BROKEN", "session corrupt: BROKEN"],
+				["ARCHIVED", "session already archived: ARCHIVED"],
+				["MISSING", "session corrupt: MISSING"],
+			] as const) {
+				const io = captureIo();
+				expect(
+					await runSessionCommand(
+						"archive",
+						[session, "--reason", "retention", "--dry-run"],
+						root,
+						io.io,
+					),
+				).toBe(2);
+				expect(io.stderr.join("\n")).toContain(expected);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restore dry-run uses apply preconditions", async () => {
+		const root = createProjectRoot("restore-dry-run-preflight");
+		try {
+			createClosedSession(root, "NOT_ARCHIVED");
+			createSessionFixture(root, "OPEN");
+			for (const [session, expected] of [
+				["NOT_ARCHIVED", "session not archived: NOT_ARCHIVED"],
+				["OPEN", "session open: OPEN"],
+				["MISSING", "session corrupt: MISSING"],
+			] as const) {
+				const io = captureIo();
+				expect(
+					await runSessionCommand(
+						"restore",
+						[session, "--reason", "retention", "--dry-run"],
+						root,
+						io.io,
+					),
+				).toBe(2);
+				expect(io.stderr.join("\n")).toContain(expected);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive and restore batches preflight all targets before mutation", async () => {
+		const root = createProjectRoot("archive-batch-preflight");
+		try {
+			createClosedSession(root, "FIRST");
+			createSessionFixture(root, "SECOND");
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(join(root, ".afol", "data", "events", "events.jsonl"), "");
+			const archive = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["FIRST", "SECOND", "--reason", "retention"],
+					root,
+					archive.io,
+				),
+			).toBe(2);
+			expect(readArchivedSessionState(root, "FIRST").archived).toBe(false);
+
+			createClosedSession(root, "RESTORE_FIRST");
+			const archiveFirst = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["RESTORE_FIRST", "--reason", "retention"],
+					root,
+					archiveFirst.io,
+				),
+			).toBe(0);
+			const restore = captureIo();
+			expect(
+				await runSessionCommand(
+					"restore",
+					["RESTORE_FIRST", "SECOND", "--reason", "retention"],
+					root,
+					restore.io,
+				),
+			).toBe(2);
+			expect(readArchivedSessionState(root, "RESTORE_FIRST").archived).toBe(
+				true,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive batches reject duplicate identifiers without mutation", () => {
+		const root = createProjectRoot("archive-batch-duplicate");
+		try {
+			createClosedSession(root, "DUPLICATE");
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			const eventPath = join(root, ".afol", "data", "events", "events.jsonl");
+			writeFileSync(eventPath, "", "utf8");
+			expect(() =>
+				archiveSessions(root, ["DUPLICATE", "DUPLICATE"], "retention"),
+			).toThrow("duplicate session identifier: DUPLICATE");
+			expect(readFileSync(eventPath, "utf8")).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive batches roll back the ledger and leave the index unchanged on a second write failure", () => {
+		const root = createProjectRoot("archive-batch-atomic-write");
+		try {
+			createClosedSession(root, "FIRST");
+			createClosedSession(root, "SECOND");
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			const eventPath = join(root, ".afol", "data", "events", "events.jsonl");
+			writeFileSync(eventPath, "", "utf8");
+			const indexPath = join(
+				root,
+				".afol",
+				"data",
+				"index",
+				"workbench-index.json",
+			);
+			mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
+			writeFileSync(indexPath, "index-before", "utf8");
+			let writes = 0;
+			expect(() =>
+				archiveSessions(root, ["FIRST", "SECOND"], "retention", {
+					ledgerIo: {
+						writeBytes: (fd, value) => {
+							writes += 1;
+							if (writes === 1) return nodeFs.writeSync(fd, value, 0, 7, null);
+							throw new Error("second ledger write failed");
+						},
+					},
+				}),
+			).toThrow("second ledger write failed");
+			expect(readFileSync(eventPath, "utf8")).toBe("");
+			expect(readFileSync(indexPath, "utf8")).toBe("index-before");
+			expect(readArchivedSessionState(root, "FIRST").archived).toBe(false);
+			expect(readArchivedSessionState(root, "SECOND").archived).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restore batches report durable commit when the post-ledger index rebuild fails", () => {
+		const root = createProjectRoot("restore-batch-index-repair");
+		try {
+			createClosedSession(root, "FIRST");
+			createClosedSession(root, "SECOND");
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "data", "events", "events.jsonl"),
+				"",
+				"utf8",
+			);
+			archiveSessions(root, ["FIRST", "SECOND"], "retention");
+			expect(() =>
+				restoreSessions(root, ["FIRST", "SECOND"], "retention", {
+					beforeIndexRebuild: () => {
+						throw new Error("index write failed");
+					},
+				}),
+			).toThrow(
+				"event ledger committed; workbench index repair required (run afol local-state rebuild): index write failed",
+			);
+			expect(readArchivedSessionState(root, "FIRST").archived).toBe(false);
+			expect(readArchivedSessionState(root, "SECOND").archived).toBe(false);
+			expect(
+				readEventLedgerRecords(root)
+					.filter((record) => record.type === "workbench.restore")
+					.map((record) => record.session),
+			).toEqual(["FIRST", "SECOND"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive dry-run blocks an unreviewed learning candidate", async () => {
+		const root = createProjectRoot("archive-learning-candidate");
+		try {
+			createClosedSession(root, "LEARNING");
+			enableLearningCandidate(root, "LEARNING");
+			expect(learningReviewStatus(root, "LEARNING")).toMatchObject({
+				terminal: false,
+			});
+			const candidates = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["--candidates", "--older-than-days", "0", "--json"],
+					root,
+					candidates.io,
+				),
+			).toBe(0);
+			expect(JSON.parse(candidates.stdout[0] ?? "{}").data.candidates).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						session: "LEARNING",
+						learning_review_state: "candidate_available",
+					}),
+				]),
+			);
+			const io = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["LEARNING", "--reason", "retention", "--dry-run"],
+					root,
+					io.io,
+				),
+			).toBe(2);
+			expect(io.stderr.join("\n")).toContain(
+				"session learning review required",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test.each([
+		"approved",
+		"rejected",
+	] as const)("archive records a terminal %s learning review", async (decision) => {
+		const root = createProjectRoot(`archive-learning-${decision}`);
+		try {
+			createClosedSession(root, "LEARNING");
+			enableLearningCandidate(root, "LEARNING");
+			recordLearningReview(root, "LEARNING", decision);
+			const status = learningReviewStatus(root, "LEARNING");
+			expect(status.terminal).toBe(true);
+			const io = captureIo();
+			const archiveCode = await runSessionCommand(
+				"archive",
+				["LEARNING", "--reason", "retention", "--json"],
+				root,
+				io.io,
+			);
+			expect(archiveCode).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+				data: {
+					archived: Array<{
+						learning_review:
+							| "no_candidate"
+							| { candidates: Array<{ id: string; fingerprint: string }> };
+					}>;
+				};
+			};
+			const review = payload.data.archived[0]?.learning_review;
+			expect(review).toMatchObject({
+				candidates: [
+					{
+						id: status.required[0]?.id,
+						fingerprint: status.required[0]?.fingerprint,
+					},
+				],
+			});
+			const archiveEvent = readEventLedgerRecords(root).find(
+				(record) => record.type === "workbench.archive",
+			);
+			expect(archiveEvent?.detail).toMatchObject({
+				learning_review: review,
+			});
+			const reviewJournal = readAdoptionReviewEvents(root);
+			const restore = captureIo();
+			expect(
+				await runSessionCommand(
+					"restore",
+					["LEARNING", "--reason", "retention exception", "--json"],
+					root,
+					restore.io,
+				),
+			).toBe(0);
+			expect(readAdoptionReviewEvents(root)).toEqual(reviewJournal);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive reblocks a candidate after its fingerprint changes", async () => {
+		const root = createProjectRoot("archive-learning-edited");
+		try {
+			createClosedSession(root, "LEARNING");
+			enableLearningCandidate(root, "LEARNING");
+			recordLearningReview(root, "LEARNING", "approved");
+			const taskPath = join(
+				root,
+				".afol",
+				"wb",
+				"LEARNING",
+				"LEARNING_task_01.md",
+			);
+			writeFileSync(
+				taskPath,
+				readFileSync(taskPath, "utf8").replace(
+					"Decision: retain the bounded learning review gate.",
+					"Decision: use an edited learning review gate.",
+				),
+				"utf8",
+			);
+			expect(learningReviewStatus(root, "LEARNING")).toMatchObject({
+				terminal: false,
+			});
+			const io = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["LEARNING", "--reason", "retention"],
+					root,
+					io.io,
+				),
+			).toBe(2);
+			expect(io.stderr.join("\n")).toContain(
+				"session learning review required",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("archive candidates apply a bounded default page and preserve offset pagination", async () => {
+		const root = createProjectRoot("archive-candidates-page");
+		const eventLog = join(root, ".afol", "data", "events", "events.jsonl");
+		try {
+			for (let index = 0; index < 128; index += 1) {
+				createClosedSession(root, `CLOSED-${String(index).padStart(3, "0")}`);
+			}
+			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+			writeFileSync(eventLog, "", "utf8");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"CLOSED-000\n",
+				"utf8",
+			);
+			bindSession(root, { session: "CLOSED-001" });
+
+			const openSpy = spyOn(nodeFs, "openSync");
+			try {
+				const defaultPage = captureIo();
+				expect(
+					await runSessionCommand(
+						"archive",
+						["--candidates", "--older-than-days", "0", "--json"],
+						root,
+						defaultPage.io,
+					),
+				).toBe(0);
+				const defaultPayload = JSON.parse(defaultPage.stdout[0] ?? "{}") as {
+					data: {
+						candidates: Array<{ session: string }>;
+						total_count: number;
+						returned_count: number;
+						offset: number;
+						limit: number;
+						has_more: boolean;
+					};
+				};
+				expect(defaultPayload.data).toMatchObject({
+					total_count: 126,
+					returned_count: 10,
+					offset: 0,
+					limit: 10,
+					has_more: true,
+				});
+				expect(defaultPayload.data.candidates).toHaveLength(10);
+				expect(defaultPayload.data.candidates[0]).toEqual(
+					expect.objectContaining({ session: "CLOSED-002" }),
+				);
+				expect(
+					new TextEncoder().encode(defaultPage.stdout[0] ?? "").byteLength,
+				).toBeLessThan(20_000);
+				const ledgerReadsAfterDefaultPage = openSpy.mock.calls.filter(
+					([path]) => String(path) === eventLog,
+				).length;
+				expect(ledgerReadsAfterDefaultPage).toBe(1);
+
+				const io = captureIo();
+				expect(
+					await runSessionCommand(
+						"archive",
+						[
+							"--candidates",
+							"--older-than-days",
+							"0",
+							"--offset",
+							"10",
+							"--limit",
+							"100",
+							"--json",
+						],
+						root,
+						io.io,
+					),
+				).toBe(0);
+				const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+					data: {
+						candidates: Array<{ session: string }>;
+						total_count: number;
+						returned_count: number;
+						offset: number;
+						limit: number;
+						has_more: boolean;
+					};
+				};
+				expect(payload.data.total_count).toBe(126);
+				expect(payload.data.returned_count).toBe(100);
+				expect(payload.data.offset).toBe(10);
+				expect(payload.data.limit).toBe(100);
+				expect(payload.data.has_more).toBe(true);
+				expect(payload.data.candidates).toHaveLength(100);
+				expect(payload.data.candidates[0]).toEqual(
+					expect.objectContaining({ session: "CLOSED-012" }),
+				);
+				expect(payload.data.candidates).not.toEqual(
+					expect.arrayContaining([
+						expect.objectContaining({ session: "CLOSED-000" }),
+						expect.objectContaining({ session: "CLOSED-001" }),
+					]),
+				);
+				const ledgerReads = openSpy.mock.calls.filter(
+					([path]) => String(path) === eventLog,
+				).length;
+				expect(ledgerReads).toBe(2);
+			} finally {
+				openSpy.mockRestore();
+			}
+
+			const invalidLimit = captureIo();
+			expect(
+				await runSessionCommand(
+					"archive",
+					["--candidates", "--older-than-days", "0", "--limit", "101"],
+					root,
+					invalidLimit.io,
+				),
+			).toBe(2);
+			expect(invalidLimit.stderr.join("\n")).toContain(
+				"--limit must not exceed 100",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("list renders text and json envelopes", async () => {
 		const root = createProjectRoot("list");
 		initGitRepo(root);
@@ -1229,7 +1897,7 @@ describe("afol session command", () => {
 			const code = await runSessionCommand("nope", [], root, io.io);
 			expect(code).toBe(2);
 			expect(io.stderr.join("\n")).toContain(
-				"use list, bind, switch, unbind, or radar",
+				"use list, bind, switch, unbind, archive, restore, or radar",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

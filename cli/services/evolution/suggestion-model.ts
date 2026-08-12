@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import type { ObservationRecord, Scorecard } from "./observation-model";
+import {
+	OBSERVATION_FINGERPRINT_VERSION,
+	type ObservationRecord,
+	type Scorecard,
+} from "./observation-model";
 
 export const EVALUATION_CONTRACT_VERSION = 1 as const;
 export const EVALUATION_COMPARATOR_VERSION = "scorecard-v1" as const;
@@ -50,13 +54,21 @@ export type SuggestionCluster = {
 	source_refs?: Array<Record<string, string>>;
 };
 
+/** Keep otherwise identical legacy and current fingerprints in separate cohorts. */
+export function suggestionClusterKey(
+	fingerprintVersion: number | undefined,
+	fingerprint: string,
+): string {
+	return `${fingerprintVersion ?? 2}:${fingerprint}`;
+}
+
 export type SuggestionCandidate = {
 	id: string;
 	project_id: string;
 	local_date: string;
 	cluster_id: string;
 	task_type: string;
-	fingerprint_version: 1;
+	fingerprint_version: number;
 	problem: string;
 	risk: string;
 	validation: string;
@@ -206,7 +218,7 @@ export function suggestionEvidenceDigest(input: {
 	observations: readonly ObservationRecord[];
 }): string {
 	return digest({
-		fingerprint_version: input.cluster.fingerprint_version ?? 1,
+		fingerprint_version: input.cluster.fingerprint_version ?? 2,
 		fingerprint: input.cluster.fingerprint,
 		state: input.cluster.state,
 		occurrences: input.observations
@@ -226,13 +238,14 @@ export function suggestionEvidenceDigest(input: {
 
 export function suggestionId(
 	projectId: string,
+	fingerprintVersion: number,
 	clusterId: string,
 	taskType?: string,
 ): string {
 	const identity =
 		taskType === undefined
-			? { projectId, clusterId }
-			: { projectId, clusterId, taskType };
+			? { projectId, fingerprintVersion, clusterId }
+			: { projectId, fingerprintVersion, clusterId, taskType };
 	return `SUG-${digest(identity).slice(0, 32)}`;
 }
 
@@ -297,7 +310,8 @@ export function buildSuggestionCandidate(input: {
 }): SuggestionCandidate {
 	if (
 		input.cluster.fingerprint_version !== undefined &&
-		input.cluster.fingerprint_version !== 1
+		input.cluster.fingerprint_version !== 1 &&
+		input.cluster.fingerprint_version !== 2
 	)
 		throw new Error("unsupported suggestion fingerprint version");
 	if (input.observations.length === 0)
@@ -331,12 +345,17 @@ export function buildSuggestionCandidate(input: {
 			(input.cluster.user_confirmed_recurrence ? 0.15 : 0),
 	);
 	return {
-		id: suggestionId(input.projectId, input.cluster.fingerprint, taskType),
+		id: suggestionId(
+			input.projectId,
+			input.cluster.fingerprint_version ?? OBSERVATION_FINGERPRINT_VERSION,
+			input.cluster.fingerprint,
+			taskType,
+		),
 		project_id: input.projectId,
 		local_date: input.localDate,
 		cluster_id: input.cluster.fingerprint,
 		task_type: taskType,
-		fingerprint_version: 1,
+		fingerprint_version: input.cluster.fingerprint_version ?? 2,
 		problem: `${observationKind(input.observations[0] as ObservationRecord) || "workflow friction"} recurred across ${input.cluster.distinct_session_count} sessions`,
 		risk: critical ? "critical alert; no automatic suggestion" : "low",
 		validation: `Compare recurrence and user-intervention metrics for ${taskType} over the next 3 comparable sessions`,
@@ -468,7 +487,12 @@ export function deriveSuggestionCandidates(input: {
 	const candidates = input.clusters
 		.flatMap((cluster) => {
 			const observations =
-				input.observationsByFingerprint.get(cluster.fingerprint) ?? [];
+				input.observationsByFingerprint.get(
+					suggestionClusterKey(
+						cluster.fingerprint_version,
+						cluster.fingerprint,
+					),
+				) ?? [];
 			if (observations.length === 0) return [];
 			const cohorts = new Map<string, ObservationRecord[]>();
 			for (const observation of observations) {

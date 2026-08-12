@@ -68,6 +68,50 @@ describe("quick-task parseQuickTaskArgs", () => {
 		expect(parsed.metadata.featureId).toBe("F-01");
 		expect(parsed.metadata.parentSpec).toBe("SPEC-001");
 		expect(parsed.metadata.task).toBe("implement foo");
+		expect(parsed.metadata.tasks).toEqual(["implement foo"]);
+	});
+
+	test("parses repeated --task into metadata.tasks with first as task", () => {
+		const parsed = parseQuickTaskArgs([
+			"alpha",
+			"--task",
+			"first",
+			"--task",
+			"second",
+			"--task",
+			"third",
+			"--command",
+			"true",
+		]);
+		expect(parsed.metadata.task).toBe("first");
+		expect(parsed.metadata.tasks).toEqual(["first", "second", "third"]);
+	});
+
+	test("normalizes repeated -t aliases into multi-task metadata", () => {
+		const parsed = parseQuickTaskArgs(
+			normalizeScopedFlags("quickTask", [
+				"alpha",
+				"-t",
+				"one",
+				"-t",
+				"two",
+				"-c",
+				"true",
+			]),
+		);
+		expect(parsed.metadata.task).toBe("one");
+		expect(parsed.metadata.tasks).toEqual(["one", "two"]);
+		expect(parsed.command).toBe("true");
+	});
+
+	test("caps repeated --task at 100", () => {
+		const args = ["alpha", "--command", "true"];
+		for (let i = 0; i < 101; i += 1) {
+			args.push("--task", `task-${i}`);
+		}
+		expect(() => parseQuickTaskArgs(args)).toThrow(
+			"quick-task supports at most 100 tasks",
+		);
 	});
 
 	test("parses --command and --artifact and --note", () => {
@@ -155,6 +199,7 @@ describe("quick-task parseQuickTaskArgs", () => {
 		expect(parsed.metadata.featureId).toBe("F-42");
 		expect(parsed.metadata.parentSpec).toBe("SPEC-X");
 		expect(parsed.metadata.task).toBe("run tests");
+		expect(parsed.metadata.tasks).toEqual(["run tests"]);
 		expect(parsed.artifact).toBe("dist/result.json");
 		expect(parsed.note).toBe("smoke check");
 	});
@@ -182,7 +227,7 @@ describe("quick-task runQuickTaskCommand", () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-pending-spec-"));
 		try {
 			const exitCode = await runQuickTaskCommand(
-				["pending", "--command", "true", "--json"],
+				["pending", "--command", "test -d .afol", "--json"],
 				root,
 			);
 			expect(exitCode).toBe(0);
@@ -218,7 +263,7 @@ describe("quick-task runQuickTaskCommand", () => {
 				[
 					"path-governed",
 					"--command",
-					"true",
+					"test -d .afol",
 					"--feature-id",
 					"F-01",
 					"--parent-spec",
@@ -294,5 +339,207 @@ describe("quick-task runQuickTaskCommand", () => {
 			"/tmp/nonexistent",
 		);
 		expect(exitCode).toBe(2);
+	});
+
+	test("JSON parse recovery does not report a phantom task", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-parse-recovery-"));
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			const exitCode = await runQuickTaskCommand(
+				["alpha", "--bogus", "--json"],
+				root,
+			);
+			expect(exitCode).toBe(2);
+			const envelope = JSON.parse(output.at(-1) ?? "{}") as {
+				schema?: string;
+				ok?: boolean;
+				exit_code?: number;
+				error?: { code?: string };
+				data?: {
+					session?: string | null;
+					task_id?: string | null;
+					task_ids?: string[];
+					failed_step?: string;
+				};
+			};
+			expect(envelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				exit_code: 2,
+				error: { code: "workbench.error" },
+				data: {
+					session: null,
+					task_id: null,
+					task_ids: [],
+					failed_step: "parse",
+				},
+			});
+			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("single-task qt still closes with done state", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-single-"));
+		try {
+			const exitCode = await runQuickTaskCommand(
+				[
+					"single",
+					"--task",
+					"only one",
+					"--command",
+					"test -d .afol",
+					"--no-spec-required",
+					"--reason",
+					"single fixture",
+				],
+				root,
+			);
+			expect(exitCode).toBe(0);
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0] as string;
+			const task = readFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"utf8",
+			);
+			expect(task).toContain("| T-01 | done |");
+			expect(task).not.toContain("| T-02 |");
+			expect(task).toContain('status: "closed"');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("multi-task qt closes all tasks done with one verification", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-multi-"));
+		try {
+			const exitCode = await runQuickTaskCommand(
+				[
+					"multi",
+					"--task",
+					"first work",
+					"--task",
+					"second work",
+					"--task",
+					"third work",
+					"--command",
+					"test -d .afol",
+					"--json",
+					"--no-spec-required",
+					"--reason",
+					"multi fixture",
+				],
+				root,
+			);
+			expect(exitCode).toBe(0);
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0] as string;
+			const task = readFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"utf8",
+			);
+			expect(task).toContain("| T-01 | done |");
+			expect(task).toContain("| T-02 | done |");
+			expect(task).toContain("| T-03 | done |");
+			expect(task).toContain('status: "closed"');
+			const evidenceLines = readFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.filter(Boolean);
+			expect(evidenceLines).toHaveLength(3);
+			for (const line of evidenceLines) {
+				const entry = JSON.parse(line) as {
+					result: string;
+					provenance?: string;
+				};
+				expect(entry.result).toBe("passed");
+				expect(entry.provenance).toBe("observed");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fail path records failed evidence and does not close", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-multi-fail-"));
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			const exitCode = await runQuickTaskCommand(
+				[
+					"multi-fail",
+					"--task",
+					"a",
+					"--task",
+					"b",
+					"--command",
+					"false",
+					"--json",
+					"--no-spec-required",
+					"--reason",
+					"fail fixture",
+				],
+				root,
+			);
+			expect(exitCode).toBe(1);
+			const envelope = JSON.parse(output.at(-1) ?? "{}") as {
+				data?: Record<string, unknown>;
+			};
+			expect(envelope.data).toMatchObject({
+				failed_step: "verification",
+				status: "failed",
+				task_ids: ["T-01", "T-02"],
+				evidence_ids: expect.any(Array),
+				next_command: expect.any(String),
+			});
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0] as string;
+			const task = readFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"utf8",
+			);
+			expect(task).toContain("| T-01 | in_progress |");
+			expect(task).toContain("| T-02 | in_progress |");
+			expect(task).not.toContain("| T-01 | done |");
+			expect(task).not.toContain('status: "closed"');
+			const evidenceLines = readFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.filter(Boolean);
+			expect(evidenceLines).toHaveLength(2);
+			for (const line of evidenceLines) {
+				const entry = JSON.parse(line) as {
+					result: string;
+					exit_code: number;
+					provenance?: string;
+				};
+				expect(entry.result).toBe("failed");
+				expect(entry.exit_code).not.toBe(0);
+				expect(entry.provenance).toBe("observed");
+			}
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });

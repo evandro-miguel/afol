@@ -81,7 +81,7 @@ function candidate(index: number, critical = false): SuggestionCandidate {
 		local_date: "2026-07-21",
 		cluster_id: `cluster-${index}`,
 		task_type: "documentation",
-		fingerprint_version: 1,
+		fingerprint_version: 2,
 		problem: "workflow friction recurred",
 		risk: critical ? "critical" : "low",
 		validation: "Compare the next three comparable sessions",
@@ -276,6 +276,26 @@ function snapshotReadOnlyState(root: string): string {
 }
 
 describe("evolution analysis previews", () => {
+	test("excludes v1 clusters while retaining current v2 proposals", () => {
+		const legacy = { ...candidate(0), fingerprint_version: 1 };
+		const current = { ...candidate(1), fingerprint_version: 2 };
+		const analysis = analyzeEvolution({
+			projectId: PROJECT_ID,
+			state: { ok: true },
+			candidates: [legacy, current],
+		});
+		expect(analysis.legacy_cluster_count).toBe(1);
+		expect(analysis.proposals).toHaveLength(1);
+		expect(analysis.proposals[0]?.fingerprint_version).toBe(2);
+		const dto = publicAnalysisDto(
+			analysis as unknown as Record<string, unknown>,
+			true,
+		);
+		expect(dto).toMatchObject({
+			legacy_cluster_count: 1,
+			recovery_action: "afol evolve repair --json",
+		});
+	});
 	test("reviews any valid bounded proposal, not only displayed proposals", () => {
 		const lowerRankedId = analyzeEvolution({
 			projectId: PROJECT_ID,
@@ -384,7 +404,7 @@ describe("evolution analysis previews", () => {
 					Object.keys(firstPayload).sort(),
 				);
 				expect(JSON.stringify(payload)).not.toMatch(
-					/(project|cluster|session|evidence|source|commit|ref|path|digest|token|db)/i,
+					/(project|session_id|evidence|source|commit|ref|path|digest|token|db)/i,
 				);
 			}
 		} finally {
@@ -455,8 +475,10 @@ describe("evolution analysis previews", () => {
 			expect(proposal.evidence_ref_count).toBe(2);
 			expect(proposal.evidence_refs).toEqual([
 				expect.objectContaining({ id: expect.any(String), kind: "commit" }),
+				expect.objectContaining({ id: expect.any(String), kind: "commit" }),
 			]);
-			expect(proposal.evidence_refs).toHaveLength(1);
+			expect(proposal.evidence_refs).toHaveLength(2);
+			expect(proposal.related_session_ids).toHaveLength(3);
 			expect(proposal.evidence_refs[0]).not.toHaveProperty("digest");
 			expect(proposal.baseline).toEqual(
 				expect.objectContaining({
@@ -476,15 +498,32 @@ describe("evolution analysis previews", () => {
 			);
 			expect(proposal.approval_policy).toBe("explicit");
 			expect(proposal.approval_surface).toBe("governed_workbench");
+			expect(proposal).toMatchObject({
+				target_kind: "behavior",
+				classification: "needs_review",
+				approval_required: true,
+				execution_surface: "governed_workbench",
+				provenance_digest: expect.stringMatching(/^[a-f0-9]{64}$/),
+			});
+			expect(proposal.target_refs).toEqual([proposal.evidence_refs[0]]);
+			expect(proposal).toMatchObject({
+				target_ref_count: 2,
+				target_refs_truncated: true,
+			});
 
 			const restricted = await invoke(agentOperationContext());
 			const restrictedProposal = restricted.proposals[0];
+			expect(restrictedProposal.related_session_ids).toHaveLength(3);
+			expect(restrictedProposal.evidence_refs).toHaveLength(2);
+			expect(restrictedProposal).toMatchObject({
+				id: expect.stringMatching(/^EVO-[a-f0-9]{32}$/),
+				target_kind: "behavior",
+				classification: "needs_review",
+				approval_required: true,
+				execution_surface: "governed_workbench",
+				provenance_digest: expect.stringMatching(/^[a-f0-9]{64}$/),
+			});
 			for (const key of [
-				"id",
-				"distinct_session_count",
-				"related_session_count",
-				"evidence_refs",
-				"evidence_ref_count",
 				"baseline",
 				"targets",
 				"approval_policy",
@@ -560,12 +599,17 @@ describe("evolution analysis previews", () => {
 		const output = stringifyEnvelope(
 			envelopeOk(dto, { action: "evolve.analyze" }),
 		);
-		expect(dto.proposals).toHaveLength(3);
+		expect(dto.proposals).toHaveLength(1);
+		expect(dto).toMatchObject({
+			proposal_available_count: 3,
+			proposal_truncated: true,
+			critical_alerts_truncated: true,
+		});
 		expect(
 			dto.proposals.every(
 				(proposal) =>
 					proposal.evidence_ref_count === 4 &&
-					proposal.evidence_refs?.length === 1 &&
+					proposal.evidence_refs?.length === 4 &&
 					proposal.baseline?.window === "recorded" &&
 					proposal.targets?.state === "canary" &&
 					proposal.approval_policy === "explicit" &&
@@ -578,12 +622,12 @@ describe("evolution analysis previews", () => {
 						proposal.evidence_refs[0]?.authority ?? "",
 						"utf8",
 					) <= 32 &&
-					Object.values(proposal.evidence_refs[0] ?? {}).every((value) =>
-						value.endsWith("..."),
+					Object.values(proposal.evidence_refs[0] ?? {}).every(
+						(value) => typeof value === "string",
 					),
 			),
 		).toBe(true);
-		expect(dto.critical_alerts).toHaveLength(3);
+		expect(dto.critical_alerts).toHaveLength(1);
 		expect(dto.critical_alert_count).toBe(3);
 		expect(dto.critical_alert_pending_count).toBe(0);
 		for (const proposal of dto.proposals) {
@@ -593,7 +637,7 @@ describe("evolution analysis previews", () => {
 				proposal.risk,
 				proposal.validation,
 			]) {
-				expect(Buffer.byteLength(field, "utf8")).toBeLessThanOrEqual(32);
+				expect(Buffer.byteLength(field, "utf8")).toBeLessThanOrEqual(160);
 				expect(field).not.toContain("\uFFFD");
 			}
 		}
@@ -1052,9 +1096,7 @@ describe("evolution analysis previews", () => {
 			expect(exitCode).toBe(0);
 			const payload = JSON.parse(output[0] ?? "{}");
 			expect(payload.data.status).toBe("blocked");
-			expect(payload.data.recovery_action).toBe(
-				"afol health --area state --json",
-			);
+			expect(payload.data.recovery_action).toBe("afol evolve status --json");
 			expect(payload.data).not.toHaveProperty("project_id");
 			expect(JSON.stringify(payload)).not.toContain(PROJECT_ID);
 			expect(existsSync(join(root, ".afol", "state", "evolution.db"))).toBe(
