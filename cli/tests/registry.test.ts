@@ -81,6 +81,7 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("c")).toBe("close");
 		expect(kernelRegistry.resolveKind("preflight")).toBe("preflight");
 		expect(kernelRegistry.resolveKind("pf")).toBe("preflight");
+		expect(kernelRegistry.resolveKind("fleet")).toBe("fleet");
 		expect(kernelRegistry.resolveKind("adapter")).toBe("adapter");
 		expect(kernelRegistry.resolveKind("adp")).toBe("adapter");
 		expect(kernelRegistry.resolveKind("session")).toBe("session");
@@ -139,6 +140,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
 		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
+		expect(byCommand.get("fleet")?.sideEffect).toBe("write");
 
 		const adr = byCommand.get("adr");
 		expect(adr?.sideEffect).toBe("write");
@@ -597,5 +599,24 @@ describe("kernel registry", () => {
 		for (const usage of usages("memory").slice(5)) {
 			expect(byUsage("memory").get(usage)).toBe("write");
 		}
+	});
+
+	test("publishes fleet command metadata and repair safety flags", () => {
+		const byCommand = new Map(
+			kernelRegistry.commands.map((entry) => [entry.command, entry]),
+		);
+		const fleet = byCommand.get("fleet");
+		expect(fleet).toBeDefined();
+		expect(fleet?.subcommands?.map((entry) => entry.usage)).toEqual([
+			"check --root <path> [--root <path>...] [--json]",
+			"repair --derived --dry-run --root <path> [--json]",
+			"repair --derived --root <path> --reason <text> [--json]",
+		]);
+		expect(fleet?.subcommands?.some((entry) => entry.requires_approval)).toBe(
+			true,
+		);
+		expect(
+			fleet?.subcommands?.some((entry) => entry.sideEffect === "write"),
+		).toBe(true);
 	});
 });

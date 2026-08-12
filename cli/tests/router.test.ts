@@ -228,6 +228,34 @@ describe("router alias grammar", () => {
 				"fix metadata",
 			],
 		});
+
+		expect(
+			resolveCommand([
+				"fleet",
+				"check",
+				"--root",
+				"/abs/A",
+				"--root",
+				"/abs/B",
+			]),
+		).toEqual({
+			kind: "fleet",
+			args: ["check", "--root", "/abs/A", "--root", "/abs/B"],
+		});
+
+		expect(
+			resolveCommand([
+				"fleet",
+				"repair",
+				"--derived",
+				"--dry-run",
+				"--root",
+				"/abs/C",
+			]),
+		).toEqual({
+			kind: "fleet",
+			args: ["repair", "--derived", "--dry-run", "--root", "/abs/C"],
+		});
 	});
 
 	test("preserves flag-like option values while normalizing scoped aliases", () => {

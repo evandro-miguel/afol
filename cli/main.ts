@@ -81,6 +81,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"rule",
 	"skill",
 	"update",
+	"fleet",
 	"close",
 	"file",
 	"localState",
@@ -354,6 +355,16 @@ export async function main(argv: string[]): Promise<number> {
 	if (resolution.kind === "init") {
 		const { runInitCommand } = await import("./commands/init");
 		return runInitCommand(resolution.args, operationCtx);
+	}
+
+	if (resolution.kind === "fleet") {
+		const { runFleetCommand } = await import("./commands/fleet");
+		return runFleetCommand(
+			resolution.args,
+			process.cwd(),
+			undefined,
+			operationCtx,
+		);
 	}
 
 	const project = loadProjectRoot(process.cwd());

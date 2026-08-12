@@ -1209,6 +1209,26 @@ Follow-on slices under this direction:
   `afol local-state rebuild` / `afol catchup` recovery, and benchmark default
   versus opt-in derived paths separately on a compatible warm host.
 
+### F-33 Fleet-Safe Downstream Update Operations
+
+- Status: active
+- Governing spec:
+  `.afol/adm/specs/260812_2006_fleet-safe-downstream-updates_spec_01.md`
+- Why: AFOL operators need one compact, bounded view of downstream project
+  health and update readiness before repairing derived state or scheduling a
+  scaffold update wave.
+- Scope: discover explicitly configured Linux-side project roots; classify
+  current, legacy, mixed, conflicted, and unhealthy projects; distinguish
+  rebuildable derived state from managed, project-owned, and historical debt;
+  provide read-only checks and approval-gated derived-state repair.
+- Exit criteria: compact fleet check with stable JSON; fail-closed discovery;
+  bounded concurrency and output; no secret or raw-session reads; derived-only
+  repair with dry-run and per-project receipts; integration coverage against
+  representative current, legacy, dirty, conflicted, and unhealthy projects.
+- Non-goals: unattended scaffold updates, automatic conflict resolution,
+  deletion or archival, session closure, Git mutation, or forcing managed
+  files across a project fleet.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command

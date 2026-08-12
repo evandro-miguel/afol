@@ -14,7 +14,7 @@ import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
-const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 550;
+const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 610;
 
 function estimateOutputTokens(output: string): number {
 	return Math.ceil(Buffer.byteLength(output, "utf8") / 4);
@@ -29,7 +29,7 @@ describe("help formatter", () => {
 		});
 
 		expect(help).toBe(copy);
-		expect(help.split("\n").length).toBeLessThanOrEqual(70);
+		expect(help.split("\n").length).toBeLessThanOrEqual(71);
 		expect(help).toContain("Usage: afol");
 		expect(help).toContain("Agent fast path (active session)");
 		expect(help).toContain(
@@ -70,7 +70,7 @@ describe("help formatter", () => {
 	test("keeps compact help lines scan-friendly", () => {
 		const lines = formatHelpText().split("\n");
 
-		expect(lines.length).toBeLessThanOrEqual(70);
+		expect(lines.length).toBeLessThanOrEqual(71);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -142,6 +142,23 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("formats fleet command help", () => {
+		const help = formatCommandHelp("fleet", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected fleet command help");
+		}
+		expect(help).toContain("Command: fleet");
+		expect(help).toContain("Aliases: none");
+		expect(help).toContain("Category: ops");
+		expect(help).toContain("Side effect: write");
+		expect(help).toContain("check --root <path> [--root <path>...] [--json]");
+		expect(help).toContain(
+			"repair --derived --root <path> --reason <text> [--json]",
+		);
 	});
 
 	test("advertises compact and verbose verify-task report options", () => {

@@ -21,6 +21,7 @@ export type CommandResolution =
 	| { kind: "hook"; args: string[] }
 	| { kind: "rule"; args: string[] }
 	| { kind: "skill"; args: string[] }
+	| { kind: "fleet"; args: string[] }
 	| { kind: "update"; args: string[] }
 	| { kind: "file"; args: string[] }
 	| { kind: "localState"; args: string[] }
@@ -299,6 +300,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 				? [normalizedAction.action, ...normalizedAction.args]
 				: normalizedAction.args,
 		};
+	}
+
+	if (topLevelKind === "fleet") {
+		return { kind: "fleet", args: rest };
 	}
 
 	if (topLevelKind === "localState") {
