@@ -105,6 +105,17 @@ function canonicalHealthyRoot(): string {
 	return root;
 }
 
+function canonicalTemplateAlignedRoot(): string {
+	const root = withCleanupRoot();
+	cpSync(join(process.cwd(), "src", "project-template"), root, {
+		recursive: true,
+	});
+	rebuildWorkBenchIndex(root);
+	rebuildProjectIndexes(root);
+	initCleanGitRoot(root);
+	return root;
+}
+
 function canonicalDerivedRepairableRoot(): string {
 	const root = canonicalHealthyRoot();
 	rmSync(join(root, ".afol", "data", "index", "rules.json"));
@@ -139,6 +150,138 @@ function canonicalTemplateConflictedRoot(conflictFiles: number): string {
 }
 
 describe("fleet core service", () => {
+	test("check canonical roots emit preview-update when conflicted", async () => {
+		const root = canonicalHealthyRoot();
+		const result = await runFleetCheck({ roots: [root] });
+
+		expect(result.ok).toBe(true);
+		expect(result.projects).toHaveLength(1);
+
+		const project = result.projects[0];
+		expect(project).toBeDefined();
+		if (!project) {
+			throw new Error("expected a single check result");
+		}
+		expect(project.decision.action).toBe("preview-update");
+		expect(project.decision.blockers).not.toContain("history-failed");
+		expect(project.decision.axes.history.state).toBe("ok");
+		expect(project.decision.axes.git.state).toBe("blocked");
+		expect(project.decision.axes.derived.state).toBe("ok");
+		expect(project.decision.next_command).toBe(
+			`cd '${root}' && 'afol' update preview --json`,
+		);
+	});
+
+	test("check marks legacy+dirty projects as manual-review with dirty blocker", async () => {
+		const root = legacyRoot();
+		initCleanGitRoot(root);
+		const dirty = join(root, "dirty.txt");
+		writeFileSync(dirty, "dirty", "utf8");
+
+		const result = await runFleetCheck({ roots: [root] });
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("manual-review");
+		expect(project?.decision.blockers).toContain("dirty-git-worktree");
+		expect(project?.decision.blockers).not.toContain("history-failed");
+		expect(project?.classification).toBe("validation-blocked");
+	});
+
+	test("check marks critical lock conflict as manual-review without next command", async () => {
+		const root = canonicalRoot();
+		mkdirSync(join(root, ".agents"), { recursive: true });
+		writeJson(join(root, ".agents", "lock.json"), {
+			revision: "broken",
+			extra: true,
+		});
+
+		const result = await runFleetCheck({
+			roots: [root],
+			entrypoint: "fleet-tool",
+		});
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("manual-review");
+		expect(project?.decision.blockers).toContain("critical-scaffold-conflict");
+		expect(project?.decision.next_command).toBeNull();
+	});
+
+	test("check marks healthy clean roots as noop with no next command", async () => {
+		const root = canonicalTemplateAlignedRoot();
+		const result = await runFleetCheck({ roots: [root] });
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("noop");
+		expect(project?.classification).toBe("healthy");
+		expect(project?.decision.blockers).toHaveLength(0);
+		expect(project?.decision.axes.git.state).toBe("ok");
+		expect(project?.decision.axes.derived.state).toBe("ok");
+		expect(project?.decision.axes.scaffold.state).toBe("ok");
+		expect(project?.decision.axes.history.state).toBe("ok");
+		expect(project?.decision.next_command).toBeNull();
+	});
+
+	test("check repairs derived drift only when clean", async () => {
+		const root = canonicalDerivedRepairableGitRoot();
+
+		const result = await runFleetCheck({ roots: [root] });
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("repair-derived");
+		expect(project?.decision.axes.derived.state).toBe("warn");
+		expect(project?.decision.blockers).not.toContain("history-failed");
+		expect(project?.decision.axes.history.state).toBe("ok");
+		expect(project?.decision.next_command).toBe(
+			`'afol' fleet repair --derived --dry-run --root '${root}' --json`,
+		);
+	});
+
+	test("check marks clean template conflicts as preview-update", async () => {
+		const root = canonicalTemplateConflictedRoot(1);
+
+		const result = await runFleetCheck({ roots: [root] });
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("preview-update");
+		expect(project?.decision.axes.scaffold.state).toBe("warn");
+		expect(project?.decision.blockers).not.toContain("history-failed");
+		expect(project?.decision.next_command).toBe(
+			`cd '${root}' && 'afol' update preview --json`,
+		);
+	});
+
+	test("check repair-derived command uses quoted unsafe entrypoint", async () => {
+		const root = canonicalDerivedRepairableGitRoot();
+		const entrypoint = "/opt/AFOL Build/bin/afol;safe";
+
+		const result = await runFleetCheck({
+			roots: [root],
+			entrypoint,
+		});
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("repair-derived");
+		expect(project?.decision.next_command).toBe(
+			`'${entrypoint}' fleet repair --derived --dry-run --root '${root}' --json`,
+		);
+	});
+
+	test("check preview-update command uses quoted unsafe entrypoint", async () => {
+		const root = canonicalTemplateConflictedRoot(1);
+		const entrypoint = "/opt/AFOL Build/bin/afol;safe";
+
+		const result = await runFleetCheck({
+			roots: [root],
+			entrypoint,
+		});
+		const project = result.projects[0];
+
+		expect(project?.decision.action).toBe("preview-update");
+		expect(project?.decision.next_command).toBe(
+			`cd '${root}' && '${entrypoint}' update preview --json`,
+		);
+	});
+
 	test("check stays read-only and reports validation/template/posture", async () => {
 		const canonical = canonicalRoot();
 		const legacy = legacyRoot();
@@ -289,6 +432,9 @@ describe("fleet core service", () => {
 		if (!entry) {
 			throw new Error("expected a single check result");
 		}
+		expect(entry.decision.action).toBe("manual-review");
+		expect(entry.decision.blockers).toContain("history-failed");
+		expect(entry.decision.axes.history.state).toBe("blocked");
 		expect(["validation-blocked", "update-conflicted"]).toContain(
 			entry.classification,
 		);
@@ -366,12 +512,12 @@ describe("fleet core service", () => {
 		expect(before.mode).toBe("preview");
 		expect(applied.mode).toBe("apply");
 		expect(applied.target).toBe("derived");
+		expect(before.eligible).toBe(true);
+		expect(before.eligibility_reason).toBe("eligible");
 		expect(applied.writes_performed).toBe(true);
 		expect(before.reason).toBe("derived-preview");
 		expect(applied.reason).toBe("derived-apply");
-		expect(before.eligible).toBe(true);
 		expect(applied.eligible).toBe(true);
-		expect(before.eligibility_reason).toBe("eligible");
 		expect(applied.eligibility_reason).toBe("eligible");
 		expect(["derived-repairable", "legacy", "mixed", "conflicted"]).toContain(
 			before.before.classification,
@@ -396,6 +542,7 @@ describe("fleet core service", () => {
 		expect(existsSync(join(root, ".afol", "data", "index", "specs.json"))).toBe(
 			true,
 		);
+		expect(existsSync(join(root, ".afol", "state"))).toBe(true);
 	});
 
 	test("repair apply skips dirty git worktree and writes nothing", async () => {

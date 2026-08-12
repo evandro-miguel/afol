@@ -1,4 +1,5 @@
-import { isAbsolute } from "node:path";
+import { existsSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 
 import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
@@ -9,6 +10,9 @@ import {
 import {
 	FLEET_MAX_PROJECTS,
 	type FleetCheckReport,
+	type FleetDecisionAction,
+	type FleetDecisionAxisState,
+	type FleetDecisionBlocker,
 	type FleetProjectCheck,
 	type FleetRepairReport,
 	runFleetCheck,
@@ -29,10 +33,31 @@ type ParsedFleetArgs = {
 
 type FleetEnvelope = Record<string, unknown>;
 
+type FleetCheckDecision = {
+	axes: {
+		git: {
+			state: FleetDecisionAxisState;
+		};
+		derived: {
+			state: FleetDecisionAxisState;
+		};
+		scaffold: {
+			state: FleetDecisionAxisState;
+		};
+		history: {
+			state: FleetDecisionAxisState;
+		};
+	};
+	action: FleetDecisionAction;
+	blockers: readonly FleetDecisionBlocker[];
+	next_command: string | null;
+};
+
 type FleetCheckProjectCompact = {
 	root: string;
 	config_source: FleetProjectCheck["config_source"];
 	classification: FleetProjectCheck["classification"];
+	decision?: FleetCheckDecision;
 	git: {
 		state: FleetProjectCheck["git"]["state"];
 		dirty_count: FleetProjectCheck["git"]["dirty_count"];
@@ -53,6 +78,169 @@ type FleetCheckProjectCompact = {
 type FleetCheckReportCompact = Omit<FleetCheckReport, "projects"> & {
 	projects: FleetCheckProjectCompact[];
 };
+
+const FLEET_ENTRYPOINT = "afol";
+
+function isCompiledBunRuntime(mainPath = Bun.main): boolean {
+	return mainPath.includes("$bunfs");
+}
+
+export function resolveFleetEntrypoint(
+	mainPath = Bun.main,
+	execPath = process.execPath,
+): string {
+	if (isCompiledBunRuntime(mainPath)) {
+		return isAbsolute(execPath) ? execPath : FLEET_ENTRYPOINT;
+	}
+
+	const wrapper = resolve(import.meta.dir, "..", "..", "afol");
+	return existsSync(wrapper) ? wrapper : FLEET_ENTRYPOINT;
+}
+
+function inferFleetAction(
+	classification: FleetProjectCheck["classification"],
+): FleetDecisionAction {
+	if (classification === "healthy") return "noop";
+	if (classification === "derived-repairable") return "repair-derived";
+	if (classification === "conflicted") return "repair-derived";
+	if (classification === "mixed") return "repair-derived";
+	if (classification === "legacy") return "repair-derived";
+	if (classification === "update-conflicted") return "preview-update";
+	return "manual-review";
+}
+
+function inferFleetBlockers(
+	project: FleetProjectCheck,
+): readonly FleetDecisionBlocker[] {
+	const blockers = new Set<FleetDecisionBlocker>();
+	if (project.config_source === null) {
+		blockers.add("missing-config");
+	}
+	if (project.git.state === "dirty") {
+		blockers.add("dirty-git-worktree");
+	}
+	if (project.health_summary.fail > 0) {
+		blockers.add("history-failed");
+	}
+	if (
+		project.template_update.critical_conflict_count > 0 ||
+		project.template_update.operation_summary.conflict > 0
+	) {
+		blockers.add("critical-scaffold-conflict");
+	}
+	return [...blockers];
+}
+
+function inferFleetAxes(
+	project: FleetProjectCheck,
+): FleetCheckDecision["axes"] {
+	const gitState: FleetDecisionAxisState =
+		project.git.state === "unavailable"
+			? "blocked"
+			: project.git.state === "dirty"
+				? "warn"
+				: "ok";
+	const derivedState: FleetDecisionAxisState =
+		project.classification === "blocked" ||
+		project.classification === "validation-blocked"
+			? "blocked"
+			: project.local_state.checks_failed > 0
+				? "warn"
+				: "ok";
+	const scaffoldState: FleetDecisionAxisState =
+		project.template_update.operation_summary.conflict > 0 ? "blocked" : "ok";
+	const historyState: FleetDecisionAxisState =
+		project.health_summary.fail > 0
+			? "blocked"
+			: project.health_summary.warn > 0
+				? "warn"
+				: "ok";
+
+	return {
+		git: {
+			state: gitState,
+		},
+		derived: {
+			state: derivedState,
+		},
+		scaffold: {
+			state: scaffoldState,
+		},
+		history: {
+			state: historyState,
+		},
+	};
+}
+
+function inferFleetNextCommand(
+	action: FleetDecisionAction,
+	root: string,
+	entrypoint: string,
+): string | null {
+	if (action === "repair-derived") {
+		return `${entrypoint} fleet repair --derived --dry-run --root ${root} --json`;
+	}
+	if (action === "preview-update") {
+		return `${entrypoint} update preview --json`;
+	}
+	if (action === "manual-review" || action === "noop") {
+		return null;
+	}
+	throw new Error(`Unknown fleet action: ${action}`);
+}
+
+function inferFleetDecision(
+	project: FleetProjectCheck,
+	entrypoint: string,
+): FleetCheckDecision {
+	const action = inferFleetAction(project.classification);
+	const blockers = inferFleetBlockers(project);
+	return {
+		axes: inferFleetAxes(project),
+		action,
+		blockers,
+		next_command: inferFleetNextCommand(action, project.root, entrypoint),
+	};
+}
+
+function resolveFleetDecision(
+	project: FleetProjectCheck,
+	entrypoint: string,
+): FleetCheckDecision {
+	const payload = (project as { decision?: FleetCheckDecision }).decision;
+	return payload ?? inferFleetDecision(project, entrypoint);
+}
+
+function toCompactFleetProject(
+	project: FleetProjectCheck,
+	includeDecisionDetails: boolean,
+	entrypoint: string,
+): FleetCheckProjectCompact {
+	const compact: FleetCheckProjectCompact = {
+		root: project.root,
+		config_source: project.config_source,
+		classification: project.classification,
+		git: {
+			state: project.git.state,
+			dirty_count: project.git.dirty_count,
+		},
+		health_summary: project.health_summary,
+		template_update: {
+			operation_summary: project.template_update.operation_summary,
+			conflict_paths_overflow: project.template_update.conflict_paths_overflow,
+		},
+		validation: {
+			failed_check_ids: project.validation.failed_check_ids,
+		},
+		local_state: {
+			checks_failed: project.local_state.checks_failed,
+		},
+	};
+	if (includeDecisionDetails) {
+		compact.decision = resolveFleetDecision(project, entrypoint);
+	}
+	return compact;
+}
 
 function resolveFleetAction(value: string | undefined): FleetSubcommand {
 	if (!value || value === "check") return "check";
@@ -146,7 +334,9 @@ function parseFleetArgs(values: string[]): ParsedFleetArgs {
 	return parsed;
 }
 
-function formatProjectLines(project: FleetRepairReport["after"]): string[] {
+type FleetProjectView = FleetProjectCheck | FleetRepairReport["after"];
+
+function formatProjectLines(project: FleetProjectView): string[] {
 	return [
 		`  root: ${project.root}`,
 		`  config_source: ${project.config_source ?? "(none)"}`,
@@ -161,16 +351,61 @@ function formatProjectLines(project: FleetRepairReport["after"]): string[] {
 	];
 }
 
+function formatDecisionLines(
+	decision: FleetCheckDecision | undefined,
+): string[] {
+	if (!decision) {
+		return [];
+	}
+	const nextCommand =
+		decision.next_command === null ? "none" : decision.next_command;
+	return [
+		`  action: ${decision.action}`,
+		`  blockers: ${decision.blockers.join(", ") || "none"}`,
+		`  next: ${nextCommand}`,
+		`  axes.git: ${decision.axes.git.state}`,
+		`  axes.derived: ${decision.axes.derived.state}`,
+		`  axes.scaffold: ${decision.axes.scaffold.state}`,
+		`  axes.history: ${decision.axes.history.state}`,
+	];
+}
+
 function formatFleetCheckReport(report: FleetCheckReport): string {
+	const entrypoint = resolveFleetEntrypoint();
+	const compactProjects = report.projects.map((project) =>
+		toCompactFleetProject(project, report.projects.length === 1, entrypoint),
+	);
 	const lines = [
 		`fleet check: ${report.ok ? "ok" : "blocked"}`,
 		`max_roots: ${report.max_projects}`,
 		`truncated: ${report.truncated ? "yes" : "no"}`,
 		`projects: ${report.projects.length}`,
 	];
-	for (const project of report.projects) {
-		lines.push(`- ${project.root}`);
-		lines.push(...formatProjectLines(project));
+	for (const compactProject of compactProjects) {
+		const detailedProject = report.projects.find(
+			(entry) => entry.root === compactProject.root,
+		);
+		if (!detailedProject) {
+			continue;
+		}
+		lines.push(`- ${compactProject.root}`);
+		lines.push(...formatProjectLines(detailedProject));
+		if (report.projects.length === 1) {
+			lines.push(...formatDecisionLines(compactProject.decision));
+		}
+	}
+	if (
+		compactProjects.length === 1 &&
+		compactProjects[0]?.decision !== undefined
+	) {
+		const { decision } = compactProjects[0];
+		const nextCommand =
+			compactProjects[0].decision.next_command === null
+				? "none"
+				: compactProjects[0].decision.next_command;
+		lines.push(`next: ${nextCommand}`);
+		lines.push(`action: ${decision.action}`);
+		lines.push(`blockers: ${decision.blockers.join(", ") || "none"}`);
 	}
 	return lines.join("\n");
 }
@@ -193,32 +428,16 @@ function formatFleetRepairReport(report: FleetRepairReport): string {
 
 function compactFleetCheckReport(
 	report: FleetCheckReport,
+	entrypoint: string,
 ): FleetCheckReportCompact {
+	const includeDecisionDetails = report.projects.length === 1;
 	return {
 		ok: report.ok,
 		max_projects: report.max_projects,
 		truncated: report.truncated,
-		projects: report.projects.map((project) => ({
-			root: project.root,
-			config_source: project.config_source,
-			classification: project.classification,
-			git: {
-				state: project.git.state,
-				dirty_count: project.git.dirty_count,
-			},
-			health_summary: project.health_summary,
-			template_update: {
-				operation_summary: project.template_update.operation_summary,
-				conflict_paths_overflow:
-					project.template_update.conflict_paths_overflow,
-			},
-			validation: {
-				failed_check_ids: project.validation.failed_check_ids,
-			},
-			local_state: {
-				checks_failed: project.local_state.checks_failed,
-			},
-		})),
+		projects: report.projects.map((project) =>
+			toCompactFleetProject(project, includeDecisionDetails, entrypoint),
+		),
 	};
 }
 
@@ -283,15 +502,17 @@ export async function runFleetCommand(
 	}
 
 	if (parsed.action === "check") {
+		const entrypoint = resolveFleetEntrypoint();
 		const report = await runFleetCheck({
 			roots: parsed.roots,
 			max_projects: FLEET_MAX_PROJECTS,
+			entrypoint,
 		});
 		if (parsed.json) {
 			io.stdout(
 				formatJsonEnvelope(
 					"fleet.check",
-					compactFleetCheckReport(report),
+					compactFleetCheckReport(report, entrypoint),
 					report.ok ? 0 : 1,
 				),
 			);
@@ -334,6 +555,7 @@ export async function runFleetCommand(
 		target: "derived",
 		dry_run: parsed.dryRun,
 		reason: parsed.reason.trim(),
+		entrypoint: resolveFleetEntrypoint(),
 	});
 
 	if (!parsed.dryRun && (!report.eligible || !report.writes_performed)) {

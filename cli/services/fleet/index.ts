@@ -17,7 +17,11 @@ import {
 	resolveProjectConfigPath,
 } from "../project/paths";
 import { validateProjectStructure } from "../project/validate";
-import { checkTemplateUpdate, type UpdateCheckResult } from "../update/check";
+import {
+	checkTemplateUpdate,
+	type UpdateCheckResult,
+	type UpdateOperation,
+} from "../update/check";
 
 export type FleetProjectClass =
 	| "healthy"
@@ -28,6 +32,37 @@ export type FleetProjectClass =
 	| "blocked"
 	| "update-conflicted"
 	| "validation-blocked";
+
+export type FleetDecisionAction =
+	| "noop"
+	| "repair-derived"
+	| "preview-update"
+	| "manual-review";
+
+export type FleetDecisionAxisState = "ok" | "warn" | "blocked";
+
+export type FleetDecisionBlocker =
+	| "critical-scaffold-conflict"
+	| "dirty-git-worktree"
+	| "history-failed"
+	| "missing-config";
+
+export type FleetDecisionAxis = {
+	state: FleetDecisionAxisState;
+	reason: string;
+};
+
+export type FleetProjectDecision = {
+	action: FleetDecisionAction;
+	blockers: readonly FleetDecisionBlocker[];
+	axes: {
+		git: FleetDecisionAxis;
+		derived: FleetDecisionAxis;
+		scaffold: FleetDecisionAxis;
+		history: FleetDecisionAxis;
+	};
+	next_command: string | null;
+};
 
 type ExclusionSegment =
 	| ".git"
@@ -44,6 +79,11 @@ const FLEET_DEFAULT_PATH_LIMIT = 3;
 const GIT_STATUS_TIMEOUT_MS = 5_000;
 const GIT_STATUS_MAX_BUFFER_BYTES = 64 * 1024;
 const LOCAL_STATE_VALIDATION_SUFFIX = "_local_state_index";
+const HISTORY_VALIDATION_FAILURE_IDS = new Set([
+	"session_evidence",
+	"session-history",
+]);
+const DEFAULT_FLEET_ENTRYPOINT = "afol";
 
 const EXCLUDED_PATH_SEGMENTS = new Set<ExclusionSegment>([
 	".git",
@@ -92,6 +132,8 @@ export type FleetTemplateUpdatePosture = {
 	};
 	conflict_paths: readonly string[];
 	conflict_paths_overflow: boolean;
+	critical_conflict_count: number;
+	project_owned_preserve_count: number;
 };
 
 export type FleetRepairEligibilityReason =
@@ -114,6 +156,7 @@ export type FleetProjectCheck = {
 	config_path: string | null;
 	classification: FleetProjectClass;
 	classification_reasons: readonly string[];
+	decision: FleetProjectDecision;
 	git: FleetGitPosture;
 	health_summary: FleetProjectHealth;
 	template_update: FleetTemplateUpdatePosture;
@@ -128,6 +171,7 @@ export type FleetCheckInput = {
 	roots: readonly string[];
 	max_projects?: number;
 	max_paths?: number;
+	entrypoint?: string;
 };
 
 export type FleetCheckReport = {
@@ -146,12 +190,14 @@ export type FleetRepairInput = {
 	dry_run?: boolean;
 	max_paths?: number;
 	reason?: string;
+	entrypoint?: string;
 };
 
 export type FleetRepairReport = {
 	mode: FleetRepairMode;
 	root: string;
 	target: FleetRepairTarget;
+	decision: FleetProjectDecision;
 	reason: string | null;
 	eligible: boolean;
 	eligibility_reason: FleetRepairEligibilityReason;
@@ -186,7 +232,34 @@ const EMPTY_FLEET_TEMPLATE_UPDATE: FleetTemplateUpdatePosture = {
 	},
 	conflict_paths: [],
 	conflict_paths_overflow: false,
+	critical_conflict_count: 0,
+	project_owned_preserve_count: 0,
 };
+
+function resolveFleetEntrypoint(value: string | undefined): string {
+	const trimmed = value?.trim();
+	return trimmed ? trimmed : DEFAULT_FLEET_ENTRYPOINT;
+}
+
+function nextCommandForFleetDecision(
+	entrypoint: string,
+	action: FleetDecisionAction,
+	root: string,
+): string | null {
+	const quotedRoot = quoteShellPath(root);
+	const quotedEntrypoint = quoteShellPath(entrypoint);
+	if (action === "repair-derived") {
+		return `${quotedEntrypoint} fleet repair --derived --dry-run --root ${quotedRoot} --json`;
+	}
+	if (action === "preview-update") {
+		return `cd ${quotedRoot} && ${quotedEntrypoint} update preview --json`;
+	}
+	return null;
+}
+
+function quoteShellPath(value: string): string {
+	return `'${value.replace(/'/g, "'\\''")}'`;
+}
 
 function absoluteRoot(value: string): string {
 	if (!isAbsolute(value)) {
@@ -256,6 +329,8 @@ function toFleetTemplateUpdate(
 		preserve: 0,
 	};
 	const conflictPaths: string[] = [];
+	let criticalConflictCount = 0;
+	let projectOwnedPreserveCount = 0;
 
 	for (const operation of update.operations) {
 		if (operation.kind === "skip-identical") {
@@ -276,10 +351,16 @@ function toFleetTemplateUpdate(
 		}
 		if (operation.kind === "preserve-project-owned") {
 			operation_summary.preserve += 1;
+			projectOwnedPreserveCount += 1;
 			continue;
 		}
-		operation_summary.conflict += 1;
-		conflictPaths.push(operation.path);
+		if (operation.kind === "conflict") {
+			if (isCriticalTemplateConflict(operation)) {
+				criticalConflictCount += 1;
+			}
+			operation_summary.conflict += 1;
+			conflictPaths.push(operation.path);
+		}
 	}
 	const visibleConflictPaths = conflictPaths
 		.sort()
@@ -293,7 +374,21 @@ function toFleetTemplateUpdate(
 		operation_summary,
 		conflict_paths: visibleConflictPaths,
 		conflict_paths_overflow: visibleConflictPaths.length < conflictPaths.length,
+		critical_conflict_count: criticalConflictCount,
+		project_owned_preserve_count: projectOwnedPreserveCount,
 	};
+}
+
+function isCriticalTemplateConflict(operation: UpdateOperation): boolean {
+	return (
+		operation.path === ".agents/lock.json" ||
+		operation.path === ".agents/manifest.json" ||
+		operation.path.endsWith(".schema.json")
+	);
+}
+
+function isHistoryValidationFailure(checkId: string): boolean {
+	return HISTORY_VALIDATION_FAILURE_IDS.has(checkId);
 }
 
 async function toFleetValidationSummary(
@@ -311,22 +406,182 @@ async function toFleetValidationSummary(
 	};
 }
 
+function makeFleetProjectDecision(
+	projectRoot: string,
+	configSource: ProjectConfigSource | null,
+	classification: FleetProjectClass,
+	git: FleetGitPosture,
+	_healthSummary: FleetProjectHealth,
+	templateUpdate: FleetTemplateUpdatePosture,
+	validation: FleetValidationSummary,
+	localStateChecks: readonly FleetLocalStateFinding[],
+	entrypoint: string,
+): FleetProjectDecision {
+	const localStateFailures = localStateChecks.filter(
+		(check) => !check.ok,
+	).length;
+	const historyDebtChecks = validation.failed_check_ids.filter(
+		isHistoryValidationFailure,
+	);
+
+	const gitAxis: FleetDecisionAxis =
+		git.state === "unavailable"
+			? {
+					state: "blocked",
+					reason: "git state unavailable",
+				}
+			: git.state === "dirty"
+				? {
+						state: "warn",
+						reason: `${git.dirty_count} dirty path(s)`,
+					}
+				: {
+						state: "ok",
+						reason: "clean worktree",
+					};
+
+	const derivedAxis: FleetDecisionAxis = (() => {
+		if (classification === "blocked") {
+			return {
+				state: "blocked",
+				reason: "missing config source",
+			};
+		}
+		if (classification === "validation-blocked") {
+			return {
+				state: "blocked",
+				reason: "validation blocked repair path",
+			};
+		}
+		if (localStateFailures > 0) {
+			return {
+				state: "warn",
+				reason: `${localStateFailures} local-state failure(s)`,
+			};
+		}
+		return {
+			state: "ok",
+			reason: "no local-state failures",
+		};
+	})();
+
+	const historyAxis: FleetDecisionAxis = (() => {
+		if (historyDebtChecks.length > 0) {
+			return {
+				state: "blocked",
+				reason: `history debt: ${historyDebtChecks.join(", ")}`,
+			};
+		}
+		return {
+			state: "ok",
+			reason: "history clean",
+		};
+	})();
+
+	const scaffoldAxis: FleetDecisionAxis = (() => {
+		if (templateUpdate.critical_conflict_count > 0) {
+			return {
+				state: "blocked",
+				reason: `${templateUpdate.critical_conflict_count} critical scaffold conflict(s)`,
+			};
+		}
+		if (templateUpdate.operation_summary.conflict > 0) {
+			return {
+				state: "warn",
+				reason: `${templateUpdate.operation_summary.conflict} scaffold conflict(s)`,
+			};
+		}
+		if (templateUpdate.project_owned_preserve_count > 0) {
+			return {
+				state: "warn",
+				reason: `${templateUpdate.project_owned_preserve_count} project-owned preserve conflict(s)`,
+			};
+		}
+		return {
+			state: "ok",
+			reason: "scaffold clean",
+		};
+	})();
+
+	const blockers = new Set<FleetDecisionBlocker>();
+	if (configSource === null) {
+		blockers.add("missing-config");
+	}
+	if (git.state === "dirty") {
+		blockers.add("dirty-git-worktree");
+	}
+	if (historyAxis.state === "blocked") {
+		blockers.add("history-failed");
+	}
+	if (scaffoldAxis.state === "blocked") {
+		blockers.add("critical-scaffold-conflict");
+	}
+
+	let action: FleetDecisionAction = "manual-review";
+	const canRepairDerived =
+		derivedAxis.state === "warn" &&
+		gitAxis.state === "ok" &&
+		historyAxis.state === "ok";
+	if (blockers.size === 0) {
+		const allClear =
+			gitAxis.state === "ok" &&
+			derivedAxis.state === "ok" &&
+			scaffoldAxis.state === "ok" &&
+			historyAxis.state === "ok";
+		if (allClear) {
+			action = "noop";
+		} else if (canRepairDerived) {
+			action = "repair-derived";
+		} else if (
+			classification === "update-conflicted" ||
+			scaffoldAxis.state === "warn"
+		) {
+			action = "preview-update";
+		}
+	}
+
+	return {
+		action,
+		blockers: [...blockers],
+		axes: {
+			git: gitAxis,
+			derived: derivedAxis,
+			scaffold: scaffoldAxis,
+			history: historyAxis,
+		},
+		next_command: nextCommandForFleetDecision(entrypoint, action, projectRoot),
+	};
+}
+
 function toFleetProjectReport(
 	projectRoot: string,
 	errors: readonly string[] = ["error:project-check"],
+	entrypoint: string = DEFAULT_FLEET_ENTRYPOINT,
 ): FleetProjectCheck {
+	const git = {
+		state: "unavailable" as const,
+		dirty_count: 0,
+		dirty_paths: [],
+		dirty_paths_overflow: false,
+	};
 	return {
 		root: projectRoot,
 		config_source: null,
 		config_path: null,
 		classification: "blocked",
 		classification_reasons: errors,
-		git: {
-			state: "unavailable",
-			dirty_count: 0,
-			dirty_paths: [],
-			dirty_paths_overflow: false,
-		},
+		decision: makeFleetProjectDecision(
+			projectRoot,
+			null,
+			"blocked",
+			git,
+			EMPTY_FLEET_PROJECT_HEALTH,
+			EMPTY_FLEET_TEMPLATE_UPDATE,
+			EMPTY_FLEET_VALIDATION_SUMMARY,
+			[],
+			entrypoint,
+		),
+		git,
 		health_summary: EMPTY_FLEET_PROJECT_HEALTH,
 		template_update: EMPTY_FLEET_TEMPLATE_UPDATE,
 		validation: EMPTY_FLEET_VALIDATION_SUMMARY,
@@ -494,6 +749,7 @@ function classifyProject(
 async function collectProjectCheck(
 	projectRoot: string,
 	maxPaths: number,
+	entrypoint: string,
 ): Promise<FleetProjectCheck> {
 	let configResolution: ProjectConfigResolution | null;
 	try {
@@ -545,15 +801,27 @@ async function collectProjectCheck(
 			pstr: false,
 		});
 	} catch (_error) {
-		return toFleetProjectReport(projectRoot, ["error:local-state"]);
+		return toFleetProjectReport(projectRoot, ["error:local-state"], entrypoint);
 	}
 
 	const localStateChecks = filterLocalStateChecks(report);
+	const git = collectGitPosture(projectRoot, maxPaths);
 	const classification = classifyProject(
 		configSource,
 		localStateChecks,
 		templateUpdate,
 		validation,
+	);
+	const decision = makeFleetProjectDecision(
+		projectRoot,
+		configSource,
+		classification.classification,
+		git,
+		healthSummary,
+		templateUpdate,
+		validation,
+		localStateChecks,
+		entrypoint,
 	);
 	return {
 		root: projectRoot,
@@ -561,7 +829,8 @@ async function collectProjectCheck(
 		config_path: configPath,
 		classification: classification.classification,
 		classification_reasons: classification.reasons,
-		git: collectGitPosture(projectRoot, maxPaths),
+		decision,
+		git,
 		health_summary: healthSummary,
 		template_update: templateUpdate,
 		validation,
@@ -576,17 +845,6 @@ function hasDerivedStateFailure(
 	localStateChecks: readonly FleetLocalStateFinding[],
 ): boolean {
 	return localStateChecks.some((check) => !check.ok);
-}
-
-function isRepairableClassification(
-	classification: FleetProjectClass,
-): boolean {
-	return (
-		classification === "derived-repairable" ||
-		classification === "conflicted" ||
-		classification === "mixed" ||
-		classification === "legacy"
-	);
 }
 
 function repairEligibility(
@@ -605,7 +863,16 @@ function repairEligibility(
 	if (check.git.state === "dirty") {
 		return { eligible: false, reason: "not-eligible:dirty-git-worktree" };
 	}
-	if (!isRepairableClassification(check.classification)) {
+	if (check.decision.action !== "repair-derived") {
+		if (
+			check.decision.action === "noop" &&
+			!hasDerivedStateFailure(check.local_state.checks)
+		) {
+			return {
+				eligible: false,
+				reason: "not-eligible:no-local-state-failures",
+			};
+		}
 		return {
 			eligible: false,
 			reason: "not-eligible:non-repairable-classification",
@@ -660,13 +927,29 @@ function toFleetReport(
 	};
 }
 
-function blockedProject(root: string): FleetProjectCheck {
+function blockedProject(root: string, entrypoint: string): FleetProjectCheck {
 	return {
 		root,
 		config_source: null,
 		config_path: null,
 		classification: "blocked",
 		classification_reasons: ["non-absolute-root"],
+		decision: makeFleetProjectDecision(
+			root,
+			null,
+			"blocked",
+			{
+				state: "unavailable",
+				dirty_count: 0,
+				dirty_paths: [],
+				dirty_paths_overflow: false,
+			},
+			EMPTY_FLEET_PROJECT_HEALTH,
+			EMPTY_FLEET_TEMPLATE_UPDATE,
+			EMPTY_FLEET_VALIDATION_SUMMARY,
+			[],
+			entrypoint,
+		),
 		git: {
 			state: "unavailable",
 			dirty_count: 0,
@@ -697,14 +980,17 @@ export async function runFleetCheck(
 		FLEET_MAX_GIT_PATHS,
 	);
 	const { selected, truncated } = dedupeProjectRoots(input.roots, maxProjects);
+	const entrypoint = resolveFleetEntrypoint(input.entrypoint);
 
 	const projects: FleetProjectCheck[] = [];
 	for (const root of selected) {
 		if (!isAbsolute(root)) {
-			projects.push(blockedProject(root));
+			projects.push(blockedProject(root, entrypoint));
 			continue;
 		}
-		projects.push(await collectProjectCheck(resolve(root), maxPaths));
+		projects.push(
+			await collectProjectCheck(resolve(root), maxPaths, entrypoint),
+		);
 	}
 
 	return toFleetReport(projects, maxProjects, truncated);
@@ -750,6 +1036,7 @@ export async function runFleetRepair(
 ): Promise<FleetRepairReport> {
 	const root = absoluteRoot(input.root);
 	const target: FleetRepairTarget = input.target ?? "derived";
+	const entrypoint = resolveFleetEntrypoint(input.entrypoint);
 	const maxPaths = toMax(
 		input.max_paths,
 		FLEET_DEFAULT_PATH_LIMIT,
@@ -759,7 +1046,7 @@ export async function runFleetRepair(
 		throw new Error(`unsupported fleet repair target: ${target}`);
 	}
 
-	const before = await collectProjectCheck(root, maxPaths);
+	const before = await collectProjectCheck(root, maxPaths, entrypoint);
 	const eligibility = repairEligibility(root, before);
 	const repairReportMetadata = {
 		reason: input.reason ?? null,
@@ -771,6 +1058,7 @@ export async function runFleetRepair(
 			mode: "preview",
 			root,
 			target,
+			decision: before.decision,
 			...repairReportMetadata,
 			writes_performed: false,
 			changed: false,
@@ -783,6 +1071,7 @@ export async function runFleetRepair(
 			mode: "apply",
 			root,
 			target,
+			decision: before.decision,
 			...repairReportMetadata,
 			writes_performed: false,
 			changed: false,
@@ -794,13 +1083,14 @@ export async function runFleetRepair(
 	withSessionLock(root, lockPathForTarget(target), () => {
 		writeLocalState(root);
 	});
-	const after = await collectProjectCheck(root, maxPaths);
+	const after = await collectProjectCheck(root, maxPaths, entrypoint);
 	const changed = !compareCheckSignatures(before, after);
 
 	return {
 		mode: "apply",
 		root,
 		target,
+		decision: after.decision,
 		...repairReportMetadata,
 		writes_performed: true,
 		changed,

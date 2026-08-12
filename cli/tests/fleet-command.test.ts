@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runFleetCommand } from "../commands/fleet";
+import { resolveFleetEntrypoint, runFleetCommand } from "../commands/fleet";
 import { FLEET_MAX_PROJECTS, type FleetCheckReport } from "../services/fleet";
 
 type CapturedIo = {
@@ -159,6 +159,29 @@ describe("fleet command", () => {
 					};
 					validation: { failed_check_ids: string[] };
 					local_state: { checks_failed: number };
+					decision: {
+						action: string;
+						blockers: string[];
+						next_command: string | null;
+						axes: {
+							git: {
+								state: string;
+								reason: string;
+							};
+							derived: {
+								state: string;
+								reason: string;
+							};
+							scaffold: {
+								state: string;
+								reason: string;
+							};
+							history: {
+								state: string;
+								reason: string;
+							};
+						};
+					};
 				}>;
 			};
 		};
@@ -213,6 +236,58 @@ describe("fleet command", () => {
 		expect(payload.data?.projects).toHaveLength(FLEET_MAX_PROJECTS);
 		expect(payload.data?.projects).toBeDefined();
 		expect((payload as { projects?: unknown }).projects).toBeUndefined();
+	});
+
+	test("one-project manual-review check marks next as none", async () => {
+		const root = mkFleetRoot("single-manual-review", false);
+		const json = captureIo();
+		const status = await runFleetCommand(
+			["check", "--root", root, "--json"],
+			process.cwd(),
+			json.io,
+		);
+		expect(status).toBe(1);
+		const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+			ok?: boolean;
+			exit_code?: number;
+			data?: {
+				projects?: Array<{
+					root: string;
+					classification: string;
+					decision: {
+						action: string;
+						blockers: string[];
+						next_command: string | null;
+					};
+				}>;
+			};
+		};
+		expect(payload.ok).toBe(false);
+		expect(payload.exit_code).toBe(status);
+		expect(payload.data?.projects).toHaveLength(1);
+		const project = payload.data?.projects?.[0];
+		expect(project?.classification).toBe("blocked");
+		expect(project?.decision.action).toBe("manual-review");
+		expect(project?.decision.next_command).toBeNull();
+		expect(project?.decision.blockers).toContain("missing-config");
+
+		const human = captureIo();
+		expect(
+			await runFleetCommand(["check", "--root", root], process.cwd(), human.io),
+		).toBe(1);
+		const output = human.stdout[0] ?? "";
+		expect(output).toContain("next: none");
+		expect(output).toContain("action: manual-review");
+		expect(output).toContain("blockers: missing-config");
+		expect(existsSync(join(root, ".afol", "state"))).toBe(false);
+		expect(existsSync(join(root, ".afol", "data"))).toBe(false);
+	});
+
+	test("compiled entrypoint resolution preserves an absolute special-character path", () => {
+		const compiledEntrypoint = "/tmp/afol with shell$space &special/afol";
+		expect(
+			resolveFleetEntrypoint("/$bunfs/root/afol", compiledEntrypoint),
+		).toBe(compiledEntrypoint);
 	});
 
 	test("check command limits output to max 25 roots", async () => {
