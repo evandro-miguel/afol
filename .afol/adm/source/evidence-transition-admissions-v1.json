@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "policy_id": "no-op-evidence-v1",
+  "admissions": [
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260716_0945_project-lifecycle-task-graph",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "beb9d532a920642040e2916e61225bb339f5ce9cca3170a9dc1984bdbe57d4de",
+      "evidence_ledger_sha256": "0b8e61de7363b49a786c44334bcdb5ed11b5e4ad582d45ff668d963669c70ddc",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    },
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260718_1557_capability-marker",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6555373fa50f2b0bef449727d9edde9d2d882868d43848a60e049403e450f55e",
+      "evidence_ledger_sha256": "099518e026f7f16c39a6a149e866d6ec91cca8740fef3ef4b327b1ed3ea3ed3e",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    },
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260718_1557_capability-marker_d942",
+      "task_id": "T-01",
+      "issue_type": "failed_evidence",
+      "state_board_sha256": "694d2c8564c94f711c295dc6e824a5b191a1060e5cfc5fda589a3a898cb65c3a",
+      "evidence_ledger_sha256": "161a8e22cbfdc65da2b325397fe55aaac6bc54e9df351ab5911e9f637394aec4",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    },
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260728_2323_ux-live-check",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "b5f9023de7c093712d673fe818b6df12c0ad38ac358cf986ee90d3b3fe9df13e",
+      "evidence_ledger_sha256": "bd0051e5d0602acaf273218ed9e4e8e52aeaab85c9068da2f1590e7754d223d6",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    },
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260728_2327_write-path-audit3",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "b7a86d092363f22fc1306ac3d93e3b85356ee5d13f4d7016006d3e99f4a2d808",
+      "evidence_ledger_sha256": "ffbd0ea2c6f04515d8aa79612ccfb9e8e510b9c837c39c36b143855e96a42a11",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    },
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260728_2352_real-use-gate",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "6f1fb26283241cc01e8669e0f345a47ffabbb40883b3ea1f5db9b226a6a9c6a8",
+      "evidence_ledger_sha256": "a534462834770cb5f3bbe3c5b9bf4008af6f3143716a6b3b8682d31078a5d72d",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    },
+    {
+      "policy_id": "no-op-evidence-v1",
+      "session_id": "260728_2353_shortpath2",
+      "task_id": "T-01",
+      "issue_type": "missing_evidence",
+      "state_board_sha256": "7c5f2176ed1a8d6e8a641fbba7adaf627847f0bef930013b49a9eb2ee3eae24a",
+      "evidence_ledger_sha256": "bda9d88913d65f3c62fac0348bb1489e02fe80901771b08bc2461a3ce1c15b9f",
+      "evidence_ledger_present": true,
+      "issue": "https://github.com/evandro-miguel/afol/issues/84",
+      "approval": "Owner-approved production repair of the no-op evidence policy transition"
+    }
+  ]
+}
