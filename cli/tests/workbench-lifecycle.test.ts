@@ -39,6 +39,7 @@ import {
 	transitionAdmitEvidence,
 } from "../services/project/evidence-transition-admission";
 import { resolveProjectPaths } from "../services/project/paths";
+import { archiveSessions } from "../services/workbench/archive";
 import { resolveTaskCompletionLockPath } from "../services/workbench/completion-lock";
 import {
 	advanceTaskAfterObservedTest,
@@ -6776,6 +6777,49 @@ describe("durable lifecycle auxiliary failures", () => {
 					exitCode: 0,
 				}),
 			).toThrow("not closed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("refuses reverification for an archived closed task until restore", () => {
+		const root = mkRoot("archived-closed-reverify");
+		try {
+			const created = newWorkstream(root, "archived closed reverify", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+			unlinkSync(created.evidencePath);
+			archiveSessions(root, [created.session], "retention boundary test");
+
+			expect(() =>
+				recordClosedTaskReverification(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result: "passed",
+					exitCode: 0,
+				}),
+			).toThrow("archived; restore it before reverify");
+			expect(existsSync(created.evidencePath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

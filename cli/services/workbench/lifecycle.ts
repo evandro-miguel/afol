@@ -41,6 +41,7 @@ import {
 } from "../project/legacy-evidence-baseline";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
+import { readArchivedSessionState } from "./session-archive-state";
 import {
 	isSessionClosed,
 	readTaskLifecycleState,
@@ -1656,6 +1657,11 @@ export function assertClosedTaskReverificationEligible(
 	if (!isSessionClosed(root, input.session)) {
 		throw new Error(
 			`Session ${input.session} is not closed; reverify is only for closed tasks.`,
+		);
+	}
+	if (readArchivedSessionState(root, input.session).archived) {
+		throw new Error(
+			`Session ${input.session} is archived; restore it before reverify.`,
 		);
 	}
 	const paths = sessionPaths(root, input.session);

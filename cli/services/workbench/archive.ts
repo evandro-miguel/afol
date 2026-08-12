@@ -18,13 +18,16 @@ import {
 	sessionLifecycleState,
 	sessionPaths,
 } from "./lifecycle";
+import {
+	type ArchivedSessionState,
+	archiveStatesFromRecords,
+	readArchivedSessionState,
+} from "./session-archive-state";
 import { listBindings } from "./session-context";
 import { readTaskLifecycleState } from "./session-lifecycle-state";
 
-export type ArchivedSessionState = {
-	archived: boolean;
-	archived_at: string | null;
-};
+export type { ArchivedSessionState } from "./session-archive-state";
+export { readArchivedSessionState } from "./session-archive-state";
 
 export type SessionArchiveCandidate = {
 	session: string;
@@ -72,56 +75,9 @@ export type SessionArchiveCandidatePageOptions = {
 	limit?: number;
 };
 
-const EMPTY_ARCHIVED_SESSION_STATE: ArchivedSessionState = {
-	archived: false,
-	archived_at: null,
-};
 const LEARNING_REVIEW_CANDIDATE_LIMIT = 10;
 const DEFAULT_SESSION_ARCHIVE_CANDIDATE_PAGE_LIMIT = 10;
 const MAX_SESSION_ARCHIVE_CANDIDATE_PAGE_LIMIT = 100;
-
-function archiveStateFromRecords(
-	records: readonly Record<string, unknown>[],
-	session: string,
-): ArchivedSessionState {
-	return (
-		archiveStatesFromRecords(records).get(session) ?? {
-			...EMPTY_ARCHIVED_SESSION_STATE,
-		}
-	);
-}
-
-function archiveStatesFromRecords(
-	records: readonly Record<string, unknown>[],
-): Map<string, ArchivedSessionState> {
-	const states = new Map<string, ArchivedSessionState>();
-	for (const record of records) {
-		const session = typeof record.session === "string" ? record.session : "";
-		if (!session) continue;
-		const state = states.get(session) ?? {
-			...EMPTY_ARCHIVED_SESSION_STATE,
-		};
-		if (record.type === "workbench.archive") {
-			state.archived = true;
-			state.archived_at = typeof record.ts === "string" ? record.ts : null;
-		} else if (record.type === "workbench.restore") {
-			state.archived = false;
-			state.archived_at = null;
-		}
-		states.set(session, state);
-	}
-	return states;
-}
-
-export function readArchivedSessionState(
-	root: string,
-	session: string,
-): ArchivedSessionState {
-	if (!hasEventLog(root)) {
-		return { archived: false, archived_at: null };
-	}
-	return archiveStateFromRecords(readEventLedgerRecords(root), session);
-}
 
 function closedAtForSession(root: string, session: string): string {
 	const paths = sessionPaths(root, session);
