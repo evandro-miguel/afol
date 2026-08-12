@@ -32,7 +32,11 @@ import {
 	acknowledgeDailySuggestion,
 	claimDailySuggestion,
 } from "../services/evolution/suggestion-journal";
-import { applyRejectionNegativeEvidence } from "../services/evolution/suggestion-model";
+import {
+	applyRejectionNegativeEvidence,
+	suggestionClusterKey,
+} from "../services/evolution/suggestion-model";
+import { readActiveSuggestionProjection } from "../services/evolution/suggestion-projection";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const DIGEST = "a".repeat(64);
@@ -145,6 +149,103 @@ function seedCanonicalCandidate(root: string, db: Database): void {
 }
 
 describe("evolution suggestion model", () => {
+	test("excludes v1 issue clusters from the active daily suggestion projection", () => {
+		const db = new Database(":memory:");
+		try {
+			applyMigrations(db);
+			const fingerprint = "legacy-fingerprint";
+			const insertObservation = db.prepare(
+				`INSERT INTO observations(project_id,id,kind,fingerprint,fingerprint_version,occurrence_identity,session_id,production_day_sequence,task_type,impact,normalized_fields,source_refs,created_at,journal_sequence,journal_event_id)
+				 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			);
+			for (const index of [1, 2, 3])
+				insertObservation.run(
+					PROJECT_ID,
+					`O-v1-${index}`,
+					"workflow_friction",
+					fingerprint,
+					1,
+					`occurrence-v1-${index}`,
+					`S-v1-${index}`,
+					index,
+					"bug-fix",
+					"rework",
+					JSON.stringify({ kind: "workflow_friction", command: "bun test" }),
+					JSON.stringify([{ id: `E-v1-${index}`, kind: "evidence" }]),
+					`2026-07-1${index}T12:00:00.000Z`,
+					index,
+					`J-v1-${index}`,
+				);
+			db.prepare(
+				`INSERT INTO issue_clusters(project_id,fingerprint_version,fingerprint,state,occurrence_count,distinct_session_count,distinct_production_day_count,user_confirmed_recurrence,first_seen_at,last_seen_at,priority,source_refs,updated_at,journal_event_id)
+				 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			).run(
+				PROJECT_ID,
+				1,
+				fingerprint,
+				"recurring",
+				3,
+				3,
+				3,
+				0,
+				"2026-07-11T12:00:00.000Z",
+				"2026-07-13T12:00:00.000Z",
+				1,
+				JSON.stringify([{ id: "E-v1-cluster", kind: "evidence" }]),
+				"2026-07-13T12:00:00.000Z",
+				"J-v1-cluster",
+			);
+			const projection = readActiveSuggestionProjection(db, PROJECT_ID);
+			expect(projection.clusters).toEqual([]);
+			expect(projection.observations).toEqual([]);
+			expect(projection.candidateIds).toEqual([]);
+			expect(
+				db
+					.query(
+						"SELECT COUNT(*) AS count FROM issue_clusters WHERE fingerprint_version = 1",
+					)
+					.get() as { count: number },
+			).toEqual({ count: 1 });
+		} finally {
+			db.close();
+		}
+	});
+
+	test("uses fingerprint version in deterministic suggestion identities", () => {
+		const observation = observations()[0];
+		if (!observation) throw new Error("fixture observation is required");
+		const fingerprint = "shared-fingerprint";
+		const baseCluster = {
+			fingerprint,
+			state: "recurring" as const,
+			occurrence_count: 3,
+			distinct_session_count: 2,
+			distinct_production_day_count: 2,
+			priority: 1,
+		};
+		const v1 = buildSuggestionCandidate({
+			projectId: PROJECT_ID,
+			localDate: "2026-07-13",
+			cluster: { ...baseCluster, fingerprint_version: 1 },
+			observations: [{ ...observation, fingerprint, fingerprint_version: 1 }],
+		});
+		const v2 = buildSuggestionCandidate({
+			projectId: PROJECT_ID,
+			localDate: "2026-07-13",
+			cluster: { ...baseCluster, fingerprint_version: 2 },
+			observations: [{ ...observation, fingerprint, fingerprint_version: 2 }],
+		});
+		expect(v1.id).not.toBe(v2.id);
+		expect(
+			buildSuggestionCandidate({
+				projectId: PROJECT_ID,
+				localDate: "2026-07-13",
+				cluster: { ...baseCluster, fingerprint_version: 2 },
+				observations: [{ ...observation, fingerprint, fingerprint_version: 2 }],
+			}).id,
+		).toBe(v2.id);
+	});
+
 	test("suggest is a no-write empty preview when no DB candidate exists", async () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-suggestion-cli-empty-"));
 		configure(root);
@@ -324,7 +425,7 @@ describe("evolution suggestion model", () => {
 							user_version: number;
 						}
 					).user_version,
-				).toBe(8);
+				).toBe(10);
 			} finally {
 				upgraded.close();
 			}
@@ -469,7 +570,9 @@ describe("evolution suggestion model", () => {
 			projectId: PROJECT_ID,
 			localDate: "2026-07-17",
 			clusters: [cluster],
-			observationsByFingerprint: new Map([[cluster.fingerprint, rows]]),
+			observationsByFingerprint: new Map([
+				[suggestionClusterKey(undefined, cluster.fingerprint), rows],
+			]),
 		});
 		expect(result.suggestions).toHaveLength(1);
 		expect(result.suggestions[0]).toMatchObject({
@@ -511,7 +614,9 @@ describe("evolution suggestion model", () => {
 			projectId: PROJECT_ID,
 			localDate: "2026-07-17",
 			clusters: [cluster],
-			observationsByFingerprint: new Map([[cluster.fingerprint, mixed]]),
+			observationsByFingerprint: new Map([
+				[suggestionClusterKey(undefined, cluster.fingerprint), mixed],
+			]),
 		});
 		expect(result.suggestions).toHaveLength(2);
 		expect(result.suggestions.map((candidate) => candidate.task_type)).toEqual([
@@ -561,7 +666,9 @@ describe("evolution suggestion model", () => {
 				projectId: PROJECT_ID,
 				localDate: "2026-07-17",
 				clusters: [{ ...base, state }],
-				observationsByFingerprint: new Map([[first.fingerprint, criticalRows]]),
+				observationsByFingerprint: new Map([
+					[suggestionClusterKey(undefined, first.fingerprint), criticalRows],
+				]),
 			});
 			expect(result.suggestions).toHaveLength(0);
 			expect(result.critical_alerts).toHaveLength(1);

@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import {
@@ -46,10 +47,15 @@ import {
 	resolveEvolutionConfig,
 } from "../services/evolution";
 import {
+	appendAdoptionReviewEvent,
+	discoverAdoptionCandidates,
+} from "../services/evolution/adoption-candidates";
+import {
 	applyEvolutionProposal,
 	rollbackEvolutionProposal,
 } from "../services/evolution/apply-service";
 import { localDateForTimezone } from "../services/evolution/config";
+import { previewHistoryBackfill } from "../services/evolution/history-backfill";
 import type { ImportProvider } from "../services/evolution/imports";
 import { ingestObservationsForSession } from "../services/evolution/observation-ingest";
 import {
@@ -79,7 +85,7 @@ const CONTROL_CHARACTER = /\p{Cc}/u;
 const MAX_OBSERVE_IDENTIFIER_LENGTH = 256;
 const MAX_ANALYSIS_OUTPUT_BYTES = 4_000;
 const MAX_ANALYSIS_PUBLIC_TEXT_BYTES = 128;
-const MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES = 32;
+const MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES = 160;
 const MAX_ANALYSIS_PUBLIC_REF_ID_BYTES = 64;
 const MAX_ANALYSIS_PUBLIC_REF_LABEL_BYTES = 32;
 const MAX_ANALYSIS_DTO_BYTES = 3_800;
@@ -861,11 +867,20 @@ type PublicAnalysisScorecard = Record<
 >;
 type PublicAnalysisProposal = {
 	id?: string;
+	fingerprint_version: number;
 	rank: number;
 	problem: string;
 	recommendation: string;
 	risk: string;
 	validation: string;
+	problem_truncated: boolean;
+	problem_digest: string;
+	recommendation_truncated: boolean;
+	recommendation_digest: string;
+	risk_truncated: boolean;
+	risk_digest: string;
+	validation_truncated: boolean;
+	validation_digest: string;
 	impact: PublicImpactCategory;
 	score: number;
 	confidence: number;
@@ -874,6 +889,7 @@ type PublicAnalysisProposal = {
 	target_metrics?: Readonly<Record<string, number | null>>;
 	distinct_session_count?: number;
 	related_session_count?: number;
+	related_session_ids?: readonly string[];
 	evidence_refs?: readonly PublicAnalysisEvidenceRef[];
 	evidence_ref_count?: number;
 	baseline?: {
@@ -891,6 +907,14 @@ type PublicAnalysisProposal = {
 	};
 	approval_policy?: "explicit";
 	approval_surface?: "governed_workbench";
+	target_kind?: "governance" | "behavior" | "documentation" | "code";
+	target_refs?: readonly PublicAnalysisEvidenceRef[];
+	target_ref_count?: number;
+	target_refs_truncated?: boolean;
+	provenance_digest?: string;
+	classification?: "classified" | "needs_review";
+	approval_required?: true;
+	execution_surface?: "governed_workbench";
 };
 type PublicAnalysisEvidenceRef = {
 	id: string;
@@ -931,10 +955,14 @@ type PublicEvolutionAnalysisDto = {
 		scorecard: PublicAnalysisScorecard;
 	};
 	proposals: readonly PublicAnalysisProposal[];
+	proposal_available_count: number;
+	proposal_truncated: boolean;
 	pending_count: number;
 	critical_alerts: readonly PublicAnalysisAlert[];
+	critical_alerts_truncated: boolean;
 	critical_alert_count: number;
 	critical_alert_pending_count: number;
+	legacy_cluster_count: number;
 };
 
 function truncateUtf8(value: string, maxBytes: number): string {
@@ -967,8 +995,23 @@ function boundedPublicText(value: unknown): string {
 	return boundedPublicTextTo(value, MAX_ANALYSIS_PUBLIC_TEXT_BYTES);
 }
 
-function boundedPublicProposalText(value: unknown): string {
-	return boundedPublicTextTo(value, MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES);
+function publicText(
+	value: unknown,
+	maxBytes: number,
+): {
+	text: string;
+	truncated: boolean;
+	digest: string;
+} {
+	const redacted = redactSensitiveText(value, { redactPaths: true }).replace(
+		/\p{Cc}/gu,
+		" ",
+	);
+	return {
+		text: truncateUtf8(redacted, maxBytes),
+		truncated: Buffer.byteLength(redacted, "utf8") > maxBytes,
+		digest: createHash("sha256").update(redacted).digest("hex"),
+	};
 }
 
 function boundedPublicIdentifier(value: unknown, maxBytes = 128): string {
@@ -1087,37 +1130,88 @@ export function publicAnalysisDto(
 	const safeProposal = (
 		proposal: Record<string, unknown>,
 	): PublicAnalysisProposal => {
+		const problem = publicText(
+			proposal.problem,
+			MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES,
+		);
+		const recommendation = publicText(
+			proposal.recommendation,
+			MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES,
+		);
+		const risk = publicText(
+			proposal.risk,
+			MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES,
+		);
+		const validation = publicText(
+			proposal.validation,
+			MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES,
+		);
 		const proposalBaseline = (proposal.baseline ?? {}) as Record<
 			string,
 			unknown
 		>;
 		const proposalTargets = (proposal.targets ?? {}) as Record<string, unknown>;
+		const targetRefs = publicEvidenceRefs(proposal.target_refs);
+		const relatedSessionIds = Array.isArray(proposal.related_session_ids)
+			? proposal.related_session_ids
+					.map((id) => boundedPublicIdentifier(id, 64))
+					.filter(Boolean)
+					.slice(0, 4)
+			: [];
+		const evidenceRefs = publicEvidenceRefs(proposal.evidence_refs);
+		const targetKind =
+			proposal.target_kind === "governance" ||
+			proposal.target_kind === "documentation" ||
+			proposal.target_kind === "code"
+				? proposal.target_kind
+				: "behavior";
 		return {
 			rank: Number(proposal.rank) || 0,
-			problem: boundedPublicProposalText(proposal.problem),
-			recommendation: boundedPublicProposalText(proposal.recommendation),
-			risk: boundedPublicProposalText(proposal.risk),
-			validation: boundedPublicProposalText(proposal.validation),
+			problem: problem.text,
+			problem_truncated: problem.truncated,
+			problem_digest: problem.digest,
+			recommendation: recommendation.text,
+			recommendation_truncated: recommendation.truncated,
+			recommendation_digest: recommendation.digest,
+			risk: risk.text,
+			risk_truncated: risk.truncated,
+			risk_digest: risk.digest,
+			validation: validation.text,
+			validation_truncated: validation.truncated,
+			validation_digest: validation.digest,
 			impact: publicImpact(proposal.impact),
 			score: Number(proposal.score) || 0,
 			confidence: Number(proposal.confidence) || 0,
 			occurrence_count: Number(proposal.occurrence_count) || 0,
 			distinct_production_day_count:
 				Number(proposal.distinct_production_day_count) || 0,
+			id: boundedPublicIdentifier(proposal.id),
+			fingerprint_version: Number(proposal.fingerprint_version) || 0,
+			distinct_session_count: Number(proposal.distinct_session_count) || 0,
+			related_session_count: Number(proposal.related_session_count) || 0,
+			related_session_ids: relatedSessionIds,
+			evidence_refs: evidenceRefs,
+			evidence_ref_count: Number(proposal.evidence_ref_count) || 0,
+			target_kind: targetKind,
+			target_refs: targetRefs.slice(0, 1),
+			target_ref_count: targetRefs.length,
+			target_refs_truncated: targetRefs.length > 1,
+			provenance_digest:
+				typeof proposal.provenance_digest === "string" &&
+				/^[a-f0-9]{64}$/.test(proposal.provenance_digest)
+					? proposal.provenance_digest
+					: "",
+			classification:
+				proposal.classification === "classified"
+					? "classified"
+					: "needs_review",
+			approval_required: true as const,
+			execution_surface: "governed_workbench" as const,
 			...(restricted
 				? { target_metrics: publicTargetMetrics(proposal.target_metrics) }
 				: {}),
 			...(!restricted
 				? {
-						id: boundedPublicIdentifier(proposal.id),
-						distinct_session_count:
-							Number(proposal.distinct_session_count) || 0,
-						related_session_count: Number(proposal.related_session_count) || 0,
-						evidence_refs: publicEvidenceRefs(proposal.evidence_refs).slice(
-							0,
-							1,
-						),
-						evidence_ref_count: Number(proposal.evidence_ref_count) || 0,
 						baseline: {
 							window: "recorded" as const,
 							observation_count:
@@ -1162,7 +1256,11 @@ export function publicAnalysisDto(
 		mode: boundedPublicText(analysis.mode),
 		status: boundedPublicText(analysis.status),
 		blocked_reason: blockedReason,
-		recovery_action: blocked ? "afol evolve status --json" : null,
+		recovery_action: blocked
+			? "afol evolve status --json"
+			: Number(analysis.legacy_cluster_count) > 0
+				? "afol evolve repair --json"
+				: null,
 		generated_at: boundedPublicText(analysis.generated_at),
 		scorecard: publicScorecard(analysis.scorecard),
 		baseline: {
@@ -1176,15 +1274,21 @@ export function publicAnalysisDto(
 					safeProposal(proposal as Record<string, unknown>),
 				)
 			: [],
+		proposal_available_count: Array.isArray(analysis.proposals)
+			? analysis.proposals.length
+			: 0,
+		proposal_truncated: false,
 		pending_count: Number(analysis.pending_count) || 0,
 		critical_alerts: Array.isArray(analysis.critical_alerts)
 			? analysis.critical_alerts.map((alert) =>
 					safeAlert(alert as Record<string, unknown>),
 				)
 			: [],
+		critical_alerts_truncated: false,
 		critical_alert_count: Number(analysis.critical_alert_count) || 0,
 		critical_alert_pending_count:
 			Number(analysis.critical_alert_pending_count) || 0,
+		legacy_cluster_count: Number(analysis.legacy_cluster_count) || 0,
 	};
 	const dtoBytes = (value: PublicEvolutionAnalysisDto): number =>
 		Buffer.byteLength(JSON.stringify(value), "utf8");
@@ -1213,6 +1317,24 @@ export function publicAnalysisDto(
 		compact = {
 			...compact,
 			baseline: { ...compact.baseline, scorecard: {} },
+		};
+	if (
+		dtoBytes(compact) > MAX_ANALYSIS_DTO_BYTES &&
+		compact.proposals.length > 1
+	)
+		compact = {
+			...compact,
+			proposals: compact.proposals.slice(0, 1),
+			proposal_truncated: true,
+		};
+	if (
+		dtoBytes(compact) > MAX_ANALYSIS_DTO_BYTES &&
+		compact.critical_alerts.length > 1
+	)
+		compact = {
+			...compact,
+			critical_alerts: compact.critical_alerts.slice(0, 1),
+			critical_alerts_truncated: true,
 		};
 	return compact;
 }
@@ -1601,6 +1723,7 @@ type EvolutionStatusData = {
 	configured: boolean;
 	enabled: boolean;
 	state: EvolutionStatusState;
+	recovery_action: string | null;
 	project_id: string | null;
 	timezone: string;
 	db_path: string;
@@ -1610,6 +1733,8 @@ type EvolutionStatusData = {
 	suggestion_queue: DailySuggestionPreview;
 	analysis_available: boolean;
 };
+
+const REBUILD_RECOVERY_ACTION = "afol evolve repair --json";
 
 const SUGGESTION_CLAIM_PROVIDERS = new Set([
 	"afol",
@@ -1631,6 +1756,208 @@ function parseArgs(args: readonly string[]): { json: boolean } {
 		throw new Error(`Unknown evolve argument: ${arg}`);
 	}
 	return { json };
+}
+
+function parseCandidatesArgs(args: readonly string[]): {
+	session?: string;
+	limit?: number;
+	json: boolean;
+	review?: {
+		id: string;
+		decision: "approved" | "rejected";
+		reason: string;
+		approve: boolean;
+	};
+} {
+	let session: string | undefined;
+	let limit: number | undefined;
+	let json = false;
+	let review = false;
+	let id = "";
+	let decision: "approved" | "rejected" | undefined;
+	let reason = "";
+	let approve = false;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "review") review = true;
+		else if (arg === "--session" || arg === "-S") {
+			session = args[++index];
+			if (!session || session.startsWith("-"))
+				throw new Error("evolve candidates --session requires a value");
+		} else if (arg === "--limit") {
+			const value = args[++index];
+			if (!value || !/^\d+$/.test(value))
+				throw new Error(
+					"evolve candidates --limit requires an integer from 1 to 10",
+				);
+			limit = Number(value);
+		} else if (arg === "--id") {
+			id = args[++index] ?? "";
+			if (!id || id.startsWith("-"))
+				throw new Error(
+					"evolve candidates review requires --id <candidate-id>",
+				);
+		} else if (arg === "--decision") {
+			const value = args[++index];
+			if (value !== "approved" && value !== "rejected")
+				throw new Error(
+					"evolve candidates review --decision must be approved or rejected",
+				);
+			decision = value;
+		} else if (arg === "--reason") {
+			reason = args[++index] ?? "";
+			if (!reason || reason.startsWith("-"))
+				throw new Error("evolve candidates review requires --reason <reason>");
+		} else if (arg === "--approve") approve = true;
+		else throw new Error(`Unknown evolve candidates argument: ${arg}`);
+	}
+	if (review && (!id || !decision || !reason))
+		throw new Error(
+			"evolve candidates review requires --id, --decision, and --reason",
+		);
+	return {
+		...(session ? { session } : {}),
+		...(limit === undefined ? {} : { limit }),
+		...(review && decision
+			? { review: { id, decision, reason, approve } }
+			: {}),
+		json,
+	};
+}
+
+function parseBackfillArgs(args: readonly string[]): {
+	offset?: number;
+	limit?: number;
+	json: boolean;
+} {
+	let offset: number | undefined;
+	let limit: number | undefined;
+	let json = false;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "--offset" || arg === "--limit") {
+			const value = args[++index];
+			if (!value || !/^\d+$/.test(value))
+				throw new Error(
+					`evolve backfill ${arg} requires a non-negative integer`,
+				);
+			if (arg === "--offset") offset = Number(value);
+			else limit = Number(value);
+		} else throw new Error(`Unknown evolve backfill argument: ${arg}`);
+	}
+	return {
+		...(offset === undefined ? {} : { offset }),
+		...(limit === undefined ? {} : { limit }),
+		json,
+	};
+}
+
+function runBackfill(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	if (
+		!isActionAllowed(operationContext, {
+			action: "evolve.backfill",
+			sideEffect: "read",
+		})
+	)
+		throw new Error("evolve.backfill is not allowed for this caller");
+	const parsed = parseBackfillArgs(args);
+	const result = previewHistoryBackfill({
+		root,
+		...(parsed.offset === undefined ? {} : { offset: parsed.offset }),
+		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+	});
+	const output = parsed.json
+		? stringifyEnvelope(envelopeOk(result, { action: "evolve.backfill" }))
+		: `backfill eligible=${result.coverage.eligible} returned=${result.pagination.returned} pending=${result.observations.pending_backfill} observed=${result.observations.already_observed}`;
+	if (Buffer.byteLength(output, "utf8") > MAX_ANALYSIS_OUTPUT_BYTES)
+		throw new Error("evolve backfill output exceeds the bounded limit");
+	io.stdout(output);
+	return 0;
+}
+
+function runCandidates(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	if (
+		!isActionAllowed(operationContext, {
+			action: "evolve.candidates",
+			sideEffect: "read",
+		})
+	)
+		throw new Error("evolve.candidates is not allowed for this caller");
+	const parsed = parseCandidatesArgs(args);
+	const result = discoverAdoptionCandidates({
+		root,
+		...(parsed.session ? { session: parsed.session } : {}),
+		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+	});
+	if (parsed.review) {
+		if (
+			!isActionAllowed(operationContext, {
+				action: "evolve.candidates.review",
+				sideEffect: "write",
+			})
+		)
+			throw new Error(
+				"evolve candidates review is not allowed for this caller",
+			);
+		if (!isTrustedLocalInteractive(operationContext))
+			throw new Error(
+				"evolve candidates review requires local interactive approval",
+			);
+		if (parsed.review.decision === "approved" && !parsed.review.approve)
+			throw new Error("evolve candidates review approval requires --approve");
+		const candidate = result.candidates.find(
+			(entry) => entry.id === parsed.review?.id,
+		);
+		if (!candidate)
+			throw new Error("evolve candidates review candidate is missing or stale");
+		const event = appendAdoptionReviewEvent(root, candidate.session_id, {
+			candidate_id: candidate.id,
+			fingerprint: candidate.fingerprint,
+			decision: parsed.review.decision,
+			reason: redactSensitiveText(parsed.review.reason, { redactPaths: true }),
+			created_at: new Date().toISOString(),
+		});
+		if (parsed.json)
+			io.stdout(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							candidate_id: candidate.id,
+							decision: event.decision,
+							review_id: event.id,
+							append_only: true,
+						},
+						{ action: "evolve.candidates.review" },
+					),
+				),
+			);
+		else
+			io.stdout(
+				`review=${event.decision} candidate=${candidate.id} review_id=${event.id}`,
+			);
+		return 0;
+	}
+	if (parsed.json)
+		io.stdout(
+			stringifyEnvelope(envelopeOk(result, { action: "evolve.candidates" })),
+		);
+	else
+		io.stdout(
+			`adoption=${result.review_state} candidates=${result.candidates.length}${result.session_id ? ` session=${result.session_id}` : ""}`,
+		);
+	return 0;
 }
 
 function readDbStatus(
@@ -1687,6 +2014,10 @@ function statusState(
 	if (dbNeedsRebuild && journalExists && journalValid === true)
 		return "rebuild_required";
 	return dbHealthy ? "healthy" : "unhealthy";
+}
+
+function statusRecoveryAction(state: EvolutionStatusState): string | null {
+	return state === "rebuild_required" ? REBUILD_RECOVERY_ACTION : null;
 }
 
 function buildStatus(projectRoot: string): EvolutionStatusData {
@@ -1819,6 +2150,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 		configured: resolved.configured,
 		enabled: resolved.enabled,
 		state,
+		recovery_action: statusRecoveryAction(state),
 		project_id: resolved.projectId,
 		timezone: resolved.timezone,
 		db_path: dbPath,
@@ -1847,6 +2179,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 function formatStatus(data: EvolutionStatusData, restricted = false): string {
 	return [
 		`evolution status: ${data.state}`,
+		`recovery_action=${data.recovery_action ?? "none"}`,
 		`configured=${data.configured} enabled=${data.enabled} project_id=${restricted ? "hidden" : (data.project_id ?? "missing")} timezone=${data.timezone}`,
 		`db=${data.db_health?.db_exists ?? false} migration=${data.db_health?.migration_version ?? 0}/${data.db_health?.expected_migration_version ?? 1} production_days=${data.db_status?.production_day_count ?? 0}`,
 		`journal=${data.journal_health.exists ? (data.journal_health.valid ? "valid" : "invalid") : "absent"}`,
@@ -1944,6 +2277,10 @@ export async function runEvolveCommand(
 				return 2;
 			}
 		}
+		if (action === "candidates")
+			return runCandidates(args, projectRoot, io, operationContext);
+		if (action === "backfill")
+			return runBackfill(args, projectRoot, io, operationContext);
 		if (action && action !== "status") {
 			throw new Error(`Unknown evolve action: ${action}`);
 		}

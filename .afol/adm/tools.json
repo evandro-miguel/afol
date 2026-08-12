@@ -602,7 +602,7 @@
       "type": "workflow",
       "side_effect": "append",
       "execution_mode": "on-demand",
-      "description": "Record task evidence or admit legacy compatibility debt",
+      "description": "Record, reverify, or narrowly admit task evidence debt",
       "subcommands": [
         {
           "usage": "--session <session-id> --task-id <task-id>",
@@ -623,6 +623,16 @@
           "usage": "--json",
           "side_effect": "append",
           "description": "Emit machine-readable evidence result"
+        },
+        {
+          "usage": "reverify -S <id> -T <id> -x \"<cmd>\" [--json]",
+          "side_effect": "append",
+          "description": "Run and append observed evidence for a closed terminal task without reopening it"
+        },
+        {
+          "usage": "transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval \"<text>\" [--dry-run|--confirm] [--json]",
+          "side_effect": "write",
+          "description": "Hash-bind closed post-cutoff missing/failed evidence debt under the registered no-op policy (preview by default)"
         },
         {
           "usage": "admit --session <id> --all-missing|--task-id <id> --reason \"<text>\" [--dry-run|--confirm] [--json]",
@@ -1292,6 +1302,21 @@
       "description": "Analyze project evolution state and proposals",
       "subcommands": [
         {
+          "usage": "backfill [--offset <n>] [--limit <1-10>] [--json]",
+          "side_effect": "read",
+          "description": "Preview bounded historical observation and adoption coverage without writes"
+        },
+        {
+          "usage": "candidates [--session <id>] [--limit <1-10>] [--json]",
+          "side_effect": "read",
+          "description": "Derive bounded Memory and Library adoption candidates from completed sessions"
+        },
+        {
+          "usage": "candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
+          "side_effect": "write",
+          "description": "Append an explicit approval-gated learning review decision"
+        },
+        {
           "usage": "evaluate <id> [--record] [--superseded-by <id>] [-j]",
           "side_effect": "preview",
           "description": "Evaluate one proposal deterministically"
@@ -1921,7 +1946,7 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "List, bind, switch, and unbind workbench sessions",
+      "description": "List, bind, switch, archive, restore, and unbind sessions",
       "subcommands": [
         {
           "usage": "list",
@@ -1952,6 +1977,21 @@
           "usage": "unbind <session-id>",
           "side_effect": "write",
           "description": "Remove a session context binding"
+        },
+        {
+          "usage": "archive --candidates [--older-than-days <days>] [--offset <n>] [--limit <n>] [--json]",
+          "side_effect": "read",
+          "description": "List closed sessions eligible for logical archiving"
+        },
+        {
+          "usage": "archive <id>... --reason <text> [--dry-run] [--json]",
+          "side_effect": "write",
+          "description": "Logically archive closed workbench sessions"
+        },
+        {
+          "usage": "restore <id>... --reason <text> [--dry-run] [--json]",
+          "side_effect": "write",
+          "description": "Restore logically archived workbench sessions"
         }
       ]
     }

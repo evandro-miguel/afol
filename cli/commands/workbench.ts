@@ -11,6 +11,10 @@ import {
 	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
 import { beginHotPathMeasurement } from "../services/hot-path/instrumentation";
+import {
+	TRANSITION_ADMISSION_POLICY,
+	transitionAdmitEvidence,
+} from "../services/project/evidence-transition-admission";
 import { admitLegacyEvidenceIssues } from "../services/project/legacy-evidence-baseline";
 import {
 	TaskCompletionBusyError,
@@ -19,6 +23,7 @@ import {
 } from "../services/workbench/completion-lock";
 import {
 	appendTimelineEntry,
+	assertClosedTaskReverificationEligible,
 	assertObservedBatchTasksReady,
 	closeSession,
 	completeObservedTask,
@@ -29,6 +34,7 @@ import {
 	type LifecycleAuxiliaryRuntime,
 	newWorkstream,
 	prepareVerificationRun,
+	recordClosedTaskReverification,
 	recordEvidence,
 	recordVerificationRunStep,
 	sanitizeEvidenceText,
@@ -338,6 +344,10 @@ export async function runEvidenceCommand(
 	if (args[0] === "admit") {
 		return runEvidenceAdmitCommand(args.slice(1), root, ctx);
 	}
+	if (args[0] === "reverify")
+		return runEvidenceReverifyCommand(args.slice(1), root, ctx);
+	if (args[0] === "transition-admit")
+		return runEvidenceTransitionAdmitCommand(args.slice(1), root, ctx);
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.evidence");
 		const parsed = parseEvidenceArgs(args, root);
@@ -380,6 +390,185 @@ export async function runEvidenceCommand(
 		} else {
 			console.error((error as Error).message);
 		}
+		return 2;
+	}
+}
+
+function requiredEvidenceOption(
+	args: string[],
+	name: string,
+	short?: string,
+): string {
+	const index = args.findIndex((arg) => arg === name || arg === short);
+	const value = index < 0 ? "" : (args[index + 1] ?? "");
+	if (!value || value.startsWith("-"))
+		throw new Error(`Missing value for ${name}.`);
+	return value;
+}
+
+export async function runEvidenceReverifyCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
+	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.evidence.reverify");
+		const session = resolveSession(
+			root,
+			requiredEvidenceOption(args, "--session", "-S"),
+			"evidence reverify",
+		);
+		const taskId = requiredEvidenceOption(args, "--task-id", "-T");
+		const command = requiredEvidenceOption(args, "--execute", "-x");
+		const allowed = new Set([
+			"--session",
+			"-S",
+			"--task-id",
+			"-T",
+			"--execute",
+			"-x",
+			"--json",
+			"-j",
+		]);
+		for (let i = 0; i < args.length; i += 1) {
+			if (allowed.has(args[i] ?? "")) {
+				if (
+					["--session", "-S", "--task-id", "-T", "--execute", "-x"].includes(
+						args[i] ?? "",
+					)
+				)
+					i += 1;
+				continue;
+			}
+			throw new Error(`Unknown evidence reverify argument: ${args[i]}`);
+		}
+		assertClosedTaskReverificationEligible(root, { session, taskId, command });
+		const observed = await runVerificationAsync(root, {
+			mode: "shell",
+			command,
+		});
+		const evidence = recordClosedTaskReverification(root, {
+			session,
+			taskId,
+			command,
+			result: observed.exitCode === 0 ? "passed" : "failed",
+			exitCode: observed.exitCode,
+			...(observed.signal ? { signal: observed.signal } : {}),
+			approvalContext: ctx,
+		});
+		if (hasJsonFlag(args))
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							session,
+							task: taskId,
+							evidence_id: evidence.id,
+							provenance: "observed",
+							status: observed.status,
+						},
+						{ action: "workbench.evidence.reverify" },
+					),
+				),
+			);
+		else console.log(`evidence reverified: ${evidence.id}`);
+		return observed.status === "passed" ? 0 : 1;
+	} catch (error) {
+		if (hasJsonFlag(args)) writeJsonError("workbench.evidence.reverify", error);
+		else console.error((error as Error).message);
+		return 2;
+	}
+}
+
+export async function runEvidenceTransitionAdmitCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
+	try {
+		const session = resolveSession(
+			root,
+			requiredEvidenceOption(args, "--session", "-S"),
+			"evidence transition-admit",
+		);
+		const taskId = requiredEvidenceOption(args, "--task-id", "-T");
+		const policy =
+			requiredEvidenceOption(args, "--policy") || TRANSITION_ADMISSION_POLICY;
+		const issue = requiredEvidenceOption(args, "--issue");
+		const approval = requiredEvidenceOption(args, "--approval");
+		const confirm = args.includes("--confirm") && !args.includes("--dry-run");
+		const known = new Set([
+			"--session",
+			"-S",
+			"--task-id",
+			"-T",
+			"--policy",
+			"--issue",
+			"--approval",
+			"--confirm",
+			"--dry-run",
+			"--json",
+			"-j",
+		]);
+		for (let i = 0; i < args.length; i += 1) {
+			const arg = args[i] ?? "";
+			if (!known.has(arg))
+				throw new Error(`Unknown evidence transition-admit argument: ${arg}`);
+			if (
+				[
+					"--session",
+					"-S",
+					"--task-id",
+					"-T",
+					"--policy",
+					"--issue",
+					"--approval",
+				].includes(arg)
+			)
+				i += 1;
+		}
+		if (confirm)
+			assertWorkbenchMutationAllowed(
+				ctx,
+				"workbench.evidence.transition_admit",
+			);
+		if (
+			confirm &&
+			(ctx.callerType !== "local" ||
+				!ctx.interactive ||
+				ctx.trustLevel !== "trusted")
+		) {
+			throw new Error(
+				"transition-admit --confirm requires a trusted interactive local context.",
+			);
+		}
+		const result = transitionAdmitEvidence(root, {
+			sessionId: session,
+			taskId,
+			policy,
+			issue,
+			approval,
+			confirm,
+		});
+		if (hasJsonFlag(args))
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(result, {
+						action: result.written
+							? "workbench.evidence.transition_admit"
+							: "workbench.evidence.transition_admit.preview",
+					}),
+				),
+			);
+		else
+			console.log(
+				`evidence transition-admit ${result.written ? "admitted" : "preview (dry-run)"}: ${taskId}`,
+			);
+		return 0;
+	} catch (error) {
+		if (hasJsonFlag(args))
+			writeJsonError("workbench.evidence.transition_admit", error);
+		else console.error((error as Error).message);
 		return 2;
 	}
 }

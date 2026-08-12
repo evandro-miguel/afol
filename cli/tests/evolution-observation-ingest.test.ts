@@ -29,11 +29,13 @@ import {
 	getEvolutionStatus,
 } from "../services/evolution/health";
 import {
+	createObservationIngestPreviewContext,
 	ingestObservationsForSession,
 	OBSERVE_EVIDENCE_LIMITS,
 	OBSERVE_JOURNAL_LIMITS,
 	OBSERVE_TASK_LIMITS,
 	OBSERVE_TELEMETRY_LIMITS,
+	previewObservationIngestForSession,
 } from "../services/evolution/observation-ingest";
 import { readObservationJournal } from "../services/evolution/observation-journal";
 import { feedbackMode, recordFeedback } from "../services/feedback";
@@ -255,6 +257,169 @@ function seededDb(root: string, projectId: string): Database {
 }
 
 describe("observation-ingest", () => {
+	test("read-only preview reports the same candidate identity ingested later", () => {
+		const root = fixtureRoot();
+		seedCompleteEvidence(root, "S-preview");
+		seedFailedEvidence(root, "S-preview", [
+			{ id: "E-preview-failure", exitCode: 1, result: "failed" },
+		]);
+
+		const preview = previewObservationIngestForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-preview",
+		});
+		const result = ingestObservationsForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-preview",
+		});
+		const observation = readObservationJournal(root, PROJECT_ID).find(
+			(event) => event.event_type === "observation",
+		);
+
+		expect(preview.eligible).toBe(true);
+		expect(preview.candidate_count).toBe(result.appended);
+		expect(observation).toBeDefined();
+		expect(preview.candidate_occurrence_identities).toEqual([
+			String(
+				(observation!.payload.observation as Record<string, unknown>)
+					.occurrence_identity,
+			),
+		]);
+	});
+
+	test("preview source digest changes when bounded evidence changes", () => {
+		const root = fixtureRoot();
+		seedCompleteEvidence(root, "S-digest");
+		seedFailedEvidence(root, "S-digest", [
+			{ id: "E-digest-one", exitCode: 1, result: "failed" },
+		]);
+		const first = previewObservationIngestForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-digest",
+		});
+		seedFailedEvidence(root, "S-digest", [
+			{ id: "E-digest-two", exitCode: 2, result: "failed" },
+		]);
+		const second = previewObservationIngestForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-digest",
+		});
+
+		expect(second.source_digests.evidence).not.toBe(
+			first.source_digests.evidence,
+		);
+		expect(second.candidate_count).toBe(2);
+	});
+
+	test("preview creates no evolution database or observation journal", () => {
+		const root = fixtureRoot();
+		seedCompleteEvidence(root, "S-read-only");
+		seedFailedEvidence(root, "S-read-only", [
+			{ id: "E-read-only", exitCode: 1, result: "failed" },
+		]);
+
+		const preview = previewObservationIngestForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-read-only",
+		});
+
+		expect(preview.candidate_count).toBe(1);
+		expect(existsSync(evolutionDbPath(root))).toBe(false);
+		expect(existsSync(observationJournalPath(root))).toBe(false);
+	});
+
+	test("eligible zero-candidate ingest does not create a database or migration", () => {
+		const root = fixtureRoot();
+		seedCompletedSession(root, "S-zero-candidate");
+
+		const result = ingestObservationsForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-zero-candidate",
+		});
+
+		expect(result).toEqual({
+			appended: 0,
+			duplicates: 0,
+			skipped: 0,
+			warnings: [],
+			observation_ids: [],
+		});
+		expect(existsSync(evolutionDbPath(root))).toBe(false);
+		expect(existsSync(observationJournalPath(root))).toBe(false);
+	});
+
+	test("preview context reuses one bounded journal view across sessions", () => {
+		const root = fixtureRoot();
+		seedCompleteEvidence(root, "S-context-existing");
+		seedFailedEvidence(root, "S-context-existing", [
+			{ id: "E-context-existing", exitCode: 1, result: "failed" },
+		]);
+		ingestObservationsForSession({
+			root,
+			projectId: PROJECT_ID,
+			session: "S-context-existing",
+		});
+		seedCompleteEvidence(root, "S-context-new");
+		seedFailedEvidence(root, "S-context-new", [
+			{ id: "E-context-new", exitCode: 1, result: "failed" },
+		]);
+
+		const context = createObservationIngestPreviewContext(root, PROJECT_ID);
+		const existing = previewObservationIngestForSession(
+			{ root, projectId: PROJECT_ID, session: "S-context-existing" },
+			context,
+		);
+		const fresh = previewObservationIngestForSession(
+			{ root, projectId: PROJECT_ID, session: "S-context-new" },
+			context,
+		);
+
+		expect(context.journalDigest).toMatch(/^[a-f0-9]{64}$/);
+		expect(existing).toMatchObject({ candidate_count: 0, duplicate_count: 1 });
+		expect(fresh).toMatchObject({ candidate_count: 1, duplicate_count: 0 });
+		expect(fresh.source_digests.journal).toBe(context.journalDigest);
+	});
+
+	test("preview context derives its journal view from the captured bounded snapshot", () => {
+		const root = fixtureRoot();
+		const session = "S-context-snapshot";
+		seedCompleteEvidence(root, session);
+		seedFailedEvidence(root, session, [
+			{ id: "E-context-snapshot", exitCode: 1, result: "failed" },
+		]);
+		ingestObservationsForSession({ root, projectId: PROJECT_ID, session });
+		const journalPath = observationJournalPath(root);
+		const context = createObservationIngestPreviewContext(
+			root,
+			PROJECT_ID,
+			() => {
+				const capturedJournal = readBoundedSourceFile(
+					journalPath,
+					"observation journal",
+					OBSERVE_JOURNAL_LIMITS,
+				);
+				writeFileSync(
+					journalPath,
+					"x".repeat(OBSERVE_JOURNAL_LIMITS.maxBytes + 1),
+					"utf8",
+				);
+				return capturedJournal;
+			},
+		);
+
+		expect(context.journalDigest).toMatch(/^[a-f0-9]{64}$/);
+		expect(context.occurrenceIdentities.size).toBe(1);
+		expect(readFileSync(journalPath, "utf8").length).toBeGreaterThan(
+			OBSERVE_JOURNAL_LIMITS.maxBytes,
+		);
+	});
+
 	test("explicit session creates observations from failed evidence", () => {
 		const root = fixtureRoot();
 		seedCompleteEvidence(root, "S-01");
@@ -503,6 +668,34 @@ describe("observation-ingest", () => {
 		).toThrow("EVENT_LEDGER_LIMIT_EXCEEDED");
 		expect(existsSync(evolutionDbPath(root))).toBe(false);
 		expect(existsSync(observationJournalPath(root))).toBe(false);
+	});
+
+	test("ignores same-session tool telemetry when enforcing the observation limit", () => {
+		const root = fixtureRoot();
+		const session = "S-tool-exec-telemetry";
+		seedCompleteEvidence(root, session);
+		const telemetryPath = resolveTelemetryEventPath(root);
+		mkdirSync(dirname(telemetryPath), { recursive: true });
+		writeFileSync(
+			telemetryPath,
+			`${Array.from(
+				{ length: OBSERVE_TELEMETRY_LIMITS.maxCandidates + 1 },
+				(_, index) =>
+					JSON.stringify({
+						schema_version: "1",
+						id: `TEL-TOOL-${index}`,
+						ts: "2026-07-28T20:00:00.000Z",
+						source: "afol-cli",
+						event_type: "tool_exec",
+						session_id: session,
+					}),
+			).join("\n")}\n`,
+			"utf8",
+		);
+
+		expect(() =>
+			ingestObservationsForSession({ root, projectId: PROJECT_ID, session }),
+		).not.toThrow();
 	});
 
 	test("allocates production day before telemetry and reuses its receipt", () => {

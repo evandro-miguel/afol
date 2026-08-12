@@ -1044,7 +1044,11 @@ Follow-on slices under this direction:
   - one short, report-first daily suggestion per project on the first session
     of the local calendar date, with shared receipts across harnesses;
   - intentional, read-only analysis and preview through `afol evolve`, with
-    application only through the normal AFOL workbench lifecycle.
+    application only through the normal AFOL workbench lifecycle;
+  - bounded, paginated historical coverage through `afol evolve backfill`,
+    which reports canonical/legacy coverage, pending observations, adoption
+    review state, source digests, and explicit skip reasons without migrating
+    derived state or applying any candidate.
 - Scope includes production-day ledger, preference evidence with temporal
   decay, deterministic recurrence detection, scorecards, suggestion receipts,
   proposal/evaluation/canary state, explicit external-session imports,

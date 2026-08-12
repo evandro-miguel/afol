@@ -227,7 +227,7 @@ describe("quick-task runQuickTaskCommand", () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-pending-spec-"));
 		try {
 			const exitCode = await runQuickTaskCommand(
-				["pending", "--command", "true", "--json"],
+				["pending", "--command", "test -d .afol", "--json"],
 				root,
 			);
 			expect(exitCode).toBe(0);
@@ -263,7 +263,7 @@ describe("quick-task runQuickTaskCommand", () => {
 				[
 					"path-governed",
 					"--command",
-					"true",
+					"test -d .afol",
 					"--feature-id",
 					"F-01",
 					"--parent-spec",
@@ -392,7 +392,7 @@ describe("quick-task runQuickTaskCommand", () => {
 					"--task",
 					"only one",
 					"--command",
-					"true",
+					"test -d .afol",
 					"--no-spec-required",
 					"--reason",
 					"single fixture",
@@ -430,7 +430,7 @@ describe("quick-task runQuickTaskCommand", () => {
 					"--task",
 					"third work",
 					"--command",
-					"true",
+					"test -d .afol",
 					"--json",
 					"--no-spec-required",
 					"--reason",

@@ -175,7 +175,7 @@ describe("downstream bootstrap smoke", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				"true",
+				"test -d .afol",
 			]);
 			assertOk(done, "done");
 
@@ -192,7 +192,7 @@ describe("downstream bootstrap smoke", () => {
 				"utf8",
 			).trim();
 			expect(evidenceDoc).toContain('"task_id":"T-01"');
-			expect(evidenceDoc).toContain('"command":"true"');
+			expect(evidenceDoc).toContain('"command":"test -d .afol"');
 			expect(evidenceDoc).toContain('"result":"passed"');
 
 			const close = runAfol(target, ["close"]);

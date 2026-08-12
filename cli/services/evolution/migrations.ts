@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 8;
+export const EVOLUTION_SCHEMA_VERSION = 10;
 
 const MIGRATIONS = [
 	{
@@ -387,6 +387,65 @@ CREATE INDEX IF NOT EXISTS evaluations_project_state_idx
 CREATE INDEX IF NOT EXISTS evaluations_project_event_idx
 	ON evaluations(project_id, event_id);
 		`,
+	},
+	{
+		version: 9,
+		sql: `
+ALTER TABLE observations RENAME TO observations_v8;
+CREATE TABLE observations (
+ project_id TEXT NOT NULL,id TEXT NOT NULL,kind TEXT NOT NULL,fingerprint TEXT NOT NULL,
+ fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version IN (1,2)),occurrence_identity TEXT NOT NULL,
+ session_id TEXT NOT NULL,production_day_sequence INTEGER NOT NULL,task_type TEXT NOT NULL,impact TEXT NOT NULL,
+ normalized_fields TEXT NOT NULL,source_refs TEXT NOT NULL,created_at TEXT NOT NULL,journal_sequence INTEGER NOT NULL,journal_event_id TEXT NOT NULL,
+ PRIMARY KEY (project_id,id),UNIQUE (project_id,occurrence_identity)
+);
+INSERT INTO observations SELECT * FROM observations_v8;
+DROP TABLE observations_v8;
+CREATE INDEX observations_project_fingerprint_idx ON observations(project_id,fingerprint_version,fingerprint,production_day_sequence);
+`,
+	},
+	{
+		version: 10,
+		sql: `
+DROP INDEX IF EXISTS observations_project_fingerprint_idx;
+ALTER TABLE observations RENAME TO observations_v9;
+CREATE TABLE observations (
+ project_id TEXT NOT NULL,id TEXT NOT NULL,kind TEXT NOT NULL CHECK (length(trim(kind)) > 0),fingerprint TEXT NOT NULL,
+ fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version IN (1,2)),occurrence_identity TEXT NOT NULL,
+ session_id TEXT NOT NULL CHECK (length(trim(session_id)) > 0),production_day_sequence INTEGER NOT NULL CHECK (production_day_sequence >= 0),task_type TEXT NOT NULL CHECK (length(trim(task_type)) > 0),impact TEXT NOT NULL CHECK (length(trim(impact)) > 0),
+ normalized_fields TEXT NOT NULL CHECK (length(trim(normalized_fields)) > 0),source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),created_at TEXT NOT NULL,journal_sequence INTEGER NOT NULL CHECK (journal_sequence > 0),journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+ PRIMARY KEY (project_id,id),UNIQUE (project_id,occurrence_identity)
+);
+INSERT INTO observations SELECT * FROM observations_v9;
+DROP TABLE observations_v9;
+CREATE INDEX observations_suggestion_tail_idx ON observations(project_id,fingerprint_version,fingerprint,journal_sequence DESC,id DESC);
+DROP INDEX IF EXISTS recurrence_decisions_project_fingerprint_idx;
+ALTER TABLE recurrence_decisions RENAME TO recurrence_decisions_v9;
+CREATE TABLE recurrence_decisions (
+ project_id TEXT NOT NULL,id TEXT NOT NULL,fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version IN (1,2)),fingerprint TEXT NOT NULL,
+ action TEXT NOT NULL CHECK (action IN ('confirm','dismiss','reopen')),observation_ids TEXT NOT NULL CHECK (length(trim(observation_ids)) > 0),
+ observation_membership_digest TEXT NOT NULL CHECK (length(trim(observation_membership_digest)) > 0),source_decision_ref TEXT NOT NULL CHECK (length(trim(source_decision_ref)) > 0),
+ decision_digest TEXT NOT NULL CHECK (length(trim(decision_digest)) > 0),source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),
+ created_at TEXT NOT NULL,journal_sequence INTEGER NOT NULL CHECK (journal_sequence > 0),journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+ PRIMARY KEY(project_id,id)
+);
+INSERT INTO recurrence_decisions SELECT * FROM recurrence_decisions_v9;
+DROP TABLE recurrence_decisions_v9;
+CREATE INDEX recurrence_decisions_project_fingerprint_idx ON recurrence_decisions(project_id,fingerprint_version,fingerprint,journal_sequence);
+DROP INDEX IF EXISTS issue_clusters_active_suggestion_idx;
+ALTER TABLE issue_clusters RENAME TO issue_clusters_v8;
+CREATE TABLE issue_clusters (
+ project_id TEXT NOT NULL,fingerprint_version INTEGER NOT NULL CHECK (fingerprint_version IN (1,2)),fingerprint TEXT NOT NULL,state TEXT NOT NULL CHECK (state IN ('observed', 'candidate', 'recurring', 'proposal_open', 'mitigation_canary', 'resolved', 'reopened', 'dismissed')),
+ occurrence_count INTEGER NOT NULL CHECK (occurrence_count >= 0),distinct_session_count INTEGER NOT NULL CHECK (distinct_session_count >= 0),distinct_production_day_count INTEGER NOT NULL CHECK (distinct_production_day_count >= 0),user_confirmed_recurrence INTEGER NOT NULL CHECK (user_confirmed_recurrence IN (0, 1)),
+ first_seen_at TEXT NOT NULL,last_seen_at TEXT NOT NULL,priority INTEGER NOT NULL CHECK (priority >= 0),source_refs TEXT NOT NULL CHECK (length(trim(source_refs)) > 0),updated_at TEXT NOT NULL,journal_event_id TEXT NOT NULL CHECK (length(trim(journal_event_id)) > 0),
+ PRIMARY KEY(project_id,fingerprint_version,fingerprint)
+);
+INSERT INTO issue_clusters SELECT * FROM issue_clusters_v8;
+DROP TABLE issue_clusters_v8;
+CREATE INDEX issue_clusters_active_suggestion_idx
+ ON issue_clusters(project_id,priority DESC,occurrence_count DESC,fingerprint)
+ WHERE state IN ('observed', 'candidate', 'recurring', 'reopened');
+`,
 	},
 ] as const;
 

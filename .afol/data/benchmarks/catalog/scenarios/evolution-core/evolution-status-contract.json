@@ -10,7 +10,10 @@
 	"coverage": {
 		"commands": ["evolve"],
 		"subcommands": [
+			"evolve candidates [--session <id>] [--limit <1-10>] [--json]",
+			"evolve candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
 			"evolve status [--json]",
+			"evolve backfill [--offset <n>] [--limit <1-10>] [--json]",
 			"evolve analyze [--json]",
 			"evolve weekly [--json]",
 			"evolve after-merge <base>..<head> [--json]",

@@ -453,7 +453,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["e"],
 		kind: "evidence",
 		sideEffect: "append",
-		description: "Record task evidence or admit legacy compatibility debt",
+		description: "Record, reverify, or narrowly admit task evidence debt",
 		category: "workflow",
 		subcommands: [
 			{
@@ -475,6 +475,19 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--json",
 				sideEffect: "append",
 				description: "Emit machine-readable evidence result",
+			},
+			{
+				usage: 'reverify -S <id> -T <id> -x "<cmd>" [--json]',
+				sideEffect: "append",
+				description:
+					"Run and append observed evidence for a closed terminal task without reopening it",
+			},
+			{
+				usage:
+					'transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval "<text>" [--dry-run|--confirm] [--json]',
+				sideEffect: "write",
+				description:
+					"Hash-bind closed post-cutoff missing/failed evidence debt under the registered no-op policy (preview by default)",
 			},
 			{
 				usage:
@@ -1063,12 +1076,34 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "evolve",
 		sideEffect: "read",
 		description: "Analyze project evolution state and proposals",
-		capabilities: ["evolution.suggest.first-session/v1"],
+		capabilities: [
+			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
+		],
 		category: "inspect",
 		guidance: [
 			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",
 		],
 		subcommands: [
+			{
+				usage: "backfill [--offset <n>] [--limit <1-10>] [--json]",
+				sideEffect: "read",
+				description:
+					"Preview bounded historical observation and adoption coverage without writes",
+			},
+			{
+				usage: "candidates [--session <id>] [--limit <1-10>] [--json]",
+				sideEffect: "read",
+				description:
+					"Derive bounded Memory and Library adoption candidates from completed sessions",
+			},
+			{
+				usage:
+					"candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
+				sideEffect: "write",
+				description:
+					"Append an explicit approval-gated learning review decision",
+			},
 			{
 				usage: "evaluate <id> [--record] [--superseded-by <id>] [-j]",
 				sideEffect: "preview",
@@ -1602,7 +1637,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["ss"],
 		kind: "session",
 		sideEffect: "write",
-		description: "List, bind, switch, and unbind workbench sessions",
+		description: "List, bind, switch, archive, restore, and unbind sessions",
 		category: "workflow",
 		subcommands: [
 			{
@@ -1634,6 +1669,22 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "unbind <session-id>",
 				sideEffect: "write",
 				description: "Remove a session context binding",
+			},
+			{
+				usage:
+					"archive --candidates [--older-than-days <days>] [--offset <n>] [--limit <n>] [--json]",
+				sideEffect: "read",
+				description: "List closed sessions eligible for logical archiving",
+			},
+			{
+				usage: "archive <id>... --reason <text> [--dry-run] [--json]",
+				sideEffect: "write",
+				description: "Logically archive closed workbench sessions",
+			},
+			{
+				usage: "restore <id>... --reason <text> [--dry-run] [--json]",
+				sideEffect: "write",
+				description: "Restore logically archived workbench sessions",
 			},
 		],
 	},

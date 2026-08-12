@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { splitCommandLine } from "../commands/workbench/verify";
 import { boundedSpawn } from "../core/subprocess";
 import { sha256 } from "../services/evolution/imports/digest";
 import {
@@ -79,6 +80,9 @@ type HotPathSample = {
 
 const HOT_PATH_OUTPUT_LIMIT_BYTES = 20_000;
 const HOT_PATH_MAIN_PATH = resolve(import.meta.dir, "../main.ts");
+
+export const F32_CONFIG_VERIFICATION_COMMAND =
+	'bun -e \'let c=await Bun.file(".afol/config.json").json().catch(()=>null);process.exit(c?.schema_version===1&&c?.project?.name==="f32-hot-path-fixture"?0:1)\'';
 
 /**
  * Compiled-Bun detection used by the hot-path launcher.
@@ -342,7 +346,7 @@ function prepareFixture(
 		completeObservedTask(root, {
 			session: created.session,
 			taskId: "T-01",
-			command: "true",
+			command: F32_CONFIG_VERIFICATION_COMMAND,
 			exitCode: 0,
 		});
 	}
@@ -371,7 +375,7 @@ export function declaredHotPathArgs(
 	command: string,
 	session: string,
 ): string[] {
-	const tokens = command.trim().split(/\s+/);
+	const tokens = splitCommandLine(command.trim());
 	if (tokens.shift() !== "afol") {
 		throw new Error(`Hot-path command must start with afol: ${command}`);
 	}

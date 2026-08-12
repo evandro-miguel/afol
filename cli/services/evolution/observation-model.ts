@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const OBSERVATION_FINGERPRINT_VERSION = 1;
+export const OBSERVATION_FINGERPRINT_VERSION = 2;
 export const RECURRENCE_MINIMUM_OCCURRENCES = 3;
 export const RECURRENCE_MINIMUM_SESSIONS = 2;
 export const RECURRENCE_MINIMUM_PRODUCTION_DAYS = 2;
@@ -62,7 +62,7 @@ export type ObservationRecord = {
 	id: string;
 	kind: string;
 	fingerprint: string;
-	fingerprint_version: 1;
+	fingerprint_version: number;
 	occurrence_identity: string;
 	session_id: string;
 	production_day_sequence: number;
@@ -220,10 +220,11 @@ export function normalizeObservation(
 
 export function observationFingerprint(
 	fields: ObservationFingerprintFields | ObservationInput,
+	version = OBSERVATION_FINGERPRINT_VERSION,
 ): string {
 	const normalized = "id" in fields ? normalizeObservation(fields) : fields;
 	return digest({
-		version: OBSERVATION_FINGERPRINT_VERSION,
+		version,
 		fields: normalized,
 	});
 }
@@ -294,7 +295,7 @@ export function normalizeObservationRecord(
 			"kind",
 		),
 		fingerprint: observationFingerprint(normalized_fields),
-		fingerprint_version: 1,
+		fingerprint_version: OBSERVATION_FINGERPRINT_VERSION,
 		occurrence_identity: occurrenceIdentity(input),
 		session_id,
 		production_day_sequence,
@@ -476,7 +477,9 @@ export function observationRecordFromRow(
 		id: String(row.id),
 		kind: String(row.kind),
 		fingerprint: String(row.fingerprint),
-		fingerprint_version: 1,
+		fingerprint_version: Number(
+			row.fingerprint_version,
+		) as typeof OBSERVATION_FINGERPRINT_VERSION,
 		occurrence_identity: String(row.occurrence_identity),
 		session_id: String(row.session_id),
 		production_day_sequence: Number(row.production_day_sequence),

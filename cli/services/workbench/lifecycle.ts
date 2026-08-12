@@ -41,15 +41,17 @@ import {
 } from "../project/legacy-evidence-baseline";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
-import { readTaskLifecycleState, scalarValue } from "./session-lifecycle-state";
+import {
+	isSessionClosed,
+	readTaskLifecycleState,
+	scalarValue,
+} from "./session-lifecycle-state";
 import { loadEvidenceEntries, sessionPaths } from "./session-reader";
 import type { EvidenceEntry, EvidenceProvenance, TaskState } from "./types";
 
 export type { SessionLifecycleState } from "./session-lifecycle-state";
-export {
-	isSessionClosed,
-	sessionLifecycleState,
-} from "./session-lifecycle-state";
+export { sessionLifecycleState } from "./session-lifecycle-state";
+export { isSessionClosed };
 
 import {
 	appendVerificationRunStart,
@@ -73,6 +75,7 @@ import {
 	evidenceCompletionAuthorization,
 	evidenceCompletionStatus,
 	evidenceResultIsFailure,
+	isNoopExecutionCommand,
 	verifyWorkbenchTasks,
 } from "./verify";
 
@@ -561,6 +564,19 @@ function renderCloseReport(
 	evidence: EvidenceEntry[],
 	summary: string,
 ): string {
+	const authorizingEvidenceIds = new Set<string>();
+	for (const row of taskRows) {
+		const authorization = evidenceCompletionAuthorization(
+			evidence.filter(
+				(entry) =>
+					entry.task_id === row.taskId && (entry.attempt ?? 0) === row.attempt,
+			),
+			completionPolicyFromNotes(row.notes),
+		);
+		if (authorization.status === "passed" && authorization.evidenceId) {
+			authorizingEvidenceIds.add(authorization.evidenceId);
+		}
+	}
 	const lines = [
 		`# Report: ${session}`,
 		"",
@@ -573,7 +589,7 @@ function renderCloseReport(
 		"## Evidence",
 		...evidence.map(
 			(entry) =>
-				`- ${entry.task_id}: ${entry.provenance === "observed" ? "" : "declared "}${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
+				`- ${entry.task_id} attempt=${entry.attempt ?? 0} evidence_id=${entry.id}${authorizingEvidenceIds.has(entry.id) ? " authorizing" : ""}: ${entry.provenance === "observed" ? "" : "declared "}${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
 		),
 	];
 	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
@@ -659,11 +675,18 @@ function refreshWorkbenchLocalState(
 	session?: string,
 	deferredEventRecords: readonly Record<string, unknown>[] = [],
 ): void {
-	countHotPathOperation("workbench.local_state_refresh");
 	if (session && deferredEventRecords.length > 0) {
 		appendEventsAndRebuildWorkBenchIndex(root, session, deferredEventRecords);
 		return;
 	}
+	if (session) {
+		// A lifecycle mutation only changes one session. Keep its materialized
+		// projection current without charging the close hot path for a global
+		// derived-state refresh.
+		rebuildWorkBenchIndex(root, session);
+		return;
+	}
+	countHotPathOperation("workbench.local_state_refresh");
 	rebuildWorkBenchIndex(root, session);
 }
 
@@ -1614,6 +1637,60 @@ export function recordEvidence(
 		return evidence;
 	});
 	return entry;
+}
+
+/**
+ * Append observed evidence for a terminal task without reopening or otherwise
+ * mutating its lifecycle. This deliberately remains append-only: it repairs
+ * the evidence ledger, never the State Board or closed-session status.
+ */
+export function assertClosedTaskReverificationEligible(
+	root: string,
+	input: Pick<RecordEvidenceInput, "session" | "taskId" | "command">,
+): void {
+	if (isNoopExecutionCommand(input.command)) {
+		throw new Error(
+			"Reverification command is a shell no-op and cannot authorize evidence.",
+		);
+	}
+	if (!isSessionClosed(root, input.session)) {
+		throw new Error(
+			`Session ${input.session} is not closed; reverify is only for closed tasks.`,
+		);
+	}
+	const paths = sessionPaths(root, input.session);
+	const task = ensureTaskExists(paths.taskPath, input.session, input.taskId);
+	if (task.state !== "done") {
+		throw new Error(
+			`Task ${input.taskId} is ${task.state}; reverify only accepts closed done tasks.`,
+		);
+	}
+	const issue = verifyWorkbenchTasks(paths.sessionDir, true).issues.find(
+		(entry) =>
+			entry.taskId === input.taskId &&
+			(entry.type === "missing_evidence" || entry.type === "failed_evidence"),
+	);
+	if (!issue) {
+		throw new Error(
+			`Task ${input.taskId} has no missing or failed evidence eligible for reverify.`,
+		);
+	}
+}
+
+export function recordClosedTaskReverification(
+	root: string,
+	input: RecordEvidenceInput,
+): EvidenceEntry {
+	return withSessionLock(root, input.session, () => {
+		assertClosedTaskReverificationEligible(root, input);
+		return recordEvidence(
+			root,
+			{ ...input, provenance: "observed" },
+			{
+				sessionMutationValidated: true,
+			},
+		);
+	});
 }
 
 export function appendTimelineEntry(
@@ -2687,6 +2764,12 @@ export function closeSession(
 		if (state.kind === "open") {
 			warnings.push(...observeCompletedSession(root, session, runtime));
 		}
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, session),
+			runtime,
+		);
 		const result = warnings as CloseSessionResult;
 		result.report = {
 			status: reportStatus,

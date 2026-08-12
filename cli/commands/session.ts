@@ -16,6 +16,13 @@ import { atomicWriteText } from "../services/io/atomic";
 import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
+	archiveSessions as archiveWorkbenchSessions,
+	listSessionArchiveCandidatePage,
+	previewArchiveSessions,
+	previewRestoreSessions,
+	restoreSessions as restoreWorkbenchSessions,
+} from "../services/workbench/archive";
+import {
 	readActiveSession,
 	sessionLifecycleState,
 	sessionPaths,
@@ -117,6 +124,7 @@ const RADAR_TEXT_WARNING_LIMIT = 3;
 const RADAR_JSON_TASK_LIMIT = 25;
 const RADAR_JSON_WARNING_LIMIT = 10;
 const RADAR_JSON_SESSION_LIMIT = 20;
+const ARCHIVE_CANDIDATE_PAGE_LIMIT = 10;
 
 let radarReaderOverride: CoordinationRadarReader | null = null;
 
@@ -127,6 +135,11 @@ type ParsedArgs = {
 	strict: boolean;
 	branch: string | null;
 	actor: string | null;
+	reason: string | null;
+	olderThanDays: number;
+	candidates: boolean;
+	archiveOffset: number;
+	archiveLimit: number;
 	session: string | null;
 	positional: string[];
 };
@@ -329,6 +342,11 @@ function parseArgs(args: string[]): ParsedArgs {
 	let strict = false;
 	let branch: string | null = null;
 	let actor: string | null = null;
+	let reason: string | null = null;
+	let olderThanDays = 90;
+	let candidates = false;
+	let archiveOffset = 0;
+	let archiveLimit = ARCHIVE_CANDIDATE_PAGE_LIMIT;
 	let session: string | null = null;
 	const positional: string[] = [];
 	for (let index = 0; index < args.length; index += 1) {
@@ -379,9 +397,66 @@ function parseArgs(args: string[]): ParsedArgs {
 			index += 1;
 			continue;
 		}
+		if (arg === "--reason") {
+			const value = args[index + 1];
+			if (!value || value.startsWith("-")) {
+				throw new Error("Missing value for --reason in session.");
+			}
+			reason = value;
+			index += 1;
+			continue;
+		}
+		if (arg === "--older-than-days") {
+			const value = args[index + 1];
+			const parsed = value === undefined ? Number.NaN : Number(value);
+			if (!Number.isFinite(parsed) || parsed < 0) {
+				throw new Error("--older-than-days must be a non-negative number.");
+			}
+			olderThanDays = parsed;
+			index += 1;
+			continue;
+		}
+		if (arg === "--candidates") {
+			candidates = true;
+			continue;
+		}
+		if (arg === "--offset") {
+			const value = args[index + 1];
+			const parsed = value === undefined ? Number.NaN : Number(value);
+			if (!Number.isInteger(parsed) || parsed < 0) {
+				throw new Error("--offset must be a non-negative integer.");
+			}
+			archiveOffset = parsed;
+			index += 1;
+			continue;
+		}
+		if (arg === "--limit") {
+			const value = args[index + 1];
+			const parsed = value === undefined ? Number.NaN : Number(value);
+			if (!Number.isInteger(parsed) || parsed <= 0) {
+				throw new Error("--limit must be a positive integer.");
+			}
+			archiveLimit = parsed;
+			index += 1;
+			continue;
+		}
 		positional.push(arg);
 	}
-	return { json, dryRun, debug, strict, branch, actor, session, positional };
+	return {
+		json,
+		dryRun,
+		debug,
+		strict,
+		branch,
+		actor,
+		reason,
+		olderThanDays,
+		candidates,
+		archiveOffset,
+		archiveLimit,
+		session,
+		positional,
+	};
 }
 
 function emit(
@@ -697,6 +772,125 @@ function unbindSession(
 	};
 }
 
+function archiveSessions(
+	projectRoot: string,
+	parsed: ParsedArgs,
+	ctx: OperationContext,
+): ActionResult {
+	if (parsed.candidates) {
+		const page = listSessionArchiveCandidatePage(
+			projectRoot,
+			parsed.olderThanDays,
+			{ offset: parsed.archiveOffset, limit: parsed.archiveLimit },
+		);
+		return {
+			data: {
+				action: "archive-candidates",
+				read_only: true,
+				older_than_days: parsed.olderThanDays,
+				...page,
+			},
+			lines: [
+				"session archive candidates:",
+				`  candidates (${page.returned_count}/${page.total_count}): ${compactList(
+					page.candidates.map((candidate) => candidate.session),
+					20,
+				)}`,
+			],
+			exitCode: 0,
+		};
+	}
+	if (!parsed.reason) {
+		throw new Error("Missing --reason for session archive.");
+	}
+	const sessions = [
+		...(parsed.session ? [parsed.session] : []),
+		...parsed.positional,
+	];
+	if (sessions.length === 0) {
+		throw new Error("Missing session identifier for session archive.");
+	}
+	if (parsed.dryRun) {
+		const candidates = previewArchiveSessions(projectRoot, sessions);
+		return {
+			data: {
+				action: "archive",
+				dry_run: true,
+				reason: parsed.reason,
+				older_than_days: parsed.olderThanDays,
+				candidates,
+			},
+			lines: [
+				"session archive: dry-run",
+				`  candidates: ${candidates.map((candidate) => candidate.session).join(", ") || "none"}`,
+			],
+			exitCode: 0,
+		};
+	}
+	if (requiresApproval(ctx)) {
+		throw new Error("session archive requires local interactive approval");
+	}
+	const archived = archiveWorkbenchSessions(
+		projectRoot,
+		sessions,
+		parsed.reason ?? "",
+	);
+	return {
+		data: { action: "archive", reason: parsed.reason, archived },
+		lines: archived.map(
+			(entry) =>
+				`session archived: ${entry.session} (closed_at=${entry.closed_at})`,
+		),
+		exitCode: 0,
+	};
+}
+
+function restoreSessions(
+	projectRoot: string,
+	parsed: ParsedArgs,
+	ctx: OperationContext,
+): ActionResult {
+	if (!parsed.reason) {
+		throw new Error("Missing --reason for session restore.");
+	}
+	if (parsed.candidates) {
+		throw new Error("--candidates is supported only by session archive.");
+	}
+	const sessions = [
+		...(parsed.session ? [parsed.session] : []),
+		...parsed.positional,
+	];
+	if (sessions.length === 0) {
+		throw new Error("Missing session identifier for session restore.");
+	}
+	if (parsed.dryRun) {
+		const plans = previewRestoreSessions(projectRoot, sessions);
+		return {
+			data: {
+				action: "restore",
+				dry_run: true,
+				reason: parsed.reason,
+				sessions: plans.map((plan) => plan.session),
+			},
+			lines: [`session restore: dry-run`, `  sessions: ${sessions.join(", ")}`],
+			exitCode: 0,
+		};
+	}
+	if (requiresApproval(ctx)) {
+		throw new Error("session restore requires local interactive approval");
+	}
+	const restored = restoreWorkbenchSessions(
+		projectRoot,
+		sessions,
+		parsed.reason ?? "",
+	);
+	return {
+		data: { action: "restore", reason: parsed.reason, restored },
+		lines: restored.map((entry) => `session restored: ${entry.session}`),
+		exitCode: 0,
+	};
+}
+
 function writeSessionError(
 	error: unknown,
 	parsed: ParsedArgs,
@@ -753,6 +947,11 @@ export async function runSessionCommand(
 				strict: false,
 				branch: null,
 				actor: null,
+				reason: null,
+				olderThanDays: 90,
+				candidates: false,
+				archiveOffset: 0,
+				archiveLimit: ARCHIVE_CANDIDATE_PAGE_LIMIT,
 				session: null,
 				positional: [],
 			},
@@ -800,6 +999,22 @@ export async function runSessionCommand(
 				io,
 			);
 		}
+		if (action === "archive") {
+			return emit(
+				archiveSessions(projectRoot, parsed, ctx),
+				"session.archive",
+				parsed.json,
+				io,
+			);
+		}
+		if (action === "restore") {
+			return emit(
+				restoreSessions(projectRoot, parsed, ctx),
+				"session.restore",
+				parsed.json,
+				io,
+			);
+		}
 		if (action === "radar") {
 			try {
 				return emit(
@@ -820,13 +1035,13 @@ export async function runSessionCommand(
 					envelopeErr("SESSION_ACTION_UNKNOWN", message, {
 						action: "session",
 						exitCode: 2,
-						hint: "use list, bind, switch, unbind, or radar",
+						hint: "use list, bind, switch, unbind, archive, restore, or radar",
 					}),
 				),
 			);
 		} else {
 			io.stderr(
-				'err session-action-unknown hint="use list, bind, switch, unbind, or radar"',
+				'err session-action-unknown hint="use list, bind, switch, unbind, archive, restore, or radar"',
 			);
 		}
 		return 2;

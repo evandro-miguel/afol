@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runEvolveCommand } from "../commands/evolve";
+import { agentOperationContext } from "../core/operation-context";
 import {
 	appendProductionDayAllocation,
 	evolutionDbPath,
@@ -135,20 +136,28 @@ function removeDb(root: string): void {
 }
 
 describe("evolve status canonical journal integrity", () => {
-	test("reports valid journal without a projection as rebuild_required", async () => {
+	test("reports the safe recovery action in restricted output when projection is absent", async () => {
 		const root = fixture();
 		try {
 			createJournal(root);
 			removeDb(root);
 			const captured = captureIo();
 			expect(
-				await runEvolveCommand("status", ["--json"], root, captured.io),
+				await runEvolveCommand(
+					"status",
+					["--json"],
+					root,
+					captured.io,
+					agentOperationContext(),
+				),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.data).toMatchObject({
 				state: "rebuild_required",
+				recovery_action: "afol evolve repair --json",
 				journal_health: { exists: true, valid: true, error: null },
 			});
+			expect(payload.data).not.toHaveProperty("project_id");
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
 			expect(existsSync(`${evolutionDbPath(root)}-wal`)).toBe(false);
 			expect(existsSync(`${evolutionDbPath(root)}-shm`)).toBe(false);
@@ -157,22 +166,46 @@ describe("evolve status canonical journal integrity", () => {
 		}
 	});
 
-	test("reports a valid journal with a stale empty projection as rebuild_required", async () => {
+	test("reports a stale schema with an approved rebuild recovery action", async () => {
 		const root = fixture();
 		try {
 			createJournal(root);
 			const db = openEvolutionDb(evolutionDbPath(root));
-			db.exec("DELETE FROM production_days; DELETE FROM evolution_metadata;");
+			db.exec("PRAGMA user_version = 0");
 			db.close();
+			const json = captureIo();
+			expect(await runEvolveCommand("status", ["--json"], root, json.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(json.stdout[0] ?? "{}");
+			expect(payload.data).toMatchObject({
+				state: "rebuild_required",
+				recovery_action: "afol evolve repair --json",
+				journal_health: { exists: true, valid: true, error: null },
+				db_health: { db_exists: true, ok: false },
+			});
+			const compact = captureIo();
+			expect(await runEvolveCommand("status", [], root, compact.io)).toBe(0);
+			expect(compact.stdout.join("\n")).toContain(
+				"recovery_action=afol evolve repair --json",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports no recovery action for a healthy projection", async () => {
+		const root = fixture();
+		try {
+			createJournal(root);
 			const captured = captureIo();
 			expect(
 				await runEvolveCommand("status", ["--json"], root, captured.io),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.data).toMatchObject({
-				state: "rebuild_required",
-				journal_health: { exists: true, valid: true, error: null },
-				db_health: { db_exists: true, ok: false },
+				state: "healthy",
+				recovery_action: null,
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });

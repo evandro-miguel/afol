@@ -1,11 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseDoneArgs } from "../commands/workbench/args";
+import { runVerificationAsync } from "../commands/workbench/verify";
 import { sha256 } from "../services/evolution/imports/digest";
 import {
 	declaredHotPathArgs,
 	executionProfile,
+	F32_CONFIG_VERIFICATION_COMMAND,
 	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
@@ -23,7 +32,7 @@ function runScenario(config: HotPathScenarioConfig) {
 						? "afol status --catchup --session fixture"
 						: "afol status --json"
 				: config.operation === "done"
-					? "afol done T-01 --test-shell true --json"
+					? `afol done T-01 --test ${JSON.stringify(F32_CONFIG_VERIFICATION_COMMAND)} --json`
 					: `afol ${config.operation} --json`;
 		const scenario: Scenario = {
 			schema_version: "1.0.0",
@@ -150,10 +159,16 @@ describe("F-32 hot-path benchmark runner", () => {
 		expect(
 			declaredHotPathArgs(
 				{ operation: "done", mode: "default" },
-				"afol done T-01 --test-shell true --json",
+				`afol done T-01 --test ${JSON.stringify(F32_CONFIG_VERIFICATION_COMMAND)} --json`,
 				session,
 			),
-		).toEqual(["done", "T-01", "--test-shell", "true", "--json"]);
+		).toEqual([
+			"done",
+			"T-01",
+			"--test",
+			F32_CONFIG_VERIFICATION_COMMAND,
+			"--json",
+		]);
 		expect(
 			declaredHotPathArgs(
 				{ operation: "close", mode: "default" },
@@ -161,6 +176,55 @@ describe("F-32 hot-path benchmark runner", () => {
 				session,
 			),
 		).toEqual(["close", "--json"]);
+	});
+
+	test("done config verification requires the F-32 fixture schema and project", async () => {
+		const root = mkdtempSync(join(tmpdir(), "f32-config-verification-"));
+		try {
+			const parsed = parseDoneArgs(
+				[
+					"T-01",
+					"--session",
+					"fixture",
+					"--test",
+					F32_CONFIG_VERIFICATION_COMMAND,
+					"--json",
+				],
+				root,
+			);
+			expect(parsed.verifications).toEqual([
+				{
+					mode: "argv",
+					executable: "bun",
+					args: [
+						"-e",
+						'let c=await Bun.file(".afol/config.json").json().catch(()=>null);process.exit(c?.schema_version===1&&c?.project?.name==="f32-hot-path-fixture"?0:1)',
+					],
+				},
+			]);
+			const verification = parsed.verifications[0];
+			expect(verification).toBeDefined();
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				'{"schema_version":1,"project":{"name":"f32-hot-path-fixture"}}\n',
+			);
+			expect(
+				await runVerificationAsync(
+					root,
+					verification as NonNullable<typeof verification>,
+				),
+			).toMatchObject({ exitCode: 0, status: "passed" });
+			writeFileSync(join(root, ".afol", "config.json"), "{malformed\n");
+			expect(
+				await runVerificationAsync(
+					root,
+					verification as NonNullable<typeof verification>,
+				),
+			).toMatchObject({ exitCode: 1, status: "failed" });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test.each([

@@ -60,6 +60,13 @@ export type TelemetryEvent = {
 	error_type?: string;
 };
 
+export type SessionTelemetryFilter = {
+	/** Limit bounded matching to event types relevant to the caller's purpose. */
+	eventTypes?: readonly TelemetryEventType[];
+	/** Apply an additional purpose-specific predicate after basic telemetry checks. */
+	predicate?: (event: TelemetryEvent) => boolean;
+};
+
 const TELEMETRY_ID_PREFIX = "TEL-";
 function nextTelemetryId(now: Date): string {
 	return `${TELEMETRY_ID_PREFIX}${now.getTime()}-${randomUUID()}`;
@@ -148,14 +155,20 @@ export function readBoundedSessionTelemetryEvents(
 	root: string,
 	session: string,
 	limits: BoundedSourceLimits,
+	filter: SessionTelemetryFilter = {},
 ): TelemetryEvent[] {
+	const allowedEventTypes = filter.eventTypes
+		? new Set<string>(filter.eventTypes)
+		: null;
 	return telemetryRecords(
 		readEventLedgerRecordsMatching(
 			root,
 			(record) =>
 				record.schema_version === "1" &&
 				typeof record.event_type === "string" &&
-				record.session_id === session,
+				record.session_id === session &&
+				(!allowedEventTypes || allowedEventTypes.has(record.event_type)) &&
+				(!filter.predicate || filter.predicate(record as TelemetryEvent)),
 			limits,
 		),
 	);

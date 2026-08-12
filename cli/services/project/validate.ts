@@ -26,6 +26,7 @@ import {
 	loadWorkBenchIndexSnapshot,
 } from "../local-state/workbench-index";
 import { verifyAllSessions } from "../workbench/verify";
+import { admitsEvidenceTransitionIssue } from "./evidence-transition-admission";
 import {
 	admitsLegacyEvidenceIssue,
 	validLegacyEvidenceBaseline,
@@ -542,6 +543,7 @@ export async function validateProjectStructure(
 			const results = verifyAllSessions(projectRoot, true);
 			const baseline = validLegacyEvidenceBaseline(projectRoot);
 			let waivedLegacyIssues = 0;
+			let admittedTransitionDebt = 0;
 			const totalIssues = results.reduce((sum, result) => {
 				const unadmitted = result.issues.filter((issue) => {
 					const admitted = admitsLegacyEvidenceIssue(
@@ -551,7 +553,16 @@ export async function validateProjectStructure(
 						result.openTasks.length > 0,
 					);
 					if (admitted) waivedLegacyIssues += 1;
-					return !admitted;
+					const transitionAdmitted =
+						!admitted &&
+						admitsEvidenceTransitionIssue(
+							projectRoot,
+							result.sessionPath,
+							issue,
+							result.openTasks.length > 0,
+						);
+					if (transitionAdmitted) admittedTransitionDebt += 1;
+					return !admitted && !transitionAdmitted;
 				});
 				return sum + unadmitted.length;
 			}, 0);
@@ -581,9 +592,9 @@ export async function validateProjectStructure(
 				id: "session_evidence" as const,
 				ok: true,
 				message:
-					waivedLegacyIssues === 0
+					waivedLegacyIssues === 0 && admittedTransitionDebt === 0
 						? `ok ${results.length} sessions verified`
-						: `ok ${results.length} sessions verified; ${waivedLegacyIssues} legacy evidence issue(s) admitted by ${baseline?.baseline_id}`,
+						: `ok ${results.length} sessions verified; ${waivedLegacyIssues} legacy evidence issue(s) admitted by ${baseline?.baseline_id}; ${admittedTransitionDebt} post-cutoff evidence debt issue(s) admitted by no-op-evidence-v1`,
 			};
 		})(),
 		(() => {

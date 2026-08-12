@@ -181,14 +181,14 @@ function executeScenario(
 		for (let index = 1; index <= taskCount; index += 1) {
 			const taskId = `T-${String(index).padStart(2, "0")}`;
 			const started = run(projectRoot, ["st", taskId]);
-			const completed = run(projectRoot, ["d", taskId, "-x", "true"]);
+			const completed = run(projectRoot, ["d", taskId, "-x", "test -d .afol"]);
 			measurements.push(started, completed);
 			authoredHotPath.push(started, completed);
 		}
 	} else {
 		const selector = `T-01..T-${String(taskCount).padStart(2, "0")}`;
 		const started = run(projectRoot, ["st", selector]);
-		const completed = run(projectRoot, ["d", selector, "-x", "true"]);
+		const completed = run(projectRoot, ["d", selector, "-x", "test -d .afol"]);
 		measurements.push(started, completed);
 		authoredHotPath.push(started, completed);
 	}

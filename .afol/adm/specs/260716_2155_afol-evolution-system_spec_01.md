@@ -111,6 +111,12 @@ canary until the configured evidence window is complete.
 
 ## 5) Evidence and trust boundaries
 
+Post-cutoff historical repair remains honest: closed terminal tasks may append
+new observed re-verification evidence. The only admission exception is the
+registered `no-op-evidence-v1` policy, hash-bound to one current
+`missing_evidence` issue and requiring issue plus trusted approval; it is never
+a generic waiver or a cutoff change.
+
 Every candidate and proposal must preserve source references. Observations
 distinguish explicit user statements, inferred behavior, structural policy, and
 external evidence. Preferences never override current user instructions,
@@ -252,8 +258,10 @@ succeeds and an explicit policy/configuration change is approved.
    and comparable-task baselines.
 4. Suggestions: ranking, one-per-project/day queue, TTL claims, skip/reject,
    reminders, pending counts, and separate critical alerts.
-5. CLI: `afol evolve`, `status`, `suggest`, `analyze`, proposal review and
-   decision flows; analysis remains read-only until approval.
+5. CLI: `afol evolve`, `status`, `suggest`, `analyze`, bounded paginated
+   historical `backfill` preview, proposal review and decision flows; analysis
+   and historical preview remain read-only until a separately approved apply
+   operation.
 6. Imports: adapter contract, Codex and Pi first, then OpenCode, Hermes, Grok,
    and generic versioned JSONL; streaming, cursors, redaction, idempotency,
    resumability, linking, and hostile-transcript tests. `auto_verified` linking
@@ -285,6 +293,9 @@ config and persistence foundation without changing critical surfaces.
 ## 10) Acceptance and Definition of Done
 
 - `afol evolve` exists and its no-argument form is analysis/preview only.
+- Historical backfill preview inventories every live workbench session through
+  stable bounded pages, reports observation/adoption coverage and skip reasons,
+  and does not open or migrate derived evolution state merely to preview.
 - Daily suggestions are deduplicated by project and local calendar date,
   including concurrent Codex/Pi/OpenCode claims; skip and reject semantics are
   preserved.

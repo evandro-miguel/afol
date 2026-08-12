@@ -89,6 +89,9 @@
 			"evidence --command \"<cmd>\" --result passed",
 			"evidence --artifact <path> --note <text>",
 			"evidence --json",
+			"evidence admit --session <id> --all-missing|--task-id <id> --reason \"<text>\" [--dry-run|--confirm] [--json]",
+			"evidence reverify -S <id> -T <id> -x \"<cmd>\" [--json]",
+			"evidence transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval \"<text>\" [--dry-run|--confirm] [--json]",
 			"legacy reconcile --session <id> --reason \"<text>\" --issue <url> [--task-id <id>] [--dry-run|--confirm] [--summary \"<text>\"] [--json]",
 			"hook list [--json]",
 			"hook show <id> [--json]",
@@ -173,7 +176,11 @@
 			"session switch <session-id>",
 			"session unbind <session-id>",
 			"session radar --json",
-			"evolve status [--json]"
+			"session archive --candidates [--older-than-days <days>] [--offset <n>] [--limit <n>] [--json]",
+			"session archive <id>... --reason <text> [--dry-run] [--json]",
+			"session restore <id>... --reason <text> [--dry-run] [--json]",
+			"evolve status [--json]",
+			"evolve backfill [--offset <n>] [--limit <1-10>] [--json]"
 		],
 		"journeys": [
 			"afol-command-user-flow-matrix",

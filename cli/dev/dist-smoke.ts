@@ -485,7 +485,7 @@ function main(): void {
 			"--task-id",
 			"T-01",
 			"--test",
-			"true",
+			"test -d .afol",
 		]);
 		assertOk(done, "dist done");
 
@@ -503,7 +503,7 @@ function main(): void {
 		if (!evidenceDoc.includes('"task_id":"T-01"')) {
 			throw new Error(`evidence doc missing task id\n${evidenceDoc}`);
 		}
-		if (!evidenceDoc.includes('"command":"true"')) {
+		if (!evidenceDoc.includes('"command":"test -d .afol"')) {
 			throw new Error(`evidence doc missing command\n${evidenceDoc}`);
 		}
 		if (!evidenceDoc.includes('"result":"passed"')) {

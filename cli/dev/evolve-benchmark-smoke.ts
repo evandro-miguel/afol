@@ -256,7 +256,7 @@ function assertPublicAnalysis(
 	if (!data || data.mode !== mode)
 		throw new Error(`analysis ${mode} mode contract failed`);
 	const sensitiveKey =
-		/(project|cluster|source|commit|path|digest|token|db|(?:^|_)session_id(?:s)?$|related_session_ids|origin_ref)/i;
+		/(project|cluster|source|commit|path|token|secret|password|api[_-]?key|db|(?:^|_)session_id$|origin_ref)/i;
 	const inspectKeys = (value: unknown): string | null => {
 		if (Array.isArray(value)) {
 			for (const item of value) {
@@ -286,10 +286,24 @@ function assertPublicAnalysis(
 		if (
 			typeof proposal.id !== "string" ||
 			!/^EVO-[a-f0-9]{32}$/.test(proposal.id) ||
+			proposal.fingerprint_version !== 2 ||
 			typeof proposal.distinct_session_count !== "number" ||
 			typeof proposal.related_session_count !== "number" ||
 			!Array.isArray(evidenceRefs) ||
 			evidenceRefs.length > 4 ||
+			!Array.isArray(proposal.related_session_ids) ||
+			proposal.related_session_ids.length > 4 ||
+			!Array.isArray(proposal.target_refs) ||
+			proposal.target_refs.length > 4 ||
+			!/[a-f0-9]{64}/.test(String(proposal.provenance_digest)) ||
+			!["governance", "behavior", "documentation", "code"].includes(
+				String(proposal.target_kind),
+			) ||
+			!["classified", "needs_review"].includes(
+				String(proposal.classification),
+			) ||
+			proposal.approval_required !== true ||
+			proposal.execution_surface !== "governed_workbench" ||
 			!evidenceRefs.every(
 				(ref) =>
 					ref &&

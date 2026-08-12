@@ -496,7 +496,10 @@ describe("help formatter", () => {
 		).toBe(true);
 		expect(
 			parsed.find((entry) => entry.command === "evolve")?.capabilities,
-		).toEqual(["evolution.suggest.first-session/v1"]);
+		).toEqual([
+			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
+		]);
 		expect(
 			parsed.find((entry) => entry.command === "status"),
 		).not.toHaveProperty("capabilities");
@@ -508,12 +511,16 @@ describe("help formatter", () => {
 
 		expect(evolve?.capabilities).toEqual([
 			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
 		]);
 		evolve?.capabilities?.push("test-only");
 		expect(
 			kernelRegistry.commands.find((entry) => entry.command === "evolve")
 				?.capabilities,
-		).toEqual(["evolution.suggest.first-session/v1"]);
+		).toEqual([
+			"evolution.suggest.first-session/v1",
+			"evolution.candidates/v1",
+		]);
 	});
 
 	test("builds intent-filtered catalog json", () => {
@@ -571,7 +578,10 @@ describe("help formatter", () => {
 	test("projects evolve capabilities in single-command json only", () => {
 		expect(buildCommandHelpJson("evolve", kernelRegistry)).toMatchObject({
 			command: "evolve",
-			capabilities: ["evolution.suggest.first-session/v1"],
+			capabilities: [
+				"evolution.suggest.first-session/v1",
+				"evolution.candidates/v1",
+			],
 		});
 		expect(buildCommandHelpJson("status", kernelRegistry)).not.toHaveProperty(
 			"capabilities",

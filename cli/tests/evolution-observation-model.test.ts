@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import {
 	applyMigrations,
+	EVOLUTION_MIGRATIONS,
 	EVOLUTION_SCHEMA_VERSION,
 } from "../services/evolution/migrations";
 import {
@@ -43,6 +44,97 @@ function observation(id: string, sessionId: string, day: number) {
 }
 
 describe("evolution observation model", () => {
+	test("pins the release checksum for migration v9", () => {
+		expect(EVOLUTION_MIGRATIONS.find(({ version }) => version === 9)).toEqual({
+			version: 9,
+			checksum:
+				"98d222b4f763eee60c0b63a838212a02dfa66bf8bccf9e4b7f97cf0cfd7bb1ad",
+		});
+	});
+
+	test("pins the release checksum for migration v10", () => {
+		expect(EVOLUTION_MIGRATIONS.find(({ version }) => version === 10)).toEqual({
+			version: 10,
+			checksum:
+				"70b7d4b60d7a759cc00251a6b983260a694405753052f238805a97cb5a6276b9",
+		});
+	});
+
+	test("pins v10 projection index definitions and retires superseded indexes", () => {
+		const db = new Database(":memory:");
+		try {
+			applyMigrations(db, 9);
+			applyMigrations(db, 10);
+
+			const indexes = db
+				.query(
+					"SELECT name, sql FROM sqlite_master WHERE type = 'index' AND name IN ('observations_suggestion_tail_idx', 'recurrence_decisions_project_fingerprint_idx', 'issue_clusters_active_suggestion_idx') ORDER BY name",
+				)
+				.all() as Array<{ name: string; sql: string }>;
+			expect(indexes.map(({ name }) => name)).toEqual([
+				"issue_clusters_active_suggestion_idx",
+				"observations_suggestion_tail_idx",
+				"recurrence_decisions_project_fingerprint_idx",
+			]);
+
+			const normalizedSql = new Map(
+				indexes.map(({ name, sql }) => [
+					name,
+					sql.replace(/\s+/g, " ").trim().toLowerCase(),
+				]),
+			);
+			expect(normalizedSql.get("observations_suggestion_tail_idx")).toBe(
+				"create index observations_suggestion_tail_idx on observations(project_id,fingerprint_version,fingerprint,journal_sequence desc,id desc)",
+			);
+			expect(
+				normalizedSql.get("recurrence_decisions_project_fingerprint_idx"),
+			).toBe(
+				"create index recurrence_decisions_project_fingerprint_idx on recurrence_decisions(project_id,fingerprint_version,fingerprint,journal_sequence)",
+			);
+			expect(normalizedSql.get("issue_clusters_active_suggestion_idx")).toBe(
+				"create index issue_clusters_active_suggestion_idx on issue_clusters(project_id,priority desc,occurrence_count desc,fingerprint) where state in ('observed', 'candidate', 'recurring', 'reopened')",
+			);
+
+			const indexColumns = (name: string) =>
+				(
+					db.query(`PRAGMA index_info(${name})`).all() as Array<{
+						name: string;
+					}>
+				).map(({ name: column }) => column);
+			expect(indexColumns("observations_suggestion_tail_idx")).toEqual([
+				"project_id",
+				"fingerprint_version",
+				"fingerprint",
+				"journal_sequence",
+				"id",
+			]);
+			expect(
+				indexColumns("recurrence_decisions_project_fingerprint_idx"),
+			).toEqual([
+				"project_id",
+				"fingerprint_version",
+				"fingerprint",
+				"journal_sequence",
+			]);
+			expect(indexColumns("issue_clusters_active_suggestion_idx")).toEqual([
+				"project_id",
+				"priority",
+				"occurrence_count",
+				"fingerprint",
+			]);
+
+			expect(
+				db
+					.query(
+						"SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('observations_project_fingerprint_idx', 'issue_clusters_project_state_idx') ORDER BY name",
+					)
+					.all(),
+			).toEqual([]);
+		} finally {
+			db.close();
+		}
+	});
+
 	test("upgrades an existing v3 observation projection without checksum drift", () => {
 		const db = new Database(":memory:");
 		try {
@@ -73,7 +165,7 @@ describe("evolution observation model", () => {
 			expect(
 				(db.query("PRAGMA user_version").get() as { user_version: number })
 					.user_version,
-			).toBe(8);
+			).toBe(EVOLUTION_SCHEMA_VERSION);
 			expect(
 				db
 					.query(
@@ -128,11 +220,131 @@ describe("evolution observation model", () => {
 		}
 	});
 
+	test("preserves v8 projection rows through the v9 and v10 fingerprint upgrade", () => {
+		const db = new Database(":memory:");
+		try {
+			applyMigrations(db, 8);
+			db.prepare(
+				`INSERT INTO observations(project_id,id,kind,fingerprint,fingerprint_version,occurrence_identity,session_id,production_day_sequence,task_type,impact,normalized_fields,source_refs,created_at,journal_sequence,journal_event_id)
+				 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			).run(
+				PROJECT_ID,
+				"O-v8",
+				"failure",
+				"fingerprint-v8",
+				1,
+				"occurrence-v8",
+				"S-v8",
+				1,
+				"validation",
+				"regression",
+				'{"kind":"failure"}',
+				"[]",
+				"2026-07-17T00:00:00.000Z",
+				1,
+				"J-v8",
+			);
+			db.prepare(
+				`INSERT INTO recurrence_decisions(project_id,id,fingerprint_version,fingerprint,action,observation_ids,observation_membership_digest,source_decision_ref,decision_digest,source_refs,created_at,journal_sequence,journal_event_id)
+				 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			).run(
+				PROJECT_ID,
+				"R-v8",
+				1,
+				"fingerprint-v8",
+				"confirm",
+				'["O-v8"]',
+				"membership-v8",
+				"source-v8",
+				"decision-v8",
+				"[]",
+				"2026-07-17T00:00:00.000Z",
+				1,
+				"J-decision-v8",
+			);
+			db.prepare(
+				`INSERT INTO issue_clusters(project_id,fingerprint_version,fingerprint,state,occurrence_count,distinct_session_count,distinct_production_day_count,user_confirmed_recurrence,first_seen_at,last_seen_at,priority,source_refs,updated_at,journal_event_id)
+				 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			).run(
+				PROJECT_ID,
+				1,
+				"fingerprint-v8",
+				"recurring",
+				1,
+				1,
+				1,
+				1,
+				"2026-07-17T00:00:00.000Z",
+				"2026-07-17T00:00:00.000Z",
+				1,
+				"[]",
+				"2026-07-17T00:00:00.000Z",
+				"J-cluster-v8",
+			);
+			applyMigrations(db);
+			expect(
+				db
+					.query(
+						"SELECT fingerprint_version, kind, journal_sequence FROM observations",
+					)
+					.get(),
+			).toEqual({
+				fingerprint_version: 1,
+				kind: "failure",
+				journal_sequence: 1,
+			});
+			expect(
+				db
+					.query(
+						"SELECT fingerprint_version, action, journal_sequence FROM recurrence_decisions",
+					)
+					.get(),
+			).toEqual({
+				fingerprint_version: 1,
+				action: "confirm",
+				journal_sequence: 1,
+			});
+			expect(
+				db
+					.query(
+						"SELECT fingerprint_version, state, priority FROM issue_clusters",
+					)
+					.get(),
+			).toEqual({ fingerprint_version: 1, state: "recurring", priority: 1 });
+		} finally {
+			db.close();
+		}
+	});
+
+	test("retains SQLite projection constraints while allowing fingerprint versions one and two", () => {
+		const db = new Database(":memory:");
+		try {
+			applyMigrations(db);
+			expect(() =>
+				db.exec(
+					"INSERT INTO observations(project_id,id,kind,fingerprint,fingerprint_version,occurrence_identity,session_id,production_day_sequence,task_type,impact,normalized_fields,source_refs,created_at,journal_sequence,journal_event_id) VALUES ('p','bad-observation','','f',2,'o','s',0,'t','i','{}','[]','now',1,'j')",
+				),
+			).toThrow();
+			expect(() =>
+				db.exec(
+					"INSERT INTO recurrence_decisions(project_id,id,fingerprint_version,fingerprint,action,observation_ids,observation_membership_digest,source_decision_ref,decision_digest,source_refs,created_at,journal_sequence,journal_event_id) VALUES ('p','bad-decision',2,'f','invalid','[]','membership','source','decision','[]','now',1,'j')",
+				),
+			).toThrow();
+			expect(() =>
+				db.exec(
+					"INSERT INTO issue_clusters(project_id,fingerprint_version,fingerprint,state,occurrence_count,distinct_session_count,distinct_production_day_count,user_confirmed_recurrence,first_seen_at,last_seen_at,priority,source_refs,updated_at,journal_event_id) VALUES ('p',2,'f','recurring',-1,0,0,0,'now','now',0,'[]','now','j')",
+				),
+			).toThrow();
+		} finally {
+			db.close();
+		}
+	});
+
 	test("adds current observation projections without scorecard tables", () => {
 		const db = new Database(":memory:");
 		try {
 			applyMigrations(db);
-			expect(EVOLUTION_SCHEMA_VERSION).toBe(8);
+			expect(EVOLUTION_SCHEMA_VERSION).toBe(10);
 			expect(
 				db
 					.query(

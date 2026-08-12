@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import {
 	firstToken,
@@ -26,7 +27,7 @@ import {
 import {
 	appendObservationJournalEventWithStatus,
 	observationJournalPath,
-	readObservationJournal,
+	parseObservationJournalText,
 } from "./observation-journal";
 import {
 	normalizeObservationRecord,
@@ -79,6 +80,71 @@ export type IngestObservationsResult = {
 	warnings: string[];
 	observation_ids: string[];
 };
+
+export type ObservationIngestPreview = {
+	eligible: boolean;
+	mode: "full" | "production-day";
+	source_digests: Record<string, string>;
+	candidate_count: number;
+	candidate_occurrence_identities: string[];
+	duplicate_count: number;
+	skip_reasons: string[];
+};
+
+/**
+ * Reusable, bounded journal view for previewing several named sessions.
+ * It contains only digests and occurrence identities, never journal payloads.
+ */
+export type ObservationIngestPreviewContext = {
+	readonly root: string;
+	readonly projectId: string;
+	readonly journalDigest: string;
+	readonly occurrenceIdentities: ReadonlySet<string>;
+};
+
+type PreparedObservationIngest = {
+	preview: ObservationIngestPreview;
+	projectId: string;
+	session: string;
+	timezone: string;
+	now: Date;
+	qualifyingEvidenceId?: string;
+	candidates: ObservationInput[];
+};
+
+type ReadObservationJournalSnapshot = () => string | null;
+
+function sourceDigest(value: unknown): string {
+	return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+export function createObservationIngestPreviewContext(
+	root: string,
+	projectId: string,
+	readJournalSnapshot: ReadObservationJournalSnapshot = () =>
+		readBoundedSourceFile(
+			observationJournalPath(root),
+			"observation journal",
+			OBSERVE_JOURNAL_LIMITS,
+		),
+): ObservationIngestPreviewContext {
+	const journalText = readJournalSnapshot();
+	const occurrenceIdentities = new Set<string>();
+	for (const event of parseObservationJournalText(journalText, projectId)) {
+		if (event.event_type !== "observation") continue;
+		const identity = String(
+			(event.payload.observation as Record<string, unknown>)
+				?.occurrence_identity ?? "",
+		);
+		if (identity) occurrenceIdentities.add(identity);
+	}
+	return {
+		root,
+		projectId,
+		journalDigest: sourceDigest(journalText),
+		occurrenceIdentities,
+	};
+}
 
 function hasCompletionSemantics(entry: EvidenceEntry): boolean {
 	return (
@@ -136,9 +202,10 @@ function telemetryMatchesEvidence(
  * Read a named workbench session and derive observations from canonical
  * evidence, telemetry, and an optional explicitly associated feedback report.
  */
-export function ingestObservationsForSession(
+function prepareObservationIngestForSession(
 	input: IngestObservationsInput,
-): IngestObservationsResult {
+	previewContext?: ObservationIngestPreviewContext,
+): PreparedObservationIngest {
 	const { root, projectId, session, feedbackId } = input;
 	const now = input.now ?? new Date();
 	if (!root.trim() || !projectId.trim() || !session.trim())
@@ -165,6 +232,11 @@ export function ingestObservationsForSession(
 	validateEvolutionIdentity({ projectId, timezone });
 	if (!resolved.projectId || resolved.projectId !== projectId)
 		throw new Error("evolution project identity mismatch");
+	if (
+		previewContext &&
+		(previewContext.root !== root || previewContext.projectId !== projectId)
+	)
+		throw new Error("observation preview context does not match input");
 	const paths = sessionPaths(root, session);
 	if (!existsSync(paths.sessionDir))
 		throw new Error(`Session folder not found: ${session}`);
@@ -195,11 +267,20 @@ export function ingestObservationsForSession(
 	// because this path cannot allocate or append anything.
 	if (!sessionComplete) {
 		return {
-			appended: 0,
-			duplicates: 0,
-			skipped: 0,
-			warnings: [],
-			observation_ids: [],
+			preview: {
+				eligible: false,
+				mode: input.mode ?? "full",
+				source_digests: { task: sourceDigest(taskText) },
+				candidate_count: 0,
+				candidate_occurrence_identities: [],
+				duplicate_count: 0,
+				skip_reasons: ["session_incomplete"],
+			},
+			projectId,
+			session,
+			timezone,
+			now,
+			candidates: [],
 		};
 	}
 
@@ -228,28 +309,27 @@ export function ingestObservationsForSession(
 			entry.exit_code === 0,
 	);
 	if (input.mode === "production-day") {
-		if (qualifyingEvidence) {
-			const db = openEvolutionDb(evolutionDbPath(root));
-			try {
-				appendProductionDayAllocation({
-					root,
-					db,
-					projectId,
-					timezone,
-					sessionId: session,
-					evidenceId: qualifyingEvidence.id,
-					now,
-				});
-			} finally {
-				db.close();
-			}
-		}
 		return {
-			appended: 0,
-			duplicates: 0,
-			skipped: 0,
-			warnings: [],
-			observation_ids: [],
+			preview: {
+				eligible: true,
+				mode: "production-day",
+				source_digests: {
+					task: sourceDigest(taskText),
+					evidence: sourceDigest(evidenceText),
+				},
+				candidate_count: 0,
+				candidate_occurrence_identities: [],
+				duplicate_count: 0,
+				skip_reasons: [],
+			},
+			projectId,
+			session,
+			timezone,
+			now,
+			...(qualifyingEvidence
+				? { qualifyingEvidenceId: qualifyingEvidence.id }
+				: {}),
+			candidates: [],
 		};
 	}
 
@@ -257,12 +337,17 @@ export function ingestObservationsForSession(
 		root,
 		session,
 		OBSERVE_TELEMETRY_LIMITS,
+		{ eventTypes: ["error", "blocker"] },
 	);
-	readBoundedSourceFile(
-		observationJournalPath(root),
-		"observation journal",
-		OBSERVE_JOURNAL_LIMITS,
-	);
+	const journalText = previewContext
+		? null
+		: readBoundedSourceFile(
+				observationJournalPath(root),
+				"observation journal",
+				OBSERVE_JOURNAL_LIMITS,
+			);
+	const journalDigest =
+		previewContext?.journalDigest ?? sourceDigest(journalText);
 	const failedEvidenceEntries = evidenceEntries.filter(
 		(entry) =>
 			ownsCompletion(entry) &&
@@ -321,61 +406,58 @@ export function ingestObservationsForSession(
 	// Normalize before any allocation so malformed source data cannot leave a
 	// production-day journal behind.
 	for (const candidate of allCandidates) normalizeObservationRecord(candidate);
-
-	const warnings: string[] = [];
-	const observationIds: string[] = [];
-	let appended = 0;
-	let skipped = 0;
-	let productionDaySequence = 0;
-	if (qualifyingEvidence) {
-		const receipt = resolveProductionDayReceipt({
-			root,
-			projectId,
-			timezone,
-			evidenceId: qualifyingEvidence.id,
-		});
-		if (receipt) {
-			productionDaySequence = receipt.ordinal_sequence;
-		} else {
-			const recoveryDb = openEvolutionDb(evolutionDbPath(root));
-			try {
-				productionDaySequence = appendProductionDayAllocation({
-					root,
-					db: recoveryDb,
-					projectId,
-					timezone,
-					sessionId: session,
-					evidenceId: qualifyingEvidence.id,
-					now,
-				}).ordinal_sequence;
-			} finally {
-				recoveryDb.close();
-			}
-		}
-		if (productionDaySequence <= 0)
-			throw new Error("qualifying evidence did not produce a production day");
-	}
-
 	if (allCandidates.length === 0) {
 		return {
-			appended,
-			duplicates: 0,
-			skipped,
-			warnings,
-			observation_ids: observationIds,
+			preview: {
+				eligible: true,
+				mode: "full",
+				source_digests: {
+					task: sourceDigest(taskText),
+					evidence: sourceDigest(evidenceText),
+					telemetry: sourceDigest(sessionTelemetryEvents),
+					journal: journalDigest,
+					...(feedback
+						? {
+								feedback: sourceDigest({
+									id: feedback.report_id,
+									created_at: feedback.created_at,
+									kind: feedback.kind,
+								}),
+							}
+						: {}),
+				},
+				candidate_count: 0,
+				candidate_occurrence_identities: [],
+				duplicate_count: 0,
+				skip_reasons: ["no_candidates"],
+			},
+			projectId,
+			session,
+			timezone,
+			now,
+			...(qualifyingEvidence
+				? { qualifyingEvidenceId: qualifyingEvidence.id }
+				: {}),
+			candidates: [],
 		};
 	}
 
-	const existingEvents = readObservationJournal(root, projectId);
-	const existingOccurrenceIds = new Set<string>();
-	for (const event of existingEvents) {
-		if (event.event_type !== "observation") continue;
-		const identity = String(
-			(event.payload.observation as Record<string, unknown>)
-				?.occurrence_identity ?? "",
-		);
-		if (identity) existingOccurrenceIds.add(identity);
-	}
+	// The journal digest and duplicate identities must come from the exact
+	// bounded snapshot above. Reopening the mutable path here would permit a
+	// replacement or growth between its cap check and this derivation.
+	const existingOccurrenceIds = previewContext
+		? previewContext.occurrenceIdentities
+		: new Set(
+				parseObservationJournalText(journalText, projectId)
+					.filter((event) => event.event_type === "observation")
+					.map((event) =>
+						String(
+							(event.payload.observation as Record<string, unknown>)
+								?.occurrence_identity ?? "",
+						),
+					)
+					.filter(Boolean),
+			);
 
 	let duplicates = 0;
 	const deduped = new Map<string, ObservationInput>();
@@ -396,37 +478,154 @@ export function ingestObservationsForSession(
 		}
 		deduped.set(key, candidate);
 	}
-	if (deduped.size === 0) {
+	return {
+		preview: {
+			eligible: true,
+			mode: "full",
+			source_digests: {
+				task: sourceDigest(taskText),
+				evidence: sourceDigest(evidenceText),
+				telemetry: sourceDigest(sessionTelemetryEvents),
+				journal: journalDigest,
+				...(feedback
+					? {
+							feedback: sourceDigest({
+								id: feedback.report_id,
+								created_at: feedback.created_at,
+								kind: feedback.kind,
+							}),
+						}
+					: {}),
+			},
+			candidate_count: deduped.size,
+			candidate_occurrence_identities: [...deduped.keys()],
+			duplicate_count: duplicates,
+			skip_reasons:
+				allCandidates.length === 0
+					? ["no_candidates"]
+					: deduped.size === 0
+						? ["all_candidates_duplicate"]
+						: [],
+		},
+		projectId,
+		session,
+		timezone,
+		now,
+		...(qualifyingEvidence
+			? { qualifyingEvidenceId: qualifyingEvidence.id }
+			: {}),
+		candidates: [...deduped.values()],
+	};
+}
+
+/** Read-only bounded preparation for one explicitly named session. */
+export function previewObservationIngestForSession(
+	input: IngestObservationsInput,
+	previewContext?: ObservationIngestPreviewContext,
+): ObservationIngestPreview {
+	return prepareObservationIngestForSession(input, previewContext).preview;
+}
+
+/** Persist the exact candidates established by the shared read-only preparation. */
+export function ingestObservationsForSession(
+	input: IngestObservationsInput,
+): IngestObservationsResult {
+	const prepared = prepareObservationIngestForSession(input);
+	if (!prepared.preview.eligible) {
 		return {
-			appended,
-			duplicates,
-			skipped,
-			warnings,
-			observation_ids: observationIds,
+			appended: 0,
+			duplicates: 0,
+			skipped: 0,
+			warnings: [],
+			observation_ids: [],
 		};
 	}
-
-	const db = openEvolutionDb(evolutionDbPath(root));
+	if (prepared.preview.mode === "production-day") {
+		if (prepared.qualifyingEvidenceId) {
+			const db = openEvolutionDb(evolutionDbPath(input.root));
+			try {
+				appendProductionDayAllocation({
+					root: input.root,
+					db,
+					projectId: prepared.projectId,
+					timezone: prepared.timezone,
+					sessionId: prepared.session,
+					evidenceId: prepared.qualifyingEvidenceId,
+					now: prepared.now,
+				});
+			} finally {
+				db.close();
+			}
+		}
+		return {
+			appended: 0,
+			duplicates: 0,
+			skipped: 0,
+			warnings: [],
+			observation_ids: [],
+		};
+	}
+	let productionDaySequence = 0;
+	if (prepared.qualifyingEvidenceId) {
+		const receipt = resolveProductionDayReceipt({
+			root: input.root,
+			projectId: prepared.projectId,
+			timezone: prepared.timezone,
+			evidenceId: prepared.qualifyingEvidenceId,
+		});
+		if (receipt) productionDaySequence = receipt.ordinal_sequence;
+		else {
+			const db = openEvolutionDb(evolutionDbPath(input.root));
+			try {
+				productionDaySequence = appendProductionDayAllocation({
+					root: input.root,
+					db,
+					projectId: prepared.projectId,
+					timezone: prepared.timezone,
+					sessionId: prepared.session,
+					evidenceId: prepared.qualifyingEvidenceId,
+					now: prepared.now,
+				}).ordinal_sequence;
+			} finally {
+				db.close();
+			}
+		}
+		if (productionDaySequence <= 0)
+			throw new Error("qualifying evidence did not produce a production day");
+	}
+	if (prepared.candidates.length === 0) {
+		return {
+			appended: 0,
+			duplicates: prepared.preview.duplicate_count,
+			skipped: 0,
+			warnings: [],
+			observation_ids: [],
+		};
+	}
+	let appended = 0;
+	let duplicates = prepared.preview.duplicate_count;
+	let skipped = 0;
+	const warnings: string[] = [];
+	const observationIds: string[] = [];
+	const db = openEvolutionDb(evolutionDbPath(input.root));
 	try {
-		for (const candidate of deduped.values()) {
+		for (const candidate of prepared.candidates) {
 			try {
 				const record = normalizeObservationRecord({
 					...candidate,
 					productionDaySequence,
 				});
 				const result = appendObservationJournalEventWithStatus({
-					root,
+					root: input.root,
 					db,
-					projectId,
+					projectId: prepared.projectId,
 					observation: record,
-					now,
+					now: prepared.now,
 				});
 				if (result.appended) {
 					appended++;
 					observationIds.push(record.id);
-				} else {
-					duplicates++;
-				}
+				} else duplicates++;
 			} catch (error) {
 				warnings.push(
 					`observer failed for candidate ${candidate.id ?? "unknown"}: ${(error as Error).message}`,
@@ -437,7 +636,6 @@ export function ingestObservationsForSession(
 	} finally {
 		db.close();
 	}
-
 	return {
 		appended,
 		duplicates,
