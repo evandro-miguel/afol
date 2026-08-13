@@ -62,6 +62,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	preflight: "plan checks",
 	telemetry: "inspect telemetry",
 	file: "append/move/archive",
+	fleet: "fleet state",
 	update: "update scaffold",
 	health: "health checks",
 	db: "database state",
@@ -388,11 +389,10 @@ export function formatHelpText(
 		"  -j, --json  JSON",
 		"  --for <intent>  planning|execution|maintenance",
 		"  --verbose  details",
-		"  afol help --verbose",
-		"  afol help <command>",
+		"  help --verbose|<command>",
 		"  a=afol",
 		"Side effects",
-		"  read=no writes; generated=derived; append=rows; write=files/state",
+		"  read=none; generated=derived; append=rows; write=state",
 	);
 	return lines.join("\n");
 }
