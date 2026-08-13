@@ -49,11 +49,11 @@ describe("help formatter", () => {
 		expect(help).toContain(
 			"pb/project-benchmark[generated] - compare references",
 		);
+		expect(help).toContain("fleet[write] - fleet state");
 		expect(help).toContain("Side effects");
-		expect(help).toMatch(/write=[^;\n]*files\/state/);
-		expect(help).toContain("  afol help --verbose");
-		expect(help).toContain("  afol help <command>");
-		expect(help).not.toContain("afol help --verbose|help <command>");
+		expect(help).toContain("read=none");
+		expect(help).toContain("write=state");
+		expect(help).toContain("  help --verbose|<command>");
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
 		expect(help).not.toContain("ma/maintenance");

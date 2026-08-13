@@ -414,7 +414,7 @@ describe("kernel front-door", () => {
 			expect(proc.stdout as string).toContain("v/validate");
 			expect(proc.stdout as string).toContain("n/new");
 			expect(proc.stdout as string).toContain("bench");
-			expect(proc.stdout as string).toContain("afol help --verbose");
+			expect(proc.stdout as string).toContain("help --verbose|<command>");
 			expect(proc.stdout as string).toContain("a=afol");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
