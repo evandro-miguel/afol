@@ -767,7 +767,7 @@ async function collectProjectCheck(
 
 	try {
 		validation = await toFleetValidationSummary(projectRoot);
-	} catch (_error) {
+	} catch {
 		validation = {
 			ok: false,
 			failed_check_ids: ["validate:error"],
@@ -778,7 +778,7 @@ async function collectProjectCheck(
 			checkTemplateUpdate(projectRoot),
 			maxPaths,
 		);
-	} catch (_error) {
+	} catch {
 		templateUpdate = {
 			...EMPTY_FLEET_TEMPLATE_UPDATE,
 			has_source: false,
@@ -800,7 +800,7 @@ async function collectProjectCheck(
 			localState: true,
 			pstr: false,
 		});
-	} catch (_error) {
+	} catch {
 		return toFleetProjectReport(projectRoot, ["error:local-state"], entrypoint);
 	}
 
