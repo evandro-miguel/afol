@@ -346,6 +346,7 @@ describe("kernel front-door", () => {
 			["./commands/local-state", ["runLocalStateCommand"]],
 			["./commands/maintenance", ["runMaintenanceCommand"]],
 			["./commands/memory", ["runMemoryCommand"]],
+			["./commands/fleet", ["runFleetCommand"]],
 			["./commands/preflight", ["runPreflightCommand"]],
 			["./commands/project-benchmark", ["runProjectBenchmarkCommand"]],
 			["./commands/pstr", ["runPstrCommand"]],
@@ -403,7 +404,7 @@ describe("kernel front-door", () => {
 			const proc = runKernel(root, ["-h"]);
 			expect(proc.status).toBe(0);
 			const lines = (proc.stdout as string).trim().split("\n");
-			expect(lines.length).toBeLessThanOrEqual(70);
+			expect(lines.length).toBeLessThanOrEqual(71);
 			expect(proc.stdout as string).toContain("Usage: afol");
 			expect(proc.stdout as string).toContain("Commands");
 			expect(proc.stdout as string).toContain("s/status");

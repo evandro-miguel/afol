@@ -17,8 +17,9 @@ export type CommandKind =
 	| "hook"
 	| "rule"
 	| "skill"
-	| "update"
 	| "file"
+	| "fleet"
+	| "update"
 	| "localState"
 	| "pstr"
 	| "ctx"
@@ -655,6 +656,35 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "ud|undo --mutation-id <id>",
 				sideEffect: "write",
 				description: "Undo a recorded mutation",
+			},
+		],
+	},
+	{
+		command: "fleet",
+		aliases: [],
+		kind: "fleet",
+		sideEffect: "write",
+		description: "Check and repair fleet-managed project state",
+		category: "ops",
+		guidance: [
+			"Use check to inspect; use repair with --dry-run before applying fixes.",
+		],
+		subcommands: [
+			{
+				usage: "check --root <path> [--root <path>...] [--json]",
+				sideEffect: "read",
+				description: "Check one or more explicit project roots",
+			},
+			{
+				usage: "repair --derived --dry-run --root <path> [--json]",
+				sideEffect: "read",
+				description: "Preview derived-state repair without writing",
+			},
+			{
+				usage: "repair --derived --root <path> --reason <text> [--json]",
+				sideEffect: "write",
+				requires_approval: true,
+				description: "Rebuild derived state for one explicit root",
 			},
 		],
 	},

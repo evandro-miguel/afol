@@ -711,22 +711,28 @@ describe("validation command family", () => {
 			expect(proc.status).toBe(0);
 			const payload = parseJsonOutput(proc.stdout as string);
 			expect(payload.mode).toBe("benchmark");
-			expect(payload.result_count).toBe(4);
+			expect(payload.result_count).toBe(7);
 			expect(payload.status).toBe("passed");
 			expect(payload.pass).toBe(true);
 			expect(payload.summary).toEqual({
-				total: 4,
-				passed: 4,
+				total: 7,
+				passed: 7,
 				failed: 0,
 				skipped: 0,
 				baseline_missing: 0,
 			});
 			const results = payload.results as Array<Record<string, unknown>>;
-			expect(results.length).toBe(4);
+			expect(results.length).toBe(7);
 			expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(
 				true,
 			);
 			expect(results.some((entry) => entry.status === "failed")).toBe(false);
+			const scenarioIds = new Set(
+				results.map((entry) => String(entry.scenario_id)),
+			);
+			expect(scenarioIds.has("fleet-check")).toBe(true);
+			expect(scenarioIds.has("fleet-preview")).toBe(true);
+			expect(scenarioIds.has("fleet-apply")).toBe(true);
 		},
 		slowValidationTestTimeoutMs,
 	);

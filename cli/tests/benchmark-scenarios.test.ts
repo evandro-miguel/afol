@@ -6,6 +6,36 @@ import { runQuickTaskCommand } from "../commands/quick-task";
 import { resolveCommand } from "../router";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
 
+type FleetScenario = {
+	scenario_id: string;
+	pack_id: string;
+	command: string;
+	coverage?: {
+		subcommands?: string[];
+		journeys?: string[];
+	};
+	expected_exit?: number;
+	implementation_status?: "planned" | "implemented" | "skipped";
+};
+
+function readFleetScenario(name: string): FleetScenario {
+	return JSON.parse(
+		readFileSync(
+			join(
+				process.cwd(),
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"scenarios",
+				"update-safety",
+				`${name}.json`,
+			),
+			"utf8",
+		),
+	) as FleetScenario;
+}
+
 function lifecycleScenario() {
 	const scenario = listBenchScenarios().find(
 		(candidate) => candidate.id === "governed-task-lifecycle",
@@ -99,5 +129,69 @@ describe("governed-task-lifecycle benchmark contract", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+});
+
+describe("fleet update-safety benchmark scenarios", () => {
+	test("covers fleet check, preview, and ineligible apply subcommands", () => {
+		const check = readFleetScenario("fleet-check");
+		const preview = readFleetScenario("fleet-preview");
+		const apply = readFleetScenario("fleet-apply");
+
+		const checkSubcommand =
+			"fleet check --root <path> [--root <path>...] [--json]";
+		const previewSubcommand =
+			"fleet repair --derived --dry-run --root <path> [--json]";
+		const applySubcommand =
+			"fleet repair --derived --root <path> --reason <text> [--json]";
+
+		expect(check).toMatchObject({
+			scenario_id: "fleet-check",
+			pack_id: "update-safety",
+			command:
+				"afol fleet check --root /__afol_fleet_benchmark_missing_root_v1__ --json",
+			implementation_status: "implemented",
+		});
+		expect(preview).toMatchObject({
+			scenario_id: "fleet-preview",
+			pack_id: "update-safety",
+			command:
+				"afol fleet repair --derived --dry-run --root /__afol_fleet_benchmark_missing_root_v1__ --json",
+			implementation_status: "implemented",
+		});
+		expect(apply).toMatchObject({
+			scenario_id: "fleet-apply",
+			pack_id: "update-safety",
+			implementation_status: "implemented",
+			command:
+				'afol fleet repair --derived --root /__afol_fleet_benchmark_missing_root_v1__ --reason "missing-config guard" --json',
+		});
+
+		expect(check.coverage?.subcommands).toEqual([checkSubcommand]);
+		expect(preview.coverage?.subcommands).toEqual([previewSubcommand]);
+		expect(apply.coverage?.subcommands).toEqual([applySubcommand]);
+
+		expect(check.coverage?.journeys?.length).toBeGreaterThanOrEqual(1);
+		expect(preview.coverage?.journeys?.length).toBeGreaterThanOrEqual(1);
+		expect(apply.coverage?.journeys?.length).toBeGreaterThanOrEqual(1);
+		expect([
+			...(check.coverage?.subcommands ?? []),
+			...(preview.coverage?.subcommands ?? []),
+			...(apply.coverage?.subcommands ?? []),
+		]).toEqual(
+			expect.arrayContaining([
+				checkSubcommand,
+				previewSubcommand,
+				applySubcommand,
+			]),
+		);
+		expect(check.expected_exit).toBe(1);
+		expect(preview.expected_exit).toBe(0);
+		expect(apply.expected_exit).toBe(1);
+		for (const scenario of [check, preview, apply]) {
+			expect(scenario.command).not.toContain("--root / ");
+			expect(scenario.command).not.toMatch(/--root\s+\/[^\w]/);
+		}
+		expect(preview.expected_exit).toBe(0);
 	});
 });

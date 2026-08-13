@@ -28,6 +28,7 @@
           "skill",
           "close",
           "file",
+          "fleet",
           "update",
           "bootstrap",
           "verify",
@@ -829,6 +830,35 @@
           "usage": "ud|undo --mutation-id <id>",
           "side_effect": "write",
           "description": "Undo a recorded mutation"
+        }
+      ]
+    },
+    {
+      "id": "fleet",
+      "name": "AFOL Fleet",
+      "tool": "afol",
+      "wrapper_command": "afol fleet",
+      "aliases": [],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Check and repair fleet-managed project state",
+      "subcommands": [
+        {
+          "usage": "check --root <path> [--root <path>...] [--json]",
+          "side_effect": "read",
+          "description": "Check one or more explicit project roots"
+        },
+        {
+          "usage": "repair --derived --dry-run --root <path> [--json]",
+          "side_effect": "read",
+          "description": "Preview derived-state repair without writing"
+        },
+        {
+          "usage": "repair --derived --root <path> --reason <text> [--json]",
+          "side_effect": "write",
+          "description": "Rebuild derived state for one explicit root"
         }
       ]
     },

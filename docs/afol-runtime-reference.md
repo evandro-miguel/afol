@@ -107,6 +107,8 @@ Operations:
 afol update check
 afol update preview
 afol update apply --dry-run
+afol fleet check --root /absolute/project/root
+afol fleet repair --derived --dry-run --root /absolute/project/root
 afol health
 afol doctor
 afol bench list
@@ -116,6 +118,13 @@ afol project-benchmark list
 Use compact command output by default. Add `--json` only when a downstream tool
 needs a field, and target that field instead of loading large payloads into
 agent context.
+
+`fleet check` accepts up to 25 explicit absolute roots and reports compact
+update, health, validation, Git, and derived-state posture without changing the
+projects. `fleet repair --derived` never applies scaffold updates or resolves
+conflicts. Preview first; a real repair also requires `--reason` and is eligible
+only for a recognized AFOL project whose failure is limited to rebuildable
+local state.
 
 ## State Ownership
 
