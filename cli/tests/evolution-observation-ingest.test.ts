@@ -277,13 +277,15 @@ describe("observation-ingest", () => {
 		const observation = readObservationJournal(root, PROJECT_ID).find(
 			(event) => event.event_type === "observation",
 		);
+		if (!observation) {
+			throw new Error("expected observation journal event");
+		}
 
 		expect(preview.eligible).toBe(true);
 		expect(preview.candidate_count).toBe(result.appended);
-		expect(observation).toBeDefined();
 		expect(preview.candidate_occurrence_identities).toEqual([
 			String(
-				(observation!.payload.observation as Record<string, unknown>)
+				(observation.payload.observation as Record<string, unknown>)
 					.occurrence_identity,
 			),
 		]);
