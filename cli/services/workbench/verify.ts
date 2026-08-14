@@ -68,6 +68,7 @@ const COMMAND_WRAPPERS = new Set(["command", "builtin"]);
 const EXEC_WRAPPER = "exec";
 const SHELL_WRAPPERS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
 const EVAL_WRAPPER = "eval";
+const SHELL_NOOP_EXEMPT = "-n";
 
 type CountedTaskState =
 	| "done"
@@ -566,6 +567,14 @@ function shellScriptArgument(
 	while (index < words.length) {
 		const word = words[index] ?? "";
 		if (word === "--") return undefined;
+		if (word === SHELL_NOOP_EXEMPT) {
+			const next = words[index + 1] ?? "";
+			if (!next || next === "--" || next === "-" || next.startsWith("-")) {
+				return null;
+			}
+			index += 1;
+			continue;
+		}
 		if (/^-[A-Za-z]*c[A-Za-z]*$/.test(word)) {
 			return words[index + 1] ?? null;
 		}

@@ -2649,6 +2649,10 @@ describe("workbench lifecycle service", () => {
 				"sh -c true",
 				"bash -lc 'true'",
 				"zsh -c ':'",
+				"sh -n",
+				"bash -n",
+				"sh -n --",
+				"bash -n --",
 				"/bin/sh -c true",
 				"/usr/bin/bash -lc true",
 				"/usr/bin/zsh -c :",
@@ -2685,6 +2689,23 @@ describe("workbench lifecycle service", () => {
 					"failed strict verification",
 				);
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("shell syntax-check evidence can authorize done task completion and closure", () => {
+		const root = mkRoot("sh-n-closure");
+		try {
+			const created = newWorkstream(root, "sh -n evidence");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "sh -n session-task.sh",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			expect(() => closeSession(root, created.session)).not.toThrow();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
