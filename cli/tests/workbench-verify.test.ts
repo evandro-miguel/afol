@@ -98,6 +98,10 @@ describe("evidence completion authorization", () => {
 			"sh -c true",
 			"bash -lc 'true'",
 			"zsh -c ':'",
+			"sh -n",
+			"bash -n",
+			"sh -n --",
+			"bash -n --",
 			"/bin/sh -c true",
 			"/usr/bin/bash -lc true",
 			"/usr/bin/zsh -c :",
@@ -122,6 +126,27 @@ describe("evidence completion authorization", () => {
 					},
 				]),
 			).toEqual({ status: "missing" });
+		}
+	});
+
+	test("authorizes shell syntax-check commands as runnable evidence", () => {
+		for (const command of [
+			"sh -n session-task.sh",
+			"bash -n session-task.sh",
+			"/bin/sh -n session-task.sh",
+			"/usr/bin/zsh -n session-task.sh",
+		]) {
+			expect(
+				evidenceCompletionAuthorization([
+					{
+						id: `E-${command.trim()}`,
+						command,
+						result: "passed",
+						exit_code: 0,
+						provenance: "observed",
+					},
+				]),
+			).toEqual({ status: "passed", evidenceId: `E-${command.trim()}` });
 		}
 	});
 

@@ -53,7 +53,8 @@ const CLOSE_COMMAND_HELP = [
 	"  --session <session-id>      Workbench session; omit when active/bound",
 	"  -m, --summary <text>        Summary for the generated report",
 	"  --allow-no-report           Explicitly waive a missing report",
-	"  --reason <text>             Required with --allow-no-report",
+	"  --carry-open                Move open tasks to one governed continuation",
+	"  --reason <text>             Required with --allow-no-report or --carry-open",
 	"  --admit-legacy-baseline     Waive issues admitted by the legacy evidence baseline",
 	"  -j, --json                  Emit machine-readable close result",
 ].join("\n");

@@ -246,6 +246,11 @@ export const FLAG_ALIASES = Object.freeze({
 		"-S": "--session",
 		"-m": "--message",
 	}),
+	transition: Object.freeze({
+		"-S": "--session",
+		"-T": "--task-id",
+		"-r": "--reason",
+	}),
 	maintenance: Object.freeze({
 		"-D": "--dry-run",
 	}),

@@ -40,11 +40,14 @@ type StatusSnapshot = {
 	validationOrChecks: string[];
 	blockers: string[];
 	next: string[];
+	warnings: string[];
 	configPath: string;
 	configSource: ProjectConfigSource;
 	lockPath: string;
 	activeSessionPath: string;
 	taskFilePath?: string;
+	problemReason?: string;
+	safeNextAction?: string;
 	sessionCount?: number | null;
 	sessionHealth?: string[];
 	catchup: CatchupReport | undefined;
@@ -77,6 +80,9 @@ type StatusJsonData = {
 		task_file: string | null;
 	};
 	session: StatusSessionInfo | undefined;
+	warnings: string[];
+	problem_reason?: string;
+	safe_next_action?: string;
 };
 
 const FIELD_HEADERS = [
@@ -102,6 +108,7 @@ const TASK_STATE_PRIORITY: Record<string, number> = {
 type TaskBoardRow = {
 	taskId: string;
 	state: string;
+	notes: string;
 };
 
 type StatusCommandError = Error & {
@@ -269,6 +276,34 @@ function normalizeList(values: string[]): string[] {
 	return normalized.length > 0 ? normalized : ["none"];
 }
 
+function compactSafeAction(values: string[]): string | undefined {
+	const normalized = values
+		.map((value) => value.trim())
+		.filter((value) => value.length > 0 && value.toLowerCase() !== "none");
+	return normalized.length > 0 ? (normalized[0] ?? undefined) : undefined;
+}
+
+function compactProblemReason(
+	status: string,
+	boardNotes?: string,
+): string | undefined {
+	if (status === "problem") {
+		const canonicalNote = taskReasonFromNotes(boardNotes ?? "");
+		if (canonicalNote) {
+			return canonicalNote;
+		}
+		return undefined;
+	}
+	if (status === "corrupt") {
+		return "active session state is corrupt";
+	}
+	return undefined;
+}
+
+function compactSafeNextAction(next: string[]): string | undefined {
+	return compactSafeAction(next);
+}
+
 function extractFieldList(
 	content: string,
 	label: "FILES_WRITTEN" | "VALIDATION_OR_CHECKS" | "BLOCKERS" | "NEXT",
@@ -368,9 +403,23 @@ function parseTaskBoardRows(content: string): TaskBoardRow[] {
 		rows.push({
 			taskId: match[1],
 			state: (match[2] ?? "").trim(),
+			notes: (match[4] ?? "").trim(),
 		});
 	}
 	return rows;
+}
+
+function taskReasonFromNotes(notes: string): string | undefined {
+	const encoded = /(?:^|\s)reason=([^\s]+)/.exec(notes)?.[1];
+	if (!encoded) {
+		return undefined;
+	}
+	try {
+		const reason = decodeURIComponent(encoded).trim();
+		return reason.length > 0 ? reason : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function taskStatePriority(state: string): number {
@@ -535,6 +584,11 @@ function readStatusSnapshot(
 	const globalFindings = includeHealthFindings
 		? collectGlobalStatusFindings(loaded.value.root)
 		: [];
+	const warnings = globalFindings.map((finding) =>
+		finding.next
+			? `${finding.validation} (next: ${finding.next})`
+			: finding.validation,
+	);
 	const selectedSession =
 		resolveEffectiveSession(loaded.value.root, {
 			...(freshnessSession ? { explicit: freshnessSession } : {}),
@@ -558,15 +612,10 @@ function readStatusSnapshot(
 			status: "none",
 			task: "none",
 			filesWritten: ["none"],
-			validationOrChecks: mergeStatusEntries(
-				["none"],
-				globalFindings.map((entry) => entry.validation),
-			),
+			validationOrChecks: mergeStatusEntries(["none"], []),
 			blockers: ["none"],
-			next: mergeStatusEntries(
-				["none"],
-				globalFindings.map((entry) => entry.next),
-			),
+			next: mergeStatusEntries(["none"], []),
+			warnings,
 			configPath: loaded.value.configPath,
 			configSource: loaded.value.configSource,
 			lockPath,
@@ -581,22 +630,22 @@ function readStatusSnapshot(
 		if (taskId) {
 			throw taskNotFoundError(taskId, selectedSession);
 		}
+		const status =
+			sessionLifecycleState(loaded.value.root, selectedSession) === "corrupt"
+				? "corrupt"
+				: "none";
+		const problemReason = compactProblemReason(status);
+		const safeNextAction = compactSafeNextAction(["none"]);
 		return {
-			status:
-				sessionLifecycleState(loaded.value.root, selectedSession) === "corrupt"
-					? "corrupt"
-					: "none",
+			status,
 			task: "none",
 			filesWritten: ["none"],
-			validationOrChecks: mergeStatusEntries(
-				["none"],
-				globalFindings.map((entry) => entry.validation),
-			),
+			validationOrChecks: mergeStatusEntries(["none"], []),
 			blockers: ["missing canonical task file"],
-			next: mergeStatusEntries(
-				["none"],
-				globalFindings.map((entry) => entry.next),
-			),
+			next: mergeStatusEntries(["none"], []),
+			warnings,
+			...(problemReason ? { problemReason } : {}),
+			...(safeNextAction ? { safeNextAction } : {}),
 			configPath: loaded.value.configPath,
 			configSource: loaded.value.configSource,
 			lockPath,
@@ -612,6 +661,13 @@ function readStatusSnapshot(
 	const task = selectTaskId(content, frontmatter, fileName, taskId);
 	const status =
 		extractTaskState(content, task) ?? frontmatter.status?.trim() ?? "none";
+	const taskRowNotes = parseTaskBoardRows(content).find(
+		(row) => row.taskId === task,
+	)?.notes;
+	const problemReason = compactProblemReason(status, taskRowNotes);
+	const safeNextAction = compactSafeNextAction(
+		extractFieldList(content, "NEXT"),
+	);
 
 	return {
 		status,
@@ -619,13 +675,13 @@ function readStatusSnapshot(
 		filesWritten: extractFieldList(content, "FILES_WRITTEN"),
 		validationOrChecks: mergeStatusEntries(
 			extractFieldList(content, "VALIDATION_OR_CHECKS"),
-			globalFindings.map((entry) => entry.validation),
+			[],
 		),
 		blockers: extractFieldList(content, "BLOCKERS"),
-		next: mergeStatusEntries(
-			extractFieldList(content, "NEXT"),
-			globalFindings.map((entry) => entry.next),
-		),
+		warnings,
+		next: mergeStatusEntries(extractFieldList(content, "NEXT"), []),
+		...(problemReason ? { problemReason } : {}),
+		...(safeNextAction ? { safeNextAction } : {}),
 		configPath: loaded.value.configPath,
 		configSource: loaded.value.configSource,
 		lockPath,
@@ -649,6 +705,18 @@ function formatCompact(snapshot: StatusSnapshot): string {
 		"NEXT:",
 		...snapshot.next.map((entry) => `- ${entry}`),
 	];
+	if (snapshot.problemReason) {
+		lines.push(`PROBLEM_REASON: ${snapshot.problemReason}`);
+	}
+	if (snapshot.safeNextAction) {
+		lines.push(`SAFE_NEXT_ACTION: ${snapshot.safeNextAction}`);
+	}
+	if (snapshot.warnings.length > 0) {
+		lines.push("WARNINGS:");
+		for (const warning of snapshot.warnings) {
+			lines.push(`- ${warning}`);
+		}
+	}
 
 	if (snapshot.sessionCount !== undefined) {
 		if (snapshot.sessionCount === null) {
@@ -713,6 +781,7 @@ export function runStatusCommand(
 			task: snapshot.task,
 			files_written: snapshot.filesWritten,
 			validation_or_checks: snapshot.validationOrChecks,
+			warnings: snapshot.warnings,
 			blockers: snapshot.blockers,
 			next: snapshot.next,
 			session_count: snapshot.sessionCount ?? null,
@@ -738,14 +807,24 @@ export function runStatusCommand(
 					}
 				: undefined,
 		};
+		if (snapshot.problemReason) {
+			data.problem_reason = snapshot.problemReason;
+		}
+		if (snapshot.safeNextAction) {
+			data.safe_next_action = snapshot.safeNextAction;
+		}
+
 		const output = stringifyEnvelope(
 			envelopeWithLegacyKeys(resultEnvelope(data, "status", 0), [
 				"status",
 				"task",
+				"warnings",
 				"files_written",
 				"validation_or_checks",
 				"blockers",
 				"next",
+				"problem_reason",
+				"safe_next_action",
 				"session_count",
 				"session_health_warnings",
 				"paths",

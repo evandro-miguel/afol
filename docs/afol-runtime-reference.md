@@ -62,6 +62,18 @@ selected execution-policy task.
 `afol status` has an optional `--catchup` flag to include the same session
 freshness checks as `afol catchup`.
 
+`afol status` output now includes compact summary lines:
+
+- `PROBLEM_REASON`: emitted only when a canonical blocker reason is available in
+  task `State Board` notes as `reason=<urlencoded>`, for `problem` state.
+- `BLOCKERS` reflects task-local blockers from the boarded state. Global/state
+  health findings remain `WARNINGS`.
+- `SAFE_NEXT_ACTION`: emitted when a concrete next action is available; omitted
+  when no practical next action can be compacted.
+
+Auxiliary index/health findings are surfaced as `WARNINGS` and do not replace
+`BLOCKERS` content unless the task explicitly declares blockers.
+
 ### Hardening behavior
 
 - `catchup` and `status --catchup` report:
@@ -72,6 +84,8 @@ freshness checks as `afol catchup`.
     status query fails
 - `afol catchup` output marks the change count as `(degraded)` when git query
   health is uncertain.
+- `afol status` with `--health` keeps freshness/index issues in warnings and
+  keeps the legacy blocker/next pair focused on lifecycle task blockers.
 - If session-health collection fails as a whole, `afol status` reports
   `SESSIONS: unavailable` and a warning entry:
   - `unavailable: session health collection failed`

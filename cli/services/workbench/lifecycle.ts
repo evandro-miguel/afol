@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	openSync,
 	readFileSync,
+	rmSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -276,6 +277,9 @@ export type NewWorkstreamMetadata = {
 
 export type CloseSessionOptions = {
 	allowNoReport?: boolean;
+	carryOpen?: boolean;
+	onContinuationCreated?: (session: string) => void;
+	onContinuationRollback?: () => void;
 	reason?: string;
 	summary?: string;
 	/**
@@ -295,12 +299,14 @@ export type CloseSessionReport = {
 
 export type CloseSessionResult = string[] & {
 	report: CloseSessionReport;
+	continuation?: string;
 };
 
 export type LifecycleAuxiliaryRuntime = {
 	beforeAuxiliary?: (label: string) => void;
 	fencingCheck?: () => void;
 	afterActiveSessionWrite?: (session: string) => void;
+	deferNewSessionAuxiliary?: boolean;
 	/**
 	 * Inject a deterministic observer seam for testing.
 	 * When set, the observer calls this function instead of running
@@ -858,6 +864,58 @@ function markTaskMetadataClosed(
 	countHotPathOperation("workbench.canonical_write");
 }
 
+function carryOpenMetadata(
+	session: string,
+	document: ReturnType<typeof readTaskLifecycleState>["document"],
+	taskRows: readonly TaskRow[],
+	reason: string,
+): { theme: string; metadata: NewWorkstreamMetadata } {
+	if (document.kind !== "frontmatter") {
+		throw new Error(`Session ${session} must be governed to carry open tasks.`);
+	}
+	const value = (key: string) =>
+		document.lines
+			.map((line) => scalarValue(line, key))
+			.find((candidate) => candidate !== undefined)
+			?.trim() ?? "";
+	const featureId = value("feature_id") || value("roadmap_feature");
+	const parentSpec = value("parent_spec");
+	if (value("governance_status") !== "governed" || !featureId || !parentSpec) {
+		throw new Error(`Session ${session} must be governed to carry open tasks.`);
+	}
+	const theme = value("theme") || "workstream";
+	return {
+		theme: `${theme} continuation`,
+		metadata: {
+			intent: `Carry open from ${session}: ${reason}`,
+			featureId,
+			parentSpec,
+			tasks: taskRows.map((row) =>
+				`${row.taskId}: ${row.notes || `Carry open: ${reason}`}`.trim(),
+			),
+		},
+	};
+}
+
+function sanitizeCarryOpenReason(reason: string): string {
+	return sanitizeEvidenceText(reason)
+		.replaceAll("|", "/")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function carryOpenTransitionChain(state: string): readonly TaskState[] {
+	if (state === "pending" || state === "problem") return ["moved"];
+	if (state === "in_progress") return ["problem", "moved"];
+	if (
+		state === "implemented_untested" ||
+		state === "tested_needs_spec_validation"
+	) {
+		return ["problem", "moved"];
+	}
+	throw new Error(`Cannot carry open task in state ${state}.`);
+}
+
 function ensureSessionOpenForMutation(root: string, session: string): void {
 	const paths = sessionPaths(root, session);
 	if (!existsSync(paths.sessionDir)) {
@@ -898,8 +956,15 @@ function transitionTaskState(
 	taskId: string,
 	nextState: TaskState,
 	completionPolicy?: CompletionPolicy,
+	notesSuffix?: string,
 ): void {
-	transitionTaskStateChain(taskPath, taskId, [nextState], completionPolicy);
+	transitionTaskStateChain(
+		taskPath,
+		taskId,
+		[nextState],
+		completionPolicy,
+		notesSuffix,
+	);
 }
 
 function transitionTaskStateChain(
@@ -907,14 +972,22 @@ function transitionTaskStateChain(
 	taskId: string,
 	nextStates: readonly TaskState[],
 	completionPolicy?: CompletionPolicy,
+	notesSuffix?: string,
 ): void {
 	transitionTaskStateChains(taskPath, [
 		{
 			taskId,
 			nextStates,
 			...(completionPolicy ? { completionPolicy } : {}),
+			...(notesSuffix ? { notesSuffix } : {}),
 		},
 	]);
+}
+
+function encodeTaskReason(reason: string): string {
+	return encodeURIComponent(
+		sanitizeEvidenceText(reason).replace(/\s+/g, " ").trim(),
+	);
 }
 
 function transitionTaskStateChains(
@@ -923,6 +996,7 @@ function transitionTaskStateChains(
 		taskId: string;
 		nextStates: readonly TaskState[];
 		completionPolicy?: CompletionPolicy;
+		notesSuffix?: string;
 	}[],
 ): void {
 	const pending = new Map(
@@ -956,9 +1030,14 @@ function transitionTaskStateChains(
 				nextState === "in_progress" || nextState === "problem"
 					? row.attempt + 1
 					: row.attempt;
-			const baseNotes = row.notes
+			let baseNotes = row.notes
 				.replace(/(?:^|\s)attempt=\d+(?=\s|$)/g, " ")
 				.trim();
+			if (nextState === "in_progress") {
+				baseNotes = baseNotes
+					.replace(/(?:^|\s)reason=[^\s]+(?=\s|$)/g, " ")
+					.trim();
+			}
 			const policyNotes = change.completionPolicy
 				? [
 						baseNotes
@@ -980,6 +1059,12 @@ function transitionTaskStateChains(
 				state: nextState,
 				notes,
 				attempt: nextAttempt,
+			};
+		}
+		if (change.notesSuffix) {
+			row = {
+				...row,
+				notes: [row.notes, change.notesSuffix].filter(Boolean).join(" "),
 			};
 		}
 		return renderTaskRow(row);
@@ -1204,7 +1289,7 @@ export function newWorkstream(
 		mkdirSync(dirname(paths.activeSessionPath), { recursive: true });
 		atomicWriteText(paths.activeSessionPath, `${session}\n`);
 		const warnings: string[] = [];
-		if (runtime.afterActiveSessionWrite) {
+		if (!runtime.deferNewSessionAuxiliary && runtime.afterActiveSessionWrite) {
 			try {
 				runtime.afterActiveSessionWrite(session);
 			} catch {
@@ -1213,50 +1298,50 @@ export function newWorkstream(
 				);
 			}
 		}
-		auxiliaryWarning(
-			warnings,
-			"workbench new event",
-			() =>
-				appendWorkbenchEvent(root, {
-					type: "workbench.new",
-					session,
-					detail: {
-						theme: theme.trim(),
-					},
-				}),
-			runtime,
-		);
-		auxiliaryWarning(
-			warnings,
-			"session-start telemetry",
-			() =>
-				appendTelemetryEvent(root, {
-					event_type: "session_start",
-					session_id: session,
-					cmd_type: "new",
-					outcome: "success",
-				}),
-			runtime,
-		);
-		auxiliaryWarning(
-			warnings,
-			"pending-spec registration",
-			() =>
-				recordPendingSpecForSession(root, {
-					session,
-					theme,
-					taskIds,
-					createdAt,
-					...(metadata ? { metadata } : {}),
-				}),
-			runtime,
-		);
-		auxiliaryWarning(
-			warnings,
-			"local-state refresh",
-			() => refreshWorkbenchLocalState(root, session),
-			runtime,
-		);
+		if (!runtime.deferNewSessionAuxiliary) {
+			auxiliaryWarning(
+				warnings,
+				"workbench new event",
+				() =>
+					appendWorkbenchEvent(root, {
+						type: "workbench.new",
+						session,
+						detail: { theme: theme.trim() },
+					}),
+				runtime,
+			);
+			auxiliaryWarning(
+				warnings,
+				"session-start telemetry",
+				() =>
+					appendTelemetryEvent(root, {
+						event_type: "session_start",
+						session_id: session,
+						cmd_type: "new",
+						outcome: "success",
+					}),
+				runtime,
+			);
+			auxiliaryWarning(
+				warnings,
+				"pending-spec registration",
+				() =>
+					recordPendingSpecForSession(root, {
+						session,
+						theme,
+						taskIds,
+						createdAt,
+						...(metadata ? { metadata } : {}),
+					}),
+				runtime,
+			);
+			auxiliaryWarning(
+				warnings,
+				"local-state refresh",
+				() => refreshWorkbenchLocalState(root, session),
+				runtime,
+			);
+		}
 
 		return {
 			session,
@@ -1328,6 +1413,7 @@ export function transitionTask(
 	input: WorkbenchTaskRef & {
 		state: TaskState;
 		completionPolicy?: CompletionPolicy;
+		reason?: string;
 	},
 	runtime: InternalLifecycleAuxiliaryRuntime = {},
 ): string[] {
@@ -1340,6 +1426,9 @@ export function transitionTask(
 		const warnings: string[] = [];
 		const paths = sessionPaths(root, input.session);
 		ensureSessionOpenForMutation(root, input.session);
+		const reason = input.reason
+			? sanitizeEvidenceText(input.reason)
+			: undefined;
 		const from =
 			readTaskRows(paths.taskPath).find((row) => row.taskId === input.taskId)
 				?.state ?? "unknown";
@@ -1349,6 +1438,7 @@ export function transitionTask(
 			input.taskId,
 			input.state,
 			input.completionPolicy,
+			reason ? `reason=${encodeTaskReason(reason)}` : undefined,
 		);
 		auxiliaryWarning(
 			warnings,
@@ -1366,6 +1456,7 @@ export function transitionTask(
 							...(input.completionPolicy
 								? { completion_policy: input.completionPolicy }
 								: {}),
+							...(reason ? { reason } : {}),
 						},
 					},
 					runtime.deferredEventRecords,
@@ -2589,21 +2680,85 @@ export function closeSession(
 			: "missing";
 		let summarySource: CloseSessionReport["summary_source"] = "state";
 		let summary = options.summary?.trim() ?? "";
-		const taskRows = readTaskRows(paths.taskPath);
+		let taskRows = readTaskRows(paths.taskPath);
+		const originalTask = readFileSync(paths.taskPath, "utf8");
+		const originalActiveSession = existsSync(paths.activeSessionPath)
+			? readFileSync(paths.activeSessionPath, "utf8")
+			: undefined;
 		const hadLog = existsSync(paths.logPath);
 		const originalLog = hadLog
 			? readFileSync(paths.logPath, "utf8")
 			: "# Log\n";
 		const logSummary = readLogSummary(originalLog);
+		let continuation: NewWorkstreamResult | undefined;
+		let continuationTheme = "";
+		const rollbackContinuation = () => {
+			if (!continuation) return;
+			try {
+				options.onContinuationRollback?.();
+			} catch {
+				// The original close failure remains the actionable error.
+			}
+			atomicWriteText(paths.taskPath, originalTask);
+			rmSync(continuation.sessionDir, { recursive: true, force: true });
+			if (originalActiveSession !== undefined) {
+				atomicWriteText(paths.activeSessionPath, originalActiveSession);
+			} else if (existsSync(paths.activeSessionPath)) {
+				unlinkSync(paths.activeSessionPath);
+			}
+			try {
+				refreshWorkbenchLocalState(root);
+			} catch {
+				// The original close failure remains the actionable error.
+			}
+			continuation = undefined;
+		};
 		if (state.kind === "open") {
 			const blockingRows = taskRows.filter((row) =>
 				BLOCKING_STATES.has(row.state),
 			);
 			if (blockingRows.length > 0) {
-				const labels = blockingRows
-					.map((row) => `${row.taskId}:${row.state}`)
-					.join(", ");
-				throw new Error(`Session ${session} has blocking tasks: ${labels}`);
+				if (options.carryOpen) {
+					const reason = options.reason?.trim();
+					if (!reason)
+						throw new Error("Missing --reason for close carry-open.");
+					const carryReason = sanitizeCarryOpenReason(reason);
+					if (!carryReason)
+						throw new Error("Missing --reason for close carry-open.");
+					const carry = carryOpenMetadata(
+						session,
+						state.document,
+						blockingRows,
+						carryReason,
+					);
+					continuation = newWorkstream(root, carry.theme, carry.metadata, {
+						deferNewSessionAuxiliary: true,
+					});
+					const continuationSession = continuation.session;
+					continuationTheme = carry.theme;
+					try {
+						options.onContinuationCreated?.(continuationSession);
+						transitionTaskStateChains(
+							paths.taskPath,
+							blockingRows.map((row) => ({
+								taskId: row.taskId,
+								nextStates: carryOpenTransitionChain(row.state),
+								notesSuffix: `destination=${continuationSession} reason=${carryReason}`,
+							})),
+						);
+						taskRows = readTaskRows(paths.taskPath);
+					} catch (error) {
+						rollbackContinuation();
+						throw error;
+					}
+				} else {
+					const labels = blockingRows
+						.map((row) => `${row.taskId}:${row.state}`)
+						.join(", ");
+					throw new Error(`Session ${session} has blocking tasks: ${labels}`);
+				}
+			} else if (options.carryOpen) {
+				throw new Error(`Session ${session} has no open tasks to carry.`);
 			}
 			const verification = verifyWorkbenchTasks(paths.sessionDir, true);
 			if (options.admitLegacyBaseline) {
@@ -2625,6 +2780,7 @@ export function closeSession(
 				const message =
 					verification.issues.map((issue) => issue.message).join("; ") ||
 					"strict verification failed";
+				rollbackContinuation();
 				throw new Error(
 					`Session ${session} failed strict verification: ${message}`,
 				);
@@ -2705,6 +2861,7 @@ export function closeSession(
 						unlinkSync(paths.logPath);
 					}
 				}
+				rollbackContinuation();
 				throw error;
 			}
 		} else if (!summary) {
@@ -2724,6 +2881,38 @@ export function closeSession(
 			reportStatus === "waived" || reportStatus === "missing"
 				? evaluateCloseWarnings(session, paths.sessionDir)
 				: [];
+		if (continuation) {
+			const continuationSession = continuation.session;
+			auxiliaryWarning(
+				warnings,
+				"workbench new event",
+				() =>
+					appendWorkbenchEvent(root, {
+						type: "workbench.new",
+						session: continuationSession,
+						detail: { theme: continuationTheme },
+					}),
+				runtime,
+			);
+			auxiliaryWarning(
+				warnings,
+				"session-start telemetry",
+				() =>
+					appendTelemetryEvent(root, {
+						event_type: "session_start",
+						session_id: continuationSession,
+						cmd_type: "new",
+						outcome: "success",
+					}),
+				runtime,
+			);
+			auxiliaryWarning(
+				warnings,
+				"continuation local-state refresh",
+				() => refreshWorkbenchLocalState(root, continuationSession),
+				runtime,
+			);
+		}
 
 		const deferredEventRecords: Record<string, unknown>[] = [];
 		for (const [alreadyRecorded, writeDiagnostic] of [
@@ -2785,6 +2974,7 @@ export function closeSession(
 					: reportRelativePath,
 			summary_source: summarySource,
 		};
+		if (continuation) result.continuation = continuation.session;
 		return result;
 	});
 	finishMeasurement(result.join("\n"));

@@ -33,7 +33,10 @@ import {
 	validateFilesIndex,
 } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
-import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
+import {
+	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import {
 	admitsEvidenceTransitionIssue,
 	transitionAdmitEvidence,
@@ -57,12 +60,14 @@ import {
 	recordEvidence as recordEvidenceRaw,
 	recordVerificationRunStep,
 	sanitizeEvidenceText,
+	sessionPaths,
 	startTask,
 	taskAttemptSnapshot,
 	transitionTask,
 } from "../services/workbench/lifecycle";
 import {
 	bindSession,
+	compensateCarriedContinuationBinding,
 	readSessionContext,
 	resolveSession,
 } from "../services/workbench/session-context";
@@ -2559,7 +2564,8 @@ describe("workbench lifecycle service", () => {
 			doneTask(root, { session: second.session, taskId: "T-01" });
 			closeSession(root, second.session);
 
-			expect(validateWorkBenchIndex(root).ok).toBe(true);
+			const indexValidation = validateWorkBenchIndex(root);
+			if (!indexValidation.ok) throw new Error(indexValidation.message);
 			expect(validateFilesIndex(root).ok).toBe(true);
 			expect(readFileSync(filesIndexPath, "utf8")).toBe(filesIndexBefore);
 		} finally {
@@ -2649,6 +2655,10 @@ describe("workbench lifecycle service", () => {
 				"sh -c true",
 				"bash -lc 'true'",
 				"zsh -c ':'",
+				"sh -n",
+				"bash -n",
+				"sh -n --",
+				"bash -n --",
 				"/bin/sh -c true",
 				"/usr/bin/bash -lc true",
 				"/usr/bin/zsh -c :",
@@ -2685,6 +2695,23 @@ describe("workbench lifecycle service", () => {
 					"failed strict verification",
 				);
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("shell syntax-check evidence can authorize done task completion and closure", () => {
+		const root = mkRoot("sh-n-closure");
+		try {
+			const created = newWorkstream(root, "sh -n evidence");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "sh -n session-task.sh",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			expect(() => closeSession(root, created.session)).not.toThrow();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2823,6 +2850,213 @@ describe("workbench lifecycle service", () => {
 				"utf8",
 			);
 			expect(() => closeSession(root, created.session)).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession carries open tasks into one governed continuation", () => {
+		const root = mkRoot("close-carry-open");
+		try {
+			const created = newWorkstream(root, "carry-open", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["finished work", "blocked work"],
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "problem",
+				reason: "external dependency is unavailable",
+			});
+
+			const result = closeSession(root, created.session, {
+				carryOpen: true,
+				reason: "continue after dependency recovery",
+			});
+			const continuationId = result.continuation;
+			expect(continuationId).toBeTruthy();
+			if (!continuationId)
+				throw new Error("Expected a carry-open continuation.");
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-02 | moved |",
+			);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				`destination=${continuationId} reason=continue after dependency recovery`,
+			);
+			const report = readFileSync(join(root, result.report.path ?? ""), "utf8");
+			expect(report).toContain("- T-02: moved");
+			const continuation = sessionPaths(root, continuationId);
+			const continuationTask = readFileSync(continuation.taskPath, "utf8");
+			expect(continuationTask).toContain('feature_id: "F-30"');
+			expect(continuationTask).toContain('parent_spec: "carry-open-spec"');
+			expect(continuationTask).toContain("| T-01 | pending |");
+			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+				continuationId,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("carry-open compensation preserves canonical state when strict close fails", () => {
+		const root = mkRoot("close-carry-open-compensation");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const created = newWorkstream(root, "carry-open-compensation", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["invalid completion", "deferred work"],
+			});
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, { session: created.session, branch, worktree: root });
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			writeFileSync(created.evidencePath, "{invalid evidence}\n", "utf8");
+			rebuildWorkBenchIndex(root);
+			expect(validateWorkBenchIndex(root).ok).toBe(true);
+			const eventsBefore = readLocalStateEvents(root);
+			const close = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--carry-open",
+				"--reason",
+				"wait for dependency",
+			]);
+			expect(close.status).toBe(2);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-02 | pending |",
+			);
+			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+				created.session,
+			);
+			expect(readLocalStateEvents(root)).toEqual(eventsBefore);
+			expect(resolveSession(root, {})).toEqual({
+				session: created.session,
+				source: "context",
+			});
+			const indexValidation = validateWorkBenchIndex(root);
+			if (!indexValidation.ok) throw new Error(indexValidation.message);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close carry-open binds the continuation and removes the source context", () => {
+		const root = mkRoot("close-carry-open-context");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const created = newWorkstream(root, "carry-open-context", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["completed", "deferred"],
+			});
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, { session: created.session, branch, worktree: root });
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const close = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--carry-open",
+				"--reason",
+				"dependency pending",
+				"--json",
+			]);
+			expect(close.status).toBe(0);
+			const continuation = (
+				parseEnvelope(close.stdout as string).data as {
+					continuation: string;
+				}
+			).continuation;
+			expect(resolveSession(root, {})).toEqual({
+				session: continuation,
+				source: "context",
+			});
+			expect(
+				readSessionContext(root).bindings.map((entry) => entry.session),
+			).toEqual([continuation]);
+			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+				continuation,
+			);
+			const repeated = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--carry-open",
+				"--reason",
+				"dependency pending",
+				"--json",
+			]);
+			expect(repeated.status).toBe(0);
+			expect(
+				(
+					parseEnvelope(repeated.stdout as string).data as {
+						continuation?: string;
+					}
+				).continuation,
+			).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("carry-open binding compensation preserves a concurrent replacement", () => {
+		const root = mkRoot("carry-open-context-interleave");
+		try {
+			initGitRepo(root);
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, { session: "source", branch, worktree: root });
+			const continuation = bindSession(root, {
+				session: "continuation",
+				branch,
+				worktree: root,
+			});
+			bindSession(root, { session: "other", branch, worktree: root });
+			compensateCarriedContinuationBinding(root, {
+				sourceSession: "source",
+				continuation,
+			});
+			expect(
+				readSessionContext(root).bindings.map((entry) => entry.session),
+			).toEqual(["other"]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -5471,6 +5705,85 @@ describe("task completion authorization and transitions", () => {
 				},
 			});
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition to problem requires and persists a blocker reason", async () => {
+		const root = mkRoot("transition-problem-reason");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const created = newWorkstream(root, "transition problem reason", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			expect(
+				await runTransitionCommand(
+					[
+						"--session",
+						created.session,
+						"--task-id",
+						"T-01",
+						"--state",
+						"problem",
+						"--reason",
+						"hosted preview requires external credentials",
+					],
+					root,
+				),
+			).toBe(0);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | problem |",
+			);
+			expect(readLocalStateEvents(root)).toContainEqual(
+				expect.objectContaining({
+					type: "workbench.transition_task",
+					session: created.session,
+					taskId: "T-01",
+					detail: expect.objectContaining({
+						to: "problem",
+						reason: "hosted preview requires external credentials",
+					}),
+				}),
+			);
+			const status = runKernel(root, ["status", "--json"]);
+			expect(status.status).toBe(0);
+			expect(parseEnvelope(status.stdout as string).data).toMatchObject({
+				problem_reason: "hosted preview requires external credentials",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition rejects problem without a blocker reason", async () => {
+		const root = mkRoot("transition-problem-no-reason");
+		const originalError = console.error;
+		try {
+			const created = newWorkstream(root, "transition problem no reason", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			console.error = () => {};
+			expect(
+				await runTransitionCommand(
+					[
+						"--session",
+						created.session,
+						"--task-id",
+						"T-01",
+						"--state",
+						"problem",
+					],
+					root,
+				),
+			).toBe(2);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | in_progress |",
+			);
+		} finally {
+			console.error = originalError;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

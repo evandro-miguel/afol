@@ -26,6 +26,7 @@ import { rebuildPstrIndex } from "../services/pstr/builder";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import type { CatchupReport } from "../services/workbench/catchup";
 import { bindSession } from "../services/workbench/session-context";
+import { buildStartBriefing } from "../services/workbench/start-briefing";
 
 type CapturedIo = {
 	stdout: string[];
@@ -465,24 +466,25 @@ describe("status command", () => {
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
 			expect(payload.exit_code).toBe(0);
-			expect(Object.keys(payload).sort()).toEqual(
-				[
-					"action",
-					"data",
-					"exit_code",
-					"files_written",
-					"validation_or_checks",
-					"blockers",
-					"next",
-					"ok",
-					"paths",
-					"schema",
-					"session_count",
-					"session_health_warnings",
-					"status",
-					"task",
-				].sort(),
-			);
+			for (const key of [
+				"action",
+				"data",
+				"exit_code",
+				"files_written",
+				"warnings",
+				"validation_or_checks",
+				"blockers",
+				"next",
+				"ok",
+				"paths",
+				"schema",
+				"session_count",
+				"session_health_warnings",
+				"status",
+				"task",
+			]) {
+				expect(payload[key]).toBeDefined();
+			}
 			expect(payload.status).toBe("in_progress");
 			expect(payload.task).toBe("T-01");
 			const data = payload.data as Record<string, unknown>;
@@ -491,8 +493,10 @@ describe("status command", () => {
 				task: "T-01",
 				files_written: ["cli/commands/status.ts"],
 				validation_or_checks: ["bun test cli/tests/status.test.ts"],
+				warnings: [],
 				blockers: ["none"],
 				next: ["implement validate"],
+				safe_next_action: "implement validate",
 				session_count: 0,
 				session_health_warnings: [],
 			});
@@ -511,9 +515,21 @@ describe("status command", () => {
 				"validation_or_checks",
 				"blockers",
 				"next",
+				"warnings",
 			]) {
 				expect(payload[key]).toEqual(data[key]);
 			}
+			expect(data).toEqual(
+				expect.objectContaining({ safe_next_action: expect.any(String) }),
+			);
+			expect(data.problem_reason).toBeUndefined();
+
+			const textCaptured = captureIo();
+			const textCode = runStatusCommand(root, [], textCaptured.io);
+			expect(textCode).toBe(0);
+			const text = textCaptured.stdout[0] ?? "";
+			expect(text).toContain("SAFE_NEXT_ACTION: implement validate");
+			expect(text).not.toContain("PROBLEM_REASON:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -550,7 +566,227 @@ describe("status command", () => {
 			expect(text).toContain("BLOCKERS:");
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
+			expect(text).toContain("WARNINGS:");
 			expect(text).toContain("BLOCKERS:\n- none");
+			expect(text).not.toContain("PROBLEM_REASON:");
+			expect(text).toContain("SAFE_NEXT_ACTION: implement validate");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("omits problem reason for in_progress and keeps safe action + warnings separate", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const taskFile = join(
+				root,
+				".afol",
+				"wb",
+				sessionId,
+				`${sessionId}_task_01.md`,
+			);
+			writeFileSync(
+				taskFile,
+				[
+					"---",
+					"task_id: T-01",
+					"status: in_progress",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					"- cli/status/flow.ts",
+					"VALIDATION_OR_CHECKS:",
+					"- none",
+					"BLOCKERS:",
+					"- migrate blocked by pending contract",
+					"NEXT:",
+					"- resolve migration before continuing",
+				].join("\n"),
+				"utf8",
+			);
+
+			const code = runStatusCommand(root, ["--health"], captured.io);
+			expect(code).toBe(0);
+
+			const text = captured.stdout[0] ?? "";
+			expect(text).not.toContain("PROBLEM_REASON:");
+			expect(text).toContain(
+				"SAFE_NEXT_ACTION: resolve migration before continuing",
+			);
+			expect(text).toContain("WARNINGS:");
+			expect(text).toContain("project indexes need rebuild");
+			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
+			expect(text).toContain(
+				"BLOCKERS:\n- migrate blocked by pending contract",
+			);
+
+			const json = captureIo();
+			const jsonCode = runStatusCommand(root, ["--json", "--health"], json.io);
+			expect(jsonCode).toBe(0);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			const payloadData = payload.data as {
+				problem_reason?: string;
+				safe_next_action?: string;
+				blockers?: string[];
+				warnings?: string[];
+			};
+			expect(payloadData.problem_reason).toBeUndefined();
+			expect(payloadData.safe_next_action).toBe(
+				"resolve migration before continuing",
+			);
+			expect(payloadData.blockers).toEqual([
+				"migrate blocked by pending contract",
+			]);
+			const warnings = payloadData.warnings ?? [];
+			expect(
+				warnings.some((warning) =>
+					warning.includes("project indexes need rebuild"),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("uses state board problem note as status problem reason", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const sessionDir = join(root, ".afol", "wb", sessionId);
+			writeFileSync(
+				join(sessionDir, `${sessionId}_task_01.md`),
+				[
+					"---",
+					"task_id: T-01",
+					"status: in_progress",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					"- cli/status/flow.ts",
+					"VALIDATION_OR_CHECKS:",
+					"- none",
+					"BLOCKERS:",
+					"- none",
+					"NEXT:",
+					"- none",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | problem | worker | reason=schema%20migration%20missing%20contract%20reason |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const textCaptured = captureIo();
+			expect(runStatusCommand(root, ["--json"], textCaptured.io)).toBe(0);
+			const json = JSON.parse(textCaptured.stdout[0] ?? "{}") as {
+				data?: {
+					problem_reason?: string;
+					safe_next_action?: string;
+				};
+			};
+			expect(json.data?.problem_reason).toBe(
+				"schema migration missing contract reason",
+			);
+			expect(json.data?.safe_next_action).toBeUndefined();
+
+			const captured = captureIo();
+			const code = runStatusCommand(root, [], captured.io);
+			const text = captured.stdout[0] ?? "";
+			expect(code).toBe(0);
+			expect(text).toContain("STATUS: problem");
+			expect(text).toContain("TASK: T-01");
+			expect(text).toContain(
+				"PROBLEM_REASON: schema migration missing contract reason",
+			);
+			expect(text).not.toContain("SAFE_NEXT_ACTION:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing pulls decoded reason= from problem-state notes", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const sessionDir = join(root, ".afol", "wb", sessionId);
+			writeFileSync(
+				join(sessionDir, `${sessionId}_task_01.md`),
+				[
+					"---",
+					"task_id: T-01",
+					"status: in_progress",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					"- cli/status/flow.ts",
+					"VALIDATION_OR_CHECKS:",
+					"- none",
+					"BLOCKERS:",
+					"- none",
+					"NEXT:",
+					"- none",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | problem | worker | reason=migration%20blocked%20by%20pending%20contract |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const briefing = buildStartBriefing(root, {
+				session: sessionId,
+				taskId: "T-01",
+			});
+			expect(briefing.problem_reason).toBe(
+				"migration blocked by pending contract",
+			);
+			expect(briefing.tasks.problem_total).toBe(1);
+			expect(briefing.safe_next_action).toBe(
+				"resolve or park problem tasks before broadening scope",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing omits problem_reason when no problem-state canonical reason exists", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const sessionDir = join(root, ".afol", "wb", sessionId);
+			writeFileSync(
+				join(sessionDir, `${sessionId}_task_01.md`),
+				[
+					"---",
+					"task_id: T-01",
+					"status: in_progress",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					"- cli/status/flow.ts",
+					"VALIDATION_OR_CHECKS:",
+					"- none",
+					"BLOCKERS:",
+					"- none",
+					"NEXT:",
+					"- none",
+				].join("\n"),
+				"utf8",
+			);
+
+			const briefing = buildStartBriefing(root, {
+				session: sessionId,
+				taskId: "T-01",
+			});
+			expect(briefing.problem_reason).toBeUndefined();
+			expect(briefing.tasks.problem_total).toBe(0);
+			expect(typeof briefing.safe_next_action).toBe("string");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

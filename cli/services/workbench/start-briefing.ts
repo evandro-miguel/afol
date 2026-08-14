@@ -40,6 +40,8 @@ export type StartBriefing = {
 		open_task_ids: string[];
 		problem_task_ids: string[];
 	};
+	problem_reason?: string;
+	safe_next_action: string;
 	warnings: string[];
 	questions: string[];
 	evolution: DailySuggestionPreview;
@@ -113,6 +115,51 @@ function compactWarnings(values: string[]): string[] {
 	return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function extractReasonFromNotes(notes: string): string | undefined {
+	const encoded = /(?:^|\s)reason=([^\s]+)/.exec(notes)?.[1];
+	if (!encoded) {
+		return undefined;
+	}
+	try {
+		const reason = decodeURIComponent(encoded).trim();
+		return reason.length > 0 ? reason : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function summarizeProblemReason(
+	problemTaskNotes: string[],
+): string | undefined {
+	for (const notes of problemTaskNotes) {
+		const reason = extractReasonFromNotes(notes);
+		if (reason !== undefined) {
+			return reason;
+		}
+	}
+	return undefined;
+}
+
+function summarizeSafeNextAction(params: {
+	problemTaskCount: number;
+	openTaskIds: string[];
+	catchupNeedsSync: boolean;
+	nextStep: string;
+}): string {
+	if (params.problemTaskCount > 0) {
+		return "resolve or park problem tasks before broadening scope";
+	}
+	if (params.catchupNeedsSync) {
+		return "sync findings/log before more edits";
+	}
+	if (params.openTaskIds.length > 0) {
+		return `advance ${params.openTaskIds[0]}`;
+	}
+	return params.nextStep === "none" || params.nextStep.length === 0
+		? "await task assignment"
+		: params.nextStep;
+}
+
 function pickQuestions(input: {
 	openTasks: number;
 	problemTasks: number;
@@ -182,6 +229,11 @@ export function buildStartBriefing(
 	const radar = loadCoordinationRadar(root);
 	const maintenance = readMaintenanceReviewSummary(root);
 	const legacyRefs = scanLegacyReferences(root);
+	const problemReason = summarizeProblemReason(
+		radar.open_tasks
+			.filter((task) => task.state === "problem")
+			.map((task) => task.notes),
+	);
 	const globalFindings = collectGlobalStatusFindings(root);
 	const warnings = compactWarnings([
 		...globalFindings.map((entry) => entry.validation),
@@ -245,6 +297,16 @@ export function buildStartBriefing(
 				(task) => `${task.session}:${task.task_id}`,
 			),
 		},
+		...(problemReason ? { problem_reason: problemReason } : {}),
+		safe_next_action: summarizeSafeNextAction({
+			problemTaskCount: problemTasks.length,
+			openTaskIds: radar.open_tasks.map(
+				(task) => `${task.session}:${task.task_id}`,
+			),
+			catchupNeedsSync:
+				catchup.freshness.findings_stale || catchup.freshness.log_behind_diff,
+			nextStep: catchup.next_step,
+		}),
 		warnings,
 		questions: pickQuestions({
 			openTasks: radar.open_tasks.length,
@@ -274,12 +336,17 @@ export function formatStartBriefing(briefing: StartBriefing): string[] {
 	const suggestionLine = suggestion
 		? `suggestion: ${String(suggestion.problem)} -> ${String(suggestion.recommendation)} risk=${String(suggestion.risk)}${briefing.evolution.pending_count > 0 ? ` +${briefing.evolution.pending_count} pending` : ""}`
 		: "suggestion: none";
+	const problemReasonLine = briefing.problem_reason
+		? [`problem_reason: ${briefing.problem_reason}`]
+		: [];
 	return [
 		`briefing: ${briefing.project.name} branch=${briefing.project.branch ?? "detached"} session=${briefing.project.session} ${roadmap}`,
 		`resume: ${briefing.resume.session_status} changed=${briefing.resume.changed_files} next=${briefing.resume.next_step}`,
 		`tasks: open=${briefing.tasks.open_total} problem=${briefing.tasks.problem_total}`,
 		`evolution: ${briefing.evolution.daily_status} pending=${briefing.evolution.pending_count}`,
 		suggestionLine,
+		...problemReasonLine,
+		`safe_next_action: ${briefing.safe_next_action}`,
 		`warnings: ${warningLine}`,
 		`questions: ${questionLine}`,
 	];
