@@ -47,7 +47,9 @@ import {
 } from "../services/workbench/lifecycle";
 import {
 	bindCurrentContextSession,
+	compensateCarriedContinuationBinding,
 	removeBinding,
+	type SessionBinding,
 } from "../services/workbench/session-context";
 import {
 	type briefingUnavailable,
@@ -820,14 +822,31 @@ export async function runTransitionCommand(
 						(_, index) => index !== policyIndex && index !== policyIndex + 1,
 					)
 				: args;
-		const stateIndex = policyArgs.indexOf("--state");
-		const state = stateIndex >= 0 ? policyArgs[stateIndex + 1] : undefined;
+		const reasonIndex = policyArgs.indexOf("--reason");
+		const reason = reasonIndex >= 0 ? policyArgs[reasonIndex + 1] : undefined;
+		if (reasonIndex >= 0 && (!reason || reason.startsWith("--"))) {
+			throw new Error("Missing value for --reason");
+		}
+		const reasonArgs =
+			reasonIndex >= 0
+				? policyArgs.filter(
+						(_, index) => index !== reasonIndex && index !== reasonIndex + 1,
+					)
+				: policyArgs;
+		const stateIndex = reasonArgs.indexOf("--state");
+		const state = reasonArgs[stateIndex + 1];
 		if (!state || !TRANSITION_STATES.has(state as TaskState)) {
 			throw new Error(
 				`Missing or invalid --state for transition: ${state ?? ""}`,
 			);
 		}
-		const sessionArgs = policyArgs.filter(
+		if (state === "problem" && !reason?.trim()) {
+			throw new Error("Transition to problem requires --reason.");
+		}
+		if (state !== "problem" && reason) {
+			throw new Error("--reason is only valid when transitioning to problem.");
+		}
+		const sessionArgs = reasonArgs.filter(
 			(_, index) => index !== stateIndex && index !== stateIndex + 1,
 		);
 		const parsed = parseSessionTaskArgs(sessionArgs, "transition", root);
@@ -842,6 +861,7 @@ export async function runTransitionCommand(
 				...parsed,
 				state: state as TaskState,
 				...(policy ? { completionPolicy: policy as CompletionPolicy } : {}),
+				...(reason ? { reason } : {}),
 			},
 			runtime,
 		);
@@ -849,7 +869,13 @@ export async function runTransitionCommand(
 			console.log(
 				stringifyEnvelope(
 					envelopeOk(
-						{ session: parsed.session, task: parsed.taskId, state, warnings },
+						{
+							session: parsed.session,
+							task: parsed.taskId,
+							state,
+							...(reason ? { reason } : {}),
+							warnings,
+						},
 						{ action: "workbench.transition" },
 					),
 				),
@@ -1651,11 +1677,31 @@ export async function runCloseCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.close");
 		const parsed = parseCloseArgs(args, root);
+		let continuationBinding: SessionBinding | null = null;
 		const closeWarnings = closeSession(root, parsed.session, {
 			allowNoReport: parsed.allowNoReport,
+			carryOpen: parsed.carryOpen,
 			reason: parsed.reason,
 			summary: parsed.summary,
 			admitLegacyBaseline: parsed.admitLegacyBaseline,
+			...(parsed.carryOpen
+				? {
+						onContinuationCreated: (continuation: string) => {
+							continuationBinding = bindCurrentContextSession(
+								root,
+								continuation,
+							);
+						},
+						onContinuationRollback: () => {
+							if (continuationBinding) {
+								compensateCarriedContinuationBinding(root, {
+									sourceSession: parsed.session,
+									continuation: continuationBinding,
+								});
+							}
+						},
+					}
+				: {}),
 		});
 		try {
 			removeBinding(root, parsed.session);
@@ -1672,6 +1718,9 @@ export async function runCloseCommand(
 							session: parsed.session,
 							status: "closed",
 							report: closeWarnings.report,
+							...(closeWarnings.continuation
+								? { continuation: closeWarnings.continuation }
+								: {}),
 						},
 						{
 							action: "workbench.close",
@@ -1682,6 +1731,9 @@ export async function runCloseCommand(
 			);
 		} else {
 			console.log(`session closed: ${parsed.session}`);
+			if (closeWarnings.continuation) {
+				console.log(`continuation created: ${closeWarnings.continuation}`);
+			}
 			for (const warning of closeWarnings) {
 				console.warn(`warning: ${warning}`);
 			}

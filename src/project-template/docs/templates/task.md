@@ -56,6 +56,16 @@ the ledger or State Board manually.
 commands. Do not add parallel `T-xx` checklist rows or checkbox-done wording as
 a state transition.
 
+**Status output convention:** keep `BLOCKERS` focused on explicit lifecycle
+blockers from task state. Auxiliary freshness/index/health findings are surfaced as
+`WARNINGS` and should not be treated as lifecycle blockers.
+
+`afol status` exposes:
+- `SAFE_NEXT_ACTION`: the next practical move for the active task/scope
+- `PROBLEM_REASON`: a concrete blocker reason when available, preferring
+  inline `State Board` notes for problem-state tasks as `reason=<urlencoded>`,
+  omitted when no concrete blocker exists.
+
 ## Governance Context
 
 - Roadmap feature: `<feature_id>`

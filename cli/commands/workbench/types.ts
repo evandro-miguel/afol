@@ -51,6 +51,7 @@ export type CloseArgs = {
 	session: string;
 	json: boolean;
 	allowNoReport: boolean;
+	carryOpen: boolean;
 	reason: string;
 	summary: string;
 	admitLegacyBaseline: boolean;

@@ -178,6 +178,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let session = "";
 	let json = false;
 	let allowNoReport = false;
+	let carryOpen = false;
 	let reason = "";
 	let summary = "";
 	let admitLegacyBaseline = false;
@@ -198,6 +199,10 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		}
 		if (arg === "--allow-no-report") {
 			allowNoReport = true;
+			continue;
+		}
+		if (arg === "--carry-open") {
+			carryOpen = true;
 			continue;
 		}
 		if (arg === "--admit-legacy-baseline") {
@@ -224,7 +229,7 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 		}
 		throw new Error(`Unknown close argument: ${arg}`);
 	}
-	if (reason.trim() && !allowNoReport) {
+	if (reason.trim() && !allowNoReport && !carryOpen) {
 		throw new Error("Missing --allow-no-report for close reason.");
 	}
 	if (allowNoReport && !reason.trim()) {
@@ -233,10 +238,17 @@ export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	if (allowNoReport && summary.trim()) {
 		throw new Error("Cannot combine --summary with --allow-no-report.");
 	}
+	if (carryOpen && !reason.trim()) {
+		throw new Error("Missing --reason for close carry-open.");
+	}
+	if (carryOpen && allowNoReport) {
+		throw new Error("Cannot combine --carry-open with --allow-no-report.");
+	}
 	return {
 		session: resolveSession(root, session, "close"),
 		json,
 		allowNoReport,
+		carryOpen,
 		reason,
 		summary,
 		admitLegacyBaseline,

@@ -307,16 +307,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "transition",
-		aliases: [],
+		aliases: ["tr"],
 		kind: "transition",
 		sideEffect: "write",
 		description: "Transition a task through the lifecycle state machine",
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "--session <session-id> --task-id <task-id> --state <state>",
+				usage:
+					"--session <session-id> --task-id <task-id> --state <state> [--reason <text>]",
 				sideEffect: "write",
 				description: "Apply one validated task-state transition",
+			},
+			{
+				usage: 'tr T-01 --state problem --reason "<blocker>"',
+				sideEffect: "write",
+				description:
+					"Record a durable blocker reason; required for the problem state",
 			},
 			{
 				usage: "--completion-policy execution|artifact|waiver",
@@ -609,6 +616,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--allow-no-report --reason <text>",
 				sideEffect: "write",
 				description: "Close without a report with an explicit waiver",
+			},
+			{
+				usage: "--carry-open --reason <text>",
+				sideEffect: "write",
+				description:
+					"Move open tasks into one governed continuation and close the completed session",
 			},
 			{
 				usage: "--admit-legacy-baseline",

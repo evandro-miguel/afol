@@ -273,6 +273,40 @@ export function bindCurrentContextSession(
 	);
 }
 
+export function compensateCarriedContinuationBinding(
+	root: string,
+	input: { sourceSession: string; continuation: SessionBinding },
+): void {
+	withSessionContextLock(root, () => {
+		const context = readSessionContext(root);
+		const current = currentContext(root);
+		const owned = context.bindings.find(
+			(binding) =>
+				binding.session === input.continuation.session &&
+				binding.last_touched === input.continuation.last_touched &&
+				binding.branch === current.branch &&
+				binding.worktree === current.worktree,
+		);
+		if (!owned) return;
+		const bindings = context.bindings.filter((binding) => binding !== owned);
+		const hasCurrentBinding = bindings.some(
+			(binding) =>
+				binding.branch === current.branch &&
+				binding.worktree === current.worktree,
+		);
+		if (!hasCurrentBinding) {
+			bindings.push({
+				session: input.sourceSession,
+				branch: current.branch,
+				worktree: current.worktree,
+				actor: null,
+				last_touched: new Date().toISOString(),
+			});
+		}
+		writeContext(root, { bindings });
+	});
+}
+
 export function resolveContextSession(
 	root: string,
 	options: { failClosed?: boolean } = {},
