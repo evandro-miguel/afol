@@ -1,13 +1,12 @@
 import {
-	cpSync,
 	existsSync,
 	mkdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
-	writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
+import { atomicWriteBytes } from "../../../services/io/atomic";
 import { withResourceLocks } from "../../../services/io/session-lock";
 import {
 	appendMutationRecord,
@@ -215,7 +214,7 @@ function applyUndoMoveMutation(
 
 			if (overwrittenBackupBytes) {
 				mkdirSync(dirname(destination.path), { recursive: true });
-				writeFileSync(destination.path, overwrittenBackupBytes);
+				atomicWriteBytes(destination.path, overwrittenBackupBytes);
 			}
 
 			afterSourceBytes = readFileBytes(source.path);
@@ -228,7 +227,7 @@ function applyUndoMoveMutation(
 			rmSync(source.path, { recursive: true, force: true });
 			rmSync(destination.path, { recursive: true, force: true });
 			mkdirSync(dirname(destination.path), { recursive: true });
-			writeFileSync(destination.path, beforeDestinationBytes);
+			atomicWriteBytes(destination.path, beforeDestinationBytes);
 			try {
 				appendMutationRecord(projectRoot, {
 					...undoRecord,
@@ -359,7 +358,7 @@ export function runMoveMutation(
 						mutationId,
 						`${destination.relativePath}.overwritten`,
 					);
-					cpSync(destination.path, overwrittenBackupPath);
+					atomicWriteBytes(overwrittenBackupPath, beforeDestinationBytes);
 				}
 				const record = {
 					id: mutationId,
@@ -408,10 +407,10 @@ export function runMoveMutation(
 					rmSync(source.path, { recursive: true, force: true });
 					rmSync(destination.path, { recursive: true, force: true });
 					mkdirSync(dirname(source.path), { recursive: true });
-					writeFileSync(source.path, beforeSource);
+					atomicWriteBytes(source.path, beforeSource);
 					if (destinationExisted) {
 						mkdirSync(dirname(destination.path), { recursive: true });
-						writeFileSync(destination.path, beforeDestinationBytes);
+						atomicWriteBytes(destination.path, beforeDestinationBytes);
 					}
 					try {
 						appendMutationRecord(projectRoot, {

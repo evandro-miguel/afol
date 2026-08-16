@@ -922,6 +922,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
     - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
     - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
+    - .afol/adm/specs/260816_core-integrity-remediation_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -940,6 +941,9 @@ Follow-on slices under this direction:
   - Reconcile accepted F-01, F-11, F-13, and F-15 governance contracts with
     the AFOL-only TypeScript runtime while retaining their pre-reconciliation
     bytes in a verified AFOL migration archive.
+  - Remediate verified mutation crash-durability, spec-resolution,
+    benchmark-provenance, and lifecycle-concurrency defects under focused
+    fault-injection and exact-commit release evidence.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,

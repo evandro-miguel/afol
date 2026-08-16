@@ -24,6 +24,7 @@ links:
   - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
   - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
   - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
+  - .afol/adm/specs/260816_core-integrity-remediation_spec-child_01.md
 risk_level: high
 ---
 
@@ -62,6 +63,9 @@ AFOL-only downstream boundary.
 - `260727_release-benchmark-timing-and-baseline-contract_spec-child_01` is
   final and owns the compiled-artifact timing, host-profile, and baseline
   compatibility contract without claiming a passing full release gate.
+- `260816_core-integrity-remediation_spec-child_01` owns the bounded correction
+  of verified crash-durability, catalog-resolution, benchmark-provenance, and
+  lifecycle-concurrency defects discovered by the final integrity audit.
 - The parent owns cross-child acceptance, compatibility constraints, and the
   final evidence ledger; neither child may expand into Windows, macOS, ARM,
   MCP, remote sync, or result/v2 work.

@@ -437,6 +437,49 @@ describe("spec-gate system", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("governance resolution rejects re-waiving a resolved session", () => {
+		const root = createFixture();
+		try {
+			const { taskPath } = writePendingGovernanceFixture(root);
+			resolvePendingSpec(root, {
+				session: "S-GOV",
+				featureId: "F-22",
+				parentSpec: "spec-22",
+			});
+			expect(() =>
+				resolvePendingSpec(root, {
+					session: "S-GOV",
+					noSpecRequiredReason: "must not downgrade governed state",
+				}),
+			).toThrow("pending_spec entry is not open");
+			const task = readFileSync(taskPath, "utf8");
+			expect(task).toContain('governance_status: "governed"');
+			expect(task).toContain('parent_spec: "spec-22"');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolved residual child remains compatible through the spec gate", () => {
+		const root = createFixture();
+		try {
+			writePendingGovernanceFixture(root);
+			writeFinalFeatureResidualFixture(root, [
+				{ id: "final-child", status: "active" },
+			]);
+			resolvePendingSpec(root, {
+				session: "S-GOV",
+				featureId: "F-03",
+				parentSpec: "final-parent",
+			});
+			const result = checkSpecCompatibility(root, "S-GOV", "T-01");
+			expect(result.status).toBe("compatible");
+			expect(result.spec_id).toBe("final-child");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("checkSpecCompatibility returns not_applicable when no spec linked", () => {
 		const root = createFixture();
 		try {
@@ -708,13 +751,13 @@ describe("spec-gate system", () => {
 		}
 	});
 
-	test("checkSpecCompatibility falls back to docs arc spec", () => {
+	test("checkSpecCompatibility rejects legacy docs arc specs", () => {
 		const root = createFixture();
 		try {
 			writeTask(root, "session-a", "T-01", "spec-legacy");
 			writeLegacySpec(root, "spec-legacy", "active");
 			const result = checkSpecCompatibility(root, "session-a", "T-01");
-			expect(result.status).toBe("compatible");
+			expect(result.status).toBe("conflict");
 			expect(result.spec_id).toBe("spec-legacy");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

@@ -5,7 +5,6 @@ import {
 	readdirSync,
 	readFileSync,
 	statSync,
-	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import {
@@ -17,8 +16,10 @@ import {
 	inspectEventLedger,
 	readEventLedgerRecords,
 } from "../events/ledger";
+import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
+import { parseMarkdownTableCells } from "../workbench/state-board";
 import { resolveWorkbenchEventLogPath } from "./workbench-events";
 
 export type WorkbenchIndexTask = {
@@ -509,45 +510,6 @@ type ParsedStateBoardTasks = {
  * Example: `a\\\|b|c` -> ["a\\\|b", "c"] (three backslashes, odd, pipe is content)
  * Example: `a\|b|c`    -> ["a\|b", "c"]    (one backslash, odd, pipe is content)
  */
-function isMarkdownPipeDelimiter(body: string, index: number): boolean {
-	let backslashCount = 0;
-	for (let cursor = index - 1; cursor >= 0 && body[cursor] === "\\"; cursor--) {
-		backslashCount++;
-	}
-	return backslashCount % 2 === 0;
-}
-
-function splitMarkdownTableCells(body: string): string[] {
-	const cells: string[] = [];
-	let current = "";
-	let i = 0;
-	while (i < body.length) {
-		const ch = body[i];
-		if (ch === "|" && isMarkdownPipeDelimiter(body, i)) {
-			cells.push(current);
-			current = "";
-			i++;
-			continue;
-		}
-		current += ch;
-		i++;
-	}
-	cells.push(current);
-	return cells;
-}
-
-function parseMarkdownTableCells(line: string): string[] | null {
-	const trimmed = line.trim();
-	if (!trimmed.startsWith("|")) {
-		return null;
-	}
-	let body = trimmed.slice(1);
-	if (body.endsWith("|") && isMarkdownPipeDelimiter(body, body.length - 1)) {
-		body = body.slice(0, -1);
-	}
-	return splitMarkdownTableCells(body).map((cell) => cell.trim());
-}
-
 function parseStateBoardTableHeader(
 	line: string,
 	allowExtraColumns: boolean,
@@ -967,7 +929,7 @@ function writeSnapshot(
 ): WorkbenchIndexSnapshot {
 	const indexPath = resolveWorkbenchIndexPath(root);
 	mkdirSync(resolve(indexPath, ".."), { recursive: true });
-	writeFileSync(indexPath, `${JSON.stringify(snapshot)}\n`, "utf8");
+	atomicWriteText(indexPath, `${JSON.stringify(snapshot)}\n`);
 	return snapshot;
 }
 
