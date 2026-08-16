@@ -37,6 +37,9 @@ risk_level: high
   `.afol/wb/260713_0724_final-observed-workbench-benchmark/` (8/8 scenarios;
   short-path p50 65-70 ms, p95 66-71 ms; argv 6/24/12 characters).
 - Implementation slice: commit `2f5f42f`.
+- Close-path correction: automatic Evolution observation is opt-in so derived
+  SQLite work cannot consume the default F-03 lifecycle latency budget; the
+  explicit `auto_observe: true` behavior remains supported.
 - The residual implementation and acceptance evidence are closed by the
   governed F-03 session below; no additional product scope is opened.
 

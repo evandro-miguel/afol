@@ -7,7 +7,7 @@
   "sandbox": true,
   "setup": [
     [
-      "node",
+      "bun",
       "-e",
       "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-short-close'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'),session+'\\n','utf8'); writeFileSync(join(dir,session+'_plan_01.md'), '# Plan: short\\n\\n## Execution Plan\\n\\n- T-01: short\\n','utf8'); writeFileSync(join(dir,session+'_task_01.md'), '# Tasks: short\\n\\n## State Board\\n\\n| Task | State | Owner | Notes |\\n|------|-------|-------|-------|\\n| T-01 | pending | worker | short |\\n','utf8'); writeFileSync(join(dir,session+'_log_01.md'), '# Log\\n\\n## Timeline\\n\\n- seed\\n','utf8'); writeFileSync(join(dir,'.evidence.jsonl'),'','utf8');"
     ],
@@ -17,7 +17,7 @@
       "-q"
     ],
     [
-      "node",
+      "bun",
       "-e",
       "const{readFileSync:r,rmSync,writeFileSync:w}=require('node:fs');const{join}=require('node:path');const root=process.cwd(),session='sb-short-close',branch=r(join(root,'.git','HEAD'),'utf8').trim().replace('ref: refs/heads/','');w(join(root,'.afol','wb','session-context.json'),JSON.stringify({bindings:[{session,branch,worktree:root,actor:null,last_touched:new Date().toISOString()}]})+'\\n','utf8');rmSync(join(root,'.afol','wb','.active_session'));"
     ],
@@ -34,7 +34,7 @@
       "echo ok"
     ],
     [
-      "node",
+      "bun",
       "-e",
       "const {rmSync}=require('node:fs'); for (const path of ['cli','src','docs','tests','.claude']) rmSync(path,{recursive:true,force:true});"
     ]
@@ -63,16 +63,16 @@
   },
   "baseline_id": "workbench-parity-v1",
   "deterministic_metrics": {
-    "duration_ms": 120,
-    "timing_p50_ms": 110,
-    "timing_p95_ms": 160,
+    "duration_ms": 81,
+    "timing_p50_ms": 81,
+    "timing_p95_ms": 271,
     "error_count": 0,
     "retry_count": 0,
     "context_tokens": 180,
     "prompt_tokens": 0,
-    "output_tokens": 42,
+    "output_tokens": 8,
     "context_bytes": 1024,
-    "output_bytes": 240,
+    "output_bytes": 31,
     "tool_call_count": 1,
     "tool_success_rate": 1,
     "argv_chars": 6

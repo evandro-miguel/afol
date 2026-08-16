@@ -475,7 +475,7 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "close") {
-		const { runCloseCommand } = await import("./commands/workbench");
+		const { runCloseCommand } = await import("./commands/close");
 		return runCloseCommand(resolution.args, project.value.root, operationCtx);
 	}
 
