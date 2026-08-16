@@ -288,14 +288,14 @@ describe("quick-task runQuickTaskCommand", () => {
 		}
 	});
 
-	test("rejects fake governance bindings before creating a session", async () => {
+	test("defers fake governance bindings into a pending-spec session", async () => {
 		const root = mkdtempSync(join(tmpdir(), "quick-task-governance-"));
 		try {
 			const exitCode = await runQuickTaskCommand(
 				[
 					"fake-governance",
 					"--command",
-					"true",
+					"test -d .afol",
 					"--feature-id",
 					"F-404",
 					"--parent-spec",
@@ -303,10 +303,88 @@ describe("quick-task runQuickTaskCommand", () => {
 				],
 				root,
 			);
-			expect(exitCode).toBe(2);
-			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
+			expect(exitCode).toBe(0);
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const session = sessions[0] as string;
+			const task = readFileSync(
+				join(root, ".afol", "wb", session, `${session}_task_01.md`),
+				"utf8",
+			);
+			expect(task).toContain('feature_id: "F-404"');
+			expect(task).toContain('parent_spec: "missing-spec"');
+			expect(task).toContain('governance_status: "pending_spec"');
+			expect(
+				JSON.parse(
+					readFileSync(
+						join(root, ".afol", "data", "governance", "pending-specs.json"),
+						"utf8",
+					),
+				) as { entries: Array<{ status: string }> },
+			).toMatchObject({ entries: [{ status: "open" }] });
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("defers planned features and inactive specs into pending_spec", async () => {
+		for (const fixture of [
+			{ feature: "F-31", featureStatus: "planned", specStatus: "active" },
+			{ feature: "F-32", featureStatus: "active", specStatus: "draft" },
+		] as const) {
+			const root = mkdtempSync(join(tmpdir(), "quick-task-catalog-deferred-"));
+			try {
+				mkdirSync(join(root, ".afol", "adm", "roadmap"), {
+					recursive: true,
+				});
+				mkdirSync(join(root, ".afol", "adm", "specs"), {
+					recursive: true,
+				});
+				writeFileSync(
+					join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+					`# Roadmap\n\n### ${fixture.feature} Fixture\n\n- Status: ${fixture.featureStatus}\n- Governing spec: .afol/adm/specs/${fixture.feature}.md\n`,
+					"utf8",
+				);
+				writeFileSync(
+					join(root, ".afol", "adm", "specs", `${fixture.feature}.md`),
+					`---\ndoc_type: spec\nid: ${fixture.feature}\nstatus: ${fixture.specStatus}\nroadmap_feature: ${fixture.feature}\n---\n\n# Spec\n`,
+					"utf8",
+				);
+
+				const exitCode = await runQuickTaskCommand(
+					[
+						"deferred catalog",
+						"--command",
+						"test -d .afol",
+						"--feature-id",
+						fixture.feature,
+						"--parent-spec",
+						fixture.feature,
+					],
+					root,
+				);
+				expect(exitCode).toBe(0);
+				const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+					(name) => !name.startsWith("."),
+				);
+				expect(sessions).toHaveLength(1);
+				const task = readFileSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						sessions[0] as string,
+						`${sessions[0]}_task_01.md`,
+					),
+					"utf8",
+				);
+				expect(task).toContain('governance_status: "pending_spec"');
+				expect(task).toContain('pending_spec_status: "open"');
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 

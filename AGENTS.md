@@ -252,6 +252,11 @@ Task state source of truth:
 - Workbench sessions must carry `roadmap_feature` and `parent_spec`.
 - `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings
   (allowed); open pending specs do not block other new sessions.
+- If supplied governance metadata cannot resolve against the catalog, `afol n`
+  and `afol qt` create a `pending_spec` session with the resolution error
+  instead of blocking delivery. Activate a planned feature with `afol gov af -F
+  <F-id>`; active is a no-op and final features are not reopened. A final
+  parent may resolve through one active residual child.
 - A `pending_spec` session may continue lifecycle (`start`, `evidence`,
   `done`, `close`) with warnings, and close is allowed; `afol status` and
   `afol validate project` warn while pending specs are open.

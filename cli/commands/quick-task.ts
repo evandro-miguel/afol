@@ -186,12 +186,16 @@ export async function runQuickTaskCommand(
 		}
 		parsed = parseQuickTaskArgs(args);
 		if (parsed.metadata.featureId && parsed.metadata.parentSpec) {
-			const catalog = resolveGovernanceCatalog(
-				root,
-				parsed.metadata.featureId,
-				parsed.metadata.parentSpec,
-			);
-			parsed.metadata.parentSpec = catalog.specId;
+			try {
+				const catalog = resolveGovernanceCatalog(
+					root,
+					parsed.metadata.featureId,
+					parsed.metadata.parentSpec,
+				);
+				parsed.metadata.parentSpec = catalog.specId;
+			} catch (error) {
+				parsed.metadata.pendingSpecReason = `catalog resolution deferred: ${error instanceof Error ? error.message : String(error)}`;
+			}
 		}
 		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);

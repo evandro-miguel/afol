@@ -38,6 +38,9 @@ Create or update the roadmap feature in `.afol/adm/roadmap/GENERAL-ROADMAP.md`
 - Every meaningful feature must have a roadmap entry
 - The roadmap is the source of truth for feature inventory and status
 - No non-trivial implementation starts before this exists
+- A planned feature may be activated with `afol gov af -F <F-id>`; an active
+  feature is a no-op and a final feature is never reopened. An active residual
+  child spec may govern work under its final parent.
 
 #### Step 2: Parent Spec
 

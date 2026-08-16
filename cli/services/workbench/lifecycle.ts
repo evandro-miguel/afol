@@ -271,6 +271,7 @@ export type NewWorkstreamMetadata = {
 	featureId?: string;
 	parentSpec?: string;
 	noSpecRequiredReason?: string;
+	pendingSpecReason?: string;
 	task?: string;
 	tasks?: string[];
 };
