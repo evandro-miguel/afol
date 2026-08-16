@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { normalizeScopedFlags, normalizeSubcommandAction } from "../aliases";
@@ -94,6 +100,34 @@ function seedOpenPending(root: string, sessionIds: string[]): void {
 	});
 }
 
+function writeRoadmapFeature(
+	root: string,
+	featureId: string,
+	status: string,
+): string {
+	const roadmapPath = join(
+		root,
+		".afol",
+		"adm",
+		"roadmap",
+		"GENERAL-ROADMAP.md",
+	);
+	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	writeFileSync(
+		roadmapPath,
+		[
+			"# Roadmap",
+			"",
+			`### ${featureId} Fixture`,
+			"",
+			`- Status: ${status}`,
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	return roadmapPath;
+}
+
 describe("governance command", () => {
 	test("returns the pending index through the command envelope", () => {
 		const stdout: string[] = [];
@@ -175,6 +209,84 @@ describe("governance command", () => {
 
 		expect(exitCode).toBe(2);
 		expect(stderr).toEqual(["Unknown governance action: unknown"]);
+	});
+
+	test("activate-feature transitions planned to active and makes active a no-op", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "planned");
+		const firstStdout: string[] = [];
+
+		expect(
+			runGovernanceCommand("activate-feature", ["--feature-id", "F-31"], root, {
+				stdout: (message) => firstStdout.push(message),
+				stderr: () => undefined,
+			}),
+		).toBe(0);
+		expect(firstStdout).toEqual(["roadmap feature activated: F-31"]);
+		const activatedRoadmap = readFileSync(roadmapPath, "utf8");
+		expect(activatedRoadmap).toContain("- Status: active");
+
+		const secondStdout: string[] = [];
+		expect(
+			runGovernanceCommand("activate-feature", ["--feature-id", "F-31"], root, {
+				stdout: (message) => secondStdout.push(message),
+				stderr: () => undefined,
+			}),
+		).toBe(0);
+		expect(secondStdout).toEqual(["roadmap feature already active: F-31"]);
+		expect(readFileSync(roadmapPath, "utf8")).toBe(activatedRoadmap);
+	});
+
+	test("activate-feature rejects final features without mutation", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "final");
+		const before = readFileSync(roadmapPath, "utf8");
+		const stderr: string[] = [];
+
+		expect(
+			runGovernanceCommand("activate-feature", ["--feature-id", "F-31"], root, {
+				stdout: () => undefined,
+				stderr: (message) => stderr.push(message),
+			}),
+		).toBe(2);
+		expect(stderr[0]).toContain("final");
+		expect(readFileSync(roadmapPath, "utf8")).toBe(before);
+	});
+
+	test("activate-feature keeps compact output and denies restricted callers", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "planned");
+		const before = readFileSync(roadmapPath, "utf8");
+		const stdout: string[] = [];
+		const stderr: string[] = [];
+
+		expect(
+			runGovernanceCommand(
+				"activate-feature",
+				["--feature-id", "F-31"],
+				root,
+				{
+					stdout: (message) => stdout.push(message),
+					stderr: (message) => stderr.push(message),
+				},
+				remoteOperationContext(),
+			),
+		).toBe(2);
+		expect(stdout).toEqual([]);
+		expect(stderr[0]).toContain(
+			"activate-feature requires local interactive approval",
+		);
+		expect(readFileSync(roadmapPath, "utf8")).toBe(before);
+
+		const localStdout: string[] = [];
+		expect(
+			runGovernanceCommand("activate-feature", ["--feature-id", "F-31"], root, {
+				stdout: (message) => localStdout.push(message),
+				stderr: () => undefined,
+			}),
+		).toBe(0);
+		expect(localStdout).toHaveLength(1);
+		expect(localStdout[0]).not.toContain("# Roadmap");
 	});
 
 	test("resolve-spec short flags expand then waive via long-form args", () => {

@@ -5,6 +5,7 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import {
+	activateRoadmapFeature,
 	formatPendingSpecBlocker,
 	readPendingSpecIndex,
 	repairPendingSpecIndex,
@@ -52,6 +53,11 @@ type BulkWaiveArgs = {
 type BulkWaiveError = {
 	session: string;
 	message: string;
+};
+
+type ActivateFeatureArgs = {
+	featureId: string;
+	json: boolean;
 };
 
 function hasJsonFlag(args: readonly string[]): boolean {
@@ -203,6 +209,29 @@ function parseBulkWaiveArgs(args: string[]): BulkWaiveArgs {
 	};
 }
 
+function parseActivateFeatureArgs(args: string[]): ActivateFeatureArgs {
+	let featureId = "";
+	let json = false;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		const value = args[index + 1];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
+		if (arg === "--feature-id") {
+			if (!value) throw new Error("Missing value for --feature-id.");
+			featureId = value;
+			index += 1;
+			continue;
+		}
+		throw new Error(`Unknown governance activate-feature argument: ${arg}`);
+	}
+	if (!featureId.trim())
+		throw new Error("governance activate-feature requires --feature-id.");
+	return { featureId: featureId.trim(), json };
+}
+
 function resolveDefaultSession(root: string): string {
 	const resolved = resolveSession(root, {});
 	if (!resolved) {
@@ -278,6 +307,29 @@ function runResolveSpecCommand(
 		`pending_spec ${entry.status}: ${entry.session_id}${
 			entry.parent_spec ? ` parent_spec=${entry.parent_spec}` : ""
 		}`,
+	);
+	return 0;
+}
+
+function runActivateFeatureCommand(
+	args: string[],
+	root: string,
+	io: GovernanceIo,
+): number {
+	const parsed = parseActivateFeatureArgs(args);
+	const result = activateRoadmapFeature(root, parsed.featureId);
+	if (parsed.json) {
+		io.stdout(
+			stringifyEnvelope(
+				envelopeOk(result, { action: "governance.activate-feature" }),
+			),
+		);
+		return 0;
+	}
+	io.stdout(
+		result.status === "activated"
+			? `roadmap feature activated: ${result.featureId}`
+			: `roadmap feature already active: ${result.featureId}`,
 	);
 	return 0;
 }
@@ -415,6 +467,13 @@ export function runGovernanceCommand(
 					"governance resolve-spec requires local interactive approval",
 				);
 			return runResolveSpecCommand(args, root, io);
+		}
+		if (resolvedAction === "activate-feature") {
+			if (requiresApproval(ctx))
+				throw new Error(
+					"governance activate-feature requires local interactive approval",
+				);
+			return runActivateFeatureCommand(args, root, io);
 		}
 		if (resolvedAction === "bulk-waive") {
 			if (requiresApproval(ctx))

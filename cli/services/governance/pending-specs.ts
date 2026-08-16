@@ -16,6 +16,7 @@ export type WorkstreamGovernanceInput = {
 	featureId?: string;
 	parentSpec?: string;
 	noSpecRequiredReason?: string;
+	pendingSpecReason?: string;
 };
 
 export type GovernanceResolution = {
@@ -355,6 +356,7 @@ export function resolveGovernance(
 	const featureId = input?.featureId?.trim() ?? "";
 	const parentSpec = input?.parentSpec?.trim() ?? "";
 	const noSpecRequiredReason = input?.noSpecRequiredReason?.trim() ?? "";
+	const pendingSpecReason = input?.pendingSpecReason?.trim() ?? "";
 	if (noSpecRequiredReason) {
 		return {
 			governanceStatus: "unbound",
@@ -373,7 +375,7 @@ export function resolveGovernance(
 	if (!parentSpec) {
 		missing.push("parent_spec");
 	}
-	if (missing.length === 0) {
+	if (missing.length === 0 && !pendingSpecReason) {
 		return {
 			governanceStatus: "governed",
 			pendingSpec: false,
@@ -389,7 +391,9 @@ export function resolveGovernance(
 		specRequired: true,
 		pendingSpecStatus: "open",
 		missing,
-		resolutionHint: DEFAULT_PENDING_SPEC_RESOLUTION_HINT,
+		resolutionHint: pendingSpecReason
+			? `${pendingSpecReason}; ${DEFAULT_PENDING_SPEC_RESOLUTION_HINT}`
+			: DEFAULT_PENDING_SPEC_RESOLUTION_HINT,
 	};
 }
 
@@ -769,7 +773,14 @@ function sha256(content: string): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
-function roadmapFeatureSection(roadmap: string, featureId: string): string {
+function roadmapFeatureRange(
+	roadmap: string,
+	featureId: string,
+): {
+	lines: string[];
+	start: number;
+	end: number;
+} {
 	const lines = roadmap.split(/\r?\n/);
 	const escaped = featureId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const headingPattern = new RegExp(`^(#{2,6})\\s+${escaped}\\b`);
@@ -784,10 +795,52 @@ function roadmapFeatureSection(roadmap: string, featureId: string): string {
 			break;
 		}
 	}
-	const section = lines.slice(start, end).join("\n");
-	if (!/^-\s*Status:\s*active\s*$/im.test(section))
-		throw new Error(`Roadmap feature is not active: ${featureId}`);
-	return section;
+	return { lines, start, end };
+}
+
+function roadmapFeatureStatus(section: string, featureId: string): string {
+	const match = /^-\s*Status:\s*(\S+)\s*$/im.exec(section);
+	if (!match?.[1])
+		throw new Error(`Roadmap feature status not found: ${featureId}`);
+	return match[1].toLowerCase();
+}
+
+export function activateRoadmapFeature(
+	root: string,
+	featureId: string,
+): {
+	featureId: string;
+	status: "activated" | "already_active";
+} {
+	const roadmapPath = join(
+		resolveAdmPaths(root).roadmapDir,
+		"GENERAL-ROADMAP.md",
+	);
+	if (!existsSync(roadmapPath)) throw new Error("Governance roadmap not found");
+	const roadmap = readFileSync(roadmapPath, "utf8");
+	const { lines, start, end } = roadmapFeatureRange(roadmap, featureId);
+	const statusIndex = lines.findIndex(
+		(line, index) =>
+			index > start && index < end && /^-\s*Status:\s*/i.test(line),
+	);
+	if (statusIndex < 0)
+		throw new Error(`Roadmap feature status not found: ${featureId}`);
+	const status = lines[statusIndex]
+		?.replace(/^-\s*Status:\s*/i, "")
+		.trim()
+		.toLowerCase();
+	if (status === "active") return { featureId, status: "already_active" };
+	if (status === "final")
+		throw new Error(
+			`Roadmap feature is final and cannot be reopened: ${featureId}`,
+		);
+	if (status !== "planned")
+		throw new Error(
+			`Roadmap feature cannot be activated from status ${status || "unknown"}: ${featureId}`,
+		);
+	lines[statusIndex] = "- Status: active";
+	atomicWriteText(roadmapPath, `${lines.join("\n").replace(/\n*$/, "")}\n`);
+	return { featureId, status: "activated" };
 }
 
 function parseGoverningSpecsFromSection(
@@ -832,7 +885,11 @@ export function resolveGovernanceCatalog(
 	const roadmapPath = join(adm.roadmapDir, "GENERAL-ROADMAP.md");
 	if (!existsSync(roadmapPath)) throw new Error("Governance roadmap not found");
 	const roadmap = readFileSync(roadmapPath, "utf8");
-	const featureSection = roadmapFeatureSection(roadmap, featureId);
+	const { lines, start, end } = roadmapFeatureRange(roadmap, featureId);
+	const featureSection = lines.slice(start, end).join("\n");
+	const featureStatus = roadmapFeatureStatus(featureSection, featureId);
+	if (featureStatus !== "active" && featureStatus !== "final")
+		throw new Error(`Roadmap feature is not active: ${featureId}`);
 	const relative = (path: string) =>
 		path.slice(resolve(root).length + 1).replaceAll("\\", "/");
 	const normalizedParentSpec = parentSpec
@@ -851,21 +908,53 @@ export function resolveGovernanceCatalog(
 		});
 	if (matches.length !== 1)
 		throw new Error(`Parent spec must resolve uniquely: ${parentSpec}`);
-	const specPath = matches[0] as string;
-	const spec = readFileSync(specPath, "utf8");
-	const fm = parseFrontmatter(spec);
+	let specPath = matches[0] as string;
+	const requestedSpecPath = specPath;
+	let spec = readFileSync(specPath, "utf8");
+	let fm = parseFrontmatter(spec);
 	if (!fm || trimString(fm.doc_type) !== "spec")
 		throw new Error(`Parent spec doc_type must be spec: ${parentSpec}`);
-	if (!fm || trimString(fm.status) !== "active")
+	if (!fm) throw new Error(`Parent spec frontmatter is invalid: ${parentSpec}`);
+	let resolvedResidual = false;
+	if (trimString(fm.status) === "final") {
+		const residuals = readdirSync(adm.specsDir, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+			.map((entry) => join(adm.specsDir, entry.name))
+			.filter((path) => {
+				const child = parseFrontmatter(readFileSync(path, "utf8"));
+				return (
+					trimString(child?.doc_type) === "spec-child" &&
+					trimString(child?.status) === "active" &&
+					trimString(child?.roadmap_feature) === featureId &&
+					trimString(child?.parent_spec) === parentSpec
+				);
+			});
+		if (residuals.length !== 1)
+			throw new Error(
+				`Parent spec is final without one active residual child: ${parentSpec}`,
+			);
+		specPath = residuals[0] as string;
+		spec = readFileSync(specPath, "utf8");
+		fm = parseFrontmatter(spec);
+		resolvedResidual = true;
+	}
+	if (featureStatus === "final" && !resolvedResidual)
+		throw new Error(
+			`Roadmap feature is final without an active residual child: ${featureId}`,
+		);
+	if (trimString(fm?.status) !== "active")
 		throw new Error(`Parent spec is not active: ${parentSpec}`);
+	if (!fm) throw new Error(`Parent spec frontmatter is invalid: ${parentSpec}`);
 	const specId = trimString(fm.id) || basename(specPath, ".md");
 	if (trimString(fm.roadmap_feature) !== featureId)
 		throw new Error(`Parent spec roadmap_feature mismatch: ${parentSpec}`);
 	const governingSpecs = parseGoverningSpecsFromSection(root, featureSection);
 	const specPathCandidate = relative(specPath);
+	const requestedSpecPathCandidate = relative(requestedSpecPath);
 	if (
 		!governingSpecs.includes(specPathCandidate) &&
-		!governingSpecs.includes(specPathCandidate.replaceAll("\\", "/"))
+		!governingSpecs.includes(specPathCandidate.replaceAll("\\", "/")) &&
+		!governingSpecs.includes(requestedSpecPathCandidate)
 	) {
 		throw new Error(`Roadmap feature governing spec mismatch: ${parentSpec}`);
 	}

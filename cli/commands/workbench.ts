@@ -134,19 +134,24 @@ export async function runNewCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.new");
 		const parsed = parseNewArgs(args);
-		const governance = resolveGovernance(parsed.metadata);
+		let governance = resolveGovernance(parsed.metadata);
 		if (
 			governance.governanceStatus === "governed" &&
 			parsed.metadata.featureId &&
 			parsed.metadata.parentSpec
 		) {
-			const catalog = resolveGovernanceCatalog(
-				root,
-				parsed.metadata.featureId,
-				parsed.metadata.parentSpec,
-			);
-			parsed.metadata.parentSpec = catalog.specId;
+			try {
+				const catalog = resolveGovernanceCatalog(
+					root,
+					parsed.metadata.featureId,
+					parsed.metadata.parentSpec,
+				);
+				parsed.metadata.parentSpec = catalog.specId;
+			} catch (error) {
+				parsed.metadata.pendingSpecReason = `catalog resolution deferred: ${error instanceof Error ? error.message : String(error)}`;
+			}
 		}
+		governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata, {
 			afterActiveSessionWrite: (session) => {
 				bindCurrentContextSession(root, session);

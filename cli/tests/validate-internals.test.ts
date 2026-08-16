@@ -930,6 +930,14 @@ describe("validate registry", () => {
 			expect(featureSpecScenario?.coverage?.specs).toContain(
 				"260726_governance-contract-reconciliation_spec-child_01",
 			);
+			const toolSurfaceScenario = snapshot.scenariosByPack[
+				"governance-history"
+			]?.find(
+				(scenario) => scenario.scenario_id === "tool-surface-coverage-matrix",
+			);
+			expect(toolSurfaceScenario?.coverage?.subcommands).toContain(
+				"governance gov af -F <F-id>",
+			);
 			const uxRegistryScenario = snapshot.scenariosByPack[
 				"governance-history"
 			]?.find((scenario) => scenario.scenario_id === "ux-registry-lifecycle");
@@ -1316,6 +1324,15 @@ describe("validate registry", () => {
 			);
 			expect(validateRegistryContract(withoutInitCoverage)).toContain(
 				"tool-subcommand-coverage-missing:init --dry-run [--json]",
+			);
+			const withoutActivateFeatureCoverage = withoutSurfaceCoverageFor(
+				"governance",
+				"governance gov af -F <F-id>",
+			);
+			expect(
+				validateRegistryContract(withoutActivateFeatureCoverage),
+			).toContain(
+				"tool-subcommand-coverage-missing:governance gov af -F <F-id>",
 			);
 			const governanceScenarios =
 				snapshot.scenariosByPack["governance-history"];

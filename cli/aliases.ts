@@ -40,6 +40,7 @@ export const SUBCOMMAND_ACTION_ALIASES = Object.freeze({
 		ud: "undo",
 	}),
 	governance: Object.freeze({
+		af: "activate-feature",
 		bw: "bulk-waive",
 		ls: "pending",
 		p: "pending",

@@ -12,6 +12,7 @@ import { runAdrCommand } from "../commands/adr";
 import { runChangelogCommand } from "../commands/changelog";
 import { runSpecCommand } from "../commands/spec";
 import {
+	activateRoadmapFeature,
 	resolveGovernanceCatalog,
 	resolvePendingSpec,
 } from "../services/governance/pending-specs";
@@ -163,6 +164,34 @@ function writePendingGovernanceFixture(
 	return { taskPath, indexPath };
 }
 
+function writeFinalFeatureResidualFixture(
+	root: string,
+	children: ReadonlyArray<{
+		id: string;
+		status: string;
+		docType?: "spec" | "spec-child";
+	}>,
+): void {
+	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+		"# Roadmap\n\n### F-03 Finalized feature\n\n- Status: final\n- Governing spec: .afol/adm/specs/final-parent.md\n",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "adm", "specs", "final-parent.md"),
+		"---\ndoc_type: spec\nid: final-parent\nstatus: final\nroadmap_feature: F-03\n---\n\n# Final parent\n",
+		"utf8",
+	);
+	for (const child of children) {
+		writeFileSync(
+			join(root, ".afol", "adm", "specs", `${child.id}.md`),
+			`---\ndoc_type: ${child.docType ?? "spec-child"}\nid: ${child.id}\nstatus: ${child.status}\nroadmap_feature: F-03\nparent_spec: final-parent\n---\n\n# Residual child\n`,
+			"utf8",
+		);
+	}
+}
+
 function writeLegacySpec(root: string, id: string, status: string): string {
 	const path = join(root, "docs", "arc", "SPECS", `${id}.md`);
 	writeFileSync(
@@ -214,6 +243,150 @@ describe("spec-gate system", () => {
 				"utf8",
 			);
 			expect(() => resolveGovernanceCatalog(root, "F-22", "spec-22")).toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance catalog accepts an active residual child under a final parent", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: .afol/adm/specs/parent-spec.md\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "parent-spec.md"),
+				"---\ndoc_type: spec\nid: parent-spec\nstatus: final\nroadmap_feature: F-22\n---\n\n# Parent\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "child-spec.md"),
+				"---\ndoc_type: spec-child\nid: child-spec\nstatus: active\nroadmap_feature: F-22\nparent_spec: parent-spec\n---\n\n# Child\n",
+				"utf8",
+			);
+
+			const catalog = resolveGovernanceCatalog(root, "F-22", "parent-spec");
+			expect(catalog).toMatchObject({
+				specId: "child-spec",
+				specPath: ".afol/adm/specs/child-spec.md",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance catalog resolves final F-03 through exactly one active residual child", () => {
+		const root = createFixture();
+		try {
+			writeFinalFeatureResidualFixture(root, [
+				{ id: "final-child", status: "active" },
+			]);
+
+			const catalog = resolveGovernanceCatalog(root, "F-03", "final-parent");
+			expect(catalog).toMatchObject({
+				specId: "final-child",
+				specPath: ".afol/adm/specs/final-child.md",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("final F-03 stays unresolved without exactly one valid active residual child", () => {
+		for (const children of [
+			[],
+			[{ id: "inactive-child", status: "draft" }],
+			[
+				{ id: "active-child-a", status: "active" },
+				{ id: "active-child-b", status: "active" },
+			],
+		] as const) {
+			const root = createFixture();
+			try {
+				writeFinalFeatureResidualFixture(root, children);
+				expect(() =>
+					resolveGovernanceCatalog(root, "F-03", "final-parent"),
+				).toThrow(
+					"Parent spec is final without one active residual child: final-parent",
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("final F-03 rejects an active spec document as a residual", () => {
+		const root = createFixture();
+		try {
+			writeFinalFeatureResidualFixture(root, [
+				{ id: "active-spec", status: "active", docType: "spec" },
+			]);
+
+			expect(() =>
+				resolveGovernanceCatalog(root, "F-03", "final-parent"),
+			).toThrow(
+				"Parent spec is final without one active residual child: final-parent",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("activateRoadmapFeature activates planned features and leaves active features unchanged", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			writeFileSync(
+				roadmapPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+				"utf8",
+			);
+			expect(activateRoadmapFeature(root, "F-31")).toEqual({
+				featureId: "F-31",
+				status: "activated",
+			});
+			const activeRoadmap = readFileSync(roadmapPath, "utf8");
+			expect(activateRoadmapFeature(root, "F-31")).toEqual({
+				featureId: "F-31",
+				status: "already_active",
+			});
+			expect(readFileSync(roadmapPath, "utf8")).toBe(activeRoadmap);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("activateRoadmapFeature rejects final features without rewriting the roadmap", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			writeFileSync(
+				roadmapPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: final\n",
+				"utf8",
+			);
+			const before = readFileSync(roadmapPath, "utf8");
+			expect(() => activateRoadmapFeature(root, "F-31")).toThrow(
+				"final and cannot be reopened",
+			);
+			expect(readFileSync(roadmapPath, "utf8")).toBe(before);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

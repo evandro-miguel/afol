@@ -224,6 +224,26 @@ function writeCliProjectContract(root: string): void {
 	);
 }
 
+function writeGovernanceCatalogFixture(
+	root: string,
+	featureId: string,
+	featureStatus: string,
+	specStatus: string,
+): void {
+	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+		`# Roadmap\n\n### ${featureId} Fixture\n\n- Status: ${featureStatus}\n- Governing spec: .afol/adm/specs/${featureId}.md\n`,
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "adm", "specs", `${featureId}.md`),
+		`---\ndoc_type: spec\nid: ${featureId}\nstatus: ${specStatus}\nroadmap_feature: ${featureId}\n---\n\n# Spec\n`,
+		"utf8",
+	);
+}
+
 function writeEvolutionConfig(root: string, enabled: boolean | string): void {
 	mkdirSync(join(root, ".afol"), { recursive: true });
 	writeFileSync(
@@ -605,10 +625,13 @@ describe("workbench lifecycle service", () => {
 				"missing-spec",
 				"--json",
 			]);
-			expect(invalidGovernedNew.status).toBe(2);
-			expect(invalidGovernedNew.stdout as string).toContain(
-				"Roadmap feature not found: F-404",
-			);
+			expect(invalidGovernedNew.status).toBe(0);
+			expect(
+				parseEnvelope(invalidGovernedNew.stdout as string).data,
+			).toMatchObject({
+				governance_status: "pending_spec",
+				pending_spec: true,
+			});
 
 			const humanNewProc = runKernel(root, [
 				"new",
@@ -919,6 +942,50 @@ describe("workbench lifecycle service", () => {
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("new defers known planned features and inactive specs into pending_spec", () => {
+		for (const fixture of [
+			{ feature: "F-31", featureStatus: "planned", specStatus: "active" },
+			{ feature: "F-32", featureStatus: "active", specStatus: "draft" },
+		] as const) {
+			const root = mkRoot(`new-catalog-deferred-${fixture.feature}`);
+			try {
+				writeCliProjectContract(root);
+				writeGovernanceCatalogFixture(
+					root,
+					fixture.feature,
+					fixture.featureStatus,
+					fixture.specStatus,
+				);
+				const created = runKernel(root, [
+					"new",
+					"deferred catalog",
+					"--feature-id",
+					fixture.feature,
+					"--parent-spec",
+					fixture.feature,
+					"--json",
+				]);
+				expect(created.status).toBe(0);
+				const envelope = parseEnvelope(created.stdout as string);
+				expect(envelope.data).toMatchObject({
+					governance_status: "pending_spec",
+					pending_spec: true,
+				});
+				const session = String(
+					(envelope.data as Record<string, unknown>).session,
+				);
+				const task = readFileSync(
+					join(root, ".afol", "wb", session, `${session}_task_01.md`),
+					"utf8",
+				);
+				expect(task).toContain('governance_status: "pending_spec"');
+				expect(task).toContain('pending_spec_status: "open"');
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 
