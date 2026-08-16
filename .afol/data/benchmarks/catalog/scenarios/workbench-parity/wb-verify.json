@@ -8,11 +8,11 @@
   "compiled_binary": true,
 	"setup": [
 		[
-			"node",
+			"bun",
 			"-e",
 			"const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-wb'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'), session+'\\n','utf8'); writeFileSync(join(dir,session+'_plan_01.md'), ['# Plan: seed','','## Execution Plan','','- T-01: seed',''].join('\\n'),'utf8'); writeFileSync(join(dir,session+'_task_01.md'), ['# Tasks: seed','','## State Board','','| Task | State | Owner | Notes |','|------|-------|-------|-------|','| T-01 | pending | worker | seed |',''].join('\\n'),'utf8'); writeFileSync(join(dir,session+'_log_01.md'), ['# Log','','## Timeline','','- seed','',''].join('\\n'),'utf8'); writeFileSync(join(dir,'.evidence.jsonl'), '', 'utf8');"
 		],
-		["node", "-e", "const{writeFileSync:w}=require('node:fs');const{join}=require('node:path');w(join(process.cwd(),'.afol','wb','session-context.json'),JSON.stringify({bindings:[]})+'\\n','utf8');"],
+		["bun", "-e", "const{writeFileSync:w}=require('node:fs');const{join}=require('node:path');w(join(process.cwd(),'.afol','wb','session-context.json'),JSON.stringify({bindings:[]})+'\\n','utf8');"],
 		["afol", "st", "--session", "sb-wb", "--task-id", "T-01"],
 		[
 			"afol",

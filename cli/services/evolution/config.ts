@@ -51,7 +51,7 @@ export const DEFAULT_EVOLUTION_SETTINGS: Readonly<Record<string, unknown>> =
 			redact_before_persist: true,
 		},
 		autonomy: {
-			auto_observe: true,
+			auto_observe: false,
 			auto_refresh_preference_projections: true,
 			auto_clean_derived_state: true,
 			auto_apply_mode: "none",

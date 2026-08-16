@@ -331,6 +331,7 @@ describe("kernel front-door", () => {
 			],
 			["./commands/catchup", ["runCatchupCommand"]],
 			["./commands/changelog", ["runChangelogCommand"]],
+			["./commands/close", ["runCloseCommand"]],
 			["./commands/context", ["runContextCommand"]],
 			["./commands/db", ["runDbCommand"]],
 			["./commands/doctor", ["runDoctorCommand"]],
@@ -365,7 +366,6 @@ describe("kernel front-door", () => {
 			[
 				"./commands/workbench",
 				[
-					"runCloseCommand",
 					"runDoneCommand",
 					"runEvidenceCommand",
 					"runLogCommand",
