@@ -521,9 +521,10 @@ function computeSessionHealth(
 	try {
 		const sessions =
 			workbenchSnapshot?.sessions ?? collectSessionIds(projectRoot);
-		const warnings = detectSessionHealth(projectRoot, {
-			...(workbenchSnapshot ? { workbenchSnapshot } : {}),
-		});
+		const warnings = detectSessionHealth(
+			projectRoot,
+			workbenchSnapshot ? { workbenchSnapshot } : {},
+		);
 		return {
 			sessionCount: sessions.length,
 			sessionHealth: warnings.map((w) => w.message),

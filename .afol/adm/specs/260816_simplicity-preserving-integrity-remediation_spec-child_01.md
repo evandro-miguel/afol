@@ -2,13 +2,13 @@
 doc_type: spec-child
 id: 260816_simplicity-preserving-integrity-remediation_spec-child_01
 theme: simplicity-preserving-integrity-remediation
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: remediation
 artifact_purpose: Close verified integrity and latency gaps without adding blocking global state or speculative infrastructure.
 created_at: '2026-08-17T01:19:23Z'
-updated_at: '2026-08-17T01:19:23Z'
+updated_at: '2026-08-17T02:17:38Z'
 roadmap_feature: F-29
 spec_role: child
 parent_spec: 260715_afol-1-0-linux-wsl-finalization_spec_01
@@ -71,16 +71,16 @@ risk_level: high
 
 ## Acceptance
 
-- [ ] Each changed predicate has a focused regression or fault-injection test
+- [x] Each changed predicate has a focused regression or fault-injection test
       asserting observable behavior and relevant boundaries.
-- [ ] Before/after benchmark evidence shows no material regression in default
+- [x] Before/after benchmark evidence shows no material regression in default
       status and lifecycle latency or output size.
-- [ ] Focused tests, typecheck, full test suite, project validation, release
+- [x] Focused tests, typecheck, full test suite, project validation, release
       validation, Gitleaks, and dependency vulnerability checks pass on the
       exact final commit candidate.
-- [ ] Independent review finds no unresolved critical/high correctness,
+- [x] Independent review finds no unresolved critical/high correctness,
       blocking-path, performance, or needless-complexity defect.
-- [ ] Changes are committed and pushed to `origin/dev`; `main` and the global
+- [x] Changes are committed and pushed to `origin/dev`; `main` and the global
       AFOL binary remain untouched.
 
 ---
