@@ -923,6 +923,7 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
     - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
     - .afol/adm/specs/260816_core-integrity-remediation_spec-child_01.md
+    - .afol/adm/specs/260816_simplicity-preserving-integrity-remediation_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -944,6 +945,8 @@ Follow-on slices under this direction:
   - Remediate verified mutation crash-durability, spec-resolution,
     benchmark-provenance, and lifecycle-concurrency defects under focused
     fault-injection and exact-commit release evidence.
+  - Close residual integrity and fast-path defects without new persistent
+    infrastructure, default global blockers, or speculative refactors.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,

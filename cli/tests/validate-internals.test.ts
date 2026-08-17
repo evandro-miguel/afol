@@ -1925,6 +1925,54 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
+	test("reports the largest varying UTF-8 sample instead of a percentile", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "max-utf8-sample",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: "node -e ''",
+				result_schema: "1.0.0",
+				oracle: "max-sample-output",
+				thresholds: {},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const samples = [
+				{ stdout: "é".repeat(100), stderr: "" },
+				{ stdout: "x".repeat(150), stderr: "é".repeat(26) },
+				{ stdout: "", stderr: "😀".repeat(51) },
+			];
+			let sampleIndex = 0;
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: samples.length,
+				warmupCount: 0,
+				seams: {
+					runSample: () => {
+						const sample = samples[sampleIndex++];
+						if (!sample) throw new Error("sample fixture exhausted");
+						return {
+							duration_ms: 1,
+							exit_code: 0,
+							signal: null,
+							spawn_error: null,
+							stdout: sample.stdout,
+							stderr: sample.stderr,
+						};
+					},
+				},
+			});
+
+			expect(result.passed).toBe(true);
+			expect(result.metrics.output_bytes).toBe(204);
+			expect(result.metrics.output_tokens).toBe(51);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("uses the canonical release compiler flags", () => {
 		expect(compiledReleaseBuildArgs("/fixture/.afol/tmp/release/afol")).toEqual(
 			[
@@ -4012,6 +4060,33 @@ describe("scenario benchmark execution", () => {
 			expect(prohibitive.result.status).toBe("failed");
 			expect(prohibitive.result.pass).toBe(false);
 			expect(prohibitive.result.notes[0]).toBe(tokenRuleProhibitiveNote);
+
+			for (const [outputTokens, expectedStatus, expectedNote] of [
+				[5_000, "passed", null],
+				[5_001, "passed", "token-rule:non-ideal(>5k):5001tokens"],
+				[10_000, "passed", "token-rule:non-ideal(>5k):10000tokens"],
+				[10_001, "failed", "token-rule:prohibitive(>10k):10001tokens"],
+			] as const) {
+				const boundary = withCapturedConsoleError(() =>
+					buildResult(
+						root,
+						makeScenario(`token-boundary-${outputTokens}`, outputTokens * 4),
+						baselinePath,
+						baseline,
+					),
+				);
+				expect(boundary.result.output_tokens).toBe(outputTokens);
+				expect(boundary.result.status).toBe(expectedStatus);
+				if (expectedNote) {
+					expect(boundary.result.notes).toContain(expectedNote);
+				} else {
+					expect(
+						boundary.result.notes.some((note) =>
+							note.startsWith("token-rule:"),
+						),
+					).toBe(false);
+				}
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -4031,6 +4106,20 @@ describe("scenario benchmark execution", () => {
 				{ status: "passed", output_tokens: 6_000 },
 			]),
 		).toBe("token-rule:combined-prohibitive(>10k):12000tokens");
+
+		const boundaryNotes = new Map<number, string | null>([
+			[5_000, null],
+			[5_001, "token-rule:combined-non-ideal(>5k):5001tokens"],
+			[10_000, "token-rule:combined-non-ideal(>5k):10000tokens"],
+			[10_001, "token-rule:combined-prohibitive(>10k):10001tokens"],
+		]);
+		for (const [outputTokens, expected] of boundaryNotes) {
+			expect(
+				combinedProjectTokenRuleNote([
+					{ status: "passed", output_tokens: outputTokens },
+				]),
+			).toBe(expected);
+		}
 	});
 });
 

@@ -3428,6 +3428,30 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("does not recover a close event from incoherent durable task state", () => {
+		const root = mkRoot("incoherent-close-without-event");
+		try {
+			const created = newWorkstream(root, "incoherent close without event");
+			const closedAt = "2026-07-09T22:30:00.000Z";
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8")
+					.replace('status: "active"', 'status: "closed"')
+					.replace(
+						/^updated_at: .*$/m,
+						`updated_at: ${JSON.stringify(closedAt)}\nclosed_at: ${JSON.stringify(closedAt)}`,
+					),
+				"utf8",
+			);
+
+			expect(() => closeSession(root, created.session)).toThrow(
+				"incoherent durable close state",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("closeSession reconciles a committed close after interruption", () => {
 		const root = mkRoot("close-recovery");
 		try {
@@ -3635,6 +3659,14 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("close-timestamp-no-milliseconds");
 		try {
 			const created = newWorkstream(root, "close timestamp no milliseconds");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
 			const closedAt = "2026-07-09T22:30:00Z";
 			writeFileSync(
 				created.taskPath,

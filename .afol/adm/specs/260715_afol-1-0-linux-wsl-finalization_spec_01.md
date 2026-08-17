@@ -25,6 +25,7 @@ links:
   - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
   - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
   - .afol/adm/specs/260816_core-integrity-remediation_spec-child_01.md
+  - .afol/adm/specs/260816_simplicity-preserving-integrity-remediation_spec-child_01.md
 risk_level: high
 ---
 

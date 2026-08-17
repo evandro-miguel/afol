@@ -3,7 +3,6 @@ import {
 	mkdirSync,
 	readFileSync,
 	renameSync,
-	rmSync,
 } from "node:fs";
 import { dirname } from "node:path";
 import { atomicWriteBytes } from "../../../services/io/atomic";
@@ -32,6 +31,15 @@ function readFileBytes(path: string): Buffer {
 	return existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
 }
 
+function fileHasHash(path: string, expectedHash: string | null | undefined): boolean {
+	return (
+		expectedHash !== null &&
+		expectedHash !== undefined &&
+		existsSync(path) &&
+		normalizeHash(readFileSync(path)) === expectedHash
+	);
+}
+
 function textPreview(bytes: Buffer): string | undefined {
 	return looksBinary(bytes) ? undefined : bytes.toString("utf8");
 }
@@ -39,7 +47,7 @@ function textPreview(bytes: Buffer): string | undefined {
 export function runArchiveMutation(
 	args: CommandArgs,
 	projectRoot: string,
-	runtime: { afterPrepared?: () => void } = {},
+	runtime: { afterPrepared?: () => void; afterReplaced?: () => void } = {},
 ): CommandResult {
 	const source = resolveSafePath(projectRoot, args.path);
 	const sourceExists = existsSync(source.path);
@@ -119,17 +127,24 @@ export function runArchiveMutation(
 					diffPreview,
 				};
 				appendMutationRecord(projectRoot, record);
+				let replacementApplied = false;
 				try {
 					runtime.afterPrepared?.();
 					mkdirSync(dirname(destination.path), { recursive: true });
 					renameSync(source.path, destination.path);
+					replacementApplied = true;
+					runtime.afterReplaced?.();
 
 					appendMutationRecord(projectRoot, { ...record, status: "committed" });
 				} catch (error) {
-					rmSync(source.path, { recursive: true, force: true });
-					rmSync(destination.path, { recursive: true, force: true });
-					mkdirSync(dirname(source.path), { recursive: true });
-					atomicWriteBytes(source.path, lockedBytes);
+					const renameCompleted =
+						replacementApplied ||
+						(!existsSync(source.path) &&
+							fileHasHash(destination.path, record.afterHash));
+					if (renameCompleted) {
+						mkdirSync(dirname(source.path), { recursive: true });
+						renameSync(destination.path, source.path);
+					}
 					try {
 						appendMutationRecord(projectRoot, {
 							...record,
@@ -167,7 +182,7 @@ export function undoArchiveMutation(
 	args: CommandArgs,
 	mutation: MutationRecord,
 	projectRoot: string,
-	runtime: { afterPrepared?: () => void } = {},
+	runtime: { afterPrepared?: () => void; afterReplaced?: () => void } = {},
 ): CommandResult {
 	if (
 		mutation.kind !== "archive" ||
@@ -281,20 +296,27 @@ export function undoArchiveMutation(
 		appendMutationRecord(projectRoot, undoRecord);
 		let afterSourceBytes: Buffer = Buffer.alloc(0);
 		let afterSourceText: string | undefined;
+		let replacementApplied = false;
 		try {
 			runtime.afterPrepared?.();
 			mkdirSync(dirname(source.path), { recursive: true });
 			renameSync(destination.path, source.path);
+			replacementApplied = true;
+			runtime.afterReplaced?.();
 
 			afterSourceBytes = readFileBytes(source.path);
 			afterSourceText = textPreview(afterSourceBytes);
 
 			appendMutationRecord(projectRoot, { ...undoRecord, status: "committed" });
 		} catch (error) {
-			rmSync(source.path, { recursive: true, force: true });
-			rmSync(destination.path, { recursive: true, force: true });
-			mkdirSync(dirname(destination.path), { recursive: true });
-			atomicWriteBytes(destination.path, beforeDestinationBytes);
+			const renameCompleted =
+				replacementApplied ||
+				(!existsSync(destination.path) &&
+					fileHasHash(source.path, mutation.afterHash));
+			if (renameCompleted) {
+				mkdirSync(dirname(destination.path), { recursive: true });
+				renameSync(source.path, destination.path);
+			}
 			try {
 				appendMutationRecord(projectRoot, {
 					...undoRecord,

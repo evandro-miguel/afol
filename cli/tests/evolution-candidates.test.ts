@@ -6,13 +6,17 @@ import {
 	readFileSync,
 	rmSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runEvolveCommand } from "../commands/evolve";
 import {
+	appendAdoptionReviewEvent,
+	discoverAdoptionCandidates,
 	learningReviewStatus,
 	readAdoptionReviewEvents,
+	reviewAdoptionCandidate,
 } from "../services/evolution/adoption-candidates";
 
 const PROJECT_ID = "6b7d91ca-496f-4f0c-8537-5c4993810d15";
@@ -500,6 +504,184 @@ describe("evolve candidates", () => {
 			expect(learningReviewStatus(root, "S-01")).toMatchObject({
 				terminal: false,
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rederives the candidate under the journal lock and keeps the first decision", () => {
+		const root = fixture();
+		try {
+			const candidate = discoverAdoptionCandidates({ root, session: "S-01" })
+				.candidates[0];
+			expect(candidate).toBeDefined();
+			const first = reviewAdoptionCandidate({
+				root,
+				session: "S-01",
+				candidateId: candidate?.id ?? "",
+				decision: "rejected",
+				reason: "first reviewer declines",
+				createdAt: "2026-08-11T13:00:00.000Z",
+			});
+			expect(first.decision).toBe("rejected");
+			expect(() =>
+			reviewAdoptionCandidate({
+				root,
+				session: "S-01",
+				candidateId: candidate?.id ?? "",
+				decision: "approved",
+				reason: "second reviewer changes course",
+				createdAt: "2026-08-11T13:01:00.000Z",
+			}),
+		).toThrow("already has a terminal decision");
+			expect(readAdoptionReviewEvents(root)).toHaveLength(1);
+			expect(learningReviewStatus(root, "S-01").terminal).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("treats a pre-existing conflicting journal history as terminal", () => {
+		const root = fixture();
+		try {
+			const candidate = discoverAdoptionCandidates({ root, session: "S-01" })
+				.candidates[0];
+			expect(candidate).toBeDefined();
+			const first = appendAdoptionReviewEvent(root, "S-01", {
+				candidate_id: candidate?.id ?? "",
+				fingerprint: candidate?.fingerprint ?? "",
+				decision: "approved",
+				reason: "first decision",
+				created_at: "2026-08-11T13:00:00.000Z",
+			});
+			const createdAt = "2026-08-11T13:01:00.000Z";
+			const decision = "rejected";
+			const id = `AR-${createHash("sha256").update(`S-01:${candidate?.id}:${candidate?.fingerprint}:${createdAt}:${decision}`).digest("hex").slice(0, 20)}`;
+			writeFileSync(
+				join(root, ".afol", "data", "evolution", "adoption-reviews.jsonl"),
+				`${JSON.stringify(first)}\n${JSON.stringify({ ...first, id, decision, reason: "forged conflict", created_at: createdAt })}\n`,
+			);
+			expect(learningReviewStatus(root, "S-01")).toMatchObject({
+				terminal: true,
+			});
+			expect(() =>
+			reviewAdoptionCandidate({
+				root,
+				session: "S-01",
+				candidateId: candidate?.id ?? "",
+				decision: "approved",
+				reason: "cannot reopen conflict",
+				createdAt: "2026-08-11T13:02:00.000Z",
+			}),
+		).toThrow("already has a terminal decision");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a stale preview after the fingerprint changes without writing", () => {
+		const root = fixture();
+		try {
+			const candidate = discoverAdoptionCandidates({ root, session: "S-01" })
+				.candidates[0];
+			const taskPath = join(root, ".afol", "wb", "S-01", "S-01_task_01.md");
+			writeFileSync(
+				taskPath,
+				readFileSync(taskPath, "utf8").replace(
+					"Preserve bounded evidence in adoption reviews.",
+					"Changed after preview.",
+				),
+			);
+			expect(() =>
+			reviewAdoptionCandidate({
+				root,
+				session: "S-01",
+				candidateId: candidate?.id ?? "",
+				decision: "approved",
+				reason: "approve current candidate",
+				createdAt: "2026-08-11T13:00:00.000Z",
+			}),
+		).toThrow("candidate is missing or stale");
+			expect(readAdoptionReviewEvents(root)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rolls back a partial review-journal write", () => {
+		const root = fixture();
+		try {
+			const candidate = discoverAdoptionCandidates({ root, session: "S-01" })
+				.candidates[0];
+			expect(candidate).toBeDefined();
+			expect(() =>
+			appendAdoptionReviewEvent(
+				root,
+				"S-01",
+				{
+					candidate_id: candidate?.id ?? "",
+					fingerprint: candidate?.fingerprint ?? "",
+					decision: "approved",
+					reason: "fault injection",
+					created_at: "2026-08-11T13:00:00.000Z",
+				},
+				{
+					writeBytes: (_fd, value) => {
+						if (value.byteLength < 2) throw new Error("injected write failure");
+						return 1;
+					},
+				},
+			),
+		).toThrow("injected write failure");
+			expect(readAdoptionReviewEvents(root)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves an existing review journal on a partial second write", () => {
+		const root = fixture();
+		try {
+			const candidate = discoverAdoptionCandidates({ root, session: "S-01" })
+				.candidates[0];
+			expect(candidate).toBeDefined();
+			const first = appendAdoptionReviewEvent(root, "S-01", {
+				candidate_id: candidate?.id ?? "",
+				fingerprint: candidate?.fingerprint ?? "",
+				decision: "approved",
+				reason: "first durable decision",
+				created_at: "2026-08-11T13:00:00.000Z",
+			});
+			const journalPath = join(
+				root,
+				".afol",
+				"data",
+				"evolution",
+				"adoption-reviews.jsonl",
+			);
+			const beforeSecondWrite = readFileSync(journalPath);
+
+			expect(() =>
+				appendAdoptionReviewEvent(
+					root,
+					"S-01",
+					{
+						candidate_id: `AC-${"b".repeat(20)}`,
+						fingerprint: "c".repeat(64),
+						decision: "rejected",
+						reason: "partial second write",
+						created_at: "2026-08-11T13:01:00.000Z",
+					},
+					{
+						writeBytes: (fd, value) => {
+							writeSync(fd, value.subarray(0, 1), 0, 1, null);
+							throw new Error("injected second-write failure");
+						},
+					},
+				),
+			).toThrow("injected second-write failure");
+			expect(readFileSync(journalPath)).toEqual(beforeSecondWrite);
+			expect(readAdoptionReviewEvents(root)).toEqual([first]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

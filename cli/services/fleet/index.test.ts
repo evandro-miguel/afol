@@ -187,6 +187,28 @@ describe("fleet core service", () => {
 		expect(project?.classification).toBe("validation-blocked");
 	});
 
+	test("ignores only AFOL-owned dirty paths and keeps other temporary paths advisory", async () => {
+		const root = canonicalTemplateAlignedRoot();
+		const afolDirty = join(root, ".afol", "tmp", "fleet-note.txt");
+		mkdirSync(dirname(afolDirty), { recursive: true });
+		writeFileSync(afolDirty, "derived", "utf8");
+
+		const afolOnly = await runFleetCheck({ roots: [root] });
+		expect(afolOnly.projects[0]?.git.state).toBe("clean");
+		expect(afolOnly.projects[0]?.decision.blockers).not.toContain(
+			"dirty-git-worktree",
+		);
+
+		const externalTemp = join(root, "notes", "user-note.txt");
+		mkdirSync(dirname(externalTemp), { recursive: true });
+		writeFileSync(externalTemp, "user-owned", "utf8");
+		const mixed = await runFleetCheck({ roots: [root] });
+		expect(mixed.projects[0]?.git.state).toBe("dirty");
+		expect(mixed.projects[0]?.git.dirty_paths).toContain("notes/user-note.txt");
+		expect(mixed.projects[0]?.decision.axes.git.state).toBe("warn");
+		expect(mixed.projects[0]?.decision.blockers).toContain("dirty-git-worktree");
+	});
+
 	test("check marks critical lock conflict as manual-review without next command", async () => {
 		const root = canonicalRoot();
 		mkdirSync(join(root, ".agents"), { recursive: true });

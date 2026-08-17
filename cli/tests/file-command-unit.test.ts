@@ -1414,7 +1414,7 @@ describe("file mutation handlers", () => {
 				},
 				root,
 			);
-			expect(dryUndo.status).toBe("dry-run");
+			expect(dryUndo.status).toBe("blocked");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2265,7 +2265,7 @@ describe("file mutation handlers", () => {
 					},
 					root,
 				).status,
-			).toBe("dry-run");
+			).toBe("blocked");
 
 			expect(() =>
 				runUndoMutation(

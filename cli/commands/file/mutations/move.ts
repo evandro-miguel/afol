@@ -3,7 +3,6 @@ import {
 	mkdirSync,
 	readFileSync,
 	renameSync,
-	rmSync,
 } from "node:fs";
 import { dirname } from "node:path";
 import { atomicWriteBytes } from "../../../services/io/atomic";
@@ -31,6 +30,15 @@ import {
 
 function readFileBytes(path: string): Buffer {
 	return existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
+}
+
+function fileHasHash(path: string, expectedHash: string | null | undefined): boolean {
+	return (
+		expectedHash !== null &&
+		expectedHash !== undefined &&
+		existsSync(path) &&
+		normalizeHash(readFileSync(path)) === expectedHash
+	);
 }
 
 function textPreview(bytes: Buffer): string | undefined {
@@ -102,7 +110,7 @@ function applyUndoMoveMutation(
 	mutation: MutationRecord,
 	projectRoot: string,
 	reason: string,
-	runtime: { afterPrepared?: () => void } = {},
+	runtime: { afterPrepared?: () => void; afterReplaced?: () => void } = {},
 ): CommandResult {
 	const moveMutation = mutation as MoveUndoMutation;
 	const source = resolveSafePath(projectRoot, moveMutation.sourcePath);
@@ -207,10 +215,13 @@ function applyUndoMoveMutation(
 		let afterSourceBytes: Buffer = Buffer.alloc(0);
 		let beforeDestinationText: string | undefined;
 		let afterDestinationText: string | undefined;
+		let replacementApplied = false;
 		try {
 			runtime.afterPrepared?.();
 			mkdirSync(dirname(source.path), { recursive: true });
 			renameSync(destination.path, source.path);
+			replacementApplied = true;
+			runtime.afterReplaced?.();
 
 			if (overwrittenBackupBytes) {
 				mkdirSync(dirname(destination.path), { recursive: true });
@@ -224,10 +235,14 @@ function applyUndoMoveMutation(
 
 			appendMutationRecord(projectRoot, { ...undoRecord, status: "committed" });
 		} catch (error) {
-			rmSync(source.path, { recursive: true, force: true });
-			rmSync(destination.path, { recursive: true, force: true });
-			mkdirSync(dirname(destination.path), { recursive: true });
-			atomicWriteBytes(destination.path, beforeDestinationBytes);
+			const renameCompleted =
+				replacementApplied ||
+				(!existsSync(destination.path) &&
+					fileHasHash(source.path, moveMutation.afterHash));
+			if (renameCompleted) {
+				mkdirSync(dirname(destination.path), { recursive: true });
+				renameSync(source.path, destination.path);
+			}
 			try {
 				appendMutationRecord(projectRoot, {
 					...undoRecord,
@@ -269,7 +284,7 @@ function applyUndoMoveMutation(
 export function runMoveMutation(
 	args: MoveArgs,
 	projectRoot: string,
-	runtime: { afterPrepared?: () => void } = {},
+	runtime: { afterPrepared?: () => void; afterReplaced?: () => void } = {},
 ): CommandResult {
 	const source = resolveSafePath(projectRoot, args.path);
 	const destination = resolveSafePath(projectRoot, args.destinationPath);
@@ -378,10 +393,13 @@ export function runMoveMutation(
 					diffPreview,
 				};
 				appendMutationRecord(projectRoot, record);
+				let replacementApplied = false;
 				try {
 					runtime.afterPrepared?.();
 					mkdirSync(dirname(destination.path), { recursive: true });
 					renameSync(source.path, destination.path);
+					replacementApplied = true;
+					runtime.afterReplaced?.();
 					const after = readFileSync(destination.path);
 					appendMutationRecord(projectRoot, {
 						...record,
@@ -404,10 +422,14 @@ export function runMoveMutation(
 						diff_preview: diffPreview,
 					};
 				} catch (error) {
-					rmSync(source.path, { recursive: true, force: true });
-					rmSync(destination.path, { recursive: true, force: true });
-					mkdirSync(dirname(source.path), { recursive: true });
-					atomicWriteBytes(source.path, beforeSource);
+					const renameCompleted =
+						replacementApplied ||
+						(!existsSync(source.path) &&
+							fileHasHash(destination.path, record.afterHash));
+					if (renameCompleted) {
+						mkdirSync(dirname(source.path), { recursive: true });
+						renameSync(destination.path, source.path);
+					}
 					if (destinationExisted) {
 						mkdirSync(dirname(destination.path), { recursive: true });
 						atomicWriteBytes(destination.path, beforeDestinationBytes);

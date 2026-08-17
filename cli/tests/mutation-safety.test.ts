@@ -6,6 +6,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -13,10 +14,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { runPatchMutation } from "../commands/file/mutations/patch";
+import { runPatchMutation, undoPatchMutation } from "../commands/file/mutations/patch";
+import { runArchiveMutation, undoArchiveMutation } from "../commands/file/mutations/archive";
+import { runMoveMutation, undoMoveMutation } from "../commands/file/mutations/move";
 import type { PatchArgs } from "../commands/file/shared";
 import { normalizeHash } from "../commands/file/shared";
-import { mutationJournalPath } from "../services/mutations/journal";
+import { mutationJournalPath, type MutationRecord } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -1189,6 +1192,176 @@ describe("mutation safety command family", () => {
 			expect(
 				secondMutationRecords.some((r) => r.status === "rolled_back"),
 			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rename rollback keeps a durable copy at each replacement boundary", () => {
+		const root = mkProjectRoot();
+		const args = {
+			command: "ud" as const,
+			path: "mut/source.txt",
+			dryRun: false,
+			json: false,
+			session: "S-RENAME",
+			taskId: "T-RENAME",
+			reason: "fault injection",
+		};
+		try {
+			createMutationSession(root, args.session, args.taskId);
+			const source = join(root, "mut", "source.txt");
+			const destination = join(root, "mut", "destination.txt");
+			mkdirSync(dirname(source), { recursive: true });
+			writeFileSync(source, "from", "utf8");
+			let observedDurableCopy = false;
+			expect(() =>
+				runMoveMutation(
+					{ ...args, command: "mv", path: "mut/source.txt", destinationPath: "mut/destination.txt" },
+					root,
+					{
+						afterReplaced: () => {
+							observedDurableCopy = existsSync(source) || existsSync(destination);
+							throw new Error("inject-after-replace");
+						},
+					},
+				),
+			).toThrow("inject-after-replace");
+			expect(observedDurableCopy).toBe(true);
+			expect(readFileSync(source, "utf8")).toBe("from");
+			expect(existsSync(destination)).toBe(false);
+
+			writeFileSync(source, "archive", "utf8");
+			observedDurableCopy = false;
+			const archiveRoot = join(root, ".afol", "data", "mutations", "archives");
+			expect(() =>
+				runArchiveMutation(
+					{ ...args, command: "ar", path: "mut/source.txt" },
+					root,
+					{
+						afterReplaced: () => {
+							observedDurableCopy =
+								existsSync(source) ||
+								(existsSync(archiveRoot) &&
+									readdirSync(archiveRoot, { recursive: true }).some((path) =>
+										path.toString().endsWith("source.txt"),
+									));
+							throw new Error("inject-after-replace");
+						},
+					},
+				),
+			).toThrow("inject-after-replace");
+			expect(observedDurableCopy).toBe(true);
+			expect(readFileSync(source, "utf8")).toBe("archive");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rename rollback restores an overwritten destination after replacement", () => {
+		const root = mkProjectRoot();
+		const sourceContent = "source-before";
+		const destinationContent = "destination-before";
+		const args = {
+			command: "mv" as const,
+			path: "mut/source.txt",
+			destinationPath: "mut/destination.txt",
+			dryRun: false,
+			json: false,
+			session: "S-RENAME-OVERWRITE",
+			taskId: "T-RENAME-OVERWRITE",
+			reason: "fault injection",
+			expectedDestinationExists: true,
+			expectedDestinationHash: normalizeHash(destinationContent),
+		};
+		try {
+			createMutationSession(root, args.session, args.taskId);
+			const source = join(root, args.path);
+			const destination = join(root, args.destinationPath);
+			mkdirSync(dirname(source), { recursive: true });
+			writeFileSync(source, sourceContent, "utf8");
+			writeFileSync(destination, destinationContent, "utf8");
+
+			expect(() =>
+				runMoveMutation(args, root, {
+					afterReplaced: () => {
+						throw new Error("inject-after-replace-overwrite");
+					},
+				}),
+		).toThrow("inject-after-replace-overwrite");
+			expect(readFileSync(source, "utf8")).toBe(sourceContent);
+			expect(readFileSync(destination, "utf8")).toBe(destinationContent);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("undo rollback keeps the moved or archived bytes durable", () => {
+		const root = mkProjectRoot();
+		const args = {
+			command: "ud" as const,
+			path: "mut/source.txt",
+			dryRun: false,
+			json: false,
+			session: "S-UNDO-RENAME",
+			taskId: "T-UNDO-RENAME",
+			reason: "fault injection",
+		};
+		const move: MutationRecord = {
+			id: "move-1", ts: new Date().toISOString(), kind: "move", status: "committed", dryRun: false,
+			session: args.session, taskId: args.taskId, reason: args.reason,
+			sourcePath: "mut/source.txt", destinationPath: "mut/destination.txt",
+			beforeHash: normalizeHash("from"), afterHash: normalizeHash("from"), destinationExisted: false,
+		};
+		const archive: MutationRecord = { ...move, id: "archive-1", kind: "archive" };
+		try {
+			createMutationSession(root, args.session, args.taskId);
+			const source = join(root, "mut", "source.txt");
+			const destination = join(root, "mut", "destination.txt");
+			mkdirSync(dirname(destination), { recursive: true });
+			for (const mutation of [move, archive]) {
+				writeFileSync(destination, "from", "utf8");
+				let observedDurableCopy = false;
+				expect(() =>
+					(mutation.kind === "move" ? undoMoveMutation : undoArchiveMutation)(
+						args,
+						mutation,
+						root,
+						{
+						afterReplaced: () => {
+							observedDurableCopy = existsSync(source) || existsSync(destination);
+							throw new Error("inject-after-replace");
+						},
+						},
+					),
+				).toThrow("inject-after-replace");
+				expect(observedDurableCopy).toBe(true);
+				expect(existsSync(source)).toBe(false);
+				expect(readFileSync(destination, "utf8")).toBe("from");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("legacy patch undo blocks when the original state cannot be proved", () => {
+		const root = mkProjectRoot();
+		try {
+			const target = join(root, "notes", "legacy.txt");
+			mkdirSync(dirname(target), { recursive: true });
+			writeFileSync(target, "after", "utf8");
+			const result = undoPatchMutation(
+				{ command: "ud", path: "notes/legacy.txt", dryRun: false, json: false, session: "S-LEGACY", taskId: "T-LEGACY", reason: "legacy undo" },
+				{
+					id: "legacy-patch", ts: new Date().toISOString(), kind: "patch", status: "committed", dryRun: false,
+					session: "S-LEGACY", taskId: "T-LEGACY", reason: "legacy patch", sourcePath: "notes/legacy.txt",
+					beforeHash: normalizeHash("before"), afterHash: normalizeHash("after"),
+				} as MutationRecord,
+				root,
+			);
+			expect(result.status).toBe("blocked");
+			expect(result.message).toBe("Undo blocked: original patch state is unprovable");
+			expect(readFileSync(target, "utf8")).toBe("after");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

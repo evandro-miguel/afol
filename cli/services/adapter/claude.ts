@@ -42,31 +42,46 @@ export type AdapterState = {
 };
 
 /**
+ * The update checker needs to avoid treating an unreadable optional adapter
+ * configuration as permission to modify adapter-owned payloads. Runtime
+ * callers retain the backwards-compatible enabled default through
+ * `readClaudeAdapterEnabled` below.
+ */
+export type ClaudeAdapterConfigState = "enabled" | "disabled" | "unreadable";
+
+export function readClaudeAdapterConfigState(
+	configRoot: string,
+): ClaudeAdapterConfigState {
+	let configPath: string | null = null;
+	try {
+		configPath = resolveProjectConfigPath(configRoot)?.absolutePath ?? null;
+	} catch {
+		return "unreadable";
+	}
+	if (!configPath) {
+		return "enabled";
+	}
+	const loaded = loadJsonObject(configPath);
+	if (!loaded.ok) {
+		return "unreadable";
+	}
+	const adapters = objectAt(loaded.value, "adapters");
+	const claude = adapters ? objectAt(adapters, "claude") : null;
+	if (!claude || claude.enabled === undefined) {
+		return "enabled";
+	}
+	return typeof claude.enabled === "boolean" && !claude.enabled
+		? "disabled"
+		: "enabled";
+}
+
+/**
  * Read the Claude adapter enabled flag from the AFOL project config.
  * Omitted or non-boolean value means enabled (backward compatible with
  * pre-adapter installs that always shipped CLAUDE.md).
  */
 export function readClaudeAdapterEnabled(configRoot: string): boolean {
-	let configPath: string | null = null;
-	try {
-		configPath = resolveProjectConfigPath(configRoot)?.absolutePath ?? null;
-	} catch {
-		return true;
-	}
-	if (!configPath) {
-		return true;
-	}
-	const loaded = loadJsonObject(configPath);
-	if (!loaded.ok) {
-		return true;
-	}
-	const adapters = objectAt(loaded.value, "adapters");
-	const claude = adapters ? objectAt(adapters, "claude") : null;
-	if (!claude) {
-		return true;
-	}
-	const enabled = claude.enabled;
-	return typeof enabled === "boolean" ? enabled : true;
+	return readClaudeAdapterConfigState(configRoot) !== "disabled";
 }
 
 /** True when a path is owned by the Claude adapter. */
