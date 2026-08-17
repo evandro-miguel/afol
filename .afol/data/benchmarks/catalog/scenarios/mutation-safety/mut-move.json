@@ -5,7 +5,10 @@
   "pack_id": "mutation-safety",
   "command": "afol f mv --session sb-mut --task-id T-01 --reason move-source --path tmp/move-src.txt --to tmp/move-dst.txt --json",
   "coverage": {
-    "specs": ["260816_core-integrity-remediation_spec-child_01"]
+    "specs": [
+      "260816_core-integrity-remediation_spec-child_01",
+      "260816_simplicity-preserving-integrity-remediation_spec-child_01"
+    ]
   },
   "sandbox": true,
   "compiled_binary": true,

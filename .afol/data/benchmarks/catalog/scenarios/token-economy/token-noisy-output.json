@@ -5,7 +5,10 @@
   "pack_id": "token-economy",
   "command": "afol r list",
   "coverage": {
-    "specs": ["260816_core-integrity-remediation_spec-child_01"]
+    "specs": [
+      "260816_core-integrity-remediation_spec-child_01",
+      "260816_simplicity-preserving-integrity-remediation_spec-child_01"
+    ]
   },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
