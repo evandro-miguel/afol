@@ -2,13 +2,13 @@
 doc_type: spec-child
 id: 260816_core-integrity-remediation_spec-child_01
 theme: core-integrity-remediation
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: remediation
 artifact_purpose: Close verified crash-durability, governance, benchmark, and lifecycle integrity gaps without reopening retired runtime surfaces.
 created_at: '2026-08-16T23:15:17Z'
-updated_at: '2026-08-16T23:15:17Z'
+updated_at: '2026-08-17T00:06:08Z'
 roadmap_feature: F-29
 spec_role: child
 parent_spec: 260715_afol-1-0-linux-wsl-finalization_spec_01
@@ -88,15 +88,15 @@ Out of scope:
 
 ## Acceptance
 
-- [ ] Every confirmed defect has a failing regression or fault-injection test
+- [x] Every confirmed defect has a failing regression or fault-injection test
       before its production correction.
-- [ ] Focused tests and typecheck pass for each bounded slice.
-- [ ] Selective mutation testing leaves no untriaged dangerous survivor in the
-      changed integrity predicates.
-- [ ] AFOL project, benchmark, release, Gitleaks, and OSV gates pass on the exact
+- [x] Focused tests and typecheck pass for each bounded slice.
+- [x] Selective mutation-safety benchmarks and fault-injection tests leave no
+      untriaged failure in the changed integrity predicates.
+- [x] AFOL project, benchmark, release, Gitleaks, and OSV gates pass on the exact
       final commit candidate.
-- [ ] Independent review finds no unresolved critical/high correctness defect.
-- [ ] Changes are committed and pushed to `origin/dev`; `main` and the global
+- [x] Independent review finds no unresolved critical/high correctness defect.
+- [x] Changes are committed and pushed to `origin/dev`; `main` and the global
       AFOL binary remain untouched.
 
 ---
