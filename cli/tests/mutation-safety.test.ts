@@ -14,12 +14,24 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { runPatchMutation, undoPatchMutation } from "../commands/file/mutations/patch";
-import { runArchiveMutation, undoArchiveMutation } from "../commands/file/mutations/archive";
-import { runMoveMutation, undoMoveMutation } from "../commands/file/mutations/move";
+import {
+	runArchiveMutation,
+	undoArchiveMutation,
+} from "../commands/file/mutations/archive";
+import {
+	runMoveMutation,
+	undoMoveMutation,
+} from "../commands/file/mutations/move";
+import {
+	runPatchMutation,
+	undoPatchMutation,
+} from "../commands/file/mutations/patch";
 import type { PatchArgs } from "../commands/file/shared";
 import { normalizeHash } from "../commands/file/shared";
-import { mutationJournalPath, type MutationRecord } from "../services/mutations/journal";
+import {
+	type MutationRecord,
+	mutationJournalPath,
+} from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -1217,11 +1229,17 @@ describe("mutation safety command family", () => {
 			let observedDurableCopy = false;
 			expect(() =>
 				runMoveMutation(
-					{ ...args, command: "mv", path: "mut/source.txt", destinationPath: "mut/destination.txt" },
+					{
+						...args,
+						command: "mv",
+						path: "mut/source.txt",
+						destinationPath: "mut/destination.txt",
+					},
 					root,
 					{
 						afterReplaced: () => {
-							observedDurableCopy = existsSync(source) || existsSync(destination);
+							observedDurableCopy =
+								existsSync(source) || existsSync(destination);
 							throw new Error("inject-after-replace");
 						},
 					},
@@ -1288,7 +1306,7 @@ describe("mutation safety command family", () => {
 						throw new Error("inject-after-replace-overwrite");
 					},
 				}),
-		).toThrow("inject-after-replace-overwrite");
+			).toThrow("inject-after-replace-overwrite");
 			expect(readFileSync(source, "utf8")).toBe(sourceContent);
 			expect(readFileSync(destination, "utf8")).toBe(destinationContent);
 		} finally {
@@ -1308,12 +1326,25 @@ describe("mutation safety command family", () => {
 			reason: "fault injection",
 		};
 		const move: MutationRecord = {
-			id: "move-1", ts: new Date().toISOString(), kind: "move", status: "committed", dryRun: false,
-			session: args.session, taskId: args.taskId, reason: args.reason,
-			sourcePath: "mut/source.txt", destinationPath: "mut/destination.txt",
-			beforeHash: normalizeHash("from"), afterHash: normalizeHash("from"), destinationExisted: false,
+			id: "move-1",
+			ts: new Date().toISOString(),
+			kind: "move",
+			status: "committed",
+			dryRun: false,
+			session: args.session,
+			taskId: args.taskId,
+			reason: args.reason,
+			sourcePath: "mut/source.txt",
+			destinationPath: "mut/destination.txt",
+			beforeHash: normalizeHash("from"),
+			afterHash: normalizeHash("from"),
+			destinationExisted: false,
 		};
-		const archive: MutationRecord = { ...move, id: "archive-1", kind: "archive" };
+		const archive: MutationRecord = {
+			...move,
+			id: "archive-1",
+			kind: "archive",
+		};
 		try {
 			createMutationSession(root, args.session, args.taskId);
 			const source = join(root, "mut", "source.txt");
@@ -1328,10 +1359,11 @@ describe("mutation safety command family", () => {
 						mutation,
 						root,
 						{
-						afterReplaced: () => {
-							observedDurableCopy = existsSync(source) || existsSync(destination);
-							throw new Error("inject-after-replace");
-						},
+							afterReplaced: () => {
+								observedDurableCopy =
+									existsSync(source) || existsSync(destination);
+								throw new Error("inject-after-replace");
+							},
 						},
 					),
 				).toThrow("inject-after-replace");
@@ -1351,16 +1383,34 @@ describe("mutation safety command family", () => {
 			mkdirSync(dirname(target), { recursive: true });
 			writeFileSync(target, "after", "utf8");
 			const result = undoPatchMutation(
-				{ command: "ud", path: "notes/legacy.txt", dryRun: false, json: false, session: "S-LEGACY", taskId: "T-LEGACY", reason: "legacy undo" },
 				{
-					id: "legacy-patch", ts: new Date().toISOString(), kind: "patch", status: "committed", dryRun: false,
-					session: "S-LEGACY", taskId: "T-LEGACY", reason: "legacy patch", sourcePath: "notes/legacy.txt",
-					beforeHash: normalizeHash("before"), afterHash: normalizeHash("after"),
+					command: "ud",
+					path: "notes/legacy.txt",
+					dryRun: false,
+					json: false,
+					session: "S-LEGACY",
+					taskId: "T-LEGACY",
+					reason: "legacy undo",
+				},
+				{
+					id: "legacy-patch",
+					ts: new Date().toISOString(),
+					kind: "patch",
+					status: "committed",
+					dryRun: false,
+					session: "S-LEGACY",
+					taskId: "T-LEGACY",
+					reason: "legacy patch",
+					sourcePath: "notes/legacy.txt",
+					beforeHash: normalizeHash("before"),
+					afterHash: normalizeHash("after"),
 				} as MutationRecord,
 				root,
 			);
 			expect(result.status).toBe("blocked");
-			expect(result.message).toBe("Undo blocked: original patch state is unprovable");
+			expect(result.message).toBe(
+				"Undo blocked: original patch state is unprovable",
+			);
 			expect(readFileSync(target, "utf8")).toBe("after");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

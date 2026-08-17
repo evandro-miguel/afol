@@ -1927,7 +1927,7 @@ function runCandidates(
 				stringifyEnvelope(
 					envelopeOk(
 						{
-					candidate_id: event.candidate_id,
+							candidate_id: event.candidate_id,
 							decision: event.decision,
 							review_id: event.id,
 							append_only: true,

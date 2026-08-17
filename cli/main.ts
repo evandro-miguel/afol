@@ -387,7 +387,12 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "status") {
 		const { runStatusCommand } = await import("./commands/status");
-		return runStatusCommand(project.value.root, resolution.args, undefined, project.value);
+		return runStatusCommand(
+			project.value.root,
+			resolution.args,
+			undefined,
+			project.value,
+		);
 	}
 
 	if (resolution.kind === "new") {

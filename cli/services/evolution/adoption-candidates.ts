@@ -436,10 +436,13 @@ export function appendAdoptionReviewEvent(
 		if (
 			existing.some(
 				(entry) =>
-					entry.session_id === session && entry.fingerprint === event.fingerprint,
+					entry.session_id === session &&
+					entry.fingerprint === event.fingerprint,
 			)
 		)
-			throw new Error("evolve candidates review already has a terminal decision");
+			throw new Error(
+				"evolve candidates review already has a terminal decision",
+			);
 		const path = adoptionReviewJournalPath(root);
 		mkdirSync(resolve(path, ".."), { recursive: true, mode: 0o700 });
 		const fd = openSync(path, "a", 0o600);
@@ -453,12 +456,15 @@ export function appendAdoptionReviewEvent(
 			let offset = 0;
 			while (offset < line.byteLength) {
 				attemptedWrite = true;
-				const written = (options.writeBytes ?? ((target, value) => writeSync(target, value, 0, value.byteLength, null)))(
-					fd,
-					line.subarray(offset),
-				);
+				const written = (
+					options.writeBytes ??
+					((target, value) =>
+						writeSync(target, value, 0, value.byteLength, null))
+				)(fd, line.subarray(offset));
 				if (!Number.isInteger(written) || written <= 0)
-					throw new Error("adoption review journal write did not make progress");
+					throw new Error(
+						"adoption review journal write did not make progress",
+					);
 				offset += written;
 			}
 			(options.syncFile ?? fsyncSync)(fd);
@@ -481,7 +487,11 @@ export function appendAdoptionReviewEvent(
 					(options.syncFile ?? fsyncSync)(fd);
 					if (process.platform !== "win32") {
 						const parentFd = openSync(resolve(path, ".."), "r");
-						try { fsyncSync(parentFd); } finally { closeSync(parentFd); }
+						try {
+							fsyncSync(parentFd);
+						} finally {
+							closeSync(parentFd);
+						}
 					}
 				} catch (errorDuringRollback) {
 					rollbackError = errorDuringRollback;
@@ -523,7 +533,9 @@ export function reviewAdoptionCandidate(input: {
 		if (!candidate)
 			throw new Error("evolve candidates review candidate is missing or stale");
 		if (candidate.review_state !== "candidate_available")
-			throw new Error("evolve candidates review already has a terminal decision");
+			throw new Error(
+				"evolve candidates review already has a terminal decision",
+			);
 		return appendAdoptionReviewEvent(input.root, input.session, {
 			candidate_id: candidate.id,
 			fingerprint: candidate.fingerprint,

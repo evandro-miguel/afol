@@ -509,9 +509,9 @@ describe("update command", () => {
 			mkdirSync(join(root, ".afol"), { recursive: true });
 			writeFileSync(join(root, ".afol", "config.json"), "{broken", "utf8");
 			const operations = checkTemplateUpdate(root).operations;
-			expect(operations.some((operation) => operation.path === "CLAUDE.md")).toBe(
-				false,
-			);
+			expect(
+				operations.some((operation) => operation.path === "CLAUDE.md"),
+			).toBe(false);
 			expect(
 				operations.some(
 					(operation) => operation.path === ".agents/manifest.json",

@@ -21,8 +21,8 @@ import {
 	resolveProjectPaths,
 } from "../services/project/paths";
 import {
-	loadProjectRoot,
 	type LoadedProjectRoot,
+	loadProjectRoot,
 } from "../services/project/root";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import {
@@ -519,7 +519,8 @@ function computeSessionHealth(
 	sessionHealth: string[];
 } {
 	try {
-		const sessions = workbenchSnapshot?.sessions ?? collectSessionIds(projectRoot);
+		const sessions =
+			workbenchSnapshot?.sessions ?? collectSessionIds(projectRoot);
 		const warnings = detectSessionHealth(projectRoot, {
 			...(workbenchSnapshot ? { workbenchSnapshot } : {}),
 		});

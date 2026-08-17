@@ -206,7 +206,9 @@ describe("fleet core service", () => {
 		expect(mixed.projects[0]?.git.state).toBe("dirty");
 		expect(mixed.projects[0]?.git.dirty_paths).toContain("notes/user-note.txt");
 		expect(mixed.projects[0]?.decision.axes.git.state).toBe("warn");
-		expect(mixed.projects[0]?.decision.blockers).toContain("dirty-git-worktree");
+		expect(mixed.projects[0]?.decision.blockers).toContain(
+			"dirty-git-worktree",
+		);
 	});
 
 	test("check marks critical lock conflict as manual-review without next command", async () => {

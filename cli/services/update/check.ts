@@ -948,9 +948,10 @@ export function checkTemplateUpdate(
 	removedPaths: readonly UpdateFilePath[] = REMOVED_TEMPLATE_PATHS,
 ): UpdateCheckResult {
 	const claudeConfig = readClaudeAdapterConfigState(projectRoot);
-	const updateTargets = claudeConfig === "enabled"
-		? UPDATE_TARGETS
-		: UPDATE_TARGETS.filter((path) => !isClaudeAdapterPath(path));
+	const updateTargets =
+		claudeConfig === "enabled"
+			? UPDATE_TARGETS
+			: UPDATE_TARGETS.filter((path) => !isClaudeAdapterPath(path));
 	const currentFiles: Record<string, string> = {};
 	for (const path of updateTargets) {
 		const absolutePath = join(projectRoot, path);

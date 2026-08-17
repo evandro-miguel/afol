@@ -525,15 +525,15 @@ describe("evolve candidates", () => {
 			});
 			expect(first.decision).toBe("rejected");
 			expect(() =>
-			reviewAdoptionCandidate({
-				root,
-				session: "S-01",
-				candidateId: candidate?.id ?? "",
-				decision: "approved",
-				reason: "second reviewer changes course",
-				createdAt: "2026-08-11T13:01:00.000Z",
-			}),
-		).toThrow("already has a terminal decision");
+				reviewAdoptionCandidate({
+					root,
+					session: "S-01",
+					candidateId: candidate?.id ?? "",
+					decision: "approved",
+					reason: "second reviewer changes course",
+					createdAt: "2026-08-11T13:01:00.000Z",
+				}),
+			).toThrow("already has a terminal decision");
 			expect(readAdoptionReviewEvents(root)).toHaveLength(1);
 			expect(learningReviewStatus(root, "S-01").terminal).toBe(true);
 		} finally {
@@ -565,15 +565,15 @@ describe("evolve candidates", () => {
 				terminal: true,
 			});
 			expect(() =>
-			reviewAdoptionCandidate({
-				root,
-				session: "S-01",
-				candidateId: candidate?.id ?? "",
-				decision: "approved",
-				reason: "cannot reopen conflict",
-				createdAt: "2026-08-11T13:02:00.000Z",
-			}),
-		).toThrow("already has a terminal decision");
+				reviewAdoptionCandidate({
+					root,
+					session: "S-01",
+					candidateId: candidate?.id ?? "",
+					decision: "approved",
+					reason: "cannot reopen conflict",
+					createdAt: "2026-08-11T13:02:00.000Z",
+				}),
+			).toThrow("already has a terminal decision");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -593,15 +593,15 @@ describe("evolve candidates", () => {
 				),
 			);
 			expect(() =>
-			reviewAdoptionCandidate({
-				root,
-				session: "S-01",
-				candidateId: candidate?.id ?? "",
-				decision: "approved",
-				reason: "approve current candidate",
-				createdAt: "2026-08-11T13:00:00.000Z",
-			}),
-		).toThrow("candidate is missing or stale");
+				reviewAdoptionCandidate({
+					root,
+					session: "S-01",
+					candidateId: candidate?.id ?? "",
+					decision: "approved",
+					reason: "approve current candidate",
+					createdAt: "2026-08-11T13:00:00.000Z",
+				}),
+			).toThrow("candidate is missing or stale");
 			expect(readAdoptionReviewEvents(root)).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -615,24 +615,25 @@ describe("evolve candidates", () => {
 				.candidates[0];
 			expect(candidate).toBeDefined();
 			expect(() =>
-			appendAdoptionReviewEvent(
-				root,
-				"S-01",
-				{
-					candidate_id: candidate?.id ?? "",
-					fingerprint: candidate?.fingerprint ?? "",
-					decision: "approved",
-					reason: "fault injection",
-					created_at: "2026-08-11T13:00:00.000Z",
-				},
-				{
-					writeBytes: (_fd, value) => {
-						if (value.byteLength < 2) throw new Error("injected write failure");
-						return 1;
+				appendAdoptionReviewEvent(
+					root,
+					"S-01",
+					{
+						candidate_id: candidate?.id ?? "",
+						fingerprint: candidate?.fingerprint ?? "",
+						decision: "approved",
+						reason: "fault injection",
+						created_at: "2026-08-11T13:00:00.000Z",
 					},
-				},
-			),
-		).toThrow("injected write failure");
+					{
+						writeBytes: (_fd, value) => {
+							if (value.byteLength < 2)
+								throw new Error("injected write failure");
+							return 1;
+						},
+					},
+				),
+			).toThrow("injected write failure");
 			expect(readAdoptionReviewEvents(root)).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

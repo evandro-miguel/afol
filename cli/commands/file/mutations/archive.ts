@@ -1,11 +1,5 @@
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { dirname } from "node:path";
-import { atomicWriteBytes } from "../../../services/io/atomic";
 import { withResourceLocks } from "../../../services/io/session-lock";
 import {
 	appendMutationRecord,
@@ -31,7 +25,10 @@ function readFileBytes(path: string): Buffer {
 	return existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
 }
 
-function fileHasHash(path: string, expectedHash: string | null | undefined): boolean {
+function fileHasHash(
+	path: string,
+	expectedHash: string | null | undefined,
+): boolean {
 	return (
 		expectedHash !== null &&
 		expectedHash !== undefined &&
