@@ -127,6 +127,7 @@ or use AFOL.
 
 - [Getting started](docs/getting-started.md)
 - [Architecture](docs/architecture.md)
+- [Architecture quality baseline](docs/architecture-quality.md)
 - [Command reference](docs/command-reference.md)
 - [Release verification](docs/release-process.md)
 - [Case study](docs/case-study/README.md)

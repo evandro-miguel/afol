@@ -19,7 +19,7 @@ import {
 	newWorkstream,
 	startTask,
 } from "../services/workbench/lifecycle";
-import { maxSampleOutputBytes } from "./scenario-execution";
+import { maxSampleOutputBytes } from "./output-metrics";
 import type {
 	BenchmarkExecutionProfile,
 	HotPathScenarioConfig,

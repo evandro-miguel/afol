@@ -101,7 +101,7 @@ and do not expand the release candidate.
 - [ ] Final repository visibility, immutable release publication, remote
       rename, and global installation occur only after explicit user approval.
 
-Local readiness evidence is bound to public candidate commit `03afc0f` in
+Local readiness evidence is bound to public candidate commit `b0bee752` in
 `/home/ozy/01_projects/dev/afol/afol.public-candidate`. Hosted native CI,
 attestation publication, rulesets, visibility changes, and immutable release
 publication remain open and require external evidence or explicit approval.

@@ -44,7 +44,7 @@ risk_level: high
 
 ## Evidence
 
-- The public candidate at `03afc0f` carries MIT `LICENSE`, scoped third-party
+- The public candidate at `b0bee752` carries MIT `LICENSE`, scoped third-party
   notices, and only AFOL-owned template skills.
 - The unverified third-party `ux-design` skill is excluded from both the
   generated template and public export.

@@ -38,7 +38,20 @@ risk_level: medium
 
 ## Acceptance
 
-- [ ] Architecture report records the baseline and every chosen refactor.
-- [ ] No known dependency cycle, dead export, lint, or type error remains.
-- [ ] Lock, mutation, release, and path boundaries have focused fault tests.
-- [ ] Public interfaces do not regress and coverage claims state their scope.
+- [x] Architecture report records the baseline and every chosen refactor.
+- [x] No known dependency cycle, dead export, lint, or type error remains.
+- [x] Lock, mutation, release, and path boundaries have focused fault tests.
+- [x] Public interfaces do not regress and coverage claims state their scope.
+
+## Evidence
+
+- `docs/public/architecture-quality.md` records module/line counts, churn,
+  dependency concentration, selected complexity findings, coverage, binary
+  size, command observations, and measurement limitations.
+- Madge found one validation cycle; extracting
+  `cli/validate/output-metrics.ts` removed it, and the repeated 406-module scan
+  found zero cycles.
+- Focused hot-path/validation tests passed 85/85; the configured toolchain,
+  typecheck, Knip, and full source suite pass.
+- High-complexity functions remain documented refactor candidates rather than
+  being changed speculatively.

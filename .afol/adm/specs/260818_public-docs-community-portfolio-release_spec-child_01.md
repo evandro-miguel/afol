@@ -49,7 +49,7 @@ risk_level: medium
 
 ## Evidence
 
-- The public candidate at `03afc0f` includes the landing README, getting
+- The public candidate at `b0bee752` includes the landing README, getting
   started, architecture, command reference, security model, troubleshooting,
   upgrade/rollback, release process, known limitations, roadmap, and case
   study without references to private operator documentation.

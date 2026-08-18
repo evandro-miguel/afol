@@ -34,6 +34,7 @@ import {
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
+import { maxSampleOutputBytes } from "./output-metrics";
 import type {
 	BenchmarkExecutionProfile,
 	PreparedCompiledReleaseArtifact,
@@ -42,6 +43,7 @@ import type {
 	ScenarioExecutionResult,
 } from "./types";
 
+export { maxSampleOutputBytes } from "./output-metrics";
 export type {
 	PreparedCompiledReleaseArtifact,
 	ScenarioExecutionMetrics,
@@ -139,21 +141,6 @@ export interface ScenarioSampleRun {
 	spawn_error: string | null;
 	stdout: string;
 	stderr: string;
-}
-
-/** Measure only user-visible stdout and stderr from measured samples. */
-export function maxSampleOutputBytes(
-	samples: ReadonlyArray<Pick<ScenarioSampleRun, "stdout" | "stderr">>,
-): number {
-	return samples.reduce(
-		(maximum, sample) =>
-			Math.max(
-				maximum,
-				Buffer.byteLength(sample.stdout, "utf8") +
-					Buffer.byteLength(sample.stderr, "utf8"),
-			),
-		0,
-	);
 }
 
 function argvCharCount(command: string): number {

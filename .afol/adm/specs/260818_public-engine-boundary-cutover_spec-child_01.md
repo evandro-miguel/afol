@@ -47,7 +47,7 @@ risk_level: high
 
 ## Evidence
 
-- Local public candidate commit: `03afc0f` in
+- Local public candidate commit: `b0bee752` in
   `/home/ozy/01_projects/dev/afol/afol.public-candidate`.
 - `bun run validate:release` passed from the clean candidate at that commit,
   including 456 tests, critical-surface coverage, deterministic build,
