@@ -2,8 +2,17 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, join } from "node:path";
+import {
+	chmodSync,
+	existsSync,
+	lstatSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
 import { releaseArtifactPath } from "./build-release";
 import {
 	assertReleaseOutputFileStable,
@@ -86,7 +95,11 @@ type ScannerFileIdentity = ScannerIdentity & {
 };
 
 type ReleaseScannerResolution =
-	| { identity: ScannerFileIdentity; executable: string }
+	| { identity: ScannerFileIdentity; executable: string; bytes: Uint8Array }
+	| { error: string };
+
+type ImmutableScannerCopy =
+	| { executable: string; cleanup: () => void }
 	| { error: string };
 
 function resolveToolExecutable(tool: string, env?: NodeJS.ProcessEnv): string {
@@ -168,6 +181,7 @@ function inspectReleaseScannerExecutable(
 		}
 		return {
 			executable: configuredPath,
+			bytes,
 			identity: {
 				executable_path: configuredPath,
 				executable_sha256: sha256Hex(bytes),
@@ -180,6 +194,46 @@ function inspectReleaseScannerExecutable(
 		const detail = error instanceof Error ? error.message : String(error);
 		return {
 			error: `release ${tool} scanner ${variable} is not an approved readable file: ${detail}`,
+		};
+	}
+}
+
+function materializeImmutableScannerCopy(
+	tool: string,
+	resolution: Exclude<ReleaseScannerResolution, { error: string }>,
+): ImmutableScannerCopy {
+	let directory: string | null = null;
+	try {
+		directory = mkdtempSync(join(tmpdir(), "afol-release-scanner-"));
+		chmodSync(directory, 0o700);
+		const executable = join(directory, basename(resolution.executable));
+		writeFileSync(executable, resolution.bytes, {
+			flag: "wx",
+			mode: 0o500,
+		});
+		chmodSync(executable, 0o500);
+		const copied = lstatSync(executable);
+		if (
+			!copied.isFile() ||
+			sha256Hex(readFileSync(executable)) !==
+				resolution.identity.executable_sha256
+		) {
+			throw new Error("immutable copy does not match the verified bytes");
+		}
+		chmodSync(directory, 0o500);
+		return {
+			executable,
+			cleanup: () => {
+				chmodSync(directory as string, 0o700);
+				rmSync(directory as string, { recursive: true, force: true });
+			},
+		};
+	} catch (error) {
+		if (directory !== null) {
+			rmSync(directory, { recursive: true, force: true });
+		}
+		return {
+			error: `release ${tool} scanner could not create an immutable verified copy: ${error instanceof Error ? error.message : String(error)}`,
 		};
 	}
 }
@@ -553,153 +607,178 @@ function runOptionalScan(opts: {
 				stderr: releaseResolution.error,
 			};
 		}
-		const executable =
-			releaseResolution?.executable ?? resolveToolExecutable(binary, opts.env);
-		const identity = releaseResolution?.identity;
-		if (releaseResolution) {
-			const beforeProbe = revalidateReleaseScannerExecutable(
-				binary,
-				opts.env,
-				releaseResolution.identity,
-			);
-			if (beforeProbe) {
-				return {
-					outcome: buildReleaseScannerTrustErrorOutcome({
-						tool: binary,
-						kind: opts.kind,
-						mode: opts.mode,
-						reason: beforeProbe,
-					}),
-					exitCode: 1,
-					stderr: beforeProbe,
-				};
-			}
-		}
-		const version = probeToolVersion(binary, opts.env, executable);
-		if (releaseResolution) {
-			const afterProbe = revalidateReleaseScannerExecutable(
-				binary,
-				opts.env,
-				releaseResolution.identity,
-			);
-			if (afterProbe) {
-				return {
-					outcome: buildReleaseScannerTrustErrorOutcome({
-						tool: binary,
-						kind: opts.kind,
-						mode: opts.mode,
-						reason: afterProbe,
-					}),
-					exitCode: 1,
-					stderr: afterProbe,
-				};
-			}
-		}
-
-		for (const commandArgs of commands) {
+		let immutableCopy: Exclude<ImmutableScannerCopy, { error: string }> | null =
+			null;
+		try {
 			if (releaseResolution) {
-				const beforeScan = revalidateReleaseScannerExecutable(
+				const snapshot = materializeImmutableScannerCopy(
 					binary,
-					opts.env,
-					releaseResolution.identity,
+					releaseResolution,
 				);
-				if (beforeScan) {
+				if ("error" in snapshot) {
 					return {
 						outcome: buildReleaseScannerTrustErrorOutcome({
 							tool: binary,
 							kind: opts.kind,
 							mode: opts.mode,
-							reason: beforeScan,
+							reason: snapshot.error,
 						}),
 						exitCode: 1,
-						stderr: beforeScan,
+						stderr: snapshot.error,
 					};
 				}
+				immutableCopy = snapshot;
 			}
-			const result = spawnSync(executable, commandArgs, {
-				encoding: opts.json ? "utf8" : undefined,
-				...(opts.cwd ? { cwd: opts.cwd } : {}),
-				...(opts.env ? { env: opts.env } : {}),
-				shell: false,
-				stdio: opts.json ? "pipe" : "inherit",
-			});
+			const executable =
+				immutableCopy?.executable ?? resolveToolExecutable(binary, opts.env);
+			const identity = releaseResolution?.identity;
 			if (releaseResolution) {
-				const afterScan = revalidateReleaseScannerExecutable(
+				const beforeProbe = revalidateReleaseScannerExecutable(
 					binary,
 					opts.env,
 					releaseResolution.identity,
 				);
-				if (afterScan) {
+				if (beforeProbe) {
 					return {
 						outcome: buildReleaseScannerTrustErrorOutcome({
 							tool: binary,
 							kind: opts.kind,
 							mode: opts.mode,
-							reason: afterScan,
+							reason: beforeProbe,
 						}),
 						exitCode: 1,
-						stderr: afterScan,
+						stderr: beforeProbe,
+					};
+				}
+			}
+			const version = probeToolVersion(binary, opts.env, executable);
+			if (releaseResolution) {
+				const afterProbe = revalidateReleaseScannerExecutable(
+					binary,
+					opts.env,
+					releaseResolution.identity,
+				);
+				if (afterProbe) {
+					return {
+						outcome: buildReleaseScannerTrustErrorOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							reason: afterProbe,
+						}),
+						exitCode: 1,
+						stderr: afterProbe,
 					};
 				}
 			}
 
-			if (result.error) {
-				const error = result.error as Error & { code?: string };
-				if (String(error.code) === "ENOENT") {
-					binaryMissing = true;
-					break;
+			for (const commandArgs of commands) {
+				if (releaseResolution) {
+					const beforeScan = revalidateReleaseScannerExecutable(
+						binary,
+						opts.env,
+						releaseResolution.identity,
+					);
+					if (beforeScan) {
+						return {
+							outcome: buildReleaseScannerTrustErrorOutcome({
+								tool: binary,
+								kind: opts.kind,
+								mode: opts.mode,
+								reason: beforeScan,
+							}),
+							exitCode: 1,
+							stderr: beforeScan,
+						};
+					}
+				}
+				const result = spawnSync(executable, commandArgs, {
+					encoding: opts.json ? "utf8" : undefined,
+					...(opts.cwd ? { cwd: opts.cwd } : {}),
+					...(opts.env ? { env: opts.env } : {}),
+					shell: false,
+					stdio: opts.json ? "pipe" : "inherit",
+				});
+				if (releaseResolution) {
+					const afterScan = revalidateReleaseScannerExecutable(
+						binary,
+						opts.env,
+						releaseResolution.identity,
+					);
+					if (afterScan) {
+						return {
+							outcome: buildReleaseScannerTrustErrorOutcome({
+								tool: binary,
+								kind: opts.kind,
+								mode: opts.mode,
+								reason: afterScan,
+							}),
+							exitCode: 1,
+							stderr: afterScan,
+						};
+					}
 				}
 
-				const stderr = `${binary} failed to start: ${error.message}`;
-				return {
-					outcome: buildProbeErrorOutcome({
-						tool: binary,
-						kind: opts.kind,
-						mode: opts.mode,
-						error,
-						...(identity ? { identity } : {}),
-					}),
-					exitCode: 1,
-					stderr,
-				};
+				if (result.error) {
+					const error = result.error as Error & { code?: string };
+					if (String(error.code) === "ENOENT") {
+						binaryMissing = true;
+						break;
+					}
+
+					const stderr = `${binary} failed to start: ${error.message}`;
+					return {
+						outcome: buildProbeErrorOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							error,
+							...(identity ? { identity } : {}),
+						}),
+						exitCode: 1,
+						stderr,
+					};
+				}
+
+				if (result.status !== 0) {
+					const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
+					const stdout = opts.json ? `${result.stdout ?? ""}`.trim() : "";
+					const failureDetail = opts.json
+						? summarizeFailureOutput(stderr || stdout)
+						: undefined;
+					return {
+						outcome: buildCommandOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							status: result.status ?? 1,
+							...(version ? { version } : {}),
+							...(identity ? { identity } : {}),
+							...(failureDetail ? { failureDetail } : {}),
+						}),
+						exitCode: result.status ?? 1,
+						...(opts.json && stderr ? { stderr } : {}),
+					};
+				}
 			}
 
-			if (result.status !== 0) {
-				const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
-				const stdout = opts.json ? `${result.stdout ?? ""}`.trim() : "";
-				const failureDetail = opts.json
-					? summarizeFailureOutput(stderr || stdout)
-					: undefined;
-				return {
-					outcome: buildCommandOutcome({
-						tool: binary,
-						kind: opts.kind,
-						mode: opts.mode,
-						status: result.status ?? 1,
-						...(version ? { version } : {}),
-						...(identity ? { identity } : {}),
-						...(failureDetail ? { failureDetail } : {}),
-					}),
-					exitCode: result.status ?? 1,
-					...(opts.json && stderr ? { stderr } : {}),
-				};
+			if (binaryMissing) {
+				continue;
 			}
+			return {
+				outcome: buildCommandOutcome({
+					tool: binary,
+					kind: opts.kind,
+					mode: opts.mode,
+					status: 0,
+					...(version ? { version } : {}),
+					...(identity ? { identity } : {}),
+				}),
+				exitCode: 0,
+			};
+		} finally {
+			immutableCopy?.cleanup();
 		}
-
-		if (binaryMissing) {
-			continue;
-		}
-		return {
-			outcome: buildCommandOutcome({
-				tool: binary,
-				kind: opts.kind,
-				mode: opts.mode,
-				status: 0,
-				...(version ? { version } : {}),
-				...(identity ? { identity } : {}),
-			}),
-			exitCode: 0,
-		};
 	}
 
 	if (opts.mode === "required") {

@@ -109,6 +109,17 @@ export function splitCommandLine(command: string): string[] {
 				command[index + 1] === '"' ||
 				command[index + 1] === "'")
 		) {
+			const next = command[index + 1];
+			const afterNext = command[index + 2];
+			if (
+				preserveBackslashes &&
+				quote !== null &&
+				next === quote &&
+				(afterNext === undefined || /\s/.test(afterNext))
+			) {
+				current += "\\";
+				continue;
+			}
 			escaping = true;
 			continue;
 		}

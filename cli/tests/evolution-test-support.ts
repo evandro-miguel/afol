@@ -11,5 +11,8 @@ export function removeEvolutionTestRoot(root: string): void {
 
 /** Releases closed native SQLite statements before a test mutates its database files. */
 export function releaseEvolutionTestHandles(): void {
-	if (process.platform === "win32") Bun.gc(true);
+	// Bun can retain native SQLite statement finalizers after Database.close().
+	// Renaming or truncating the backing file while those mappings remain live
+	// can crash with SIGBUS on POSIX and can retain locks on Windows.
+	Bun.gc(true);
 }

@@ -377,6 +377,10 @@ export async function withTaskCompletionLock<T>(
 		ownedIdentity = identity(ownerFd);
 	} catch (error) {
 		try {
+			// Metadata replacement changes ctime even when the write or fsync then
+			// fails. Refresh from the still-owned descriptor so cleanup cannot leave
+			// an empty or partial lock permanently blocking future completions.
+			ownedIdentity = identity(ownerFd);
 			unlinkOwned(lockPath, ownedIdentity);
 		} finally {
 			try {

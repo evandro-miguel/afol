@@ -5,7 +5,9 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	readlinkSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,6 +17,7 @@ import {
 	copyCleanCheckout,
 	isCleanSmokeExcluded,
 } from "../dev/clean-smoke";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function git(root: string, args: string[]): void {
 	const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
@@ -65,6 +68,35 @@ describe("clean smoke checkout", () => {
 			rmSync(sandbox, { recursive: true, force: true });
 		}
 	});
+
+	test.skipIf(!symlinkTestSupport.available)(
+		"preserves relative symlink targets inside the isolated checkout",
+		() => {
+			const sandbox = mkdtempSync(join(tmpdir(), "afol-clean-smoke-link-"));
+			try {
+				const source = join(sandbox, "source");
+				const checkout = join(sandbox, "checkout");
+				mkdirSync(join(source, "docs", "templates"), { recursive: true });
+				mkdirSync(join(source, "canonical"), { recursive: true });
+				writeFileSync(join(source, "canonical", "adr.md"), "adr\n", "utf8");
+				symlinkSync(
+					"../../canonical/adr.md",
+					join(source, "docs", "templates", "adr.md"),
+					"file",
+				);
+				git(source, ["init", "--quiet"]);
+				git(source, ["add", "canonical/adr.md", "docs/templates/adr.md"]);
+
+				copyCleanCheckout(source, checkout);
+
+				const copiedLink = join(checkout, "docs", "templates", "adr.md");
+				expect(readlinkSync(copiedLink)).toBe("../../canonical/adr.md");
+				expect(readFileSync(copiedLink, "utf8")).toBe("adr\n");
+			} finally {
+				rmSync(sandbox, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("recognizes every explicit clean-smoke exclusion", () => {
 		expect(isCleanSmokeExcluded(".git/config")).toBe(true);

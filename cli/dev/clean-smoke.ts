@@ -153,7 +153,7 @@ export function copyCleanCheckout(sourceRoot: string, checkout: string): void {
 		mkdirSync(dirname(targetPath), { recursive: true });
 		cpSync(sourcePath, targetPath, {
 			force: true,
-			verbatimSymlinks: process.platform === "win32",
+			verbatimSymlinks: true,
 		});
 	}
 }

@@ -355,28 +355,6 @@ function resolveCommandInvocation(
 	return { command: program, args };
 }
 
-function shellQuote(value: string): string {
-	return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function bashPath(path: string): string {
-	if (process.platform !== "win32") return path;
-	const result = boundedSpawn(
-		"bash",
-		["-lc", `wslpath -a -- ${shellQuote(path)}`],
-		{
-			timeoutMs: 15_000,
-		},
-	);
-	const resolved = result.stdout.trim();
-	if (!result.ok || !resolved) {
-		throw new Error(
-			`Sandbox path conversion failed: ${outputTail(spawnFailureDetail(result))}`,
-		);
-	}
-	return resolved;
-}
-
 function isSymlinkPrivilegeError(error: unknown): boolean {
 	return (
 		typeof error === "object" &&
@@ -495,20 +473,57 @@ function createSandboxRoot(projectRoot: string): string {
 		join(ensureBenchmarkTempRoot(projectRoot), "afol-bench-sandbox-"),
 	);
 	const sandboxIdentity = captureSandboxRootIdentity(sandboxRoot);
-	const excludeFlags = SANDBOX_COPY_EXCLUDES.map(
-		(entry) => `--exclude ${shellQuote(entry)}`,
-	).join(" ");
-	const exportCommand = [
-		"set -euo pipefail;",
-		`tar -C ${shellQuote(bashPath(projectRoot))} ${excludeFlags} -cf - . | tar -C ${shellQuote(bashPath(sandboxRoot))} -xf -`,
-	].join(" ");
-	const exportResult = boundedSpawn("bash", ["-lc", exportCommand], {
-		timeoutMs: 120_000,
-	});
-	if (!exportResult.ok) {
+	try {
+		const shouldCopy = (sourcePath: string): boolean => {
+			const sourceRelative = relative(projectRoot, sourcePath).replaceAll(
+				"\\",
+				"/",
+			);
+			return !SANDBOX_COPY_EXCLUDES.some((excluded) => {
+				if (excluded.endsWith("*")) {
+					return sourceRelative
+						.split("/")
+						.some((part) => part.startsWith(excluded.slice(0, -1)));
+				}
+				return (
+					sourceRelative === excluded ||
+					sourceRelative.startsWith(`${excluded}/`) ||
+					sourceRelative.includes(`/${excluded}/`)
+				);
+			});
+		};
+		const copyEntry = (sourcePath: string, targetPath: string): void => {
+			if (!shouldCopy(sourcePath)) return;
+			const sourceStat = lstatSync(sourcePath);
+			if (sourceStat.isDirectory()) {
+				mkdirSync(targetPath, { recursive: true, mode: sourceStat.mode });
+				for (const entry of readdirSync(sourcePath)) {
+					copyEntry(join(sourcePath, entry), join(targetPath, entry));
+				}
+				chmodSync(targetPath, sourceStat.mode);
+				return;
+			}
+			if (sourceStat.isSymbolicLink()) {
+				cpSync(sourcePath, targetPath, {
+					force: true,
+					verbatimSymlinks: true,
+				});
+				return;
+			}
+			if (!sourceStat.isFile()) {
+				throw new Error(`Unsupported sandbox source entry: ${sourcePath}`);
+			}
+			copyFileSync(sourcePath, targetPath);
+			chmodSync(targetPath, sourceStat.mode);
+		};
+		for (const entry of readdirSync(projectRoot)) {
+			const sourcePath = join(projectRoot, entry);
+			copyEntry(sourcePath, join(sandboxRoot, entry));
+		}
+	} catch (error) {
 		removeSandboxRoot(sandboxRoot, sandboxIdentity);
 		throw new Error(
-			`Sandbox copy export failed: ${outputTail(spawnFailureDetail(exportResult))}`,
+			`Sandbox copy export failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
 	const projectNodeModules = join(projectRoot, "node_modules");

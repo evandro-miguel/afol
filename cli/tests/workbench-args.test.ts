@@ -492,6 +492,16 @@ describe("parseDoneArgs", () => {
 		]);
 	});
 
+	test("preserves a trailing separator in a quoted Windows path", () => {
+		if (process.platform !== "win32") return;
+		const directory = "C:\\AFOL Windows\\tests\\";
+		expect(splitCommandLine(`bun test "${directory}"`)).toEqual([
+			"bun",
+			"test",
+			directory,
+		]);
+	});
+
 	test("executes an unquoted Windows executable path", () => {
 		if (process.platform !== "win32") return;
 		const executable = process.execPath;

@@ -29,6 +29,7 @@ type MockScannerOptions = {
 	stdout?: string;
 	stderr?: string;
 	logPath?: string;
+	invocationPathLog?: string;
 	replaceExecutableOnVersion?: boolean;
 };
 
@@ -74,7 +75,7 @@ function writeMockScanner(
 		writeFileSync(scriptPath, script, "utf8");
 		writeFileSync(
 			executable,
-			`@echo off\r\n"${process.execPath}" "${scriptPath}" %*\r\n`,
+			`@echo off\r\n${options.invocationPathLog ? `echo %~f0>>"${options.invocationPathLog}"\r\n` : ""}"${process.execPath}" "${scriptPath}" %*\r\n`,
 			"utf8",
 		);
 		return;
@@ -82,11 +83,16 @@ function writeMockScanner(
 
 	const script = [
 		"#!/bin/sh",
+		...(options.invocationPathLog
+			? [
+					`printf '%s\\n' "$0" >> '${options.invocationPathLog.replaceAll("'", "'\\''")}'`,
+				]
+			: []),
 		...(supportsVersion
 			? [
 					`if [ "$1" = "--version" ]; then ${
 						options.replaceExecutableOnVersion
-							? `printf '#!/bin/sh\\nexit 0\\n' > "$0"; `
+							? `printf '#!/bin/sh\\nexit 0\\n' > '${executable.replaceAll("'", "'\\''")}'; `
 							: ""
 					}printf '${version}\\n'; exit 0; fi`,
 				]
@@ -310,6 +316,39 @@ describe("security scan CLI", () => {
 				waiver_required: true,
 			});
 			expect(payload.reason).toContain("changed after trust validation");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release scan executes a private verified copy instead of the configured pathname", () => {
+		const root = mkdtempSync(join(tmpdir(), "security-scan-release-copy-"));
+		const binDir = join(root, "bin");
+		const invocationPathLog = join(root, "scanner-path.log");
+		mkdirSync(binDir, { recursive: true });
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		writeMockScanner(binDir, "osv-scanner", {
+			version: "osv-scanner 2.4.0",
+			invocationPathLog,
+		});
+
+		try {
+			const configured = scannerExecutable(binDir, "osv-scanner");
+			const result = runSecurityScan(
+				["deps", "--release", "--json"],
+				root,
+				binDir,
+				{ AFOL_OSV_SCANNER_PATH: configured },
+			);
+			expect(result.status).toBe(0);
+			const invoked = readFileSync(invocationPathLog, "utf8")
+				.trim()
+				.split(/\r?\n/);
+			expect(invoked.length).toBeGreaterThanOrEqual(2);
+			for (const path of invoked) {
+				expect(path).not.toBe(configured);
+				expect(path).toContain("afol-release-scanner-");
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

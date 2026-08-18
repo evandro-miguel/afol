@@ -27,6 +27,7 @@ import {
 	resolveExternalPathLockPath,
 	resolveSessionLockPath,
 	withExternalPathLock,
+	withExternalPathLockSync,
 	withResourceLocks,
 	withSessionLock,
 } from "../services/io/session-lock";
@@ -262,6 +263,24 @@ describe("session-lock", () => {
 			const session = "process-start-identity-session";
 			const lockPath = resolveSessionLockPath(root, session);
 			withSessionLock(root, session, () => {
+				const metadata = JSON.parse(readFileSync(lockPath, "utf8")) as {
+					process_start_token?: unknown;
+				};
+				if (process.platform === "linux") {
+					expect(metadata.process_start_token).toMatch(/^\d+$/);
+				}
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("records the Linux process-start identity in synchronous external locks", () => {
+		const root = mkProjectRoot("sync-process-start-identity");
+		try {
+			const target = join(root, "state.db");
+			const lockPath = resolveExternalPathLockPath(target);
+			withExternalPathLockSync(target, () => {
 				const metadata = JSON.parse(readFileSync(lockPath, "utf8")) as {
 					process_start_token?: unknown;
 				};

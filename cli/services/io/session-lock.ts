@@ -698,6 +698,9 @@ export function withExternalPathLockSync<T>(
 			fd,
 			`${JSON.stringify({
 				pid: process.pid,
+				...(PROCESS_START_TOKEN !== null
+					? { process_start_token: PROCESS_START_TOKEN }
+					: {}),
 				acquired_at: new Date().toISOString(),
 				host: HOSTNAME,
 				resource: resolve(canonicalPath),
