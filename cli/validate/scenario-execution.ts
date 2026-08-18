@@ -27,8 +27,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import {
 	readMinifiedCompiledReleaseBuildReceipt,
-	compiledReleaseBuildArgs as releaseBuildArgs,
 	releaseArtifactPath,
+	compiledReleaseBuildArgs as releaseBuildArgs,
 	writeCompiledReleaseBuildReceipt,
 } from "../dev/build-release";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
@@ -339,9 +339,13 @@ function shellQuote(value: string): string {
 
 function bashPath(path: string): string {
 	if (process.platform !== "win32") return path;
-	const result = boundedSpawn("bash", ["-lc", `wslpath -a -- ${shellQuote(path)}`], {
-		timeoutMs: 15_000,
-	});
+	const result = boundedSpawn(
+		"bash",
+		["-lc", `wslpath -a -- ${shellQuote(path)}`],
+		{
+			timeoutMs: 15_000,
+		},
+	);
 	const resolved = result.stdout.trim();
 	if (!result.ok || !resolved) {
 		throw new Error(

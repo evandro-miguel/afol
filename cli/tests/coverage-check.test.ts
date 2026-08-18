@@ -42,9 +42,9 @@ function runCoverageCheck(
 			fixtureScript,
 			[
 				`process.stdout.write(${JSON.stringify(output)});`,
-			...(bunScript?.includes("kill -TERM $$")
-				? ['process.kill(process.pid, "SIGTERM");']
-				: []),
+				...(bunScript?.includes("kill -TERM $$")
+					? ['process.kill(process.pid, "SIGTERM");']
+					: []),
 			].join("\n"),
 			"utf8",
 		);
@@ -56,13 +56,7 @@ function runCoverageCheck(
 	} else {
 		writeFileSync(
 			join(binDir, "bun"),
-			bunScript ??
-				[
-					"#!/bin/sh",
-					"cat <<'EOF'",
-					output,
-					"EOF",
-				].join("\n"),
+			bunScript ?? ["#!/bin/sh", "cat <<'EOF'", output, "EOF"].join("\n"),
 			"utf8",
 		);
 		chmodSync(join(binDir, "bun"), 0o755);

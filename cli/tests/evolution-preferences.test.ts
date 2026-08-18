@@ -1,14 +1,8 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	agentOperationContext,
 	defaultOperationContext,
@@ -31,6 +25,7 @@ import {
 	createPreference,
 	recordPreferenceEvidence,
 } from "../services/evolution/preferences";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const OTHER_PROJECT_ID = "7b7d91ca-496b-4f0c-8537-5c4993810d15";

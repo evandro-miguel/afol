@@ -1,14 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import {
-	mkdtempSync,
-	readFileSync,
-	writeFileSync,
-	writeSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import { checkEvolutionDbHealth } from "../services/evolution/health";
 import {
@@ -23,6 +17,7 @@ import {
 	rebuildExternalImportProjection,
 	validateExternalImportProjection,
 } from "../services/evolution/import-store";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const EXTERNAL_SESSION_ID = `EXT-${"b".repeat(32)}`;

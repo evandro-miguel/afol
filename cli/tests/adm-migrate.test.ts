@@ -101,22 +101,24 @@ describe("adm migrate", () => {
 	symlinkTest(
 		"planner rejects symlinked docs/arc sources before reading outside project [requires symlink privilege]",
 		() => {
-		const root = mkdtempSync(join(tmpdir(), "adm-migrate-symlink-source-"));
-		const outside = mkdtempSync(join(tmpdir(), "adm-migrate-outside-source-"));
-		try {
-			mkdirSync(join(root, "docs"), { recursive: true });
-			writeFileSync(
-				join(outside, "GENERAL-ROADMAP.md"),
-				"outside roadmap",
-				"utf8",
+			const root = mkdtempSync(join(tmpdir(), "adm-migrate-symlink-source-"));
+			const outside = mkdtempSync(
+				join(tmpdir(), "adm-migrate-outside-source-"),
 			);
-			symlinkSync(outside, join(root, "docs", "arc"), "dir");
+			try {
+				mkdirSync(join(root, "docs"), { recursive: true });
+				writeFileSync(
+					join(outside, "GENERAL-ROADMAP.md"),
+					"outside roadmap",
+					"utf8",
+				);
+				symlinkSync(outside, join(root, "docs", "arc"), "dir");
 
-			expect(() => validateAdmMigration(root)).toThrow(/symlink/);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
-		}
+				expect(() => validateAdmMigration(root)).toThrow(/symlink/);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
 		},
 	);
 

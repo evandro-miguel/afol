@@ -14,8 +14,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand } from "../commands/evolve";
 import {
 	appendProductionDayAllocation,
@@ -24,6 +22,8 @@ import {
 	openEvolutionDb,
 	productionDayJournalPath,
 } from "../services/evolution";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "67cfb6af-14a2-4d07-a8e2-9e0be1435844";
 
@@ -210,18 +210,21 @@ describe("evolution static path safety", () => {
 		}
 	});
 
-	test.skipIf(!symlinkTestSupport.available)("rejects a symlinked intermediate state directory", () => {
-		const root = fixture();
-		try {
-			const outside = join(root, "outside");
-			mkdirSync(outside);
-			mkdirSync(join(root, ".afol"), { recursive: true });
-			symlinkSync(outside, join(root, ".afol", "state"), "dir");
-			expect(() =>
-				openEvolutionDb(join(root, ".afol", "state", "evolution.db")),
-			).toThrow(/parent|reparse|symlink/i);
-		} finally {
-			removeEvolutionTestRoot(root);
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"rejects a symlinked intermediate state directory",
+		() => {
+			const root = fixture();
+			try {
+				const outside = join(root, "outside");
+				mkdirSync(outside);
+				mkdirSync(join(root, ".afol"), { recursive: true });
+				symlinkSync(outside, join(root, ".afol", "state"), "dir");
+				expect(() =>
+					openEvolutionDb(join(root, ".afol", "state", "evolution.db")),
+				).toThrow(/parent|reparse|symlink/i);
+			} finally {
+				removeEvolutionTestRoot(root);
+			}
+		},
+	);
 });

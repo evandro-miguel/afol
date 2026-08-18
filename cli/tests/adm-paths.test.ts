@@ -139,26 +139,26 @@ describe("adm command", () => {
 	test.skipIf(!symlinkTestSupport.available)(
 		"migrate rejects symlinked .afol before writing archive or targets",
 		() => {
-		const root = createFixture(false);
-		const outside = mkdtempSync(join(tmpdir(), "adm-command-outside-"));
-		try {
-			mkdirSync(join(root, "docs", "arc"), { recursive: true });
-			writeFileSync(
-				join(root, "docs", "arc", "GENERAL-ROADMAP.md"),
-				"# Roadmap\n",
-				"utf8",
-			);
-			symlinkSync(outside, join(root, ".afol"), "dir");
+			const root = createFixture(false);
+			const outside = mkdtempSync(join(tmpdir(), "adm-command-outside-"));
+			try {
+				mkdirSync(join(root, "docs", "arc"), { recursive: true });
+				writeFileSync(
+					join(root, "docs", "arc", "GENERAL-ROADMAP.md"),
+					"# Roadmap\n",
+					"utf8",
+				);
+				symlinkSync(outside, join(root, ".afol"), "dir");
 
-			expect(() => migrateAdm(root)).toThrow(/symlink/);
-			expect(
-				existsSync(join(outside, "adm", "roadmap", "GENERAL-ROADMAP.md")),
-			).toBe(false);
-			expect(existsSync(join(outside, "adm", "migrations"))).toBe(false);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
-		}
+				expect(() => migrateAdm(root)).toThrow(/symlink/);
+				expect(
+					existsSync(join(outside, "adm", "roadmap", "GENERAL-ROADMAP.md")),
+				).toBe(false);
+				expect(existsSync(join(outside, "adm", "migrations"))).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
 		},
 	);
 });

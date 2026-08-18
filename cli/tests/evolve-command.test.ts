@@ -11,7 +11,6 @@ import {
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand, runObserveCommand } from "../commands/evolve";
 import {
 	agentOperationContext,
@@ -30,6 +29,7 @@ import {
 	validateEvolutionConfigExtension,
 } from "../services/evolution";
 import { resolveSessionLockPath } from "../services/io/session-lock";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
 

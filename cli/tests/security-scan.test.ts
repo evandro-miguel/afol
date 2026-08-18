@@ -12,7 +12,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, join } from "node:path";
 import { releaseArtifactPath } from "../dev/build-release";
 import { buildReleaseSecurityScanOutcomes } from "../dev/security-scan";
 import {
@@ -38,7 +38,8 @@ function writeMockScanner(
 	options: MockScannerOptions = {},
 ): void {
 	const version = options.version ?? `${name} test`;
-	const supportsVersion = options.version !== undefined || (options.exitCode ?? 0) === 0;
+	const supportsVersion =
+		options.version !== undefined || (options.exitCode ?? 0) === 0;
 	const executable = join(
 		binDir,
 		process.platform === "win32" ? `${name}.cmd` : name,
@@ -50,15 +51,17 @@ function writeMockScanner(
 			"const args = process.argv.slice(2);",
 			...(supportsVersion
 				? [
-					`if (args[0] === "--version") { ${
-						options.replaceExecutableOnVersion
-							? `fs.writeFileSync(${JSON.stringify(executable)}, "@echo off\\r\\nexit /b 0\\r\\n", "utf8"); `
-							: ""
-					}process.stdout.write(${JSON.stringify(`${version}\n`)}); process.exit(0); }`,
-				]
+						`if (args[0] === "--version") { ${
+							options.replaceExecutableOnVersion
+								? `fs.writeFileSync(${JSON.stringify(executable)}, "@echo off\\r\\nexit /b 0\\r\\n", "utf8"); `
+								: ""
+						}process.stdout.write(${JSON.stringify(`${version}\n`)}); process.exit(0); }`,
+					]
 				: []),
 			...(options.logPath
-				? [`fs.appendFileSync(${JSON.stringify(options.logPath)}, args.join(" ") + "\\n");`]
+				? [
+						`fs.appendFileSync(${JSON.stringify(options.logPath)}, args.join(" ") + "\\n");`,
+					]
 				: []),
 			...(options.stdout
 				? [`process.stdout.write(${JSON.stringify(`${options.stdout}\n`)});`]
@@ -81,12 +84,12 @@ function writeMockScanner(
 		"#!/bin/sh",
 		...(supportsVersion
 			? [
-				`if [ "$1" = "--version" ]; then ${
-					options.replaceExecutableOnVersion
-						? `printf '#!/bin/sh\\nexit 0\\n' > "$0"; `
-						: ""
-				}printf '${version}\\n'; exit 0; fi`,
-			]
+					`if [ "$1" = "--version" ]; then ${
+						options.replaceExecutableOnVersion
+							? `printf '#!/bin/sh\\nexit 0\\n' > "$0"; `
+							: ""
+					}printf '${version}\\n'; exit 0; fi`,
+				]
 			: []),
 		...(options.logPath
 			? [`printf '%s\\n' "$*" >> '${options.logPath.replaceAll("'", "'\\''")}'`]
@@ -119,9 +122,7 @@ function runSecurityScan(
 			env: {
 				...process.env,
 				...envOverrides,
-				PATH:
-					pathDir ??
-					mkdtempSync(join(tmpdir(), "security-scan-path-")),
+				PATH: pathDir ?? mkdtempSync(join(tmpdir(), "security-scan-path-")),
 			},
 			shell: false,
 		},
@@ -396,7 +397,9 @@ describe("security scan CLI", () => {
 				pinnedReleaseScannerEnvironment(binDir),
 			);
 			expect(result.status).toBe(0);
-			expect(result.stdout).toContain(join("dist", "security-scan.release.json"));
+			expect(result.stdout).toContain(
+				join("dist", "security-scan.release.json"),
+			);
 
 			const report = JSON.parse(
 				readFileSync(join(root, "dist/security-scan.release.json"), "utf8"),
@@ -520,7 +523,9 @@ describe("security scan CLI", () => {
 	);
 
 	test("release scan rejects a scanner path that is not a regular file", () => {
-		const root = mkdtempSync(join(tmpdir(), "security-scan-scanner-directory-"));
+		const root = mkdtempSync(
+			join(tmpdir(), "security-scan-scanner-directory-"),
+		);
 		const binDir = join(root, "bin");
 		mkdirSync(binDir, { recursive: true });
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
@@ -553,7 +558,11 @@ describe("security scan CLI", () => {
 			const binDir = join(root, "bin");
 			mkdirSync(binDir, { recursive: true });
 			writeFileSync(join(root, "bun.lock"), "", "utf8");
-			writeFileSync(join(external, RELEASE_ARTIFACT.split("/").at(-1)!), "artifact", "utf8");
+			writeFileSync(
+				join(external, basename(RELEASE_ARTIFACT)),
+				"artifact",
+				"utf8",
+			);
 			symlinkSync(
 				external,
 				join(root, "dist"),
@@ -564,9 +573,9 @@ describe("security scan CLI", () => {
 				const result = runSecurityScan(["release"], root, binDir);
 				expect(result.status).not.toBe(0);
 				expect(result.stderr).toContain("release output directory");
-				expect(
-					existsSync(join(external, "security-scan.release.json")),
-				).toBe(false);
+				expect(existsSync(join(external, "security-scan.release.json"))).toBe(
+					false,
+				);
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 				rmSync(external, { recursive: true, force: true });
@@ -612,7 +621,11 @@ describe("security scan CLI", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(binDir, { recursive: true });
 		if (process.platform === "win32") {
-			writeFileSync(join(binDir, "osv-scanner.exe"), "not a real binary\r\n", "utf8");
+			writeFileSync(
+				join(binDir, "osv-scanner.exe"),
+				"not a real binary\r\n",
+				"utf8",
+			);
 		} else {
 			writeFileSync(join(binDir, "osv-scanner"), "not a real binary\n", "utf8");
 			chmodSync(join(binDir, "osv-scanner"), 0o755);

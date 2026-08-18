@@ -185,7 +185,9 @@ describe("bootstrap planner ownership policy", () => {
 	});
 
 	test("fails closed for a non-regular completion-lock gitignore", async () => {
-		const target = mkdtempSync(join(tmpdir(), "bootstrap-gitignore-directory-"));
+		const target = mkdtempSync(
+			join(tmpdir(), "bootstrap-gitignore-directory-"),
+		);
 		try {
 			mkdirSync(join(target, ".gitignore"));
 			expect(await runBootstrapCommand([target, "--dry-run"])).toBe(4);
@@ -200,7 +202,9 @@ describe("bootstrap planner ownership policy", () => {
 	symlinkTest(
 		"fails closed for a symlinked completion-lock gitignore [requires symlink privilege]",
 		async () => {
-			const target = mkdtempSync(join(tmpdir(), "bootstrap-gitignore-symlink-"));
+			const target = mkdtempSync(
+				join(tmpdir(), "bootstrap-gitignore-symlink-"),
+			);
 			try {
 				symlinkSync(join(target, "missing-target"), join(target, ".gitignore"));
 				expect(await runBootstrapCommand([target, "--dry-run"])).toBe(4);
@@ -345,32 +349,32 @@ describe("bootstrap provider-compatible mutable state", () => {
 	symlinkTest(
 		"rejects a target replaced by a symlink while waiting for its lock [requires symlink privilege]",
 		async () => {
-		const root = mkdtempSync(join(tmpdir(), "bootstrap-locked-target-swap-"));
-		const target = join(root, "target");
-		const outside = join(root, "outside");
-		mkdirSync(target);
-		mkdirSync(outside);
-		const errors: string[] = [];
-		const originalError = console.error;
-		try {
-			console.error = (...values: unknown[]) =>
-				errors.push(values.map(String).join(" "));
-			const exitCode = await runBootstrapCommand([target], {
-				beforeLockedPlan: () => {
-					rmSync(target, { recursive: true, force: true });
-					symlinkSync(outside, target, "dir");
-				},
-			});
-			expect(exitCode).toBe(2);
-			expect(errors.join("\n")).toContain(
-				"Bootstrap target changed while waiting for lock",
-			);
-			expect(readdirSync(outside)).toEqual([]);
-			expect(lstatSync(target).isSymbolicLink()).toBe(true);
-		} finally {
-			console.error = originalError;
-			rmSync(root, { recursive: true, force: true });
-		}
+			const root = mkdtempSync(join(tmpdir(), "bootstrap-locked-target-swap-"));
+			const target = join(root, "target");
+			const outside = join(root, "outside");
+			mkdirSync(target);
+			mkdirSync(outside);
+			const errors: string[] = [];
+			const originalError = console.error;
+			try {
+				console.error = (...values: unknown[]) =>
+					errors.push(values.map(String).join(" "));
+				const exitCode = await runBootstrapCommand([target], {
+					beforeLockedPlan: () => {
+						rmSync(target, { recursive: true, force: true });
+						symlinkSync(outside, target, "dir");
+					},
+				});
+				expect(exitCode).toBe(2);
+				expect(errors.join("\n")).toContain(
+					"Bootstrap target changed while waiting for lock",
+				);
+				expect(readdirSync(outside)).toEqual([]);
+				expect(lstatSync(target).isSymbolicLink()).toBe(true);
+			} finally {
+				console.error = originalError;
+				rmSync(root, { recursive: true, force: true });
+			}
 		},
 	);
 
@@ -393,29 +397,29 @@ describe("bootstrap provider-compatible mutable state", () => {
 	symlinkTest(
 		"rejects existing and broken target-root symlinks without replacing them [requires symlink privilege]",
 		async () => {
-		const root = mkdtempSync(join(tmpdir(), "bootstrap-root-symlink-"));
-		const realTarget = join(root, "real");
-		mkdirSync(realTarget);
-		for (const [name, destination] of [
-			["existing-link", realTarget],
-			["broken-link", join(root, "missing")],
-		] as const) {
-			const target = join(root, name);
-			symlinkSync(destination, target, "dir");
-			const errors: string[] = [];
-			const originalError = console.error;
-			try {
-				console.error = (...values: unknown[]) =>
-					errors.push(values.map(String).join(" "));
-				expect(await runBootstrapCommand([target])).toBe(2);
-				expect(errors.join("\n")).toContain("must not be a symlink");
-				expect(lstatSync(target).isSymbolicLink()).toBe(true);
-			} finally {
-				console.error = originalError;
+			const root = mkdtempSync(join(tmpdir(), "bootstrap-root-symlink-"));
+			const realTarget = join(root, "real");
+			mkdirSync(realTarget);
+			for (const [name, destination] of [
+				["existing-link", realTarget],
+				["broken-link", join(root, "missing")],
+			] as const) {
+				const target = join(root, name);
+				symlinkSync(destination, target, "dir");
+				const errors: string[] = [];
+				const originalError = console.error;
+				try {
+					console.error = (...values: unknown[]) =>
+						errors.push(values.map(String).join(" "));
+					expect(await runBootstrapCommand([target])).toBe(2);
+					expect(errors.join("\n")).toContain("must not be a symlink");
+					expect(lstatSync(target).isSymbolicLink()).toBe(true);
+				} finally {
+					console.error = originalError;
+				}
 			}
-		}
-		expect(readdirSync(realTarget)).toEqual([]);
-		rmSync(root, { recursive: true, force: true });
+			expect(readdirSync(realTarget)).toEqual([]);
+			rmSync(root, { recursive: true, force: true });
 		},
 	);
 
@@ -543,26 +547,26 @@ describe("bootstrap provider-compatible mutable state", () => {
 	symlinkTest(
 		"does not write template files through symlinked target directories [requires symlink privilege]",
 		async () => {
-		const target = mkdtempSync(join(tmpdir(), "bootstrap-symlink-target-"));
-		const outside = mkdtempSync(join(tmpdir(), "bootstrap-symlink-outside-"));
-		const errors: string[] = [];
-		const originalError = console.error;
-		try {
-			console.error = (...values: unknown[]) => {
-				errors.push(values.map(String).join(" "));
-			};
-			symlinkSync(outside, join(target, ".agents"), "dir");
+			const target = mkdtempSync(join(tmpdir(), "bootstrap-symlink-target-"));
+			const outside = mkdtempSync(join(tmpdir(), "bootstrap-symlink-outside-"));
+			const errors: string[] = [];
+			const originalError = console.error;
+			try {
+				console.error = (...values: unknown[]) => {
+					errors.push(values.map(String).join(" "));
+				};
+				symlinkSync(outside, join(target, ".agents"), "dir");
 
-			const exitCode = await runBootstrapCommand([target]);
+				const exitCode = await runBootstrapCommand([target]);
 
-			expect(exitCode).toBe(2);
-			expect(errors.join("\n")).toContain("Path crosses symlink");
-			expect(existsSync(join(outside, "config.json"))).toBe(false);
-		} finally {
-			console.error = originalError;
-			rmSync(target, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
-		}
+				expect(exitCode).toBe(2);
+				expect(errors.join("\n")).toContain("Path crosses symlink");
+				expect(existsSync(join(outside, "config.json"))).toBe(false);
+			} finally {
+				console.error = originalError;
+				rmSync(target, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
 		},
 	);
 

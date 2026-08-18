@@ -168,7 +168,8 @@ describe("external import core", () => {
 			"\\\\server\\share\\codex.jsonl",
 			join(root, "session.jsonl:stream"),
 		];
-		if (process.platform !== "win32") unsupported.push("C:\\sessions\\codex.jsonl");
+		if (process.platform !== "win32")
+			unsupported.push("C:\\sessions\\codex.jsonl");
 		for (const path of unsupported)
 			await expect(
 				codexAdapter.preview({ provider: "codex", path }),

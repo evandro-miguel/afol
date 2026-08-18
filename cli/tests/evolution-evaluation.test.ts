@@ -13,10 +13,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-	removeEvolutionTestRoot,
-	releaseEvolutionTestHandles,
-} from "./evolution-test-support";
-import {
 	appendProductionDayAllocation,
 	checkEvolutionDbHealth,
 	EVOLUTION_SCHEMA_VERSION,
@@ -51,6 +47,10 @@ import {
 	readActiveSession,
 	startTask,
 } from "../services/workbench/lifecycle";
+import {
+	releaseEvolutionTestHandles,
+	removeEvolutionTestRoot,
+} from "./evolution-test-support";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
 const NOW = new Date("2026-07-18T12:00:00.000Z");

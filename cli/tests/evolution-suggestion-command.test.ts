@@ -10,7 +10,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand } from "../commands/evolve";
 import {
 	agentOperationContext,
@@ -32,6 +31,7 @@ import {
 } from "../services/evolution";
 import { appendObservationJournalEvent } from "../services/evolution/observation-journal";
 import { claimDailySuggestion } from "../services/evolution/suggestion-journal";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496f-4f0c-8537-5c4993810d15";
 const DIGEST = "a".repeat(64);

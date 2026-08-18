@@ -475,7 +475,11 @@ describe("validate command", () => {
 			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			expect(
-				await runValidateCommand(root, ["--check-drift", "--json"], captured.io),
+				await runValidateCommand(
+					root,
+					["--check-drift", "--json"],
+					captured.io,
+				),
 			).toBe(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

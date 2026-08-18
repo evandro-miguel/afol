@@ -99,7 +99,9 @@ function secureDirectoryIdentity(
 		Number(verified.ino) !== Number(stat.ino) ||
 		!samePath(realpathSync(path), canonical)
 	)
-		throw new Error("external import destination identity changed during security verification");
+		throw new Error(
+			"external import destination identity changed during security verification",
+		);
 	const identity = { dev: Number(stat.dev), ino: Number(stat.ino), canonical };
 	if (
 		expected &&
@@ -109,7 +111,10 @@ function secureDirectoryIdentity(
 	return identity;
 }
 
-function ensureSecureImportDirectory(root: string, target: string): DirectoryIdentity {
+function ensureSecureImportDirectory(
+	root: string,
+	target: string,
+): DirectoryIdentity {
 	const rootIdentity = secureDirectoryIdentity(root, root);
 	const segments = relative(root, target).split(/[\\/]/).filter(Boolean);
 	let current = root;
@@ -870,10 +875,7 @@ export async function confirmExternalImport(
 				preview.importId,
 			);
 			const providerPath = dirname(finalPath);
-			const provider = ensureSecureImportDirectory(
-				input.root,
-				providerPath,
-			);
+			const provider = ensureSecureImportDirectory(input.root, providerPath);
 			const existed = existsSync(finalPath);
 			if (existed) secureDirectoryIdentity(finalPath, input.root);
 			let canonicalLinks: readonly ExternalSessionLink[] = preview.links;
@@ -905,7 +907,9 @@ export async function confirmExternalImport(
 					secureDirectoryIdentity(providerPath, input.root, provider);
 					secureDirectoryIdentity(stagePath, input.root, stage);
 					if (existsSync(finalPath))
-						throw new Error("external import artifact destination appeared during staging");
+						throw new Error(
+							"external import artifact destination appeared during staging",
+						);
 					renameSync(stagePath, finalPath);
 					installed = true;
 					secureDirectoryIdentity(finalPath, input.root, stage);

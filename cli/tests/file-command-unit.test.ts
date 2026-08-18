@@ -13,7 +13,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
 import { runFileCommand } from "../commands/file";
 import {
 	parseArchiveArgs,
@@ -59,6 +58,7 @@ import {
 	withMutationJournalLock,
 } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function mkProjectRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "file-command-unit-"));
@@ -464,20 +464,26 @@ describe("mutation transaction hardening", () => {
 		}
 	});
 
-	test.skipIf(!symlinkTestSupport.available)("journal backup reads reject symlink escapes", () => {
-		const root = mkProjectRoot();
-		const outside = writeFileTree(root, "outside.txt", "secret");
-		const link = join(resolveProjectPaths(root).abs.mutationBackupsDir, "link");
-		try {
-			mkdirSync(dirname(link), { recursive: true });
-			symlinkSync(outside, link);
-			expect(() => readJournalBackupBytes(root, link)).toThrow(
-				"escapes mutation backups",
+	test.skipIf(!symlinkTestSupport.available)(
+		"journal backup reads reject symlink escapes",
+		() => {
+			const root = mkProjectRoot();
+			const outside = writeFileTree(root, "outside.txt", "secret");
+			const link = join(
+				resolveProjectPaths(root).abs.mutationBackupsDir,
+				"link",
 			);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+			try {
+				mkdirSync(dirname(link), { recursive: true });
+				symlinkSync(outside, link);
+				expect(() => readJournalBackupBytes(root, link)).toThrow(
+					"escapes mutation backups",
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 	test("strict journal reports unmatched prepared while locked reads remain reentrant", () => {
 		const root = mkProjectRoot();
 		try {

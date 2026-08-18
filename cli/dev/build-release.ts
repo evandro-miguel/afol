@@ -78,9 +78,7 @@ export function writeCompiledReleaseBuildReceipt(
 	cwd?: string,
 ): string {
 	const receiptPath = compiledReleaseBuildReceiptPath(outfile);
-	const outputGuard = cwd
-		? prepareReleaseOutputFile(cwd, receiptPath)
-		: null;
+	const outputGuard = cwd ? prepareReleaseOutputFile(cwd, receiptPath) : null;
 	writeFileSync(
 		receiptPath,
 		`${JSON.stringify(

@@ -95,15 +95,11 @@ export function prepareReleaseOutputFile(
 	const root = assertRealDirectory(rootPath, "release root");
 	const directories = [root];
 	const parent = dirname(targetPath);
-	const segments = relative(rootPath, parent)
-		.split(/[\\/]/)
-		.filter(Boolean);
+	const segments = relative(rootPath, parent).split(/[\\/]/).filter(Boolean);
 	let current = rootPath;
 	for (const segment of segments) {
 		current = join(current, segment);
-		directories.push(
-			ensureRealDirectory(current, "release output directory"),
-		);
+		directories.push(ensureRealDirectory(current, "release output directory"));
 	}
 	if (existsSync(targetPath)) {
 		assertRealFile(targetPath, "release output file");
@@ -131,7 +127,10 @@ export function assertReleaseOutputFileStable(
 }
 
 /** Validate an already-existing release artifact before it is read or hashed. */
-export function assertSafeReleaseArtifact(cwd: string, artifactPath: string): void {
+export function assertSafeReleaseArtifact(
+	cwd: string,
+	artifactPath: string,
+): void {
 	const guard = prepareReleaseOutputFile(cwd, artifactPath);
 	assertReleaseOutputFileStable(guard, true);
 }

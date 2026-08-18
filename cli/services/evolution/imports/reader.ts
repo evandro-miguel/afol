@@ -82,9 +82,13 @@ export async function* readJsonl(
 		path.includes("\0") ||
 		/^(?:\\\\|\/\/)/.test(path) ||
 		(isWindowsDrivePath && process.platform !== "win32") ||
-		path.split(/[\\/]/).some((part, index) =>
-			part.includes(":") && !(isWindowsDrivePath && index === 0 && /^[A-Za-z]:$/.test(part)),
-		)
+		path
+			.split(/[\\/]/)
+			.some(
+				(part, index) =>
+					part.includes(":") &&
+					!(isWindowsDrivePath && index === 0 && /^[A-Za-z]:$/.test(part)),
+			)
 	)
 		throw new Error("import source path is not a supported local path");
 	const resolvedPath = resolve(path);

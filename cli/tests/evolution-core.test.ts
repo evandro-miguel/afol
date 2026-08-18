@@ -9,8 +9,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	appendProductionDayAllocation,
 	applyMigrations,
@@ -30,6 +28,8 @@ import {
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
 import { rebuildPreferenceProjection } from "../services/evolution/preference-journal";
 import { allocateProductionDay } from "../services/evolution/production-days";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 
@@ -711,21 +711,24 @@ describe("Evolution Slice 1 persistence core", () => {
 		}
 	});
 
-	test.skipIf(!symlinkTestSupport.available)("rejects escaped or symlinked configured database paths", () => {
-		const root = mkdtempSync(join(tmpdir(), "evolution-paths-"));
-		const outside = mkdtempSync(join(tmpdir(), "evolution-outside-"));
-		try {
-			expect(() => evolutionDbPath(root, "../outside/evolution.db")).toThrow(
-				"escapes project root",
-			);
-			mkdirSync(join(root, "links"), { recursive: true });
-			symlinkSync(outside, join(root, "links", "db"));
-			expect(() => evolutionDbPath(root, "links/db/evolution.db")).toThrow(
-				"crosses symlink",
-			);
-		} finally {
-			removeEvolutionTestRoot(root);
-			removeEvolutionTestRoot(outside);
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"rejects escaped or symlinked configured database paths",
+		() => {
+			const root = mkdtempSync(join(tmpdir(), "evolution-paths-"));
+			const outside = mkdtempSync(join(tmpdir(), "evolution-outside-"));
+			try {
+				expect(() => evolutionDbPath(root, "../outside/evolution.db")).toThrow(
+					"escapes project root",
+				);
+				mkdirSync(join(root, "links"), { recursive: true });
+				symlinkSync(outside, join(root, "links", "db"));
+				expect(() => evolutionDbPath(root, "links/db/evolution.db")).toThrow(
+					"crosses symlink",
+				);
+			} finally {
+				removeEvolutionTestRoot(root);
+				removeEvolutionTestRoot(outside);
+			}
+		},
+	);
 });

@@ -9,10 +9,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	removeEvolutionTestRoot,
-	releaseEvolutionTestHandles,
-} from "./evolution-test-support";
 import { runEvolveCommand } from "../commands/evolve";
 import { agentOperationContext } from "../core/operation-context";
 import {
@@ -21,6 +17,10 @@ import {
 	openEvolutionDb,
 	productionDayJournalPath,
 } from "../services/evolution";
+import {
+	releaseEvolutionTestHandles,
+	removeEvolutionTestRoot,
+} from "./evolution-test-support";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
 

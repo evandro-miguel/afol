@@ -10,8 +10,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	appendProductionDayAllocation,
 	applyMigrations,
@@ -25,6 +23,8 @@ import {
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
 import { validateEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import { withSessionLock } from "../services/io/session-lock";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const TIMEZONE = "America/Asuncion";
@@ -366,27 +366,30 @@ describe("Evolution canonical projection and concurrency", () => {
 		}
 	});
 
-	test.skipIf(!symlinkTestSupport.available)("journal rejects a final symlink without touching its target", () => {
-		const root = mkdtempSync(join(tmpdir(), "evolution-journal-symlink-"));
-		const db = openEvolutionDb(evolutionDbPath(root));
-		seedEvidence(root, "S-01", "E-01");
-		const journalPath = productionDayJournalPath(root);
-		const externalPath = join(root, "outside.jsonl");
-		mkdirSync(join(root, ".afol", "data", "events", "evolution"), {
-			recursive: true,
-		});
-		writeFileSync(externalPath, "external sentinel\n");
-		symlinkSync(externalPath, journalPath);
-		try {
-			expect(() => append(root, db, "S-01", "E-01")).toThrow(
-				"production-day journal target must be a regular file",
-			);
-			expect(readFileSync(externalPath, "utf8")).toBe("external sentinel\n");
-		} finally {
-			db.close();
-			removeEvolutionTestRoot(root);
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"journal rejects a final symlink without touching its target",
+		() => {
+			const root = mkdtempSync(join(tmpdir(), "evolution-journal-symlink-"));
+			const db = openEvolutionDb(evolutionDbPath(root));
+			seedEvidence(root, "S-01", "E-01");
+			const journalPath = productionDayJournalPath(root);
+			const externalPath = join(root, "outside.jsonl");
+			mkdirSync(join(root, ".afol", "data", "events", "evolution"), {
+				recursive: true,
+			});
+			writeFileSync(externalPath, "external sentinel\n");
+			symlinkSync(externalPath, journalPath);
+			try {
+				expect(() => append(root, db, "S-01", "E-01")).toThrow(
+					"production-day journal target must be a regular file",
+				);
+				expect(readFileSync(externalPath, "utf8")).toBe("external sentinel\n");
+			} finally {
+				db.close();
+				removeEvolutionTestRoot(root);
+			}
+		},
+	);
 
 	test("health waits for an in-flight append and avoids false projection drift", async () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-health-inflight-"));

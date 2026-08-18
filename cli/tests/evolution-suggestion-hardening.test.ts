@@ -16,8 +16,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { defaultOperationContext } from "../core/operation-context";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
@@ -35,6 +33,8 @@ import {
 	suggestionJournalPath,
 } from "../services/evolution/suggestion-journal";
 import { previewDailySuggestion } from "../services/evolution/suggestion-query";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const DIGEST = "a".repeat(64);
@@ -479,8 +479,7 @@ describe("evolution suggestion hardening", () => {
 			if (kind === "symlink") {
 				if (!symlinkTestSupport.available) continue;
 				symlinkSync(outside, target);
-			}
-			else linkSync(outside, target);
+			} else linkSync(outside, target);
 			try {
 				expect(() =>
 					claimDailySuggestion({

@@ -105,26 +105,34 @@ function writeMockScanner(
 	options: MockScannerOptions = {},
 ): void {
 	const version = options.version ?? `${name} test`;
-	const supportsVersion = options.version !== undefined || (options.exitCode ?? 0) === 0;
-	const executable = join(binDir, process.platform === "win32" ? `${name}.cmd` : name);
+	const supportsVersion =
+		options.version !== undefined || (options.exitCode ?? 0) === 0;
+	const executable = join(
+		binDir,
+		process.platform === "win32" ? `${name}.cmd` : name,
+	);
 	if (process.platform === "win32") {
 		const scriptPath = join(binDir, `${name}-fixture.js`);
 		const script = [
 			'const fs = require("node:fs");',
-		"const args = process.argv.slice(2);",
+			"const args = process.argv.slice(2);",
 			...(supportsVersion
-				? [`if (args[0] === "--version") { process.stdout.write(${JSON.stringify(`${version}\n`)}); process.exit(0); }`]
+				? [
+						`if (args[0] === "--version") { process.stdout.write(${JSON.stringify(`${version}\n`)}); process.exit(0); }`,
+					]
 				: []),
-		...(options.logPath
-			? [`fs.appendFileSync(${JSON.stringify(options.logPath)}, args.join(" ") + "\\n");`]
-			: []),
-		...(options.stdout
-			? [`process.stdout.write(${JSON.stringify(`${options.stdout}\n`)});`]
-			: []),
-		...(options.stderr
-			? [`process.stderr.write(${JSON.stringify(`${options.stderr}\n`)});`]
-			: []),
-		`process.exit(${options.exitCode ?? 0});`,
+			...(options.logPath
+				? [
+						`fs.appendFileSync(${JSON.stringify(options.logPath)}, args.join(" ") + "\\n");`,
+					]
+				: []),
+			...(options.stdout
+				? [`process.stdout.write(${JSON.stringify(`${options.stdout}\n`)});`]
+				: []),
+			...(options.stderr
+				? [`process.stderr.write(${JSON.stringify(`${options.stderr}\n`)});`]
+				: []),
+			`process.exit(${options.exitCode ?? 0});`,
 		].join("\n");
 		writeFileSync(scriptPath, script, "utf8");
 		writeFileSync(
@@ -295,7 +303,9 @@ describe("release and toolchain contracts", () => {
 	test.skipIf(!directoryReparseTestSupport.available)(
 		"provenance refuses a dist directory reparse point before writing receipts",
 		() => {
-			const root = mkdtempSync(join(tmpdir(), "release-provenance-reparse-root-"));
+			const root = mkdtempSync(
+				join(tmpdir(), "release-provenance-reparse-root-"),
+			);
 			const external = mkdtempSync(
 				join(tmpdir(), "release-provenance-reparse-external-"),
 			);
@@ -890,7 +900,7 @@ describe("release and toolchain contracts", () => {
 		};
 		try {
 			commitReleaseFixture(root, gitEnv);
-		writeCompiledReleaseBuildReceipt(join(distDir, RELEASE_ARTIFACT_NAME), [
+			writeCompiledReleaseBuildReceipt(join(distDir, RELEASE_ARTIFACT_NAME), [
 				"build",
 				"--compile",
 				"--format=esm",
@@ -932,7 +942,11 @@ describe("release and toolchain contracts", () => {
 		};
 		try {
 			commitReleaseFixture(root, gitEnv);
-			writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "mutated artifact", "utf8");
+			writeFileSync(
+				join(distDir, RELEASE_ARTIFACT_NAME),
+				"mutated artifact",
+				"utf8",
+			);
 			expect(() =>
 				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
 			).toThrow(/compiled release build receipt does not bind artifact/);
@@ -1059,7 +1073,9 @@ describe("release and toolchain contracts", () => {
 				releaseMode: true,
 				env: gitEnv,
 			});
-			expect(readFileSync(checksumPath, "utf8")).toContain(`  ${RELEASE_ARTIFACT}`);
+			expect(readFileSync(checksumPath, "utf8")).toContain(
+				`  ${RELEASE_ARTIFACT}`,
+			);
 			const provenance = JSON.parse(readFileSync(provenancePath, "utf8"));
 			const artifactPath = join(root, RELEASE_ARTIFACT);
 			expect(provenance).toMatchObject({

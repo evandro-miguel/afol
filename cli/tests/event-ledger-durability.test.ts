@@ -15,7 +15,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
 import { runLocalStateCommand } from "../commands/local-state";
 import { runTelemetryCommand } from "../commands/telemetry";
 import {
@@ -39,6 +38,7 @@ import {
 	newWorkstream,
 	startTask,
 } from "../services/workbench/lifecycle";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function configureRoot(label: string): string {
 	const root = mkdtempSync(join(tmpdir(), `afol-event-ledger-${label}-`));
@@ -754,8 +754,7 @@ describe("shared event ledger durability", () => {
 				if (kind === "symlink") {
 					if (!symlinkTestSupport.available) continue;
 					symlinkSync(source, eventPath(root));
-				}
-				else linkSync(source, eventPath(root));
+				} else linkSync(source, eventPath(root));
 				expect(() =>
 					appendEventLedgerRecord(root, canonicalWorkbenchRecord(`E-${kind}`)),
 				).toThrow(/regular file|hardlinked|reparse|symbolic|symlink/i);

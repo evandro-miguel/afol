@@ -8,19 +8,14 @@ import {
 	mkdtempSync,
 	readFileSync,
 	renameSync,
-	rmSync,
 	rmdirSync,
+	rmSync,
 	symlinkSync,
 	writeFileSync,
 	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import {
-	directoryReparseTestSupport,
-	symlinkTestSupport,
-} from "./symlink-test-support";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
 	appendImportJournalEventUnlocked,
@@ -32,6 +27,11 @@ import {
 	previewExternalImport,
 } from "../services/evolution/import-service";
 import { rebuildExternalImportProjection } from "../services/evolution/import-store";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import {
+	directoryReparseTestSupport,
+	symlinkTestSupport,
+} from "./symlink-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 
@@ -534,33 +534,36 @@ describe.skipIf(process.platform === "win32")("external import service", () => {
 		process.platform === "win32"
 			? !directoryReparseTestSupport.available
 			: !symlinkTestSupport.available,
-	)("rejects a reparse-point project root before staging an import", async () => {
-		const { root: backingRoot, source } = fixture();
-		const linkedRoot = `${backingRoot}-linked`;
-		const db = openEvolutionDb(evolutionDbPath(backingRoot));
-		try {
-			symlinkSync(
-				backingRoot,
-				linkedRoot,
-				process.platform === "win32" ? "junction" : "dir",
-			);
-			await expect(
-				confirmExternalImport({
-					root: linkedRoot,
-					provider: "codex",
-					source: { provider: "codex", path: source, projectId: PROJECT_ID },
-					projectId: PROJECT_ID,
-					db,
-				}),
-			).rejects.toThrow(/real directory|reparse/i);
-			expect(existsSync(join(backingRoot, ".afol", "external"))).toBe(false);
-		} finally {
-			db.close();
-			if (process.platform === "win32") rmdirSync(linkedRoot);
-			else rmSync(linkedRoot, { force: true });
-			removeEvolutionTestRoot(backingRoot);
-		}
-	});
+	)(
+		"rejects a reparse-point project root before staging an import",
+		async () => {
+			const { root: backingRoot, source } = fixture();
+			const linkedRoot = `${backingRoot}-linked`;
+			const db = openEvolutionDb(evolutionDbPath(backingRoot));
+			try {
+				symlinkSync(
+					backingRoot,
+					linkedRoot,
+					process.platform === "win32" ? "junction" : "dir",
+				);
+				await expect(
+					confirmExternalImport({
+						root: linkedRoot,
+						provider: "codex",
+						source: { provider: "codex", path: source, projectId: PROJECT_ID },
+						projectId: PROJECT_ID,
+						db,
+					}),
+				).rejects.toThrow(/real directory|reparse/i);
+				expect(existsSync(join(backingRoot, ".afol", "external"))).toBe(false);
+			} finally {
+				db.close();
+				if (process.platform === "win32") rmdirSync(linkedRoot);
+				else rmSync(linkedRoot, { force: true });
+				removeEvolutionTestRoot(backingRoot);
+			}
+		},
+	);
 
 	test("rejects a group/world-writable artifact parent on POSIX", async () => {
 		if (process.platform === "win32") return;

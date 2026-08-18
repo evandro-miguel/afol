@@ -115,7 +115,9 @@ describe("verify-tasks command", () => {
 
 			expect(proc.status).toBe(1);
 			expect(proc.stderr as string).toBe("");
-			expect(portablePath(proc.stdout as string)).toContain("Session: .afol/wb");
+			expect(portablePath(proc.stdout as string)).toContain(
+				"Session: .afol/wb",
+			);
 			expect(proc.stdout as string).toContain("Pending:");
 			expect(proc.stdout as string).not.toContain("/.afol/wb/_archive/");
 			expect(proc.stdout as string).not.toContain("/.agents/wb/");

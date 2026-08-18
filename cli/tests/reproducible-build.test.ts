@@ -13,15 +13,15 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import {
-	directoryReparseTestSupport,
-	symlinkTestSupport,
-} from "./symlink-test-support";
-import {
 	buildReleaseArtifact,
 	compiledReleaseBuildArgs,
 	readMinifiedCompiledReleaseBuildReceipt,
 	releaseArtifactPath,
 } from "../dev/build-release";
+import {
+	directoryReparseTestSupport,
+	symlinkTestSupport,
+} from "./symlink-test-support";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const scratchRoot = join(repoRoot, ".tmp");
@@ -69,97 +69,105 @@ describe("deterministic release build", () => {
 		]);
 	});
 
-	test("two independent clean source roots produce identical SHA-256", () => {
-		const sandbox = projectScratch("reproducible-build-");
-		try {
-			const artifact = releaseArtifactPath("dist/afol");
-			const firstRoot = join(sandbox, "first");
-			const secondRoot = join(sandbox, "second");
-			copyCleanSourceRoot(firstRoot);
-			copyCleanSourceRoot(secondRoot);
+	test(
+		"two independent clean source roots produce identical SHA-256",
+		() => {
+			const sandbox = projectScratch("reproducible-build-");
+			try {
+				const artifact = releaseArtifactPath("dist/afol");
+				const firstRoot = join(sandbox, "first");
+				const secondRoot = join(sandbox, "second");
+				copyCleanSourceRoot(firstRoot);
+				copyCleanSourceRoot(secondRoot);
 
-			const first = buildReleaseArtifact({
-				cwd: firstRoot,
-				outfile: artifact,
-			});
-			const second = buildReleaseArtifact({
-				cwd: secondRoot,
-				outfile: artifact,
-			});
+				const first = buildReleaseArtifact({
+					cwd: firstRoot,
+					outfile: artifact,
+				});
+				const second = buildReleaseArtifact({
+					cwd: secondRoot,
+					outfile: artifact,
+				});
 
-			expect(first.outfile).toBe(join(firstRoot, artifact));
-			expect(second.outfile).toBe(join(secondRoot, artifact));
-			expect(fileSha256(first.outfile)).toBe(first.sha256);
-			expect(first.sha256).toBe(second.sha256);
-			expect(existsSync(first.receiptPath)).toBe(true);
-			expect(
-				readMinifiedCompiledReleaseBuildReceipt(
-					first.outfile,
-					compiledReleaseBuildArgs("cli/main.ts", artifact),
-				),
-			).toEqual({
-				artifact_sha256: first.sha256,
-				build_args: compiledReleaseBuildArgs("cli/main.ts", artifact),
-			});
+				expect(first.outfile).toBe(join(firstRoot, artifact));
+				expect(second.outfile).toBe(join(secondRoot, artifact));
+				expect(fileSha256(first.outfile)).toBe(first.sha256);
+				expect(first.sha256).toBe(second.sha256);
+				expect(existsSync(first.receiptPath)).toBe(true);
+				expect(
+					readMinifiedCompiledReleaseBuildReceipt(
+						first.outfile,
+						compiledReleaseBuildArgs("cli/main.ts", artifact),
+					),
+				).toEqual({
+					artifact_sha256: first.sha256,
+					build_args: compiledReleaseBuildArgs("cli/main.ts", artifact),
+				});
 
-			const version = spawnSync(first.outfile, ["--version"], {
-				cwd: firstRoot,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
-			});
-			expect(version.status).toBe(0);
-			expect(version.stdout as string).toContain("afol");
-		} finally {
-			rmSync(sandbox, { recursive: true, force: true });
-		}
-	}, NATIVE_BUILD_TIMEOUT_MS);
+				const version = spawnSync(first.outfile, ["--version"], {
+					cwd: firstRoot,
+					encoding: "utf8",
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+				expect(version.status).toBe(0);
+				expect(version.stdout as string).toContain("afol");
+			} finally {
+				rmSync(sandbox, { recursive: true, force: true });
+			}
+		},
+		NATIVE_BUILD_TIMEOUT_MS,
+	);
 
-	test("release build binds the entrypoint to the requested source root", () => {
-		const sandbox = projectScratch("reproducible-build-entry-");
-		try {
-			const artifact = releaseArtifactPath("dist/afol");
-			const firstRoot = join(sandbox, "first");
-			const secondRoot = join(sandbox, "second");
-			mkdirSync(join(firstRoot, "cli"), { recursive: true });
-			mkdirSync(join(secondRoot, "cli"), { recursive: true });
-			writeFileSync(
-				join(firstRoot, "cli", "main.ts"),
-				'console.log("root-one");\n',
-				"utf8",
-			);
-			writeFileSync(
-				join(secondRoot, "cli", "main.ts"),
-				'console.log("root-two");\n',
-				"utf8",
-			);
+	test(
+		"release build binds the entrypoint to the requested source root",
+		() => {
+			const sandbox = projectScratch("reproducible-build-entry-");
+			try {
+				const artifact = releaseArtifactPath("dist/afol");
+				const firstRoot = join(sandbox, "first");
+				const secondRoot = join(sandbox, "second");
+				mkdirSync(join(firstRoot, "cli"), { recursive: true });
+				mkdirSync(join(secondRoot, "cli"), { recursive: true });
+				writeFileSync(
+					join(firstRoot, "cli", "main.ts"),
+					'console.log("root-one");\n',
+					"utf8",
+				);
+				writeFileSync(
+					join(secondRoot, "cli", "main.ts"),
+					'console.log("root-two");\n',
+					"utf8",
+				);
 
-			const first = buildReleaseArtifact({
-				cwd: firstRoot,
-				outfile: artifact,
-			});
-			const second = buildReleaseArtifact({
-				cwd: secondRoot,
-				outfile: artifact,
-			});
-			const firstRun = spawnSync(first.outfile, [], {
-				cwd: firstRoot,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
-			});
-			const secondRun = spawnSync(second.outfile, [], {
-				cwd: secondRoot,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
-			});
+				const first = buildReleaseArtifact({
+					cwd: firstRoot,
+					outfile: artifact,
+				});
+				const second = buildReleaseArtifact({
+					cwd: secondRoot,
+					outfile: artifact,
+				});
+				const firstRun = spawnSync(first.outfile, [], {
+					cwd: firstRoot,
+					encoding: "utf8",
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+				const secondRun = spawnSync(second.outfile, [], {
+					cwd: secondRoot,
+					encoding: "utf8",
+					stdio: ["ignore", "pipe", "pipe"],
+				});
 
-			expect(firstRun.status).toBe(0);
-			expect(secondRun.status).toBe(0);
-			expect(firstRun.stdout as string).toContain("root-one");
-			expect(secondRun.stdout as string).toContain("root-two");
-		} finally {
-			rmSync(sandbox, { recursive: true, force: true });
-		}
-	}, NATIVE_BUILD_TIMEOUT_MS);
+				expect(firstRun.status).toBe(0);
+				expect(secondRun.status).toBe(0);
+				expect(firstRun.stdout as string).toContain("root-one");
+				expect(secondRun.stdout as string).toContain("root-two");
+			} finally {
+				rmSync(sandbox, { recursive: true, force: true });
+			}
+		},
+		NATIVE_BUILD_TIMEOUT_MS,
+	);
 
 	test("release build fails closed when the source root lacks the entrypoint", () => {
 		const root = projectScratch("reproducible-build-missing-");
@@ -183,7 +191,11 @@ describe("deterministic release build", () => {
 			const artifact = releaseArtifactPath("dist/afol");
 			try {
 				mkdirSync(join(root, "cli"), { recursive: true });
-				writeFileSync(join(root, "cli", "main.ts"), "console.log('safe');\n", "utf8");
+				writeFileSync(
+					join(root, "cli", "main.ts"),
+					"console.log('safe');\n",
+					"utf8",
+				);
 				symlinkSync(
 					external,
 					join(root, "dist"),

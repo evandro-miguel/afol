@@ -103,26 +103,26 @@ describe("claude adapter service", () => {
 	symlinkTest(
 		"writeClaudeAdapterEnabled rejects symlinked config paths [requires symlink privilege]",
 		() => {
-		const root = mkdtempSync(join(tmpdir(), "adapter-cmd-symlink-"));
-		const outside = mkdtempSync(join(tmpdir(), "adapter-cmd-outside-"));
-		try {
-			writeFileSync(
-				join(outside, "config.json"),
-				`${JSON.stringify({ schema_version: 1, adapters: { claude: { enabled: true } } }, null, 2)}\n`,
-				"utf8",
-			);
-			symlinkSync(outside, join(root, ".afol"), "dir");
+			const root = mkdtempSync(join(tmpdir(), "adapter-cmd-symlink-"));
+			const outside = mkdtempSync(join(tmpdir(), "adapter-cmd-outside-"));
+			try {
+				writeFileSync(
+					join(outside, "config.json"),
+					`${JSON.stringify({ schema_version: 1, adapters: { claude: { enabled: true } } }, null, 2)}\n`,
+					"utf8",
+				);
+				symlinkSync(outside, join(root, ".afol"), "dir");
 
-			expect(() => writeClaudeAdapterEnabled(root, false)).toThrow(
-				/Path crosses symlink/,
-			);
-			expect(readFileSync(join(outside, "config.json"), "utf8")).toContain(
-				'"enabled": true',
-			);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
-		}
+				expect(() => writeClaudeAdapterEnabled(root, false)).toThrow(
+					/Path crosses symlink/,
+				);
+				expect(readFileSync(join(outside, "config.json"), "utf8")).toContain(
+					'"enabled": true',
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
 		},
 	);
 
@@ -157,21 +157,21 @@ describe("claude adapter service", () => {
 	symlinkTest(
 		"archiveClaudeArtifacts rejects symlinked archive roots before creating directories [requires symlink privilege]",
 		() => {
-		const root = createRoot(true);
-		const outside = mkdtempSync(join(tmpdir(), "adapter-archive-outside-"));
-		try {
-			rmSync(join(root, ".afol"), { recursive: true, force: true });
-			symlinkSync(outside, join(root, ".afol"), "dir");
+			const root = createRoot(true);
+			const outside = mkdtempSync(join(tmpdir(), "adapter-archive-outside-"));
+			try {
+				rmSync(join(root, ".afol"), { recursive: true, force: true });
+				symlinkSync(outside, join(root, ".afol"), "dir");
 
-			expect(() => archiveClaudeArtifacts(root)).toThrow(
-				/Path crosses symlink/,
-			);
-			expect(existsSync(join(outside, "data"))).toBe(false);
-			expect(existsSync(join(root, "CLAUDE.md"))).toBe(true);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
-		}
+				expect(() => archiveClaudeArtifacts(root)).toThrow(
+					/Path crosses symlink/,
+				);
+				expect(existsSync(join(outside, "data"))).toBe(false);
+				expect(existsSync(join(root, "CLAUDE.md"))).toBe(true);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
 		},
 	);
 

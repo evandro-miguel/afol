@@ -11,7 +11,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
 import { runUpdateCommand } from "../commands/update";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
@@ -22,6 +21,7 @@ import {
 } from "../services/mutations/journal";
 import { checkTemplateUpdate } from "../services/update/check";
 import { newWorkstream, startTask } from "../services/workbench/lifecycle";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
 

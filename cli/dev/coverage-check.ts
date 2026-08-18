@@ -2,14 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import {
-	delimiter,
-	isAbsolute,
-	join,
-	relative,
-	resolve,
-	sep,
-} from "node:path";
+import { delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const THRESHOLD = 80;
 

@@ -13,7 +13,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
 import { runPstrCommand } from "../commands/pstr";
 import { agentOperationContext } from "../core/operation-context";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
@@ -39,6 +38,7 @@ import {
 	sweepMonthly,
 	sweepWeekly,
 } from "../services/sweep/runner";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function initGitRepo(root: string): void {
 	const git = (args: string[]): void => {
@@ -1264,34 +1264,37 @@ describe("pstr service helpers", () => {
 		}
 	});
 
-	test.skipIf(!symlinkTestSupport.available)("watch rejects configured roots whose symlink leaves the project", () => {
-		const root = createFixture();
-		const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));
-		try {
-			mkdirSync(join(outside, "secret"), { recursive: true });
-		symlinkSync(join(outside, "secret"), join(root, "outside-link"));
-			writeFileSync(
-				join(root, ".agents", "config.json"),
-				JSON.stringify({
-					pstr: {
-						areas: [
-							{
-								id: "outside",
-								scope: "outside",
-								source_roots: ["outside-link"],
-								tags: ["test"],
-							},
-						],
-					},
-				}),
-			);
-			expect(() => resolvePstrAreas(root)).toThrow(/symlink|escapes/);
-			expect(getPstrWatchTargets(root, ["outside-link"])).toEqual([]);
-		} finally {
-			cleanup(root);
-			cleanup(outside);
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"watch rejects configured roots whose symlink leaves the project",
+		() => {
+			const root = createFixture();
+			const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));
+			try {
+				mkdirSync(join(outside, "secret"), { recursive: true });
+				symlinkSync(join(outside, "secret"), join(root, "outside-link"));
+				writeFileSync(
+					join(root, ".agents", "config.json"),
+					JSON.stringify({
+						pstr: {
+							areas: [
+								{
+									id: "outside",
+									scope: "outside",
+									source_roots: ["outside-link"],
+									tags: ["test"],
+								},
+							],
+						},
+					}),
+				);
+				expect(() => resolvePstrAreas(root)).toThrow(/symlink|escapes/);
+				expect(getPstrWatchTargets(root, ["outside-link"])).toEqual([]);
+			} finally {
+				cleanup(root);
+				cleanup(outside);
+			}
+		},
+	);
 
 	test("registry and affected-area matching stay stable", () => {
 		const root = createFixture();

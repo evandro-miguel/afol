@@ -15,8 +15,8 @@ import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import {
 	compiledReleaseBuildArgs,
 	DEFAULT_BUILD_COMMAND,
-	releaseArtifactPath,
 	readMinifiedCompiledReleaseBuildReceipt,
+	releaseArtifactPath,
 } from "./build-release";
 import {
 	assertReleaseOutputFileStable,
@@ -405,8 +405,7 @@ function assertReleaseSecurityScanEvidenceShape(
 		}
 		if (
 			("version" in scan && typeof scan.version !== "string") ||
-			("executable_path" in scan &&
-				typeof scan.executable_path !== "string") ||
+			("executable_path" in scan && typeof scan.executable_path !== "string") ||
 			("executable_sha256" in scan &&
 				typeof scan.executable_sha256 !== "string") ||
 			("reason" in scan && typeof scan.reason !== "string") ||

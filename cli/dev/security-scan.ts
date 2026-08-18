@@ -89,14 +89,12 @@ type ReleaseScannerResolution =
 	| { identity: ScannerFileIdentity; executable: string }
 	| { error: string };
 
-function resolveToolExecutable(
-	tool: string,
-	env?: NodeJS.ProcessEnv,
-): string {
+function resolveToolExecutable(tool: string, env?: NodeJS.ProcessEnv): string {
 	// Informative and required scans retain PATH discovery for local operator use.
 	// Release scans resolve only the explicit, hash-recorded paths below.
 	if (process.platform !== "win32") return tool;
-	const pathValue = env?.PATH ?? env?.Path ?? process.env.PATH ?? process.env.Path;
+	const pathValue =
+		env?.PATH ?? env?.Path ?? process.env.PATH ?? process.env.Path;
 	if (!pathValue) return tool;
 	for (const directory of pathValue.split(delimiter)) {
 		if (!directory) continue;
@@ -392,12 +390,16 @@ function probeToolVersion(
 	env?: NodeJS.ProcessEnv,
 	executable?: string,
 ): string | undefined {
-	const probe = spawnSync(executable ?? resolveToolExecutable(tool, env), ["--version"], {
-		encoding: "utf8",
-		...(env ? { env } : {}),
-		shell: false,
-		stdio: "pipe",
-	});
+	const probe = spawnSync(
+		executable ?? resolveToolExecutable(tool, env),
+		["--version"],
+		{
+			encoding: "utf8",
+			...(env ? { env } : {}),
+			shell: false,
+			stdio: "pipe",
+		},
+	);
 	if (probe.error || (probe.status ?? 0) !== 0) {
 		return undefined;
 	}
@@ -551,7 +553,8 @@ function runOptionalScan(opts: {
 				stderr: releaseResolution.error,
 			};
 		}
-		const executable = releaseResolution?.executable ?? resolveToolExecutable(binary, opts.env);
+		const executable =
+			releaseResolution?.executable ?? resolveToolExecutable(binary, opts.env);
 		const identity = releaseResolution?.identity;
 		if (releaseResolution) {
 			const beforeProbe = revalidateReleaseScannerExecutable(

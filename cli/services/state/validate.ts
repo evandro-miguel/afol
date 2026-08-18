@@ -64,10 +64,7 @@ function isAfolBinaryName(path: string): boolean {
 
 function resolveBinaryArtifactPath(invocationPath: string): string {
 	const resolvedInvocationPath = resolve(invocationPath);
-	if (
-		isAfolBinaryName(invocationPath) &&
-		isAfolBinaryName(process.execPath)
-	) {
+	if (isAfolBinaryName(invocationPath) && isAfolBinaryName(process.execPath)) {
 		return resolve(process.execPath);
 	}
 	return resolvedInvocationPath;

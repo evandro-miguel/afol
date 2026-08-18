@@ -3,12 +3,12 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
 	confirmManualSessionLink,
 	evaluateSessionLink,
 } from "../services/evolution/import-linking";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const DIGEST = "a".repeat(64);

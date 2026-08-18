@@ -86,7 +86,10 @@ function errorCode(error: unknown): string | null {
 		: null;
 }
 
-function isWindowsDeletedLockTransition(error: unknown, lockPath: string): boolean {
+function isWindowsDeletedLockTransition(
+	error: unknown,
+	lockPath: string,
+): boolean {
 	if (process.platform !== "win32" || errorCode(error) !== "EPERM") {
 		return false;
 	}

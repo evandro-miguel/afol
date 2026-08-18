@@ -72,5 +72,4 @@ export function detectDirectoryReparseTestSupport(): SymlinkTestSupport {
 	}
 }
 
-export const directoryReparseTestSupport =
-	detectDirectoryReparseTestSupport();
+export const directoryReparseTestSupport = detectDirectoryReparseTestSupport();

@@ -8,7 +8,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { defaultOperationContext } from "../core/operation-context";
 import {
 	appendProductionDayAllocation,
@@ -36,6 +35,7 @@ import {
 	createPreference,
 	recordPreferenceEvidence,
 } from "../services/evolution/preferences";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 

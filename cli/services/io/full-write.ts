@@ -16,8 +16,7 @@ export function writeBufferFullySync(
 ): void {
 	let offset = 0;
 	while (offset < buffer.byteLength) {
-		const position =
-			startPosition === null ? null : startPosition + offset;
+		const position = startPosition === null ? null : startPosition + offset;
 		const written = write(
 			fd,
 			buffer,

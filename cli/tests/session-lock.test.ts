@@ -16,7 +16,6 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
-import { symlinkTestSupport } from "./symlink-test-support";
 import { dirname, join } from "node:path";
 import {
 	isMainThread,
@@ -32,6 +31,7 @@ import {
 	withSessionLock,
 } from "../services/io/session-lock";
 import { withMutationJournalLock } from "../services/mutations/journal";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const RECLAIM_READY = 0;
 const RECLAIM_START = 1;
@@ -256,19 +256,22 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
-	test.skipIf(!symlinkTestSupport.available)("external path lock keys physical roots identically through symlinks", () => {
-		const root = mkProjectRoot("external-lock-realpath");
-		const link = `${root}-link`;
-		try {
-			symlinkSync(root, link, "dir");
-			expect(resolveExternalPathLockPath(link)).toBe(
-				resolveExternalPathLockPath(root),
-			);
-		} finally {
-			rmSync(link, { force: true });
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"external path lock keys physical roots identically through symlinks",
+		() => {
+			const root = mkProjectRoot("external-lock-realpath");
+			const link = `${root}-link`;
+			try {
+				symlinkSync(root, link, "dir");
+				expect(resolveExternalPathLockPath(link)).toBe(
+					resolveExternalPathLockPath(root),
+				);
+			} finally {
+				rmSync(link, { force: true });
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("external path lock reclaims dead stale owners", async () => {
 		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
@@ -302,11 +305,7 @@ describe("session-lock", () => {
 			let injected = false;
 			const openSpy = spyOn(nodeFs, "openSync").mockImplementation(
 				(...args) => {
-					if (
-						!injected &&
-						args[0] === lockPath &&
-						args[1] === "wx"
-					) {
+					if (!injected && args[0] === lockPath && args[1] === "wx") {
 						injected = true;
 						throw Object.assign(new Error("deleted lock transition"), {
 							code: "EPERM",

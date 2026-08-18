@@ -13,8 +13,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
-import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	appendTelemetryEvent,
 	resolveTelemetryEventPath,
@@ -42,6 +40,8 @@ import {
 import { readObservationJournal } from "../services/evolution/observation-journal";
 import { feedbackMode, recordFeedback } from "../services/feedback";
 import { readBoundedSourceFile } from "../services/io/safe-source";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const OTHER_PROJECT_ID = "7b7d91ca-496b-4f0c-8537-5c4993810d15";

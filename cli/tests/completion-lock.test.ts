@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import { symlinkTestSupport } from "./symlink-test-support";
 
 const symlinkTest = test.skipIf(!symlinkTestSupport.available);
+
 import {
 	resolveTaskCompletionLockPath,
 	TaskCompletionBusyError,
@@ -207,33 +208,36 @@ describe("task completion lock", () => {
 		}
 	});
 
-	symlinkTest("rejects a fence symlink without modifying its target", async () => {
-		const projectRoot = root("fence-symlink");
-		try {
-			const lockPath = resolveTaskCompletionLockPath(
-				projectRoot,
-				"session-a",
-				"T-01",
-			);
-			const targetPath = join(projectRoot, "preserve.txt");
-			mkdirSync(dirname(lockPath), { recursive: true });
-			writeFileSync(targetPath, "preserve\n", "utf8");
-			symlinkSync(targetPath, `${lockPath}.fence`, "file");
-
-			await expect(
-				withTaskCompletionLock(
+	symlinkTest(
+		"rejects a fence symlink without modifying its target",
+		async () => {
+			const projectRoot = root("fence-symlink");
+			try {
+				const lockPath = resolveTaskCompletionLockPath(
 					projectRoot,
 					"session-a",
 					"T-01",
-					async () => {},
-				),
-			).rejects.toThrow();
-			expect(readFileSync(targetPath, "utf8")).toBe("preserve\n");
-			expect(existsSync(lockPath)).toBe(false);
-		} finally {
-			rmSync(projectRoot, { recursive: true, force: true });
-		}
-	});
+				);
+				const targetPath = join(projectRoot, "preserve.txt");
+				mkdirSync(dirname(lockPath), { recursive: true });
+				writeFileSync(targetPath, "preserve\n", "utf8");
+				symlinkSync(targetPath, `${lockPath}.fence`, "file");
+
+				await expect(
+					withTaskCompletionLock(
+						projectRoot,
+						"session-a",
+						"T-01",
+						async () => {},
+					),
+				).rejects.toThrow();
+				expect(readFileSync(targetPath, "utf8")).toBe("preserve\n");
+				expect(existsSync(lockPath)).toBe(false);
+			} finally {
+				rmSync(projectRoot, { recursive: true, force: true });
+			}
+		},
+	);
 
 	for (const [name, content] of [
 		["empty", ""],
