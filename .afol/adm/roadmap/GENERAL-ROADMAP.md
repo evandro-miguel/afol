@@ -1241,6 +1241,30 @@ Follow-on slices under this direction:
   deletion or archival, session closure, Git mutation, or forcing managed
   files across a project fleet.
 
+### F-34 Public Product and Portfolio Readiness
+
+- Status: active
+- Governing spec:
+  `.afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md`
+- Why: AFOL needs a clean, independently reproducible public product boundary
+  before repository visibility, portfolio promotion, or an alpha release.
+- Scope: freeze the stable-alpha surface; close release and Windows blockers;
+  reconcile security and lifecycle evidence; extract the complete engine from
+  private operational state; audit licenses and third-party content; harden
+  architecture; publish accurate documentation, community policy, provenance,
+  SBOM, and release artifacts.
+- Exit criteria: the public repository is the sole canonical engine source;
+  a clean clone builds, tests, and installs the declared platform artifacts;
+  no private operational content or unlicensed vendored material is reachable;
+  stable, experimental, planned, and unsupported surfaces are explicit; every
+  public claim is linked to evidence from the exact release commit.
+- Release freeze: until this feature is final, new product features are not
+  accepted into the alpha scope. F-30 Evolution and F-33 Fleet remain active
+  roadmap work but are outside the stable alpha and cannot delay or expand it.
+- Non-goals: npm publication, macOS or ARM support, public visibility changes,
+  global installation, production deployment, provider/model execution, or
+  publishing private workbench, RAG, governance history, and raw evidence.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
