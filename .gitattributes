@@ -1,6 +1,6 @@
 # Canonical template text is hashed byte-for-byte; keep these payloads stable on Windows.
 /cli/** text eol=lf
-/.afol/data/migrations/** text eol=lf
+/.afol/data/migrations/** -text
 /.afol/adm/doctrine/PROJECT-MANIFESTO.md text eol=lf
 /.afol/data/migrations/260726_f29-afol-only-active-canon/originals/.agents/config.json text eol=lf
 /.afol/adm/source/universal-skills/skills/afol-rules/SKILL.md text eol=lf
