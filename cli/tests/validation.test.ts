@@ -722,7 +722,7 @@ describe("validation command family", () => {
 				"update-safety",
 				"--json",
 			]);
-			expect(proc.status).toBe(0);
+			expect(proc.status, proc.stderr as string).toBe(0);
 			const payload = parseJsonOutput(proc.stdout as string);
 			expect(payload.mode).toBe("benchmark");
 			expect(payload.result_count).toBe(7);
