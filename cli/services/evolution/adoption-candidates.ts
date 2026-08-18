@@ -483,8 +483,25 @@ export function appendAdoptionReviewEvent(
 			primaryError = error;
 			if (attemptedWrite) {
 				try {
-					(options.truncateFile ?? ftruncateSync)(fd, previousSize);
-					(options.syncFile ?? fsyncSync)(fd);
+					// Windows rejects ftruncate on an O_APPEND descriptor. Roll back
+					// through a separate non-append descriptor after proving it still
+					// names the file that received the partial append.
+					const opened = fstatSync(fd);
+					const rollbackFd = openSync(path, "r+");
+					try {
+						const rollbackOpened = fstatSync(rollbackFd);
+						if (
+							String(rollbackOpened.dev) !== String(opened.dev) ||
+							String(rollbackOpened.ino) !== String(opened.ino)
+						)
+							throw new Error(
+								"adoption review journal changed before rollback",
+							);
+						(options.truncateFile ?? ftruncateSync)(rollbackFd, previousSize);
+						(options.syncFile ?? fsyncSync)(rollbackFd);
+					} finally {
+						closeSync(rollbackFd);
+					}
 					if (process.platform !== "win32") {
 						const parentFd = openSync(resolve(path, ".."), "r");
 						try {

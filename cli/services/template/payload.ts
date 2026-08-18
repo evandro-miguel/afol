@@ -30,6 +30,10 @@ function sha256Hex(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
+function canonicalTemplateContent(content: Buffer): Buffer {
+	return Buffer.from(content.toString("utf8").replaceAll("\r\n", "\n"), "utf8");
+}
+
 function reproducibleGeneratedAt(): string {
 	const sourceDateEpoch = process.env.SOURCE_DATE_EPOCH;
 	if (sourceDateEpoch && /^[0-9]+$/.test(sourceDateEpoch)) {
@@ -53,7 +57,7 @@ export async function buildTemplatePayload(
 		}
 
 		const absolutePath = join(sourceRoot, relativePath);
-		const content = await readFile(absolutePath);
+		const content = canonicalTemplateContent(await readFile(absolutePath));
 		const contentBase64 = content.toString("base64");
 		const sha256 = sha256Hex(content);
 

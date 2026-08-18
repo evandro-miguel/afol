@@ -11,6 +11,7 @@ import {
 	resolveVerificationTimeoutMs,
 	runVerification,
 	runVerificationAsync,
+	splitCommandLine,
 } from "../commands/workbench/verify";
 
 describe("workbench parseNewArgs", () => {
@@ -471,6 +472,43 @@ describe("parseDoneArgs", () => {
 			args: ["-e", "process.exit(0)"],
 		});
 		expect(result).toEqual({ exitCode: 0 });
+	});
+
+	test("preserves Windows executable backslashes when tokenizing --test", () => {
+		if (process.platform !== "win32") return;
+		const executable = String.raw`D:\projects\active\afol-windows-fix\dist\afol.exe`;
+		expect(splitCommandLine(`${executable} --version`)).toEqual([
+			executable,
+			"--version",
+		]);
+	});
+
+	test("preserves quoted Windows paths containing spaces", () => {
+		if (process.platform !== "win32") return;
+		const executable = String.raw`D:\AFOL Windows\dist\afol.exe`;
+		expect(splitCommandLine(`"${executable}" --version`)).toEqual([
+			executable,
+			"--version",
+		]);
+	});
+
+	test("preserves a trailing separator in a quoted Windows path", () => {
+		if (process.platform !== "win32") return;
+		const directory = "C:\\AFOL Windows\\tests\\";
+		expect(splitCommandLine(`bun test "${directory}"`)).toEqual([
+			"bun",
+			"test",
+			directory,
+		]);
+	});
+
+	test("executes an unquoted Windows executable path", () => {
+		if (process.platform !== "win32") return;
+		const executable = process.execPath;
+		const command = executable.includes(" ")
+			? `"${executable}" --version`
+			: `${executable} --version`;
+		expect(runVerification(process.cwd(), command)).toEqual({ exitCode: 0 });
 	});
 
 	test("runs a verification configured above 120 seconds and rejects an unsafe maximum", async () => {

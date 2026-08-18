@@ -1,12 +1,6 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -31,6 +25,7 @@ import {
 	createPreference,
 	recordPreferenceEvidence,
 } from "../services/evolution/preferences";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const OTHER_PROJECT_ID = "7b7d91ca-496b-4f0c-8537-5c4993810d15";
@@ -129,7 +124,7 @@ describe("Evolution preference projection", () => {
 			).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -281,7 +276,7 @@ describe("Evolution preference projection", () => {
 			expect(contradicted.negative_evidence).toBe(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -385,7 +380,7 @@ describe("Evolution preference projection", () => {
 			).toMatchObject({ journal_event_id: first.journal_event_id });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -423,7 +418,7 @@ describe("Evolution preference projection", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -459,7 +454,7 @@ describe("Evolution preference projection", () => {
 			).toThrow(/external or imported/);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -515,7 +510,7 @@ describe("Evolution preference projection", () => {
 			expect(structural.provenance).toBe("structural");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -545,7 +540,7 @@ describe("Evolution preference projection", () => {
 			});
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -634,7 +629,7 @@ describe("Evolution preference projection", () => {
 			expect(reopened.status).toBe("active");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

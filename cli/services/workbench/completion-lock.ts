@@ -12,7 +12,7 @@ import {
 	readSync,
 	realpathSync,
 	unlinkSync,
-	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,6 +30,8 @@ const READ_WRITE_NOFOLLOW = fsConstants.O_RDWR | NOFOLLOW;
 interface LockIdentity {
 	dev: bigint;
 	ino: bigint;
+	birthtimeNs: bigint;
+	ctimeNs: bigint;
 }
 
 interface GenerationFence {
@@ -42,6 +44,7 @@ interface CompletionLockMetadata {
 	pid: number;
 	host: string;
 	owner_token: string;
+	ownership_probe?: string;
 	generation: number;
 	acquired_at: string;
 	heartbeat_at: string;
@@ -97,18 +100,37 @@ function isProcessAlive(pid: number): boolean {
 
 function identity(fd: number): LockIdentity {
 	const stat = fstatSync(fd, { bigint: true });
-	return { dev: stat.dev, ino: stat.ino };
+	return {
+		dev: stat.dev,
+		ino: stat.ino,
+		birthtimeNs: stat.birthtimeNs,
+		ctimeNs: stat.ctimeNs,
+	};
 }
 
 function sameIdentity(left: LockIdentity, right: LockIdentity): boolean {
-	return left.dev === right.dev && left.ino === right.ino;
+	return (
+		left.dev === right.dev &&
+		left.ino === right.ino &&
+		left.birthtimeNs === right.birthtimeNs &&
+		left.ctimeNs === right.ctimeNs
+	);
 }
 
 function pathHasIdentity(path: string, expected: LockIdentity): boolean {
 	try {
 		const stat = lstatSync(path, { bigint: true });
 		return (
-			stat.isFile() && sameIdentity({ dev: stat.dev, ino: stat.ino }, expected)
+			stat.isFile() &&
+			sameIdentity(
+				{
+					dev: stat.dev,
+					ino: stat.ino,
+					birthtimeNs: stat.birthtimeNs,
+					ctimeNs: stat.ctimeNs,
+				},
+				expected,
+			)
 		);
 	} catch {
 		return false;
@@ -195,20 +217,16 @@ function incrementGeneration(path: string): GenerationFence {
 	try {
 		fd = openSync(
 			path,
-			fsConstants.O_RDWR |
-				fsConstants.O_CREAT |
-				fsConstants.O_EXCL |
-				fsConstants.O_APPEND |
-				NOFOLLOW,
+			fsConstants.O_RDWR | fsConstants.O_CREAT | fsConstants.O_EXCL | NOFOLLOW,
 			0o600,
 		);
 		created = true;
 	} catch (error) {
 		if (!isAlreadyExistsError(error)) throw error;
-		fd = openSync(path, fsConstants.O_RDWR | fsConstants.O_APPEND | NOFOLLOW);
+		fd = openSync(path, fsConstants.O_RDWR | NOFOLLOW);
 	}
 	try {
-		const fenceIdentity = identity(fd);
+		let fenceIdentity = identity(fd);
 		if (!pathHasIdentity(path, fenceIdentity)) {
 			throw new Error("Task completion fence is not a regular owned file.");
 		}
@@ -222,9 +240,8 @@ function incrementGeneration(path: string): GenerationFence {
 		if (!Number.isSafeInteger(next)) {
 			throw new Error("Task completion fence generation is exhausted.");
 		}
-		ftruncateSync(fd, 0);
-		writeFileSync(fd, `${next}\n`, "utf8");
-		fsyncSync(fd);
+		replaceFileContents(fd, `${next}\n`);
+		fenceIdentity = identity(fd);
 		if (!pathHasIdentity(path, fenceIdentity)) {
 			throw new Error("Task completion fence ownership was lost.");
 		}
@@ -236,8 +253,18 @@ function incrementGeneration(path: string): GenerationFence {
 }
 
 function writeMetadataFd(fd: number, metadata: CompletionLockMetadata): void {
+	replaceFileContents(fd, `${JSON.stringify(metadata)}\n`);
+}
+
+function replaceFileContents(fd: number, contents: string): void {
 	ftruncateSync(fd, 0);
-	writeFileSync(fd, `${JSON.stringify(metadata)}\n`, "utf8");
+	const value = Buffer.from(contents, "utf8");
+	let offset = 0;
+	while (offset < value.length) {
+		const written = writeSync(fd, value, offset, value.length - offset, offset);
+		if (written <= 0) throw new Error("Failed to write task completion state.");
+		offset += written;
+	}
 	fsyncSync(fd);
 }
 
@@ -325,7 +352,7 @@ export async function withTaskCompletionLock<T>(
 	}
 
 	const ownerFd = fd;
-	const ownedIdentity = identity(ownerFd);
+	let ownedIdentity = identity(ownerFd);
 	const ownerToken = randomUUID();
 	let generation: number;
 	let fenceFd: number | null = null;
@@ -341,13 +368,19 @@ export async function withTaskCompletionLock<T>(
 			pid: process.pid,
 			host: HOSTNAME,
 			owner_token: ownerToken,
+			ownership_probe: randomUUID(),
 			generation,
 			acquired_at: acquiredAt,
 			heartbeat_at: acquiredAt,
 		};
 		writeMetadataFd(ownerFd, metadata);
+		ownedIdentity = identity(ownerFd);
 	} catch (error) {
 		try {
+			// Metadata replacement changes ctime even when the write or fsync then
+			// fails. Refresh from the still-owned descriptor so cleanup cannot leave
+			// an empty or partial lock permanently blocking future completions.
+			ownedIdentity = identity(ownerFd);
 			unlinkOwned(lockPath, ownedIdentity);
 		} finally {
 			try {
@@ -390,6 +423,7 @@ export async function withTaskCompletionLock<T>(
 				...metadata,
 				heartbeat_at: new Date().toISOString(),
 			});
+			ownedIdentity = identity(heartbeatFd);
 		} catch {
 			markLost();
 		} finally {
@@ -408,10 +442,19 @@ export async function withTaskCompletionLock<T>(
 	} finally {
 		clearInterval(heartbeat);
 		try {
+			const ownershipProbe = randomUUID();
+			metadata = {
+				...metadata,
+				heartbeat_at: new Date().toISOString(),
+				ownership_probe: ownershipProbe,
+			};
+			writeMetadataFd(ownerFd, metadata);
+			ownedIdentity = identity(ownerFd);
 			const current = readOwnedMetadata(lockPath, ownedIdentity);
 			if (
 				current?.owner_token === ownerToken &&
-				current.generation === generation
+				current.generation === generation &&
+				current.ownership_probe === ownershipProbe
 			) {
 				unlinkOwned(lockPath, ownedIdentity);
 			}

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { resolveAdmPaths } from "../adm/paths";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -870,11 +870,15 @@ function parseGoverningSpecsFromSection(
 		if (!cleaned) continue;
 		const absolute = resolve(root, cleaned);
 		const canonicalRoot = resolve(root);
-		if (!absolute.startsWith(`${canonicalRoot}/`) && absolute !== canonicalRoot)
+		const relativePath = relative(canonicalRoot, absolute);
+		if (
+			relativePath === "" ||
+			relativePath.startsWith("..") ||
+			isAbsolute(relativePath)
+		)
 			continue;
-		const relative = absolute.slice(canonicalRoot.length + 1);
-		if (relative) {
-			specPaths.add(relative.replaceAll("\\", "/"));
+		if (relativePath) {
+			specPaths.add(relativePath.replaceAll("\\", "/"));
 		}
 	}
 	return [...specPaths];

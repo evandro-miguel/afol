@@ -25,7 +25,7 @@
 		"toolchain:diff": "bun run cli/dev/toolchain-smoke.ts",
 		"validate:toolchain": "bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		"test": "bun test",
-		"test:full": "bun test --only-failures",
+		"test:full": "bun run cli/dev/full-test.ts",
 		"test:unit": "bun test cli/tests",
 		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
 		"coverage": "bun test --coverage --coverage-reporter=text",
@@ -62,7 +62,7 @@
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
 		"smoke:dist": "bun run cli/dev/dist-smoke.ts",
 		"smoke:wsl2": "bun run cli/dev/dist-smoke.ts --wsl2",
-		"smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude-vcs-ignores --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
+		"smoke:clean": "bun run cli/dev/clean-smoke.ts"
 	},
 	"dependencies": {
 		"diff": "^9.0.0"

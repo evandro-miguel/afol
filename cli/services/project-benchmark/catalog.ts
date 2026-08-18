@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import { toPosixPath } from "../../core/file-paths";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
 import { resolveProjectBenchmarkPaths } from "./paths";
 import type {
@@ -13,7 +14,7 @@ const PROJECT_BENCHMARK_TEMPLATE_PREFIX = ".afol/adm/project-benchmarks/";
 const PROJECT_BENCHMARK_TEMPLATE_PROJECTS_PREFIX = `${PROJECT_BENCHMARK_TEMPLATE_PREFIX}projects/`;
 
 function rel(projectRoot: string, file: string): string {
-	return relative(projectRoot, file) || file;
+	return toPosixPath(relative(projectRoot, file) || file);
 }
 
 function parseJsonFile<T>(

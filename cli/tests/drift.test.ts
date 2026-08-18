@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
@@ -20,6 +14,7 @@ import { collectFreshnessReport } from "../services/local-state/freshness";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import { hydrateSession } from "../services/state/session-state";
 import { sweepDaily } from "../services/sweep/runner";
+import { removeTestRoot } from "./windows-test-support";
 
 type CapturedIo = {
 	stdout: string[];
@@ -216,7 +211,7 @@ describe("drift validation", () => {
 			expect(report.ok).toBe(true);
 			expect(report.findings).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -235,7 +230,7 @@ describe("drift validation", () => {
 				),
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -269,7 +264,7 @@ describe("drift validation", () => {
 				hint: "run afol pstr rebuild",
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -292,7 +287,7 @@ describe("drift validation", () => {
 				expect.objectContaining({ id: "pstr:index:invalid" }),
 			]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -327,7 +322,7 @@ describe("drift validation", () => {
 				expect.objectContaining({ id: "pstr:index:invalid" }),
 			]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -354,7 +349,7 @@ describe("drift validation", () => {
 				),
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -368,7 +363,7 @@ describe("drift validation", () => {
 			expect(findings[0]?.id).toBe("active-session-pointer-mutated");
 			expect(findings[0]?.severity).toBe("warn");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -383,7 +378,7 @@ describe("drift validation", () => {
 				"review .afol/wb/.active_session mutation",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -394,7 +389,7 @@ describe("drift validation", () => {
 			const findings = checkActiveSessionPointerMutation(root);
 			expect(findings).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -413,7 +408,7 @@ describe("drift validation", () => {
 				true,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -441,7 +436,7 @@ describe("drift validation", () => {
 			expect(payload.data?.report?.ok).toBe(true);
 			expect(captured.stderr).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -459,7 +454,7 @@ describe("drift validation", () => {
 			});
 			expect(report.findings[0]?.actual).toContain("not a git repository");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 });

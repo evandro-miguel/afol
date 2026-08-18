@@ -355,7 +355,10 @@ async function runImport(
 		"evolve.import",
 		{
 			...importPreviewPayload(accepted.preview, "confirmed"),
-			artifact_path: relative(root, accepted.artifactPath),
+			artifact_path: relative(root, accepted.artifactPath).replaceAll(
+				"\\",
+				"/",
+			),
 			duplicate: accepted.duplicate,
 			checkpoint_status: accepted.checkpoint?.status ?? null,
 		},

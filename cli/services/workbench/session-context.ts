@@ -43,7 +43,7 @@ type SessionBindingInput = {
 
 const EMPTY_CONTEXT: SessionContext = { bindings: [] };
 const SESSION_CONTEXT_LOCK = "__session-context__";
-const GIT_CONTEXT_TIMEOUT_MS = 1_000;
+const GIT_CONTEXT_TIMEOUT_MS = 5_000;
 
 function contextPath(root: string): string {
 	return join(resolveProjectPaths(root).abs.wbDir, "session-context.json");
@@ -52,6 +52,11 @@ function contextPath(root: string): string {
 function normalizeText(value?: string | null): string | null {
 	const trimmed = value?.trim() ?? "";
 	return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeWorktree(value?: string | null): string | null {
+	const normalized = normalizeText(value);
+	return normalized?.replaceAll("\\", "/") ?? null;
 }
 
 function parseBinding(input: unknown): SessionBinding | null {
@@ -71,7 +76,9 @@ function parseBinding(input: unknown): SessionBinding | null {
 	const branch =
 		typeof record.branch === "string" ? normalizeText(record.branch) : null;
 	const worktree =
-		typeof record.worktree === "string" ? normalizeText(record.worktree) : null;
+		typeof record.worktree === "string"
+			? normalizeWorktree(record.worktree)
+			: null;
 	const actor =
 		typeof record.actor === "string" ? normalizeText(record.actor) : null;
 	return { session, branch, worktree, actor, last_touched: lastTouched };
@@ -123,7 +130,7 @@ function currentContext(root: string): {
 	}
 	return {
 		branch,
-		worktree: worktree || null,
+		worktree: normalizeWorktree(worktree),
 	};
 }
 
@@ -160,7 +167,7 @@ function removeMatchedBinding(
 		return bindings.slice();
 	}
 	const targetBranch = normalizeText(target.branch ?? null);
-	const targetWorktree = normalizeText(target.worktree ?? null);
+	const targetWorktree = normalizeWorktree(target.worktree ?? null);
 	return bindings.filter((binding) => {
 		if (binding.session === targetSession) {
 			return false;
@@ -186,7 +193,7 @@ function upsertBinding(
 		throw new Error("Missing session identifier for binding.");
 	}
 	const branch = normalizeText(input.branch ?? null);
-	const worktree = normalizeText(input.worktree ?? null);
+	const worktree = normalizeWorktree(input.worktree ?? null);
 	const actor = normalizeText(input.actor ?? null);
 	const nextBinding: SessionBinding = {
 		session,

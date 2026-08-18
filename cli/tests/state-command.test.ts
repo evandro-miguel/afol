@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runHydrateCommand } from "../commands/hydrate";
 import { runStateCommand } from "../commands/state";
+import { removeTestRoot } from "./windows-test-support";
 
 function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "state-command-"));
@@ -124,7 +125,7 @@ describe("state commands", () => {
 			expect(captured.stdout.join("\n")).toContain("test-session");
 			expect(captured.stderr).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -160,7 +161,7 @@ describe("state commands", () => {
 					.session,
 			).toBe("test-session");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -209,7 +210,7 @@ describe("state commands", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -235,7 +236,7 @@ describe("state commands", () => {
 				session: "bad session",
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -255,7 +256,7 @@ describe("state commands", () => {
 				"Use either --all or --session for hydrate, not both.",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -282,7 +283,7 @@ describe("state commands", () => {
 			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("state validate: ok");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -327,7 +328,7 @@ describe("state commands", () => {
 					.session,
 			).toBe("test-session");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -391,7 +392,7 @@ describe("state commands", () => {
 				).snapshot.summary.evidenceEntries,
 			).toBe(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -455,7 +456,7 @@ describe("state commands", () => {
 				taskRows: 2,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -517,7 +518,7 @@ describe("state commands", () => {
 				).snapshot.summary.taskRows,
 			).toBe(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -530,7 +531,7 @@ describe("state commands", () => {
 				"Missing --session or --all for hydrate.",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -559,7 +560,7 @@ describe("state commands", () => {
 			);
 			expect(payload.snapshot).toBeUndefined();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -586,7 +587,7 @@ describe("state commands", () => {
 			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("state: test-session");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -613,7 +614,7 @@ describe("state commands", () => {
 			expect(captured.stdout.join("\n")).toContain("state: test-session");
 			expect(captured.stderr).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -627,7 +628,7 @@ describe("state commands", () => {
 			);
 			expect(captured.stderr.join("\n")).toContain("afol ss list");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -664,7 +665,7 @@ describe("state commands", () => {
 			);
 			expect(payload.session as string).toBe("test-session");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -703,7 +704,7 @@ describe("state commands", () => {
 			).toBe(1);
 			expect(captured.stdout.join("\n")).toContain("state validate: fail");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -723,7 +724,7 @@ describe("state commands", () => {
 				"no hydrated state for test-session",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 });

@@ -328,7 +328,7 @@ const SPEC_STATUSES = new Set(["draft", "active", "final", "superseded"]);
 function readSpecFrontmatter(path: string): Record<string, unknown> | null {
 	try {
 		const content = readFileSync(path, "utf8");
-		const match = /^---\n([\s\S]*?)\n---\n?/.exec(content);
+		const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(content);
 		if (!match?.[1]) return null;
 		const parsed = Bun.YAML.parse(match[1]);
 		return parsed !== null &&
@@ -466,6 +466,7 @@ export async function validateProjectStructure(
 	projectRoot: string,
 	options?: ProjectValidationOptions,
 ): Promise<ProjectValidationReport> {
+	const toolchainClaims = scanTemplateToolchainClaims();
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const eventLedger = inspectEventLedger(projectRoot);
 	const freshness = collectFreshnessReport(projectRoot, {
@@ -623,7 +624,7 @@ export async function validateProjectStructure(
 		})(),
 		(() => {
 			// Toolchain claims check — only CRITICAL failures cause validate to fail
-			const claims = scanTemplateToolchainClaims();
+			const claims = toolchainClaims;
 			const missing = claims.filter((c) => !c.available);
 			const criticalMissing = missing.filter((c) => c.critical);
 			if (missing.length === 0) {

@@ -383,12 +383,14 @@ function appendPreferenceJournalEventUnlocked(
 		} finally {
 			closeSync(fd);
 		}
-		if (!existedBefore && process.platform !== "win32") {
-			const directoryFd = openSync(dirname(path), "r");
-			try {
-				fsyncSync(directoryFd);
-			} finally {
-				closeSync(directoryFd);
+		if (!existedBefore) {
+			if (process.platform !== "win32") {
+				const directoryFd = openSync(dirname(path), "r");
+				try {
+					fsyncSync(directoryFd);
+				} finally {
+					closeSync(directoryFd);
+				}
 			}
 			input.syncDirectory?.(dirname(path));
 		}

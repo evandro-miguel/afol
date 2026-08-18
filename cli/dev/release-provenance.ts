@@ -9,14 +9,20 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import {
 	compiledReleaseBuildArgs,
 	DEFAULT_BUILD_COMMAND,
 	readMinifiedCompiledReleaseBuildReceipt,
+	releaseArtifactPath,
 } from "./build-release";
+import {
+	assertReleaseOutputFileStable,
+	assertSafeReleaseArtifact,
+	prepareReleaseOutputFile,
+} from "./release-output";
 import {
 	buildReleaseSecurityScanOutcomes,
 	DEFAULT_RELEASE_ARTIFACT,
@@ -65,6 +71,8 @@ type ReleaseProvenance = {
 		kind: string;
 		status: string;
 		version?: string;
+		executable_path?: string;
+		executable_sha256?: string;
 		reason?: string;
 		waiver_required?: boolean;
 	}>;
@@ -320,6 +328,12 @@ function toProvenanceSecurityScanners(
 		kind: scanner.kind,
 		status: scanner.status,
 		...(scanner.version ? { version: scanner.version } : {}),
+		...(scanner.executable_path
+			? { executable_path: scanner.executable_path }
+			: {}),
+		...(scanner.executable_sha256
+			? { executable_sha256: scanner.executable_sha256 }
+			: {}),
 		...(scanner.reason ? { reason: scanner.reason } : {}),
 		...(scanner.waiver_required
 			? { waiver_required: scanner.waiver_required }
@@ -391,11 +405,25 @@ function assertReleaseSecurityScanEvidenceShape(
 		}
 		if (
 			("version" in scan && typeof scan.version !== "string") ||
+			("executable_path" in scan && typeof scan.executable_path !== "string") ||
+			("executable_sha256" in scan &&
+				typeof scan.executable_sha256 !== "string") ||
 			("reason" in scan && typeof scan.reason !== "string") ||
 			("waiver_required" in scan && typeof scan.waiver_required !== "boolean")
 		) {
 			throw new Error(
 				`${RELEASE_SECURITY_EVIDENCE_PATH} scan ${index} has invalid optional fields`,
+			);
+		}
+		if (
+			scan.status === "passed" &&
+			(typeof scan.executable_path !== "string" ||
+				!isAbsolute(scan.executable_path) ||
+				typeof scan.executable_sha256 !== "string" ||
+				!/^[a-f0-9]{64}$/i.test(scan.executable_sha256))
+		) {
+			throw new Error(
+				`${RELEASE_SECURITY_EVIDENCE_PATH} passed scan ${index} must bind an approved absolute scanner path and SHA-256`,
 			);
 		}
 	}
@@ -458,6 +486,7 @@ function readReleaseSecurityScanEvidence(
 			`missing required ${RELEASE_SECURITY_EVIDENCE_PATH}; run bun run validate:security:release before release provenance`,
 		);
 	}
+	assertSafeReleaseArtifact(cwd, evidencePath);
 
 	const raw = JSON.parse(
 		readFileSync(evidencePath, "utf8"),
@@ -508,11 +537,15 @@ export function buildReleaseProvenance(
 	options: WriteReleaseProvenanceOptions = {},
 ): ReleaseProvenance {
 	const cwd = options.cwd ?? process.cwd();
-	const artifact = options.artifact ?? DEFAULT_RELEASE_ARTIFACT;
+	const artifact = releaseArtifactPath(
+		options.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	);
 	const artifactPath = join(cwd, artifact);
+	prepareReleaseOutputFile(cwd, artifactPath);
 	if (!existsSync(artifactPath)) {
 		throw new Error(`missing release artifact: ${artifact}`);
 	}
+	assertSafeReleaseArtifact(cwd, artifactPath);
 
 	const bytes = readFileSync(artifactPath);
 	const stats = statSync(artifactPath);
@@ -597,15 +630,19 @@ export function writeReleaseProvenance(
 	provenancePath: string;
 } {
 	const cwd = options.cwd ?? process.cwd();
-	const artifact = options.artifact ?? DEFAULT_RELEASE_ARTIFACT;
+	const artifact = releaseArtifactPath(
+		options.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	);
 	const checksumPath = join(cwd, `${artifact}.sha256`);
 	const provenancePath = join(cwd, `${artifact}.provenance.json`);
+	const checksumGuard = prepareReleaseOutputFile(cwd, checksumPath);
+	const provenanceGuard = prepareReleaseOutputFile(cwd, provenancePath);
 	const provenance = buildReleaseProvenance(options);
 
 	const checksumContent = `${provenance.sha256}  ${artifact}\n`;
 	const provenanceContent = `${JSON.stringify(provenance, null, 2)}\n`;
-	writeFileAtomically(checksumPath, checksumContent);
-	writeFileAtomically(provenancePath, provenanceContent);
+	writeFileAtomically(cwd, checksumPath, checksumContent, checksumGuard);
+	writeFileAtomically(cwd, provenancePath, provenanceContent, provenanceGuard);
 	assertReleaseProvenanceBindsArtifact(
 		cwd,
 		artifact,
@@ -617,10 +654,18 @@ export function writeReleaseProvenance(
 	return { checksumPath, provenancePath };
 }
 
-function writeFileAtomically(path: string, content: string): void {
+function writeFileAtomically(
+	cwd: string,
+	path: string,
+	content: string,
+	outputGuard = prepareReleaseOutputFile(cwd, path),
+): void {
 	const tempPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+	const tempGuard = prepareReleaseOutputFile(cwd, tempPath);
 	writeFileSync(tempPath, content, "utf8");
+	assertReleaseOutputFileStable(tempGuard, true);
 	renameSync(tempPath, path);
+	assertReleaseOutputFileStable(outputGuard, true);
 }
 
 function assertReleaseProvenanceBindsArtifact(
@@ -630,12 +675,16 @@ function assertReleaseProvenanceBindsArtifact(
 	checksumPath: string,
 	provenancePath: string,
 ): void {
-	const artifactSha256 = sha256Hex(readFileSync(join(cwd, artifact)));
+	const artifactPath = join(cwd, artifact);
+	assertSafeReleaseArtifact(cwd, artifactPath);
+	assertSafeReleaseArtifact(cwd, checksumPath);
+	assertSafeReleaseArtifact(cwd, provenancePath);
+	const artifactSha256 = sha256Hex(readFileSync(artifactPath));
 	const written = JSON.parse(
 		readFileSync(provenancePath, "utf8"),
 	) as ReleaseProvenance;
 	const checksumText = readFileSync(checksumPath, "utf8").trim();
-	const artifactSize = statSync(join(cwd, artifact)).size;
+	const artifactSize = statSync(artifactPath).size;
 	const sizeMatches =
 		Number.isSafeInteger(provenance.size_bytes) &&
 		Number.isSafeInteger(written.size_bytes) &&

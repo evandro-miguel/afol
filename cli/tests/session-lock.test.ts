@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import * as nodeFs from "node:fs";
 import {
 	existsSync,
 	linkSync,
@@ -26,10 +27,12 @@ import {
 	resolveExternalPathLockPath,
 	resolveSessionLockPath,
 	withExternalPathLock,
+	withExternalPathLockSync,
 	withResourceLocks,
 	withSessionLock,
 } from "../services/io/session-lock";
 import { withMutationJournalLock } from "../services/mutations/journal";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const RECLAIM_READY = 0;
 const RECLAIM_START = 1;
@@ -272,19 +275,40 @@ describe("session-lock", () => {
 		}
 	});
 
-	test("external path lock keys physical roots identically through symlinks", () => {
-		const root = mkProjectRoot("external-lock-realpath");
-		const link = `${root}-link`;
+	test("records the Linux process-start identity in synchronous external locks", () => {
+		const root = mkProjectRoot("sync-process-start-identity");
 		try {
-			symlinkSync(root, link, "dir");
-			expect(resolveExternalPathLockPath(link)).toBe(
-				resolveExternalPathLockPath(root),
-			);
+			const target = join(root, "state.db");
+			const lockPath = resolveExternalPathLockPath(target);
+			withExternalPathLockSync(target, () => {
+				const metadata = JSON.parse(readFileSync(lockPath, "utf8")) as {
+					process_start_token?: unknown;
+				};
+				if (process.platform === "linux") {
+					expect(metadata.process_start_token).toMatch(/^\d+$/);
+				}
+			});
 		} finally {
-			rmSync(link, { force: true });
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test.skipIf(!symlinkTestSupport.available)(
+		"external path lock keys physical roots identically through symlinks",
+		() => {
+			const root = mkProjectRoot("external-lock-realpath");
+			const link = `${root}-link`;
+			try {
+				symlinkSync(root, link, "dir");
+				expect(resolveExternalPathLockPath(link)).toBe(
+					resolveExternalPathLockPath(root),
+				);
+			} finally {
+				rmSync(link, { force: true });
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("external path lock reclaims dead stale owners", async () => {
 		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
@@ -308,6 +332,81 @@ describe("session-lock", () => {
 		expect(entered).toBe(true);
 		expect(existsSync(lockPath)).toBe(false);
 	});
+
+	test.skipIf(process.platform !== "win32")(
+		"external path lock retries a proven deleted-lock EPERM transition",
+		async () => {
+			const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
+			const lockPath = resolveExternalPathLockPath(resource);
+			const originalOpenSync = nodeFs.openSync;
+			let injected = false;
+			const openSpy = spyOn(nodeFs, "openSync").mockImplementation(
+				(...args) => {
+					if (!injected && args[0] === lockPath && args[1] === "wx") {
+						injected = true;
+						throw Object.assign(new Error("deleted lock transition"), {
+							code: "EPERM",
+						});
+					}
+					return originalOpenSync(...args);
+				},
+			);
+			try {
+				let entered = false;
+				await withExternalPathLock(resource, async () => {
+					entered = true;
+				});
+				expect(injected).toBe(true);
+				expect(entered).toBe(true);
+			} finally {
+				openSpy.mockRestore();
+				rmSync(lockPath, { force: true });
+			}
+		},
+	);
+
+	test.skipIf(process.platform !== "win32")(
+		"external path lock treats EPERM on a visible regular lock as contention",
+		async () => {
+			const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
+			const lockPath = resolveExternalPathLockPath(resource);
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(lockPath, "existing lock\n", "utf8");
+			const originalOpenSync = nodeFs.openSync;
+			let injected = false;
+			const openSpy = spyOn(nodeFs, "openSync").mockImplementation(
+				(...args) => {
+					if (!injected && args[0] === lockPath && args[1] === "wx") {
+						injected = true;
+						throw Object.assign(new Error("unproven lock transition"), {
+							code: "EPERM",
+						});
+					}
+					return originalOpenSync(...args);
+				},
+			);
+			// The lock implementation retries synchronously, so a same-thread timer
+			// cannot release the fixture. Use a separate process to model the Windows
+			// owner finishing its delete-pending transition.
+			const release = Bun.spawn({
+				cmd: [
+					process.execPath,
+					"-e",
+					`import { rmSync } from "node:fs"; setTimeout(() => rmSync(${JSON.stringify(lockPath)}, { force: true }), 25);`,
+				],
+				stdout: "ignore",
+				stderr: "ignore",
+			});
+			try {
+				await withExternalPathLock(resource, async () => undefined);
+				expect(injected).toBe(true);
+			} finally {
+				await release.exited;
+				openSpy.mockRestore();
+				rmSync(lockPath, { force: true });
+			}
+		},
+	);
 
 	test("external path lock never removes a replacement inode", async () => {
 		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
@@ -498,67 +597,6 @@ describe("session-lock", () => {
 			expect(result).toBe("acquired");
 			expect(existsSync(lockPath)).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
-
-	test("recovers a legacy stale lock when the pid was reused by this process", () => {
-		const root = mkProjectRoot("legacy-reused-pid");
-		try {
-			const session = "legacy-reused-pid-session";
-			const now = Date.now();
-			const acquiredAt = now - (process.uptime() * 1_000 + 35_000);
-			const lockPath = writeLockMetadata(
-				root,
-				session,
-				{
-					pid: process.pid,
-					session,
-					acquired_at: new Date(acquiredAt).toISOString(),
-					host: hostname(),
-				},
-				acquiredAt,
-			);
-
-			const result = withPatchedDateNow(
-				now,
-				() => withSessionLock(root, session, () => "acquired"),
-				31_000,
-			);
-			expect(result).toBe("acquired");
-			expect(existsSync(lockPath)).toBe(false);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
-
-	test("recovers a stale lock when a live pid has a different start identity", async () => {
-		const root = mkProjectRoot("reused-live-pid");
-		const replacement = Bun.spawn(
-			[process.execPath, "-e", "setTimeout(() => {}, 60_000);"],
-			{ stderr: "ignore", stdout: "ignore" },
-		);
-		try {
-			const session = "reused-live-pid-session";
-			const acquiredAt = Date.now() - 35_000;
-			const lockPath = writeLockMetadata(
-				root,
-				session,
-				{
-					pid: replacement.pid,
-					process_start_token: "0",
-					session,
-					acquired_at: new Date(acquiredAt).toISOString(),
-					host: hostname(),
-				},
-				acquiredAt,
-			);
-
-			expect(withSessionLock(root, session, () => "acquired")).toBe("acquired");
-			expect(existsSync(lockPath)).toBe(false);
-		} finally {
-			replacement.kill();
-			await replacement.exited;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

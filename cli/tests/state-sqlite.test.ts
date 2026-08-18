@@ -14,6 +14,7 @@ import {
 	validateSessionState,
 } from "../services/state/session-state";
 import { isStale } from "../services/state/validate";
+import { removeTestRoot } from "./windows-test-support";
 
 function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "state-sqlite-"));
@@ -139,7 +140,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 	test("openDb creates DB and tables on first open", () => {
@@ -171,7 +172,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -184,7 +185,7 @@ describe("state sqlite", () => {
 			second.close();
 			expect(true).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -208,7 +209,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -246,7 +247,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -290,7 +291,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -328,7 +329,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -346,7 +347,7 @@ describe("state sqlite", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -358,7 +359,7 @@ describe("state sqlite", () => {
 				ok: true,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -382,7 +383,7 @@ describe("state sqlite", () => {
 				ok: false,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -398,7 +399,7 @@ describe("state sqlite", () => {
 			);
 			expect(isStale(root, "test-session")).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -416,7 +417,7 @@ describe("state sqlite", () => {
 			);
 			expect(isStale(root, "test-session")).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 });

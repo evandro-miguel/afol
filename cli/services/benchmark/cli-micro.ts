@@ -1,5 +1,6 @@
-import { join } from "node:path";
+import { resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../../core/subprocess";
+import { resolveAfolExecutable } from "../../validate/scenario-execution";
 import { DEFAULT_CLI_PACK_ID } from "./types";
 
 export type CliMicroResult = {
@@ -18,6 +19,11 @@ export type CliMicroThresholds = {
 	max_output_tokens: number;
 };
 
+export type CliMicroInvocation = {
+	command: string;
+	args: string[];
+};
+
 export const CLI_MICRO_THRESHOLDS: CliMicroThresholds = {
 	max_wall_clock_ms: 60_000,
 	max_output_tokens: 10_000,
@@ -34,6 +40,23 @@ const MICRO_COMMANDS: string[][] = [
 	["catchup"],
 	["preflight", "test"],
 ];
+
+/**
+ * Resolve the AFOL process that owns this benchmark. Compiled builds must
+ * re-execute their current binary, while source runs must invoke Bun with the
+ * source entrypoint. The repository's `afol` wrapper is POSIX shell-only.
+ */
+export function resolveCliMicroInvocation(
+	mainPath = Bun.main,
+	execPath = process.execPath,
+): CliMicroInvocation {
+	const executable = resolveAfolExecutable(undefined, mainPath, execPath);
+	if (executable) return { command: executable, args: [] };
+	return {
+		command: execPath,
+		args: [resolve(import.meta.dir, "..", "..", "main.ts")],
+	};
+}
 
 export function collectCliMicroThresholdNotes(
 	wallClockMs: number,
@@ -60,14 +83,18 @@ export function collectCliMicroThresholdNotes(
 export function runCliMicroBenchmark(
 	root: string,
 	thresholds: CliMicroThresholds = CLI_MICRO_THRESHOLDS,
+	invocation: CliMicroInvocation = resolveCliMicroInvocation(),
 ): CliMicroResult[] {
-	const afolPath = join(root, "afol");
 	return MICRO_COMMANDS.map((args) => {
 		const startedAt = Date.now();
-		const result = boundedSpawn(afolPath, args, {
-			cwd: root,
-			timeoutMs: 60_000,
-		});
+		const result = boundedSpawn(
+			invocation.command,
+			[...invocation.args, ...args],
+			{
+				cwd: root,
+				timeoutMs: 60_000,
+			},
+		);
 		const wallClockMs = Date.now() - startedAt;
 		const outputBytes =
 			Buffer.byteLength(result.stdout, "utf8") +

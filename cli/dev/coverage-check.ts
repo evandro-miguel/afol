@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const THRESHOLD = 80;
 
@@ -22,7 +22,7 @@ const lcovPath = resolve(
 	parsedArgs.lcovPath ?? `${coverageDir}/lcov.info`,
 );
 const result = spawnSync(
-	"bun",
+	resolveBunExecutable(),
 	[
 		"test",
 		...parsedArgs.testArgs,
@@ -69,6 +69,8 @@ if (result.status !== 0) {
 		console.error(`coverage: bun test terminated by signal ${result.signal}`);
 	} else if (result.status === null) {
 		console.error("coverage: bun test exited without a status");
+	} else {
+		console.error(`coverage: bun test exited with status ${result.status}`);
 	}
 	process.exit(result.status ?? 1);
 }
@@ -363,4 +365,18 @@ function selectCoverageRows(
 
 function formatPercent(value: number): string {
 	return value.toFixed(2);
+}
+
+function resolveBunExecutable(env: NodeJS.ProcessEnv = process.env): string {
+	if (process.platform !== "win32") return "bun";
+	const pathValue = env.PATH ?? env.Path;
+	if (!pathValue) return "bun";
+	for (const directory of pathValue.split(delimiter)) {
+		if (!directory) continue;
+		for (const candidate of ["bun.exe", "bun.cmd", "bun.bat", "bun"]) {
+			const executable = join(directory, candidate);
+			if (existsSync(executable)) return executable;
+		}
+	}
+	return "bun";
 }

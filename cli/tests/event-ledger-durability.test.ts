@@ -38,6 +38,7 @@ import {
 	newWorkstream,
 	startTask,
 } from "../services/workbench/lifecycle";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function configureRoot(label: string): string {
 	const root = mkdtempSync(join(tmpdir(), `afol-event-ledger-${label}-`));
@@ -745,14 +746,15 @@ describe("shared event ledger durability", () => {
 	});
 
 	test("rejects symlink and hardlink event targets without changing their source", () => {
-		if (process.platform === "win32") return;
 		for (const kind of ["symlink", "hardlink"] as const) {
 			const root = configureRoot(`unsafe-${kind}`);
 			try {
 				const source = join(root, `${kind}-source.jsonl`);
 				writeFileSync(source, "source-safe\n", "utf8");
-				if (kind === "symlink") symlinkSync(source, eventPath(root));
-				else linkSync(source, eventPath(root));
+				if (kind === "symlink") {
+					if (!symlinkTestSupport.available) continue;
+					symlinkSync(source, eventPath(root));
+				} else linkSync(source, eventPath(root));
 				expect(() =>
 					appendEventLedgerRecord(root, canonicalWorkbenchRecord(`E-${kind}`)),
 				).toThrow(/regular file|hardlinked|reparse|symbolic|symlink/i);

@@ -4,7 +4,6 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,6 +35,7 @@ import {
 	createPreference,
 	recordPreferenceEvidence,
 } from "../services/evolution/preferences";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 
@@ -371,7 +371,7 @@ describe("Evolution preference authority round 3", () => {
 			expect(await second.exited).toBe(0);
 			expect(existsSync(secondEntered)).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -386,7 +386,7 @@ describe("Evolution preference authority round 3", () => {
 				/preference mutation appender is no longer active/,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -472,7 +472,7 @@ describe("Evolution preference authority round 3", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -509,7 +509,7 @@ describe("Evolution preference authority round 3", () => {
 			).toEqual({ value: PROJECT_ID });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -542,7 +542,7 @@ describe("Evolution preference authority round 3", () => {
 			).toEqual({ count: 0 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -606,7 +606,7 @@ describe("Evolution preference authority round 3", () => {
 				appendChild.kill();
 				preferenceChild.kill();
 			} catch {}
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

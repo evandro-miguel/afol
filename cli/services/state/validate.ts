@@ -52,17 +52,19 @@ function isBinaryInvocation(invocationPath: string): boolean {
 	}
 	const binaryPath = resolveBinaryArtifactPath(invocationPath);
 	return (
-		basename(invocationPath) === "afol" ||
+		isAfolBinaryName(invocationPath) ||
 		existsSync(`${binaryPath}.provenance.json`)
 	);
 }
 
+function isAfolBinaryName(path: string): boolean {
+	const name = basename(path).toLowerCase();
+	return name === "afol" || name === "afol.exe";
+}
+
 function resolveBinaryArtifactPath(invocationPath: string): string {
 	const resolvedInvocationPath = resolve(invocationPath);
-	if (
-		basename(invocationPath) === "afol" &&
-		basename(process.execPath) === "afol"
-	) {
+	if (isAfolBinaryName(invocationPath) && isAfolBinaryName(process.execPath)) {
 		return resolve(process.execPath);
 	}
 	return resolvedInvocationPath;

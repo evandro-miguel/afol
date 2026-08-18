@@ -13,6 +13,9 @@ import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
 import { migrateAdm } from "../services/adm/migrator";
 import { validateAdmMigration } from "../services/adm/validate";
+import { symlinkTestSupport } from "./symlink-test-support";
+
+const symlinkTest = test.skipIf(!symlinkTestSupport.available);
 
 type CapturedIo = {
 	stdout: string[];
@@ -95,24 +98,29 @@ describe("adm migrate", () => {
 		}
 	});
 
-	test("planner rejects symlinked docs/arc sources before reading outside project", () => {
-		const root = mkdtempSync(join(tmpdir(), "adm-migrate-symlink-source-"));
-		const outside = mkdtempSync(join(tmpdir(), "adm-migrate-outside-source-"));
-		try {
-			mkdirSync(join(root, "docs"), { recursive: true });
-			writeFileSync(
-				join(outside, "GENERAL-ROADMAP.md"),
-				"outside roadmap",
-				"utf8",
+	symlinkTest(
+		"planner rejects symlinked docs/arc sources before reading outside project [requires symlink privilege]",
+		() => {
+			const root = mkdtempSync(join(tmpdir(), "adm-migrate-symlink-source-"));
+			const outside = mkdtempSync(
+				join(tmpdir(), "adm-migrate-outside-source-"),
 			);
-			symlinkSync(outside, join(root, "docs", "arc"), "dir");
+			try {
+				mkdirSync(join(root, "docs"), { recursive: true });
+				writeFileSync(
+					join(outside, "GENERAL-ROADMAP.md"),
+					"outside roadmap",
+					"utf8",
+				);
+				symlinkSync(outside, join(root, "docs", "arc"), "dir");
 
-			expect(() => validateAdmMigration(root)).toThrow(/symlink/);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
-		}
-	});
+				expect(() => validateAdmMigration(root)).toThrow(/symlink/);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("applies docs and archives manifest", async () => {
 		const root = createFixture();

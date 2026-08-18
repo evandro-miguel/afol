@@ -59,6 +59,7 @@ import {
 	withMutationJournalLock,
 } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function mkProjectRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "file-command-unit-"));
@@ -464,20 +465,26 @@ describe("mutation transaction hardening", () => {
 		}
 	});
 
-	test("journal backup reads reject symlink escapes", () => {
-		const root = mkProjectRoot();
-		const outside = writeFileTree(root, "outside.txt", "secret");
-		const link = join(resolveProjectPaths(root).abs.mutationBackupsDir, "link");
-		try {
-			mkdirSync(dirname(link), { recursive: true });
-			symlinkSync(outside, link);
-			expect(() => readJournalBackupBytes(root, link)).toThrow(
-				"escapes mutation backups",
+	test.skipIf(!symlinkTestSupport.available)(
+		"journal backup reads reject symlink escapes",
+		() => {
+			const root = mkProjectRoot();
+			const outside = writeFileTree(root, "outside.txt", "secret");
+			const link = join(
+				resolveProjectPaths(root).abs.mutationBackupsDir,
+				"link",
 			);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+			try {
+				mkdirSync(dirname(link), { recursive: true });
+				symlinkSync(outside, link);
+				expect(() => readJournalBackupBytes(root, link)).toThrow(
+					"escapes mutation backups",
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 	test("strict journal reports unmatched prepared while locked reads remain reentrant", () => {
 		const root = mkProjectRoot();
 		try {
@@ -672,7 +679,10 @@ describe("mutation transaction hardening", () => {
 	});
 
 	test("journal recovery rejects overwrite backups outside the backup root or through symlinks", () => {
-		for (const useSymlink of [false, true]) {
+		const backupVariants = symlinkTestSupport.available
+			? [false, true]
+			: [false];
+		for (const useSymlink of backupVariants) {
 			const root = mkProjectRoot();
 			try {
 				writeFileTree(root, "notes/source.txt", "source");
@@ -957,7 +967,7 @@ describe("file shared helpers", () => {
 				resolveProjectPaths(root).abs.mutationBackupsDir,
 			);
 			expect(archive.path).toContain(
-				resolveProjectPaths(root).mutationArchivesDir,
+				resolveProjectPaths(root).abs.mutationArchivesDir,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

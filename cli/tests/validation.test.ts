@@ -8,11 +8,10 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
-	symlinkSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { arch, cpus, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -26,7 +25,8 @@ const runtimeLiveBenchmarkValidationCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand}`;
 const runtimeLiveBenchmarkRefreshNote = `obtain a fresh receipt from the external fixed harness, place it at .afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json, then validate with ${runtimeLiveBenchmarkValidationCommand}`;
-const slowValidationTestTimeoutMs = 60_000;
+const slowValidationTestTimeoutMs =
+	process.platform === "win32" ? 360_000 : 60_000;
 const cliKernelValidationTestTimeoutMs = 60_000;
 const cliKernelRunTestTimeoutMs = 120_000;
 
@@ -88,6 +88,17 @@ function relaxMutationSafetyTimingLimits(root: string): void {
 		"baseline-v1.json",
 	);
 	const baseline = parseJsonOutput(readFileSync(baselinePath, "utf8"));
+	const os = platform();
+	const cpuClass = (cpus()[0]?.model ?? "unknown-cpu")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	baseline.host_profile_id = `${os}-${arch()}-${cpuClass}`;
+	baseline.os = os;
+	baseline.arch = arch();
+	baseline.cpu_class = cpuClass;
+	baseline.bun_version = Bun.version;
+	baseline.runtime_version = Bun.version;
 	const baselineScenarios = baseline.scenarios as Record<
 		string,
 		Record<string, unknown>
@@ -199,8 +210,11 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
 		{ recursive: true },
 	);
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
-	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	// These entries are source aliases for the fixture, not symlink-security
+	// scenarios. Copying them keeps validation portable on Windows hosts where
+	// symlink creation requires Developer Mode or an elevated privilege.
+	cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+	cpSync(join(process.cwd(), "afol"), join(root, "afol"));
 	for (const args of [
 		["init"],
 		["config", "user.email", "bench@example.com"],
@@ -708,7 +722,7 @@ describe("validation command family", () => {
 				"update-safety",
 				"--json",
 			]);
-			expect(proc.status).toBe(0);
+			expect(proc.status, proc.stderr as string).toBe(0);
 			const payload = parseJsonOutput(proc.stdout as string);
 			expect(payload.mode).toBe("benchmark");
 			expect(payload.result_count).toBe(7);

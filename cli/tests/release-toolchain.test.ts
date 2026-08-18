@@ -15,10 +15,11 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import {
 	compiledReleaseBuildArgs,
 	DEFAULT_BUILD_COMMAND,
+	releaseArtifactPath,
 	writeCompiledReleaseBuildReceipt,
 } from "../dev/build-release";
 import {
@@ -26,8 +27,11 @@ import {
 	writeReleaseProvenance,
 } from "../dev/release-provenance";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { directoryReparseTestSupport } from "./symlink-test-support";
 
 const repoRoot = join(import.meta.dir, "..", "..");
+const RELEASE_ARTIFACT = releaseArtifactPath("dist/afol");
+const RELEASE_ARTIFACT_NAME = releaseArtifactPath("afol");
 const SEMVER_PATTERN =
 	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
@@ -87,26 +91,99 @@ function writeReleaseVersionRegistry(
 	);
 }
 
+type MockScannerOptions = {
+	version?: string;
+	exitCode?: number;
+	stdout?: string;
+	stderr?: string;
+	logPath?: string;
+};
+
+function writeMockScanner(
+	binDir: string,
+	name: string,
+	options: MockScannerOptions = {},
+): void {
+	const version = options.version ?? `${name} test`;
+	const supportsVersion =
+		options.version !== undefined || (options.exitCode ?? 0) === 0;
+	const executable = join(
+		binDir,
+		process.platform === "win32" ? `${name}.cmd` : name,
+	);
+	if (process.platform === "win32") {
+		const scriptPath = join(binDir, `${name}-fixture.js`);
+		const script = [
+			'const fs = require("node:fs");',
+			"const args = process.argv.slice(2);",
+			...(supportsVersion
+				? [
+						`if (args[0] === "--version") { process.stdout.write(${JSON.stringify(`${version}\n`)}); process.exit(0); }`,
+					]
+				: []),
+			...(options.logPath
+				? [
+						`fs.appendFileSync(${JSON.stringify(options.logPath)}, args.join(" ") + "\\n");`,
+					]
+				: []),
+			...(options.stdout
+				? [`process.stdout.write(${JSON.stringify(`${options.stdout}\n`)});`]
+				: []),
+			...(options.stderr
+				? [`process.stderr.write(${JSON.stringify(`${options.stderr}\n`)});`]
+				: []),
+			`process.exit(${options.exitCode ?? 0});`,
+		].join("\n");
+		writeFileSync(scriptPath, script, "utf8");
+		writeFileSync(
+			executable,
+			`@echo off\r\n"${process.execPath}" "${scriptPath}" %*\r\n`,
+			"utf8",
+		);
+		return;
+	}
+
+	const script = [
+		"#!/bin/sh",
+		...(supportsVersion
+			? [`if [ "$1" = "--version" ]; then printf '${version}\\n'; exit 0; fi`]
+			: []),
+		...(options.logPath
+			? [`printf '%s\\n' "$*" >> '${options.logPath.replaceAll("'", "'\\''")}'`]
+			: []),
+		...(options.stdout ? [`printf '%s\\n' '${options.stdout}'`] : []),
+		...(options.stderr ? [`printf '%s\\n' '${options.stderr}' >&2`] : []),
+		`exit ${options.exitCode ?? 0}`,
+		"",
+	].join("\n");
+	writeFileSync(executable, script, "utf8");
+	chmodSync(executable, 0o755);
+}
+
+function scannerPath(binDir: string): string {
+	return `${binDir}${delimiter}${process.env.PATH ?? ""}`;
+}
+
+function pinnedReleaseScannerEnvironment(binDir: string): NodeJS.ProcessEnv {
+	return {
+		AFOL_OSV_SCANNER_PATH: join(
+			binDir,
+			process.platform === "win32" ? "osv-scanner.cmd" : "osv-scanner",
+		),
+		AFOL_GITLEAKS_PATH: join(
+			binDir,
+			process.platform === "win32" ? "gitleaks.cmd" : "gitleaks",
+		),
+	};
+}
+
 function writeFakeReleaseScanners(binDir: string): void {
 	mkdirSync(binDir, { recursive: true });
 	for (const [name, version] of [
 		["osv-scanner", "osv-scanner 2.4.0"],
 		["gitleaks", "gitleaks 8.30.1"],
 	] as const) {
-		writeFileSync(
-			join(binDir, name),
-			[
-				"#!/bin/sh",
-				'if [ "$1" = "--version" ]; then',
-				`  printf '${version}\\n'`,
-				"  exit 0",
-				"fi",
-				"exit 0",
-				"",
-			].join("\n"),
-			"utf8",
-		);
-		chmodSync(join(binDir, name), 0o755);
+		writeMockScanner(binDir, name, { version });
 	}
 }
 
@@ -131,7 +208,7 @@ function securityEvidenceTarget(
 	root: string,
 	overrides: Partial<Record<string, string>> = {},
 ): Record<string, string> {
-	const artifact = "dist/afol";
+	const artifact = RELEASE_ARTIFACT;
 	const artifactPath = join(root, artifact);
 	const lockPath = join(root, "bun.lock");
 	return {
@@ -203,11 +280,11 @@ function runGit(root: string, args: string[], env: NodeJS.ProcessEnv): void {
 }
 
 function commitReleaseFixture(root: string, env: NodeJS.ProcessEnv): void {
-	const artifactPath = join(root, "dist", "afol");
+	const artifactPath = join(root, RELEASE_ARTIFACT);
 	if (existsSync(artifactPath)) {
 		writeCompiledReleaseBuildReceipt(
 			artifactPath,
-			compiledReleaseBuildArgs("cli/main.ts", "dist/afol"),
+			compiledReleaseBuildArgs("cli/main.ts", RELEASE_ARTIFACT),
 		);
 	}
 	runGit(root, ["init"], env);
@@ -223,6 +300,51 @@ function splitScriptSteps(script: string | undefined): string[] {
 }
 
 describe("release and toolchain contracts", () => {
+	test.skipIf(!directoryReparseTestSupport.available)(
+		"provenance refuses a dist directory reparse point before writing receipts",
+		() => {
+			const root = mkdtempSync(
+				join(tmpdir(), "release-provenance-reparse-root-"),
+			);
+			const external = mkdtempSync(
+				join(tmpdir(), "release-provenance-reparse-external-"),
+			);
+			try {
+				writeFileSync(
+					join(root, "package.json"),
+					JSON.stringify({ name: CLI_PACKAGE_NAME, version: CLI_VERSION }),
+					"utf8",
+				);
+				writeFileSync(join(root, "bun.lock"), "", "utf8");
+				writeFileSync(
+					join(external, RELEASE_ARTIFACT_NAME),
+					"artifact",
+					"utf8",
+				);
+				symlinkSync(
+					external,
+					join(root, "dist"),
+					process.platform === "win32" ? "junction" : "dir",
+				);
+
+				expect(() => writeReleaseProvenance({ cwd: root })).toThrow(
+					/release output directory/,
+				);
+				expect(
+					existsSync(join(external, `${RELEASE_ARTIFACT_NAME}.sha256`)),
+				).toBe(false);
+				expect(
+					existsSync(
+						join(external, `${RELEASE_ARTIFACT_NAME}.provenance.json`),
+					),
+				).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(external, { recursive: true, force: true });
+			}
+		},
+	);
+
 	test("package scripts pin stable TypeScript and keep strict release gates", () => {
 		const pkg = JSON.parse(
 			readFileSync(join(repoRoot, "package.json"), "utf8"),
@@ -264,7 +386,7 @@ describe("release and toolchain contracts", () => {
 			"bun install --frozen-lockfile && bun test cli/tests/reproducible-build.test.ts && bun run build",
 		);
 		expect(scripts["smoke:wsl2"]).toBe("bun run cli/dev/dist-smoke.ts --wsl2");
-		expect(scripts["smoke:clean"]).toContain("--exclude-vcs-ignores");
+		expect(scripts["smoke:clean"]).toBe("bun run cli/dev/clean-smoke.ts");
 		expect(scripts["validate:toolchain"]).toBe(
 			"bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		);
@@ -276,7 +398,7 @@ describe("release and toolchain contracts", () => {
 		);
 		expect(scripts["validate:release"]).toContain("bun run validate:project");
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
-		expect(scripts["test:full"]).toBe("bun test --only-failures");
+		expect(scripts["test:full"]).toBe("bun run cli/dev/full-test.ts");
 		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
 		expect(scripts["validate:ux-governance"]).toBe(
@@ -375,7 +497,7 @@ describe("release and toolchain contracts", () => {
 		const workflow = readFileSync(
 			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
 			"utf8",
-		);
+		).replace(/\r\n/g, "\n");
 		type RunDefaults = {
 			shell?: string;
 			"working-directory"?: string;
@@ -443,15 +565,17 @@ describe("release and toolchain contracts", () => {
 		);
 	});
 
-	test("CI runs only when manually dispatched", () => {
+	test("CI runs release validation for pull requests and main while retaining manual dispatch", () => {
 		const workflow = readFileSync(
 			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
 			"utf8",
-		);
+		).replace(/\r\n/g, "\n");
 
 		expect(workflow).toContain("on:\n  workflow_dispatch:\n");
-		expect(workflow).not.toMatch(/\n {2}push:/);
-		expect(workflow).not.toMatch(/\n {2}pull_request:/);
+		expect(workflow).toContain("  pull_request:\n");
+		expect(workflow).toContain("  push:\n    branches: [main]\n");
+		expect(workflow).toContain("permissions:\n  contents: read\n");
+		expect(workflow).toContain("with:\n          fetch-depth: 0\n");
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {
@@ -589,6 +713,13 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(osvInstallCommand);
 		expect(workflow).toContain(gitleaksInstallCommand);
+		expect(workflow).toContain(
+			'echo "AFOL_OSV_SCANNER_PATH=$tool_dir/osv-scanner" >> "$GITHUB_ENV"',
+		);
+		expect(workflow).toContain(
+			'echo "AFOL_GITLEAKS_PATH=$tool_dir/gitleaks" >> "$GITHUB_ENV"',
+		);
+		expect(workflow).not.toContain('echo "$tool_dir" >> "$GITHUB_PATH"');
 		expect(workflow).toContain('export GOSUMDB="sum.golang.org"');
 		expect(workflow).not.toContain("curl -fsSL");
 		expect(workflow).not.toContain("tar -xzf");
@@ -651,14 +782,15 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -720,13 +852,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -734,7 +867,7 @@ describe("release and toolchain contracts", () => {
 		};
 		try {
 			commitReleaseFixture(root, gitEnv);
-			unlinkSync(join(distDir, "afol.build.json"));
+			unlinkSync(join(distDir, `${RELEASE_ARTIFACT_NAME}.build.json`));
 			expect(() =>
 				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
 			).toThrow(/missing compiled release build receipt/);
@@ -752,13 +885,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -766,7 +900,7 @@ describe("release and toolchain contracts", () => {
 		};
 		try {
 			commitReleaseFixture(root, gitEnv);
-			writeCompiledReleaseBuildReceipt(join(distDir, "afol"), [
+			writeCompiledReleaseBuildReceipt(join(distDir, RELEASE_ARTIFACT_NAME), [
 				"build",
 				"--compile",
 				"--format=esm",
@@ -774,7 +908,7 @@ describe("release and toolchain contracts", () => {
 				"--no-compile-autoload-bunfig",
 				"cli/main.ts",
 				"--outfile",
-				"dist/afol",
+				RELEASE_ARTIFACT,
 			]);
 			expect(() =>
 				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
@@ -793,13 +927,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -807,7 +942,11 @@ describe("release and toolchain contracts", () => {
 		};
 		try {
 			commitReleaseFixture(root, gitEnv);
-			writeFileSync(join(distDir, "afol"), "mutated artifact", "utf8");
+			writeFileSync(
+				join(distDir, RELEASE_ARTIFACT_NAME),
+				"mutated artifact",
+				"utf8",
+			);
 			expect(() =>
 				buildReleaseProvenance({ cwd: root, releaseMode: true, env: gitEnv }),
 			).toThrow(/compiled release build receipt does not bind artifact/);
@@ -825,13 +964,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -840,7 +980,7 @@ describe("release and toolchain contracts", () => {
 		try {
 			commitReleaseFixture(root, gitEnv);
 			writeCompiledReleaseBuildReceipt(
-				join(distDir, "afol"),
+				join(distDir, RELEASE_ARTIFACT_NAME),
 				compiledReleaseBuildArgs("cli/forged-main.ts", "dist/forged-afol"),
 			);
 			expect(() =>
@@ -858,14 +998,15 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -895,7 +1036,7 @@ describe("release and toolchain contracts", () => {
 			);
 			expect(report.generated_at).not.toBe("2000-01-01T00:00:00.000Z");
 			expect(report.target.artifact_sha256).toBe(
-				fileSha256(join(distDir, "afol")),
+				fileSha256(join(distDir, RELEASE_ARTIFACT_NAME)),
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -909,14 +1050,15 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -931,11 +1073,13 @@ describe("release and toolchain contracts", () => {
 				releaseMode: true,
 				env: gitEnv,
 			});
-			expect(readFileSync(checksumPath, "utf8")).toContain("  dist/afol");
+			expect(readFileSync(checksumPath, "utf8")).toContain(
+				`  ${RELEASE_ARTIFACT}`,
+			);
 			const provenance = JSON.parse(readFileSync(provenancePath, "utf8"));
-			const artifactPath = join(root, "dist", "afol");
+			const artifactPath = join(root, RELEASE_ARTIFACT);
 			expect(provenance).toMatchObject({
-				artifact: "dist/afol",
+				artifact: RELEASE_ARTIFACT,
 				build_command: DEFAULT_BUILD_COMMAND,
 				compile_bytecode: false,
 				compile_minify: true,
@@ -962,14 +1106,15 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1017,7 +1162,7 @@ describe("release and toolchain contracts", () => {
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
 		try {
@@ -1083,7 +1228,7 @@ describe("release and toolchain contracts", () => {
 			packageJsonVersion: "9.9.9",
 			registryVersion: "9.9.9",
 		});
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 
 		try {
 			expect(() => buildReleaseProvenance({ cwd: root })).toThrow(
@@ -1101,12 +1246,13 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1132,13 +1278,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1175,13 +1322,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1222,41 +1370,19 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		writeFileSync(
-			join(binDir, "osv-scanner"),
-			[
-				"#!/bin/sh",
-				'if [ "$1" = "--version" ]; then',
-				"  printf 'osv-scanner 2.4.0\\n'",
-				"  exit 0",
-				"fi",
-				"printf 'osv blocked\\n' >&2",
-				"exit 7",
-				"",
-			].join("\n"),
-			"utf8",
-		);
-		writeFileSync(
-			join(binDir, "gitleaks"),
-			[
-				"#!/bin/sh",
-				'if [ "$1" = "--version" ]; then',
-				"  printf 'gitleaks 8.30.1\\n'",
-				"  exit 0",
-				"fi",
-				"exit 0",
-				"",
-			].join("\n"),
-			"utf8",
-		);
-		chmodSync(join(binDir, "osv-scanner"), 0o755);
-		chmodSync(join(binDir, "gitleaks"), 0o755);
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+		writeMockScanner(binDir, "osv-scanner", {
+			version: "osv-scanner 2.4.0",
+			stderr: "osv blocked",
+			exitCode: 7,
+		});
+		writeMockScanner(binDir, "gitleaks", { version: "gitleaks 8.30.1" });
+
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1291,13 +1417,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1347,7 +1474,7 @@ describe("release and toolchain contracts", () => {
 				readFileSync(join(root, "dist", "security-scan.release.json"), "utf8"),
 			);
 			expect(report.target.artifact_sha256).toBe(
-				fileSha256(join(distDir, "afol")),
+				fileSha256(join(distDir, RELEASE_ARTIFACT_NAME)),
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1363,13 +1490,14 @@ describe("release and toolchain contracts", () => {
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
-		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
 		writeFakeReleaseScanners(binDir);
 		const gitEnv = {
 			...process.env,
-			PATH: binDir,
+			PATH: scannerPath(binDir),
+			...pinnedReleaseScannerEnvironment(binDir),
 			GIT_AUTHOR_NAME: "Test User",
 			GIT_AUTHOR_EMAIL: "test@example.com",
 			GIT_COMMITTER_NAME: "Test User",
@@ -1433,7 +1561,7 @@ describe("release and toolchain contracts", () => {
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
 		writeReleaseVersionRegistry(root);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 		const gitEnv = {
 			...process.env,
@@ -1473,7 +1601,7 @@ describe("release and toolchain contracts", () => {
 			),
 			"utf8",
 		);
-		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 
 		try {
 			expect(() =>

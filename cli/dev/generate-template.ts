@@ -17,7 +17,8 @@ import {
 
 function formatGeneratedTemplate(outputPath: string): void {
 	const result = Bun.spawnSync([
-		"bunx",
+		process.execPath,
+		"x",
 		"--bun",
 		"@biomejs/biome",
 		"format",

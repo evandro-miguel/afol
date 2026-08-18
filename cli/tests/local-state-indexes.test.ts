@@ -2188,35 +2188,38 @@ describe("local-state project indexer", () => {
 		}
 	});
 
-	test("rebuildWorkBenchIndex marks unreadable session directories degraded", () => {
-		const root = mkdtempSync(join(tmpdir(), "wb-unreadable-session-"));
-		const session = "260715_1300_unreadable-session";
-		const sessionDir = join(root, ".afol", "wb", session);
-		try {
-			mkdirSync(sessionDir, { recursive: true });
-			mkdirSync(join(root, ".afol", "state"), { recursive: true });
-			mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
-			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
-			mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
-			chmodSync(sessionDir, 0o000);
+	test.skipIf(process.platform === "win32")(
+		"rebuildWorkBenchIndex marks unreadable session directories degraded",
+		() => {
+			const root = mkdtempSync(join(tmpdir(), "wb-unreadable-session-"));
+			const session = "260715_1300_unreadable-session";
+			const sessionDir = join(root, ".afol", "wb", session);
+			try {
+				mkdirSync(sessionDir, { recursive: true });
+				mkdirSync(join(root, ".afol", "state"), { recursive: true });
+				mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+				mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+				mkdirSync(join(root, ".afol", "data", "events"), { recursive: true });
+				chmodSync(sessionDir, 0o000);
 
-			const snapshot = rebuildWorkBenchIndex(root);
-			const indexedSession = snapshot.sessions.find(
-				(entry) => entry.session === session,
-			);
-			expect(indexedSession?.degraded).toBe(true);
-			expect(validateWorkBenchIndex(root).ok).toBe(false);
-			expect(detectSessionHealth(root)).toContainEqual(
-				expect.objectContaining({
-					type: "unreadable_session_directory",
-					session,
-				}),
-			);
-		} finally {
-			chmodSync(sessionDir, 0o700);
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+				const snapshot = rebuildWorkBenchIndex(root);
+				const indexedSession = snapshot.sessions.find(
+					(entry) => entry.session === session,
+				);
+				expect(indexedSession?.degraded).toBe(true);
+				expect(validateWorkBenchIndex(root).ok).toBe(false);
+				expect(detectSessionHealth(root)).toContainEqual(
+					expect.objectContaining({
+						type: "unreadable_session_directory",
+						session,
+					}),
+				);
+			} finally {
+				chmodSync(sessionDir, 0o700);
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("rebuildWorkBenchIndex preserves escaped pipes in state board cells (odd backslash)", () => {
 		const root = mkdtempSync(join(tmpdir(), "wb-escaped-pipes-"));

@@ -3,7 +3,6 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	writeFileSync,
 	writeSync,
 } from "node:fs";
@@ -27,6 +26,7 @@ import {
 } from "../services/evolution/observation-model";
 import { writeEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import { dispatchRecurrenceDecision } from "../services/evolution/recurrence-authority";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 
@@ -155,7 +155,7 @@ describe("observation journal", () => {
 			validateObservationProjection({ root, db, projectId: PROJECT_ID });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -199,7 +199,7 @@ describe("observation journal", () => {
 			).toEqual({ count: 1 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -237,7 +237,7 @@ describe("observation journal", () => {
 			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -324,7 +324,7 @@ describe("observation journal", () => {
 			validateObservationProjection({ root, db, projectId: PROJECT_ID });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -364,7 +364,7 @@ describe("observation journal", () => {
 			).toEqual({ occurrence_count: 1 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -458,7 +458,7 @@ describe("observation journal", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -483,7 +483,7 @@ describe("observation journal", () => {
 			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -514,7 +514,7 @@ describe("observation journal", () => {
 			).toMatchObject({ state: "recurring" });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -537,7 +537,7 @@ describe("observation journal", () => {
 			).toEqual({ count: 2 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -581,7 +581,7 @@ describe("observation journal", () => {
 			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -649,7 +649,7 @@ describe("observation journal", () => {
 			).toEqual({ journal_event_id: "OBS-reopen-02" });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -693,7 +693,7 @@ describe("observation journal", () => {
 			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -744,7 +744,7 @@ describe("observation journal", () => {
 			).toThrow("observation id already exists with different content");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

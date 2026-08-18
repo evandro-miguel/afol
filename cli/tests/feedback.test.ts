@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runFeedbackCommand } from "../commands/feedback";
@@ -12,6 +12,7 @@ import {
 	recordFeedback,
 	resolveFeedbackDbPath,
 } from "../services/feedback";
+import { removeTestRoot } from "./windows-test-support";
 
 function capture() {
 	const stdout: string[] = [];
@@ -69,7 +70,7 @@ describe("offline feedback backend", () => {
 			expect(captured.stdout[0]).not.toContain("\u001b");
 			expect(captured.stdout[0]).toContain("[REDACTED]");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -103,7 +104,7 @@ describe("offline feedback backend", () => {
 			expect(listFeedback(10, local)).toHaveLength(1);
 			expect(feedbackStatus(local).count).toBe(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -136,7 +137,7 @@ describe("offline feedback backend", () => {
 			}
 			expect(serialized).toContain("keep");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -171,7 +172,7 @@ describe("offline feedback backend", () => {
 		} finally {
 			if (previousHome === undefined) delete process.env.AFOL_STATE_HOME;
 			else process.env.AFOL_STATE_HOME = previousHome;
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -209,7 +210,7 @@ describe("offline feedback backend", () => {
 			if (previousHome === undefined) delete process.env.AFOL_STATE_HOME;
 			else process.env.AFOL_STATE_HOME = previousHome;
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -266,7 +267,7 @@ describe("offline feedback backend", () => {
 			expect(getFeedback("FB-missing", local)).toBeNull();
 			expect(existsSync(resolveFeedbackDbPath(local))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -282,7 +283,7 @@ describe("offline feedback backend", () => {
 				"file is not a database",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -301,7 +302,7 @@ describe("offline feedback backend", () => {
 			const reloaded = getFeedback(report.report_id, local);
 			expect(reloaded?.metadata).toEqual({ malformed: true });
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -325,7 +326,7 @@ describe("offline feedback backend", () => {
 			expect(statuses).toEqual(Array.from({ length: 8 }, () => 0));
 			expect(listFeedback(100, env(root))).toHaveLength(8);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -348,7 +349,7 @@ describe("offline feedback backend", () => {
 			expect(recordFeedback({ message: "recovered" }, local)).not.toBeNull();
 			expect(listFeedback(10, local)).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -365,7 +366,7 @@ describe("offline feedback backend", () => {
 				recordFeedback({ kind: "error", message: "should fail" }, local),
 			).toThrow("database is locked");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 });

@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSkillCommand } from "../commands/catalog";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function mkRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "skill-command-"));
@@ -272,25 +273,28 @@ describe("skill command", () => {
 		}
 	});
 
-	test("ignores non-directory skill entries without aborting discovery", async () => {
-		const root = mkRoot();
-		try {
-			symlinkSync(
-				join(root, ".agents", "skills", "missing-skill"),
-				join(root, ".agents", "skills", "broken-skill-link"),
-				"dir",
-			);
+	test.skipIf(!symlinkTestSupport.available)(
+		"ignores non-directory skill entries without aborting discovery",
+		async () => {
+			const root = mkRoot();
+			try {
+				symlinkSync(
+					join(root, ".agents", "skills", "missing-skill"),
+					join(root, ".agents", "skills", "broken-skill-link"),
+					"dir",
+				);
 
-			const list = capture();
-			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
-			expect(list.stderr).toEqual([]);
-			expect(list.stdout.join("\n")).toContain("skills: 2");
-			expect(list.stdout.join("\n")).toContain("bun-development");
-			expect(list.stdout.join("\n")).toContain("typescript-expert");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+				const list = capture();
+				expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
+				expect(list.stderr).toEqual([]);
+				expect(list.stdout.join("\n")).toContain("skills: 2");
+				expect(list.stdout.join("\n")).toContain("bun-development");
+				expect(list.stdout.join("\n")).toContain("typescript-expert");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("rejects ambiguous skill names", async () => {
 		const root = mkRoot();

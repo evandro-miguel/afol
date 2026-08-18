@@ -16,10 +16,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { baselineFilename, loadRegistry } from "../validate/registry";
+import { releaseArtifactPath } from "./build-release";
 import { assertCompiledHotPathBenchmark } from "./dist-smoke-assertions";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const distPath = join(repoRoot, "dist", "afol");
+const releaseArtifact = releaseArtifactPath("dist/afol");
+const distPath = join(repoRoot, releaseArtifact);
 const requireWsl2 = process.argv.includes("--wsl2");
 const DIAGNOSTIC_LIMIT = 800;
 
@@ -271,25 +273,26 @@ type DistReleaseReceipts = {
 };
 
 function readDistReleaseReceipts(root: string): DistReleaseReceipts {
-	const artifactPath = join(root, "dist", "afol");
-	const checksumPath = join(root, "dist", "afol.sha256");
-	const provenancePath = join(root, "dist", "afol.provenance.json");
+	const artifact = releaseArtifactPath("dist/afol");
+	const artifactPath = join(root, artifact);
+	const checksumPath = join(root, `${artifact}.sha256`);
+	const provenancePath = join(root, `${artifact}.provenance.json`);
 	if (!existsSync(artifactPath)) {
 		throw new Error(`Missing ${artifactPath}. Run bun run build first.`);
 	}
 	if (!existsSync(checksumPath) || !existsSync(provenancePath)) {
 		throw new Error(
-			"Missing dist/afol.sha256 or dist/afol.provenance.json; run release provenance before dist smoke",
+			`Missing ${artifact}.sha256 or ${artifact}.provenance.json; run release provenance before dist smoke`,
 		);
 	}
 
 	const artifactBytes = readFileSync(artifactPath);
 	const sha256 = sha256Hex(artifactBytes);
 	const checksumText = readFileSync(checksumPath, "utf8").trim();
-	const expectedChecksum = `${sha256}  dist/afol`;
+	const expectedChecksum = `${sha256}  ${artifact}`;
 	if (checksumText !== expectedChecksum) {
 		throw new Error(
-			`dist/afol.sha256 does not bind dist/afol; expected ${expectedChecksum}, got ${checksumText}`,
+			`${artifact}.sha256 does not bind ${artifact}; expected ${expectedChecksum}, got ${checksumText}`,
 		);
 	}
 
@@ -298,8 +301,8 @@ function readDistReleaseReceipts(root: string): DistReleaseReceipts {
 		sha256?: unknown;
 		size_bytes?: unknown;
 	};
-	if (provenance.artifact !== "dist/afol" || provenance.sha256 !== sha256) {
-		throw new Error("dist/afol.provenance.json does not bind dist/afol");
+	if (provenance.artifact !== artifact || provenance.sha256 !== sha256) {
+		throw new Error(`${artifact}.provenance.json does not bind ${artifact}`);
 	}
 	if (
 		typeof provenance.size_bytes !== "number" ||
@@ -308,7 +311,7 @@ function readDistReleaseReceipts(root: string): DistReleaseReceipts {
 		provenance.size_bytes !== artifactBytes.byteLength
 	) {
 		throw new Error(
-			`dist/afol.provenance.json size_bytes does not match dist/afol`,
+			`${artifact}.provenance.json size_bytes does not match ${artifact}`,
 		);
 	}
 
@@ -651,7 +654,7 @@ function main(): void {
 			!receiptsBefore.provenanceBytes.equals(receiptsAfter.provenanceBytes)
 		) {
 			throw new Error(
-				"dist smoke mutated dist/afol.sha256 or dist/afol.provenance.json",
+				`dist smoke mutated ${releaseArtifact}.sha256 or ${releaseArtifact}.provenance.json`,
 			);
 		}
 		process.stdout.write(`dist smoke: ok ${session}\n`);

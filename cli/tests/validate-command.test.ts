@@ -457,63 +457,97 @@ describe("validate command", () => {
 		}
 	});
 
-	test("reports unreadable spec frontmatter without crashing", async () => {
+	test("accepts CRLF specs frontmatter on Windows worktrees", async () => {
 		const root = createValidationFixture();
-		const specsDir = join(root, ".afol", "adm", "specs");
-		const specPath = join(specsDir, "unreadable.md");
 		try {
+			const specsDir = join(root, ".afol", "adm", "specs");
 			mkdirSync(specsDir, { recursive: true });
 			writeFileSync(
-				specPath,
-				"---\nid: unreadable\nstatus: active\n---\n",
+				join(specsDir, "spec-a.md"),
+				"---\r\ndoc_type: spec\r\nid: spec-a\r\ntheme: alpha\r\nstatus: active\r\nowners:\r\n- worker\r\n---\r\n# Spec A\r\n",
 				"utf8",
 			);
 			writeFileSync(
 				join(specsDir, "INDEX.md"),
-				[
-					"---",
-					"doc_type: specs_index",
-					"id: specs_index",
-					"status: active",
-					"---",
-					"",
-					"| Total | Count |",
-					"|--------|-------|",
-					"| Total | 1 |",
-					"| Draft | 0 |",
-					"| Active | 1 |",
-					"| Final | 0 |",
-					"| Superseded | 0 |",
-					"",
-					"| SPEC ID | Theme | Status | Owner | Links |",
-					"|--------:|-------|--------|-------|------|",
-					"| unreadable | unreadable | active | worker | |",
-					"",
-				].join("\n"),
+				"---\r\ndoc_type: specs_index\r\nid: specs_index\r\nstatus: active\r\n---\r\n| Total | Count |\r\n|--------|-------|\r\n| Total | 1 |\r\n| Draft | 0 |\r\n| Active | 1 |\r\n| Final | 0 |\r\n| Superseded | 0 |\r\n| SPEC ID | Theme | Status | Owner | Links |\r\n|--------:|-------|--------|-------|------|\r\n| spec-a | alpha | active | worker | |\r\n",
 				"utf8",
 			);
 			rebuildValidationFixtureIndexes(root);
-			chmodSync(specPath, 0o000);
 			const captured = captureIo();
-			const code = await runValidateCommand(
-				root,
-				["--check-drift", "--json"],
-				captured.io,
-			);
-			expect(code).toBe(1);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				checks?: Array<{ id: string; ok: boolean; message: string }>;
-			};
-			const check = payload.checks?.find((entry) => entry.id === "index_drift");
-			expect(check?.ok).toBe(false);
-			expect(check?.message).toContain(
-				"invalid spec frontmatter: unreadable.md",
-			);
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--json"],
+					captured.io,
+				),
+			).toBe(0);
 		} finally {
-			if (existsSync(specPath)) chmodSync(specPath, 0o600);
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test.skipIf(process.platform === "win32")(
+		"reports unreadable spec frontmatter without crashing",
+		async () => {
+			const root = createValidationFixture();
+			const specsDir = join(root, ".afol", "adm", "specs");
+			const specPath = join(specsDir, "unreadable.md");
+			try {
+				mkdirSync(specsDir, { recursive: true });
+				writeFileSync(
+					specPath,
+					"---\nid: unreadable\nstatus: active\n---\n",
+					"utf8",
+				);
+				writeFileSync(
+					join(specsDir, "INDEX.md"),
+					[
+						"---",
+						"doc_type: specs_index",
+						"id: specs_index",
+						"status: active",
+						"---",
+						"",
+						"| Total | Count |",
+						"|--------|-------|",
+						"| Total | 1 |",
+						"| Draft | 0 |",
+						"| Active | 1 |",
+						"| Final | 0 |",
+						"| Superseded | 0 |",
+						"",
+						"| SPEC ID | Theme | Status | Owner | Links |",
+						"|--------:|-------|--------|-------|------|",
+						"| unreadable | unreadable | active | worker | |",
+						"",
+					].join("\n"),
+					"utf8",
+				);
+				rebuildValidationFixtureIndexes(root);
+				chmodSync(specPath, 0o000);
+				const captured = captureIo();
+				const code = await runValidateCommand(
+					root,
+					["--check-drift", "--json"],
+					captured.io,
+				);
+				expect(code).toBe(1);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					checks?: Array<{ id: string; ok: boolean; message: string }>;
+				};
+				const check = payload.checks?.find(
+					(entry) => entry.id === "index_drift",
+				);
+				expect(check?.ok).toBe(false);
+				expect(check?.message).toContain(
+					"invalid spec frontmatter: unreadable.md",
+				);
+			} finally {
+				if (existsSync(specPath)) chmodSync(specPath, 0o600);
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test.each([
 		{

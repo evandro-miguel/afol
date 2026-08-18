@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 
@@ -31,20 +31,36 @@ function runCoverageCheck(
 		mkdirSync(dirname(lcovPath), { recursive: true });
 		writeFileSync(lcovPath, options.lcovOutput, "utf8");
 	}
-	writeFileSync(
-		join(binDir, "bun"),
-		options.bunScript ??
+	const output =
+		typeof coverageOutput === "function"
+			? coverageOutput(root)
+			: coverageOutput;
+	const bunScript = options.bunScript;
+	if (process.platform === "win32") {
+		const fixtureScript = join(binDir, "bun-fixture.js");
+		writeFileSync(
+			fixtureScript,
 			[
-				"#!/bin/sh",
-				"cat <<'EOF'",
-				typeof coverageOutput === "function"
-					? coverageOutput(root)
-					: coverageOutput,
-				"EOF",
+				`process.stdout.write(${JSON.stringify(output)});`,
+				...(bunScript?.includes("kill -TERM $$")
+					? ['process.kill(process.pid, "SIGTERM");']
+					: []),
 			].join("\n"),
-		"utf8",
-	);
-	chmodSync(join(binDir, "bun"), 0o755);
+			"utf8",
+		);
+		writeFileSync(
+			join(binDir, "bun.cmd"),
+			`@echo off\r\n"${process.execPath}" "${fixtureScript}" %*\r\n`,
+			"utf8",
+		);
+	} else {
+		writeFileSync(
+			join(binDir, "bun"),
+			bunScript ?? ["#!/bin/sh", "cat <<'EOF'", output, "EOF"].join("\n"),
+			"utf8",
+		);
+		chmodSync(join(binDir, "bun"), 0o755);
+	}
 
 	try {
 		return {
@@ -58,7 +74,7 @@ function runCoverageCheck(
 					cwd: root,
 					env: {
 						...process.env,
-						PATH: `${binDir}:${process.env.PATH ?? ""}`,
+						PATH: `${binDir}${delimiter}${process.env.PATH ?? process.env.Path ?? ""}`,
 					},
 					stdout: "pipe",
 					stderr: "pipe",
@@ -244,7 +260,9 @@ end_of_record
 		try {
 			expect(result.exitCode).toBe(1);
 			expect(decode(result.stderr)).toContain(
-				"coverage: bun test terminated by signal SIGTERM",
+				process.platform === "win32"
+					? "coverage: bun test exited with status 1"
+					: "coverage: bun test terminated by signal SIGTERM",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
