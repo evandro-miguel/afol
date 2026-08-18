@@ -68,6 +68,18 @@ risk_level: high
   `validate:release` pass on the final `dev` commit.
 - [ ] No global binary is installed or changed by this workstream.
 
+## Public-Readiness Reconciliation (2026-08-18)
+
+- PR #94 commit `e22b32df` passed the local full-suite, typecheck, Biome,
+  Oxlint, Knip, template/manifest, clean-checkout smoke, Gitleaks, and OSV
+  gates. These observations do not retroactively check every criterion above.
+- Hosted run `32186289879` failed before runner assignment on both Linux and
+  Windows. GitHub's annotation identifies account payment/spending-limit state
+  as the cause.
+- The spec remains active until the exact final candidate passes hosted CI and
+  `validate:release`; no global installation or promotion is authorized by
+  this reconciliation.
+
 ## Rollout and Backout
 
 - Keep every change on `dev` until all acceptance gates pass. If a gate fails,

@@ -248,6 +248,17 @@ follow-up. Existing compact-output and token-budget contracts remain in force.
 - [ ] Clean-checkout release validation and CI evidence are linked from this
       spec before finalization.
 
+### Public-readiness reconciliation (2026-08-18)
+
+- Local focused, full-suite, template, toolchain, clean-checkout, Gitleaks, and
+  OSV evidence passed on PR #94 commit `e22b32df`.
+- Hosted run `32186289879` scheduled both `ubuntu-24.04` and `windows-2025`, but
+  GitHub assigned neither job a runner or any steps. Its failure annotation
+  states that recent account payments failed or the spending limit must be
+  increased.
+- This criterion remains open. Local evidence does not substitute for the
+  required hosted/native CI evidence.
+
 ## Required verification matrix
 
 The implementation slice must provide focused tests for:

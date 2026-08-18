@@ -39,6 +39,6 @@ risk_level: high
 ## Acceptance
 
 - [ ] Zero release-blocking spec acceptance item remains pending.
-- [ ] Issue #84 is closed with exact validation evidence.
+- [x] Issue #84 is closed with exact validation evidence.
 - [ ] README, roadmap, specs, command metadata, and implementation agree.
 - [ ] Threat-model claims state deployment boundaries and non-boundaries.
