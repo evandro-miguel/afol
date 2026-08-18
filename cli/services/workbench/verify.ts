@@ -3,6 +3,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { collectSessionIds } from "../local-state/workbench-index";
 import { resolveProjectPaths } from "../project/paths";
 import { loadProjectRoot } from "../project/root";
+import { parseStateBoardTaskRow } from "./state-board";
 import {
 	readVerificationRunLedgerAtSessionPath,
 	verificationRunRecordsAuthorize,
@@ -10,8 +11,6 @@ import {
 
 const LEGACY_TASK_RE = /^\s*-\s\[( |\/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$/;
 const OPEN_CHECKLIST_RE = /^\s*-\s\[( |\/|%|&|!)\]\s+(.+?)\s*$/;
-const STATE_BOARD_TASK_RE =
-	/^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|?\s*$/;
 
 const MARKER_TO_STATE: Record<string, string> = {
 	" ": "pending",
@@ -279,12 +278,12 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 			if (/^\|\s*-+/.test(trimmed)) {
 				continue;
 			}
-			const stateMatch = line.match(STATE_BOARD_TASK_RE);
-			if (stateMatch?.[1] && stateMatch[2]) {
-				const notes = (stateMatch[4] ?? "").trim();
+			const stateBoardRow = parseStateBoardTaskRow(line);
+			if (stateBoardRow) {
+				const notes = stateBoardRow.notes;
 				tasks.push({
-					id: stateMatch[1],
-					state: normalizeState(stateMatch[2]),
+					id: stateBoardRow.taskId,
+					state: normalizeState(stateBoardRow.state),
 					description: notes,
 					file,
 					line: lineNumber,

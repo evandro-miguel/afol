@@ -271,7 +271,7 @@ function writeProjectBenchmarkCatalog(root: string): void {
 }
 
 function writeSpec(root: string, id: string, status: string): void {
-	const specDir = join(root, "docs", "arc", "SPECS");
+	const specDir = join(root, ".afol", "adm", "specs");
 	mkdirSync(specDir, { recursive: true });
 	writeFileSync(
 		join(specDir, `${id}.md`),

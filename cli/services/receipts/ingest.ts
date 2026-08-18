@@ -436,7 +436,7 @@ function assertPathProvenance(root: string, receipt: ExternalReceipt): void {
 			"--binary",
 			`${receipt.source_commit}..${receipt.head_commit}`,
 		],
-		{ cwd: root },
+		{ cwd: root, maxBuffer: MAX_RECEIPT_BYTES },
 	);
 	const canonicalDiffHash = createHash("sha256").update(diff).digest("hex");
 	if (receipt.diff_hash !== canonicalDiffHash)

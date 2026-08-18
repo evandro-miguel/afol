@@ -47,8 +47,8 @@ import {
 	resolveEvolutionConfig,
 } from "../services/evolution";
 import {
-	appendAdoptionReviewEvent,
 	discoverAdoptionCandidates,
+	reviewAdoptionCandidate,
 } from "../services/evolution/adoption-candidates";
 import {
 	applyEvolutionProposal,
@@ -1896,11 +1896,6 @@ function runCandidates(
 	)
 		throw new Error("evolve.candidates is not allowed for this caller");
 	const parsed = parseCandidatesArgs(args);
-	const result = discoverAdoptionCandidates({
-		root,
-		...(parsed.session ? { session: parsed.session } : {}),
-		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
-	});
 	if (parsed.review) {
 		if (
 			!isActionAllowed(operationContext, {
@@ -1917,24 +1912,22 @@ function runCandidates(
 			);
 		if (parsed.review.decision === "approved" && !parsed.review.approve)
 			throw new Error("evolve candidates review approval requires --approve");
-		const candidate = result.candidates.find(
-			(entry) => entry.id === parsed.review?.id,
-		);
-		if (!candidate)
-			throw new Error("evolve candidates review candidate is missing or stale");
-		const event = appendAdoptionReviewEvent(root, candidate.session_id, {
-			candidate_id: candidate.id,
-			fingerprint: candidate.fingerprint,
+		if (!parsed.session)
+			throw new Error("evolve candidates review requires --session <session>");
+		const event = reviewAdoptionCandidate({
+			root,
+			session: parsed.session,
+			candidateId: parsed.review.id,
 			decision: parsed.review.decision,
 			reason: redactSensitiveText(parsed.review.reason, { redactPaths: true }),
-			created_at: new Date().toISOString(),
+			createdAt: new Date().toISOString(),
 		});
 		if (parsed.json)
 			io.stdout(
 				stringifyEnvelope(
 					envelopeOk(
 						{
-							candidate_id: candidate.id,
+							candidate_id: event.candidate_id,
 							decision: event.decision,
 							review_id: event.id,
 							append_only: true,
@@ -1945,10 +1938,15 @@ function runCandidates(
 			);
 		else
 			io.stdout(
-				`review=${event.decision} candidate=${candidate.id} review_id=${event.id}`,
+				`review=${event.decision} candidate=${event.candidate_id} review_id=${event.id}`,
 			);
 		return 0;
 	}
+	const result = discoverAdoptionCandidates({
+		root,
+		...(parsed.session ? { session: parsed.session } : {}),
+		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+	});
 	if (parsed.json)
 		io.stdout(
 			stringifyEnvelope(envelopeOk(result, { action: "evolve.candidates" })),

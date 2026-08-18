@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
 	chmodSync,
@@ -21,7 +21,9 @@ import {
 	resetHotPathCountersForTests,
 } from "../services/hot-path/instrumentation";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import * as workbenchIndexModule from "../services/local-state/workbench-index";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import * as projectRootModule from "../services/project/root";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import type { CatchupReport } from "../services/workbench/catchup";
@@ -336,6 +338,86 @@ describe("status command", () => {
 			expect(runStatusCommand(root, [], captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("SESSIONS: 0");
 			expect(healthCalls).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("combined status reuses a supplied root and one shared workbench snapshot", () => {
+		const root = createFixture();
+		try {
+			rebuildWorkBenchIndex(root);
+			const loaded = projectRootModule.loadProjectRoot(root);
+			if (!loaded.ok) throw new Error(loaded.error.message);
+
+			const loadRootSpy = spyOn(projectRootModule, "loadProjectRoot");
+			const snapshotSpy = spyOn(
+				workbenchIndexModule,
+				"loadWorkBenchIndexSnapshot",
+			);
+			let observedHealthRoot: string | undefined;
+			let observedSnapshot: unknown;
+			let catchupCalls = 0;
+			const report: CatchupReport = {
+				session: "260530_2256_cli-native-command-parity",
+				session_status: "active",
+				git_changed_files: [],
+				git_changed_files_overflow: false,
+				git_changed_files_degraded: false,
+				git_branch: null,
+				artifacts: {
+					plan: { present: false, mtime: null, lines: 0 },
+					task: { present: true, mtime: null, lines: 1 },
+					log: { present: false, mtime: null, lines: 0 },
+					report: { present: false, mtime: null, lines: 0 },
+				},
+				freshness: {
+					findings_stale: false,
+					log_behind_diff: false,
+					notes: [],
+				},
+				next_step: "next",
+			};
+			setHealthComputerForTests((healthRoot, snapshot) => {
+				observedHealthRoot = healthRoot;
+				observedSnapshot = snapshot;
+				return {
+					sessionCount: snapshot?.sessions.length ?? null,
+					sessionHealth: [],
+				};
+			});
+			setCatchupComputerForTests((() => {
+				catchupCalls += 1;
+				return report;
+			}) as Parameters<typeof setCatchupComputerForTests>[0]);
+
+			const captured = captureIo();
+			expect(
+				runStatusCommand(
+					root,
+					["--health", "--catchup", "--json"],
+					captured.io,
+					loaded.value,
+				),
+			).toBe(0);
+			expect(loadRootSpy).not.toHaveBeenCalled();
+			expect(snapshotSpy).toHaveBeenCalledTimes(2);
+			expect(observedHealthRoot).toBe(root);
+			// The status snapshot is the first load; the freshness warning collector
+			// performs its own independent read. Health receives the exact object used
+			// for the default session count rather than triggering a third load.
+			expect(observedSnapshot).toBe(snapshotSpy.mock.results[0]?.value);
+			expect(catchupCalls).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data?: { session_count?: number | null; session?: { id?: string } };
+			};
+			expect(payload.data?.session_count).toBe(1);
+			expect(payload.data?.session?.id).toBe(
+				"260530_2256_cli-native-command-parity",
+			);
+
+			loadRootSpy.mockRestore();
+			snapshotSpy.mockRestore();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

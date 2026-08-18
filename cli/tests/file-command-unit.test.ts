@@ -51,6 +51,7 @@ import {
 import { agentOperationContext } from "../core/operation-context";
 import {
 	appendMutationRecord,
+	assertMutationJournalIntegrity,
 	createMutationId,
 	loadMutationJournalStrict,
 	type MutationRecord,
@@ -497,6 +498,227 @@ describe("mutation transaction hardening", () => {
 			expect(result.issues).toContain("unmatched-prepared:M-prepared");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal recovery terminalizes only byte-provable prepared patch states", () => {
+		const root = mkProjectRoot();
+		try {
+			const target = writeFileTree(root, "notes/recover.txt", "before+after");
+			appendMutationRecord(root, {
+				id: "M-recover-committed",
+				ts: new Date().toISOString(),
+				kind: "patch",
+				status: "prepared",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "crash recovery",
+				sourcePath: "notes/recover.txt",
+				beforeHash: normalizeHash("before"),
+				afterHash: normalizeHash("before+after"),
+				beforeExisted: true,
+			});
+			assertMutationJournalIntegrity(root);
+			expect(loadMutationJournalStrict(root).records.at(-1)?.status).toBe(
+				"committed",
+			);
+
+			writeFileSync(target, "before", "utf8");
+			appendMutationRecord(root, {
+				id: "M-recover-rolled-back",
+				ts: new Date().toISOString(),
+				kind: "patch",
+				status: "prepared",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "crash recovery",
+				sourcePath: "notes/recover.txt",
+				beforeHash: normalizeHash("before"),
+				afterHash: normalizeHash("before+after"),
+				beforeExisted: true,
+			});
+			assertMutationJournalIntegrity(root);
+			expect(loadMutationJournalStrict(root).records.at(-1)?.status).toBe(
+				"rolled_back",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal recovery reconciles archive and overwritten move byte states", () => {
+		const root = mkProjectRoot();
+		try {
+			const moveBackup = backupPath(root, "M-move-rollback", "dest.txt");
+			writeFileTree(root, "notes/move-destination.txt", "moved");
+			writeFileTree(root, "notes/move-rollback-source.txt", "source");
+			writeFileTree(root, "notes/move-rollback-destination.txt", "original");
+			writeFileSync(moveBackup, "original", "utf8");
+			const archiveId = "M-archive-committed";
+			const archivePath = archiveDestination(
+				root,
+				archiveId,
+				"notes/archive.txt",
+			);
+			mkdirSync(dirname(archivePath.path), { recursive: true });
+			writeFileSync(archivePath.path, "archived", "utf8");
+			appendMutationRecord(root, {
+				id: "M-move-committed",
+				ts: new Date().toISOString(),
+				kind: "move",
+				status: "prepared",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "crash recovery",
+				sourcePath: "notes/move-source.txt",
+				destinationPath: "notes/move-destination.txt",
+				beforeHash: normalizeHash("moved"),
+				afterHash: normalizeHash("moved"),
+				destinationExisted: false,
+			});
+			appendMutationRecord(root, {
+				id: "M-move-rollback",
+				ts: new Date().toISOString(),
+				kind: "move",
+				status: "prepared",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "crash recovery",
+				sourcePath: "notes/move-rollback-source.txt",
+				destinationPath: "notes/move-rollback-destination.txt",
+				beforeHash: normalizeHash("source"),
+				afterHash: normalizeHash("source"),
+				destinationExisted: true,
+				overwrittenBackupPath: moveBackup,
+			});
+			appendMutationRecord(root, {
+				id: archiveId,
+				ts: new Date().toISOString(),
+				kind: "archive",
+				status: "prepared",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "crash recovery",
+				sourcePath: "notes/archive.txt",
+				destinationPath: archivePath.relativePath,
+				beforeHash: normalizeHash("archived"),
+				afterHash: normalizeHash("archived"),
+			});
+			assertMutationJournalIntegrity(root);
+			const recovered = loadMutationJournalStrict(root).records.slice(-3);
+			expect(recovered.map((record) => record.status)).toEqual([
+				"committed",
+				"rolled_back",
+				"committed",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal recovery fails closed for ambiguous, escaped, and undo prepared records", () => {
+		for (const record of [
+			{
+				id: "M-ambiguous",
+				kind: "patch" as const,
+				sourcePath: "notes/ambiguous.txt",
+				beforeHash: normalizeHash("before"),
+				afterHash: normalizeHash("after"),
+			},
+			{
+				id: "M-escape",
+				kind: "patch" as const,
+				sourcePath: "../outside.txt",
+				beforeHash: normalizeHash("before"),
+				afterHash: normalizeHash("after"),
+			},
+			{
+				id: "M-undo",
+				kind: "undo" as const,
+				sourcePath: "notes/source.txt",
+				destinationPath: "notes/destination.txt",
+				targetMutationId: "M-target",
+			},
+		]) {
+			const root = mkProjectRoot();
+			try {
+				writeFileTree(root, "notes/ambiguous.txt", "neither");
+				appendMutationRecord(root, {
+					...record,
+					ts: new Date().toISOString(),
+					status: "prepared",
+					dryRun: false,
+					session: "S",
+					taskId: "T",
+					reason: "crash recovery",
+				});
+				expect(() => assertMutationJournalIntegrity(root)).toThrow(
+					`unmatched-prepared:${record.id}`,
+				);
+				if (record.kind === "undo") {
+					expect(() => assertMutationJournalIntegrity(root)).toThrow(
+						`unrecoverable-prepared-undo:${record.id}`,
+					);
+				}
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("journal recovery rejects overwrite backups outside the backup root or through symlinks", () => {
+		for (const useSymlink of [false, true]) {
+			const root = mkProjectRoot();
+			try {
+				writeFileTree(root, "notes/source.txt", "source");
+				const destination = writeFileTree(
+					root,
+					"notes/destination.txt",
+					"original",
+				);
+				const outsideBackup = writeFileTree(
+					root,
+					"notes/not-a-backup.txt",
+					"original",
+				);
+				const storedBackup = useSymlink
+					? join(
+							resolveProjectPaths(root).abs.mutationBackupsDir,
+							"escape-link",
+						)
+					: outsideBackup;
+				if (useSymlink) {
+					mkdirSync(dirname(storedBackup), { recursive: true });
+					symlinkSync(outsideBackup, storedBackup);
+				}
+				appendMutationRecord(root, {
+					id: `M-backup-${useSymlink ? "symlink" : "outside"}`,
+					ts: new Date().toISOString(),
+					kind: "move",
+					status: "prepared",
+					dryRun: false,
+					session: "S",
+					taskId: "T",
+					reason: "crash recovery",
+					sourcePath: "notes/source.txt",
+					destinationPath: "notes/destination.txt",
+					beforeHash: normalizeHash("source"),
+					afterHash: normalizeHash("source"),
+					destinationExisted: true,
+					overwrittenBackupPath: storedBackup,
+				});
+				expect(() => assertMutationJournalIntegrity(root)).toThrow(
+					"unmatched-prepared:",
+				);
+				expect(readFileSync(destination, "utf8")).toBe("original");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 
@@ -1192,7 +1414,7 @@ describe("file mutation handlers", () => {
 				},
 				root,
 			);
-			expect(dryUndo.status).toBe("dry-run");
+			expect(dryUndo.status).toBe("blocked");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2043,7 +2265,7 @@ describe("file mutation handlers", () => {
 					},
 					root,
 				).status,
-			).toBe("dry-run");
+			).toBe("blocked");
 
 			expect(() =>
 				runUndoMutation(

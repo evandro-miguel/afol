@@ -28,6 +28,18 @@ type PatchUndoMutation = MutationRecord & {
 	backupPath?: string | null | undefined;
 };
 
+function patchUndoStateIsProvable(
+	mutation: PatchUndoMutation,
+	backupPathValue: string | null,
+): boolean {
+	return (
+		mutation.beforeExisted === false ||
+		(mutation.beforeExisted === true &&
+			backupPathValue !== null &&
+			existsSync(backupPathValue))
+	);
+}
+
 function buildUndoPatchDryRunResult(
 	args: CommandArgs,
 	mutation: MutationRecord,
@@ -41,6 +53,20 @@ function buildUndoPatchDryRunResult(
 		patchMutation.backupPath,
 	);
 	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
+	if (!patchUndoStateIsProvable(patchMutation, backupPathValue)) {
+		return {
+			command: "ud",
+			status: "blocked",
+			dry_run: true,
+			session: args.session,
+			task_id: args.taskId,
+			reason,
+			path: patchMutation.sourcePath,
+			destination: patchMutation.sourcePath,
+			target_mutation_id: patchMutation.id,
+			message: "Undo blocked: original patch state is unprovable",
+		};
+	}
 	const after =
 		backupPathValue && existsSync(backupPathValue)
 			? readTextOrEmpty(backupPathValue)
@@ -98,10 +124,7 @@ function applyUndoPatchMutation(
 				message: "undo-conflict: current hash differs from mutation afterHash",
 			};
 		}
-		if (
-			patchMutation.beforeExisted &&
-			(!backupPathValue || !existsSync(backupPathValue))
-		) {
+		if (!patchUndoStateIsProvable(patchMutation, backupPathValue)) {
 			return {
 				command: "ud",
 				status: "blocked",
@@ -112,7 +135,7 @@ function applyUndoPatchMutation(
 				path: patchMutation.sourcePath,
 				destination: patchMutation.sourcePath,
 				target_mutation_id: patchMutation.id,
-				message: "Undo blocked: original file backup is missing",
+				message: "Undo blocked: original patch state is unprovable",
 			};
 		}
 		const mutationId = createMutationId();

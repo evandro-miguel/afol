@@ -236,6 +236,34 @@ describe("update command", () => {
 		}
 	});
 
+	test("distinguishes empty target files from missing target files", () => {
+		const root = mkRoot();
+		try {
+			const genericPath = "docs/standards/user-journey-registry.md";
+			const emptyGeneric = join(root, genericPath);
+			mkdirSync(join(root, "docs", "standards"), { recursive: true });
+			writeFileSync(emptyGeneric, "", "utf8");
+			writeFileSync(join(root, ".agents", "lock.json"), "", "utf8");
+
+			const operations = new Map(
+				checkTemplateUpdate(root).operations.map((operation) => [
+					operation.path,
+					operation,
+				]),
+			);
+			expect(operations.get(genericPath)).toMatchObject({
+				kind: "conflict",
+				reason: "local-drift-or-unknown-ownership",
+			});
+			expect(operations.get(".agents/lock.json")).toMatchObject({
+				kind: "conflict",
+				reason: "local-user-edit-or-unsafe",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("manages the project-owned completion-lock ignore and restores its exact prior bytes", async () => {
 		const root = mkRoot();
 		const gitignore = join(root, ".gitignore");
@@ -470,6 +498,25 @@ describe("update command", () => {
 			expect(operationPaths).not.toContain(".claude/README.md");
 			expect(previewPaths).not.toContain("CLAUDE.md");
 			expect(previewPaths).not.toContain(".claude/README.md");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("check skips only Claude payload when optional config is corrupt", () => {
+		const root = mkRoot();
+		try {
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(join(root, ".afol", "config.json"), "{broken", "utf8");
+			const operations = checkTemplateUpdate(root).operations;
+			expect(
+				operations.some((operation) => operation.path === "CLAUDE.md"),
+			).toBe(false);
+			expect(
+				operations.some(
+					(operation) => operation.path === ".agents/manifest.json",
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

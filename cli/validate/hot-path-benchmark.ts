@@ -19,6 +19,7 @@ import {
 	newWorkstream,
 	startTask,
 } from "../services/workbench/lifecycle";
+import { maxSampleOutputBytes } from "./scenario-execution";
 import type {
 	BenchmarkExecutionProfile,
 	HotPathScenarioConfig,
@@ -160,7 +161,7 @@ function addInstrumentation(
 	return combined;
 }
 
-function captureBenchmarkMarker(stderr: string): {
+export function captureBenchmarkMarker(stderr: string): {
 	output: string;
 	instrumentation: HotPathInstrumentationSnapshot;
 	note?: string;
@@ -412,7 +413,6 @@ function invokeHotPath(
 	const primaryArgs = declaredHotPathArgs(scenario, command, session);
 	const primary = runDeclaredCli(root, primaryArgs, session, artifact);
 	let recoveryDuration = 0;
-	let recoveryOutput = "";
 	let recoveryInstrumentation = emptyInstrumentation();
 	const notes: string[] = [];
 	if (primary.note) notes.push(primary.note);
@@ -429,25 +429,19 @@ function invokeHotPath(
 			artifact,
 		);
 		recoveryDuration = recovery.duration_ms;
-		recoveryOutput =
-			`${recovery.output.stdout}\n${recovery.output.stderr}`.trim();
 		recoveryInstrumentation = recovery.instrumentation;
 		if (recovery.note) notes.push(`recovery-${recovery.note}`);
 		if (recovery.exitCode !== 0) {
 			notes.push(`hot-path-recovery-exit:${recovery.exitCode}`);
 		}
 	}
-	const combinedOutput = [
-		`${primary.output.stdout}\n${primary.output.stderr}`.trim(),
-		recoveryOutput,
-	]
-		.filter(Boolean)
-		.join("\n");
 	return {
 		exitCode:
 			primary.exitCode !== 0 ? primary.exitCode : notes.length > 0 ? 1 : 0,
 		duration_ms: primary.duration_ms,
-		output: { stdout: combinedOutput, stderr: "" },
+		// Recovery is a harness boundary, not command output. The instrumentation
+		// marker was removed by runDeclaredCli before this is measured.
+		output: primary.output,
 		recovery_duration_ms: recoveryDuration,
 		instrumentation: addInstrumentation(
 			primary.instrumentation,
@@ -476,9 +470,7 @@ function runSample(
 			command,
 			artifact,
 		);
-		const output =
-			`${invocation.output.stdout}\n${invocation.output.stderr}`.trim();
-		const outputBytes = Buffer.byteLength(output, "utf8");
+		const outputBytes = maxSampleOutputBytes([invocation.output]);
 		const counters = invocation.instrumentation.counters;
 		const measurement =
 			invocation.instrumentation.measurements[scenario.operation];
@@ -602,9 +594,9 @@ export function runHotPathScenario(
 			retry_count: 0,
 			context_tokens: 0,
 			prompt_tokens: 0,
-			output_tokens: Math.round(percentile(outputBytes, 0.5) / 4),
+			output_tokens: Math.round(Math.max(0, ...outputBytes) / 4),
 			context_bytes: 0,
-			output_bytes: percentile(outputBytes, 0.5),
+			output_bytes: Math.max(0, ...outputBytes),
 			argv_chars: Array.from(scenario.command ?? "").length,
 			tool_call_count: 1,
 			tool_success_rate: Number((successful / options.sampleCount).toFixed(4)),

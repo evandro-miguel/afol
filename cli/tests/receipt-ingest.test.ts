@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -179,6 +180,61 @@ describe("receipt ingestion recovery", () => {
 			expect(() => readExternalReceipt(path)).toThrow(
 				"allowed future clock skew",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed on an oversized Git diff before recording evidence", () => {
+		const { root, receipt } = fixture();
+		let evidenceCalls = 0;
+		try {
+			writeFileSync(join(root, "oversized.txt"), "x".repeat(90_000), "utf8");
+			execFileSync("git", ["add", "oversized.txt"], { cwd: root });
+			execFileSync("git", ["commit", "-m", "oversized diff"], {
+				cwd: root,
+				stdio: "ignore",
+			});
+			const head = execFileSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).trim();
+			const diff = execFileSync(
+				"git",
+				[
+					"diff",
+					"--no-ext-diff",
+					"--binary",
+					`${receipt.source_commit}..${head}`,
+				],
+				{ cwd: root, maxBuffer: 256 * 1024 },
+			);
+			const oversizedReceipt: ExternalReceipt = {
+				...receipt,
+				head_commit: head,
+				diff_hash: createHash("sha256").update(diff).digest("hex"),
+			};
+
+			expect(() =>
+				ingestExternalReceipt({
+					root,
+					receipt: oversizedReceipt,
+					commands: kernelRegistry.commands,
+					recordObservedEvidence: () => {
+						evidenceCalls += 1;
+						return { id: "must-not-record" };
+					},
+				}),
+			).toThrow();
+			expect(evidenceCalls).toBe(0);
+			expect(
+				existsSync(
+					join(root, ".afol", "wb", receipt.session_id, ".evidence.jsonl"),
+				),
+			).toBe(false);
+			expect(
+				existsSync(join(root, ".afol", "data", "receipts", "external.jsonl")),
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

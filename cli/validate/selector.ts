@@ -40,6 +40,16 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 	const reasons: string[] = [];
 	for (const changedPath of changedPaths) {
 		const normalizedPath = normalizePath(changedPath);
+		if (normalizedPath === "cli/validate/runtime-live.ts") {
+			selected.add("runtime-live-agent");
+			reasons.push(`runtime-live-change:${changedPath}`);
+			continue;
+		}
+		if (hasPrefix(normalizedPath, ["cli/validate/"])) {
+			selected.add("token-economy");
+			reasons.push(`validation-change:${changedPath}`);
+			continue;
+		}
 		if (
 			hasPrefix(normalizedPath, [
 				"cli/services/evolution/",

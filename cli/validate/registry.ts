@@ -1680,6 +1680,7 @@ export function validateMutationBaselineContract(
 
 export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 	const issues: string[] = [];
+	const scenarioIds = new Set<string>();
 	for (const packId of REQUIRED_PACKS) {
 		const pack = snapshot.packs.find((entry) => entry.pack_id === packId);
 		if (!pack) {
@@ -1693,6 +1694,11 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 			);
 		}
 		for (const scenario of scenarios) {
+			if (scenarioIds.has(scenario.scenario_id)) {
+				issues.push(`duplicate-scenario-id:${scenario.scenario_id}`);
+			} else {
+				scenarioIds.add(scenario.scenario_id);
+			}
 			if (
 				packId === "evolution-core" &&
 				scenario.implementation_status !== "implemented"

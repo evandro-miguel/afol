@@ -43,6 +43,7 @@ type SessionBindingInput = {
 
 const EMPTY_CONTEXT: SessionContext = { bindings: [] };
 const SESSION_CONTEXT_LOCK = "__session-context__";
+const GIT_CONTEXT_TIMEOUT_MS = 1_000;
 
 function contextPath(root: string): string {
 	return join(resolveProjectPaths(root).abs.wbDir, "session-context.json");
@@ -104,6 +105,7 @@ function currentContext(root: string): {
 		{
 			cwd: root,
 			encoding: "utf8",
+			timeout: GIT_CONTEXT_TIMEOUT_MS,
 			stdio: ["ignore", "pipe", "pipe"],
 		},
 	);

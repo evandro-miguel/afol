@@ -254,6 +254,24 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
+	test("records the Linux process-start identity in acquired locks", () => {
+		const root = mkProjectRoot("process-start-identity");
+		try {
+			const session = "process-start-identity-session";
+			const lockPath = resolveSessionLockPath(root, session);
+			withSessionLock(root, session, () => {
+				const metadata = JSON.parse(readFileSync(lockPath, "utf8")) as {
+					process_start_token?: unknown;
+				};
+				if (process.platform === "linux") {
+					expect(metadata.process_start_token).toMatch(/^\d+$/);
+				}
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("external path lock keys physical roots identically through symlinks", () => {
 		const root = mkProjectRoot("external-lock-realpath");
 		const link = `${root}-link`;
@@ -480,6 +498,67 @@ describe("session-lock", () => {
 			expect(result).toBe("acquired");
 			expect(existsSync(lockPath)).toBe(false);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recovers a legacy stale lock when the pid was reused by this process", () => {
+		const root = mkProjectRoot("legacy-reused-pid");
+		try {
+			const session = "legacy-reused-pid-session";
+			const now = Date.now();
+			const acquiredAt = now - (process.uptime() * 1_000 + 35_000);
+			const lockPath = writeLockMetadata(
+				root,
+				session,
+				{
+					pid: process.pid,
+					session,
+					acquired_at: new Date(acquiredAt).toISOString(),
+					host: hostname(),
+				},
+				acquiredAt,
+			);
+
+			const result = withPatchedDateNow(
+				now,
+				() => withSessionLock(root, session, () => "acquired"),
+				31_000,
+			);
+			expect(result).toBe("acquired");
+			expect(existsSync(lockPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recovers a stale lock when a live pid has a different start identity", async () => {
+		const root = mkProjectRoot("reused-live-pid");
+		const replacement = Bun.spawn(
+			[process.execPath, "-e", "setTimeout(() => {}, 60_000);"],
+			{ stderr: "ignore", stdout: "ignore" },
+		);
+		try {
+			const session = "reused-live-pid-session";
+			const acquiredAt = Date.now() - 35_000;
+			const lockPath = writeLockMetadata(
+				root,
+				session,
+				{
+					pid: replacement.pid,
+					process_start_token: "0",
+					session,
+					acquired_at: new Date(acquiredAt).toISOString(),
+					host: hostname(),
+				},
+				acquiredAt,
+			);
+
+			expect(withSessionLock(root, session, () => "acquired")).toBe("acquired");
+			expect(existsSync(lockPath)).toBe(false);
+		} finally {
+			replacement.kill();
+			await replacement.exited;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
