@@ -5,12 +5,13 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	appendProductionDayAllocation,
 	applyMigrations,
@@ -109,7 +110,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			});
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -152,7 +153,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			expect(existsSync(readerDone)).toBe(true);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -191,7 +192,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			});
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -237,7 +238,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				rebuilt.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -272,7 +273,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				readonly.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -292,7 +293,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			expect(readFileSync(journalPath, "utf8")).toBe(before);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -314,7 +315,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			).toEqual({ count: 0 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -333,7 +334,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				db.exec("ROLLBACK");
 			} catch {}
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -361,11 +362,11 @@ describe("Evolution canonical projection and concurrency", () => {
 				db.exec("ROLLBACK");
 			} catch {}
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
-	test("journal rejects a final symlink without touching its target", () => {
+	test.skipIf(!symlinkTestSupport.available)("journal rejects a final symlink without touching its target", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-journal-symlink-"));
 		const db = openEvolutionDb(evolutionDbPath(root));
 		seedEvidence(root, "S-01", "E-01");
@@ -383,7 +384,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			expect(readFileSync(externalPath, "utf8")).toBe("external sentinel\n");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -434,7 +435,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				holdDb.exec("ROLLBACK");
 			} catch {}
 			holdDb.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -459,7 +460,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				]),
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -486,7 +487,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			]);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

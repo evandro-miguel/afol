@@ -4,12 +4,13 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	appendProductionDayAllocation,
 	applyMigrations,
@@ -185,7 +186,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			}
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -268,7 +269,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -332,7 +333,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -398,7 +399,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			expect(journal.map((event) => event.sequence)).toEqual([1, 2]);
 			expect(journal[1]?.previous_event_digest).toBe(journal[0]?.event_digest);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -430,7 +431,7 @@ describe("Evolution Slice 1 persistence core", () => {
 				migration_stale: true,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -466,7 +467,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			expect(health.ok).toBe(true);
 			expect(health.production_day_count).toBe(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -503,7 +504,7 @@ describe("Evolution Slice 1 persistence core", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -524,7 +525,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			).toBeNull();
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -600,7 +601,7 @@ describe("Evolution Slice 1 persistence core", () => {
 			expect(health.ok).toBe(true);
 			expect(health.production_day_count).toBe(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -706,11 +707,11 @@ describe("Evolution Slice 1 persistence core", () => {
 			expect(Array.isArray(rebuilt)).toBe(true);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
-	test("rejects escaped or symlinked configured database paths", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects escaped or symlinked configured database paths", () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-paths-"));
 		const outside = mkdtempSync(join(tmpdir(), "evolution-outside-"));
 		try {
@@ -723,8 +724,8 @@ describe("Evolution Slice 1 persistence core", () => {
 				"crosses symlink",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
-			rmSync(outside, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
+			removeEvolutionTestRoot(outside);
 		}
 	});
 });

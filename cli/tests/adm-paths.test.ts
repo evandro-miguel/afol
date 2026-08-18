@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
 import { migrateAdm } from "../services/adm/migrator";
 import { resolveAdmPaths } from "../services/adm/paths";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 type CapturedIo = {
 	stdout: string[];
@@ -37,6 +38,10 @@ function captureIo(): CapturedIo {
 			},
 		},
 	};
+}
+
+function portablePath(value: string): string {
+	return value.replaceAll("\\", "/");
 }
 
 function createFixture(withAdmFiles: boolean): string {
@@ -73,8 +78,8 @@ describe("adm command", () => {
 			expect(payload.data).toMatchObject({ action: "paths" });
 			const paths = payload.paths as Record<string, string>;
 			expect(payload.data).toMatchObject({ paths });
-			expect(paths.admDir).toContain(".afol/adm");
-			expect(paths.schemaDir).toContain(".afol/adm/schema");
+			expect(portablePath(paths.admDir ?? "")).toContain(".afol/adm");
+			expect(portablePath(paths.schemaDir ?? "")).toContain(".afol/adm/schema");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -99,8 +104,9 @@ describe("adm command", () => {
 			const captured = captureIo();
 			const code = await runAdmCommand("show", [], root, captured.io);
 			expect(code).toBe(0);
-			expect(captured.stdout[0]).toContain(".afol/adm/notes.md");
-			expect(captured.stdout[0]).toContain(".afol/adm/routing/resolver.md");
+			const output = portablePath(captured.stdout[0] ?? "");
+			expect(output).toContain(".afol/adm/notes.md");
+			expect(output).toContain(".afol/adm/routing/resolver.md");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -130,7 +136,9 @@ describe("adm command", () => {
 		}
 	});
 
-	test("migrate rejects symlinked .afol before writing archive or targets", () => {
+	test.skipIf(!symlinkTestSupport.available)(
+		"migrate rejects symlinked .afol before writing archive or targets",
+		() => {
 		const root = createFixture(false);
 		const outside = mkdtempSync(join(tmpdir(), "adm-command-outside-"));
 		try {
@@ -151,5 +159,6 @@ describe("adm command", () => {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(outside, { recursive: true, force: true });
 		}
-	});
+		},
+	);
 });

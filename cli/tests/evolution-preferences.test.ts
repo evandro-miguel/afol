@@ -4,11 +4,11 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	agentOperationContext,
 	defaultOperationContext,
@@ -129,7 +129,7 @@ describe("Evolution preference projection", () => {
 			).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -281,7 +281,7 @@ describe("Evolution preference projection", () => {
 			expect(contradicted.negative_evidence).toBe(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -385,7 +385,7 @@ describe("Evolution preference projection", () => {
 			).toMatchObject({ journal_event_id: first.journal_event_id });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -423,7 +423,7 @@ describe("Evolution preference projection", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -459,7 +459,7 @@ describe("Evolution preference projection", () => {
 			).toThrow(/external or imported/);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -515,7 +515,7 @@ describe("Evolution preference projection", () => {
 			expect(structural.provenance).toBe("structural");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -545,7 +545,7 @@ describe("Evolution preference projection", () => {
 			});
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -634,7 +634,7 @@ describe("Evolution preference projection", () => {
 			expect(reopened.status).toBe("active");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

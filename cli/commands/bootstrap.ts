@@ -615,7 +615,7 @@ function cleanupProviderCompatibleAgentsMutable(
 			const archivePath = join(
 				archiveRoot,
 				operation.path.replace(/^\.agents\//, ""),
-			);
+			).replaceAll("\\", "/");
 			const absoluteArchivePath = resolveBootstrapWritePath(
 				targetRoot,
 				archivePath,

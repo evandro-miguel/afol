@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { DEFAULT_BENCH_MODEL } from "../services/benchmark/types";
 import {
 	resolveTaskCompletionLockPath,
@@ -52,6 +53,7 @@ import {
 } from "../validate/runtime-live";
 import {
 	compiledReleaseBuildArgs,
+	compiledBenchmarkArtifactPath,
 	ensureBenchmarkTempRoot,
 	executeScenarioPackWithArtifact,
 	isCompiledBunRuntime,
@@ -177,7 +179,11 @@ function createFixtureRoot(): string {
 			{ recursive: true },
 		);
 	}
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	if (symlinkTestSupport.available) {
+		symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	} else {
+		cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+	}
 	const gitSteps = [
 		["init"],
 		["config", "user.email", "bench@example.com"],
@@ -287,14 +293,25 @@ function createBenchExecutionFixtureRoot(): string {
 		'const { appendFileSync } = require("node:fs");\nappendFileSync("tracked.txt", "changed\\n", "utf8");\n',
 		"utf8",
 	);
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
-	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	if (symlinkTestSupport.available) {
+		symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+		symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	} else {
+		cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+		cpSync(join(process.cwd(), "afol"), join(root, "afol"));
+	}
 	if (existsSync(join(process.cwd(), "node_modules"))) {
-		symlinkSync(
-			join(process.cwd(), "node_modules"),
-			join(root, "node_modules"),
-			"dir",
-		);
+		if (symlinkTestSupport.available) {
+			symlinkSync(
+				join(process.cwd(), "node_modules"),
+				join(root, "node_modules"),
+				"dir",
+			);
+		} else {
+			cpSync(join(process.cwd(), "node_modules"), join(root, "node_modules"), {
+				recursive: true,
+			});
+		}
 	}
 	const gitSteps = [
 		["init"],
@@ -1938,9 +1955,14 @@ describe("scenario benchmark execution", () => {
 
 	test("detects Bun compiled virtual entrypoints", () => {
 		expect(isCompiledBunRuntime("/$bunfs/root/cli/main.ts")).toBe(true);
+		expect(
+			isCompiledBunRuntime("B:/~BUN/root/print-bun-main.exe"),
+		).toBe(true);
 		expect(isCompiledBunRuntime(join(process.cwd(), "cli", "main.ts"))).toBe(
 			false,
 		);
+		expect(isCompiledBunRuntime("B:/projects/~BUN/cli/main.ts")).toBe(false);
+		expect(isCompiledBunRuntime("C:/~BUN/cli/main.ts")).toBe(false);
 	});
 
 	test("uses the running AFOL executable for compiled downstream benchmarks", () => {
@@ -1951,6 +1973,13 @@ describe("scenario benchmark execution", () => {
 				"/home/operator/.local/bin/afol",
 			),
 		).toBe("/home/operator/.local/bin/afol");
+		expect(
+			resolveAfolExecutable(
+				undefined,
+				"B:/~BUN/root/print-bun-main.exe",
+				"D:/tools/bin/afol.exe",
+			),
+		).toBe("D:/tools/bin/afol.exe");
 		expect(
 			resolveAfolExecutable(
 				"/fixture/trusted-afol",
@@ -1965,6 +1994,16 @@ describe("scenario benchmark execution", () => {
 				process.execPath,
 			),
 		).toBeNull();
+	});
+
+	test("uses the platform-native extension for temporary compiled artifacts", () => {
+		const artifactRoot = join("fixture", "afol-bench-release");
+		expect(compiledBenchmarkArtifactPath(artifactRoot)).toBe(
+			join(
+				artifactRoot,
+				process.platform === "win32" ? "afol.exe" : "afol",
+			),
+		);
 	});
 
 	test("prepares a registered sidecar and executes a compiled mutation", () => {
@@ -2211,7 +2250,9 @@ describe("scenario benchmark execution", () => {
 			).toBe(20);
 			expect(cleanedSandboxes).toEqual(createdSandboxes);
 			expect(
-				createdSandboxes.every((path) => path.includes("/.afol/tmp/")),
+				createdSandboxes.every((path) =>
+					path.replaceAll("\\", "/").includes("/.afol/tmp/"),
+				),
 			).toBe(true);
 			expect(
 				invocationCommands.every((command) => command === artifactPath),
@@ -2326,7 +2367,7 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
-	test("does not follow a sandbox symlink swap to an external target", () => {
+	test.skipIf(!symlinkTestSupport.available)("does not follow a sandbox symlink swap to an external target", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
 			const scenario: Scenario = {
@@ -2391,7 +2432,52 @@ describe("scenario benchmark execution", () => {
 				baseline_id: "bench-v1",
 				deterministic_metrics: {},
 			};
-			const result = runScenarioCommand(root, scenario);
+			let replacementSandboxCount = 0;
+			const result = runScenarioCommand(
+				root,
+				scenario,
+				process.platform === "win32"
+					? {
+						seams: {
+							createSandboxRoot: () => {
+								const sandbox = join(
+									root,
+									".afol",
+									"tmp",
+									`afol-bench-sandbox-root-replacement-${replacementSandboxCount++}`,
+								);
+								mkdirSync(sandbox, { recursive: true });
+								return sandbox;
+							},
+							runSample: (sandbox, _invocation, phase) => {
+								if (phase === "setup") {
+									const parent = dirname(sandbox);
+									const external = join(parent, "external-replacement");
+									rmSync(external, { recursive: true, force: true });
+									renameSync(sandbox, external);
+									mkdirSync(sandbox);
+									writeFileSync(
+										join(sandbox, "replacement-sentinel"),
+										"replacement",
+									);
+									writeFileSync(
+										join(external, "external-sentinel"),
+										"external",
+									);
+								}
+								return {
+									duration_ms: 1,
+									exit_code: 0,
+									signal: null,
+									spawn_error: null,
+									stdout: "",
+									stderr: "",
+								};
+							},
+						},
+					}
+					: undefined,
+			);
 			expect(result.passed).toBe(false);
 			expect(
 				result.notes.every((note) => note === "sandbox-root-replaced"),
@@ -2416,11 +2502,15 @@ describe("scenario benchmark execution", () => {
 				return existsSync(candidate) ? [candidate] : [];
 			});
 			expect(readFileSync(externalSentinel, "utf8")).toBe("external");
-			expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			if (process.platform !== "win32") {
+				expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			}
 			expect(replacementSentinels.length).toBeGreaterThan(0);
 			for (const replacementSentinel of replacementSentinels) {
 				expect(readFileSync(replacementSentinel, "utf8")).toBe("replacement");
-				expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+				if (process.platform !== "win32") {
+					expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+				}
 				expect(
 					existsSync(join(dirname(replacementSentinel), "command-ran")),
 				).toBe(false);
@@ -2492,9 +2582,13 @@ describe("scenario benchmark execution", () => {
 				"replacement-sentinel",
 			);
 			expect(readFileSync(externalSentinel, "utf8")).toBe("external");
-			expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			if (process.platform !== "win32") {
+				expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			}
 			expect(readFileSync(replacementSentinel, "utf8")).toBe("replacement");
-			expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+			if (process.platform !== "win32") {
+				expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2517,10 +2611,45 @@ describe("scenario benchmark execution", () => {
 				baseline_id: "bench-v1",
 				deterministic_metrics: {},
 			};
-			const result = runScenarioCommand(root, scenario, {
-				sampleCount: 1,
-				warmupCount: 0,
-			});
+			const result = runScenarioCommand(
+				root,
+				scenario,
+				process.platform === "win32"
+					? {
+						sampleCount: 1,
+						warmupCount: 0,
+						seams: {
+							createSandboxRoot: () => {
+								const sandbox = join(
+									root,
+									".afol",
+									"tmp",
+									"afol-bench-sandbox-rename-only",
+								);
+								mkdirSync(sandbox, { recursive: true });
+								return sandbox;
+							},
+							runSample: (sandbox) => {
+								const target = join(dirname(sandbox), "rename-only-target");
+								rmSync(target, { recursive: true, force: true });
+								renameSync(sandbox, target);
+								writeFileSync(join(target, "rename-sentinel"), "renamed");
+								return {
+									duration_ms: 1,
+									exit_code: 0,
+									signal: null,
+									spawn_error: null,
+									stdout: "",
+									stderr: "",
+								};
+							},
+						},
+					}
+					: {
+						sampleCount: 1,
+						warmupCount: 0,
+					},
+			);
 			expect(result.passed).toBe(false);
 			expect(result.notes).toContain("sandbox-root-replaced");
 			const sentinel = join(
@@ -2531,7 +2660,9 @@ describe("scenario benchmark execution", () => {
 				"rename-sentinel",
 			);
 			expect(readFileSync(sentinel, "utf8")).toBe("renamed");
-			expect(lstatSync(sentinel).mode & 0o777).toBe(0o555);
+			if (process.platform !== "win32") {
+				expect(lstatSync(sentinel).mode & 0o777).toBe(0o555);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2701,13 +2832,19 @@ describe("scenario benchmark execution", () => {
 				`${JSON.stringify(baseline, null, 2)}\n`,
 				"utf8",
 			);
+			const successCommand =
+				process.platform === "win32" ? "node --version" : "afol --version";
+			const expectedExitCommand =
+				process.platform === "win32"
+					? "node -e 'process.exit(2)'"
+					: "afol __nonexistent__";
 
 			const successScenario: Scenario = {
 				schema_version: "1.0.0",
 				scenario_id: "bench-success",
 				scenario_version: "1.0.0",
 				pack_id: "pstr-integrity",
-				command: "afol --version",
+				command: successCommand,
 				result_schema: "1.0.0",
 				oracle: "normalized-envelope-and-threshold-check",
 				thresholds: {
@@ -2732,6 +2869,14 @@ describe("scenario benchmark execution", () => {
 					tool_success_rate: 1,
 				},
 			};
+			if (process.platform === "win32") {
+				const sourceAfol = runScenarioCommand(
+					root,
+					{ ...successScenario, command: "afol --version" },
+					{ sampleCount: 1, warmupCount: 0 },
+				);
+				expect(sourceAfol.passed).toBe(true);
+			}
 			const success = withCapturedConsoleError(() =>
 				buildResult(root, successScenario, baselinePath, baseline),
 			);
@@ -2796,7 +2941,7 @@ describe("scenario benchmark execution", () => {
 			const expectedExitScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-expected-exit",
-				command: "afol __nonexistent__",
+				command: expectedExitCommand,
 				expected_exit: 2,
 			};
 			const expectedExit = withCapturedConsoleError(() =>
@@ -2809,7 +2954,7 @@ describe("scenario benchmark execution", () => {
 			const failureScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-failure",
-				command: "afol __nonexistent__",
+				command: expectedExitCommand,
 			};
 			const failure = withCapturedConsoleError(() =>
 				buildResult(root, failureScenario, baselinePath, baseline),
@@ -3071,36 +3216,38 @@ describe("scenario benchmark execution", () => {
 					expect(existsSync(arbitraryLockFile)).toBe(false);
 					expect(existsSync(ownerLockPath)).toBe(true);
 
-					const symlinkTarget = join(root, "lock-symlink-target.txt");
-					writeFileSync(symlinkTarget, "preserve\n", "utf8");
-					const symlinkEntry = join(
-						root,
-						".afol",
-						"wb",
-						".locks",
-						"unexpected-link",
-					);
-					const symlink = withCapturedConsoleError(() =>
-						buildResult(
+					if (symlinkTestSupport.available) {
+						const symlinkTarget = join(root, "lock-symlink-target.txt");
+						writeFileSync(symlinkTarget, "preserve\n", "utf8");
+						const symlinkEntry = join(
 							root,
-							{
-								...scenario,
-								scenario_id: "bench-held-lock-symlink-entry",
-								command: `node -e 'require("node:fs").symlinkSync(${JSON.stringify(symlinkTarget)}, ".afol/wb/.locks/unexpected-link")'`,
-							},
-							baselinePath,
-							baseline,
-						),
-					);
-					expect(symlink.result.status).toBe("failed");
-					expect(
-						symlink.result.notes.find((note) =>
-							note.startsWith("side-effect-leak:"),
-						),
-					).toBe("side-effect-leak:.afol/wb/.locks/unexpected-link");
-					expect(existsSync(symlinkEntry)).toBe(false);
-					expect(readFileSync(symlinkTarget, "utf8")).toBe("preserve\n");
-					expect(existsSync(ownerLockPath)).toBe(true);
+							".afol",
+							"wb",
+							".locks",
+							"unexpected-link",
+						);
+						const symlink = withCapturedConsoleError(() =>
+							buildResult(
+								root,
+								{
+									...scenario,
+									scenario_id: "bench-held-lock-symlink-entry",
+									command: `node -e 'require("node:fs").symlinkSync(${JSON.stringify(symlinkTarget)}, ".afol/wb/.locks/unexpected-link")'`,
+								},
+								baselinePath,
+								baseline,
+							),
+						);
+						expect(symlink.result.status).toBe("failed");
+						expect(
+							symlink.result.notes.find((note) =>
+								note.startsWith("side-effect-leak:"),
+							),
+						).toBe("side-effect-leak:.afol/wb/.locks/unexpected-link");
+						expect(existsSync(symlinkEntry)).toBe(false);
+						expect(readFileSync(symlinkTarget, "utf8")).toBe("preserve\n");
+						expect(existsSync(ownerLockPath)).toBe(true);
+					}
 
 					const leaked = withCapturedConsoleError(() =>
 						buildResult(
@@ -3289,7 +3436,11 @@ describe("scenario benchmark execution", () => {
 					const original = readFileSync(ownerLockPath, "utf8");
 					const originalInode = lstatSync(ownerLockPath).ino;
 					const replacementPath = `${ownerLockPath}.hostile-replacement`;
-					const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); fs.renameSync(replacement,p)'`;
+					const replaceOwner =
+						process.platform === "win32"
+							? "try { fs.renameSync(replacement,p); } catch (error) { if (error.code !== 'EPERM') throw error; fs.unlinkSync(p); fs.renameSync(replacement,p); }"
+							: "fs.renameSync(replacement,p)";
+					const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); ${replaceOwner}'`;
 					const result = withCapturedConsoleError(() =>
 						buildResult(
 							root,
@@ -3334,9 +3485,9 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, process.platform === "win32" ? 120_000 : 30_000);
 
-	test("reports an owner lock root replaced by a symlink without touching its target", async () => {
+	test.skipIf(!symlinkTestSupport.available)("reports an owner lock root replaced by a symlink without touching its target", async () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
 			const target = join(root, "lock-root-target");
@@ -3406,7 +3557,7 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, process.platform === "win32" ? 120_000 : 30_000);
 
 	test("applies the documented timing tolerance to baseline comparisons", () => {
 		const root = createBenchExecutionFixtureRoot();
@@ -3828,12 +3979,15 @@ describe("scenario benchmark execution", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	}, 30_000);
+	}, process.platform === "win32" ? 120_000 : 30_000);
 
 	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
-			const counterPath = join(root, "sandbox-sample-count.txt");
+			const counterPath = join(root, "sandbox-sample-count.txt").replaceAll(
+				"\\",
+				"/",
+			);
 			const baseline: Baseline = {
 				baseline_id: "bench-v1",
 				pack_id: "pstr-integrity",
@@ -4624,7 +4778,7 @@ describe("validation command entrypoint", () => {
 	test("fails JSON-reporting packs when the child emits malformed JSON", () => {
 		const root = createFixtureRoot();
 		try {
-			unlinkSync(join(root, "cli"));
+			rmSync(join(root, "cli"), { recursive: true, force: true });
 			mkdirSync(join(root, "cli"), { recursive: true });
 			writeFileSync(
 				join(root, "cli", "main.ts"),
@@ -4671,7 +4825,7 @@ describe("validation command entrypoint", () => {
 		] as const) {
 			const root = createFixtureRoot();
 			try {
-				unlinkSync(join(root, "cli"));
+				rmSync(join(root, "cli"), { recursive: true, force: true });
 				mkdirSync(join(root, "cli"), { recursive: true });
 				writeFileSync(join(root, "cli", "main.ts"), script, "utf8");
 
@@ -4701,7 +4855,7 @@ describe("validation command entrypoint", () => {
 	test("fails JSON-reporting packs when the child reports failure", () => {
 		const root = createFixtureRoot();
 		try {
-			unlinkSync(join(root, "cli"));
+			rmSync(join(root, "cli"), { recursive: true, force: true });
 			mkdirSync(join(root, "cli"), { recursive: true });
 			writeFileSync(
 				join(root, "cli", "main.ts"),

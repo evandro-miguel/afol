@@ -2,18 +2,25 @@ import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	renameSync,
 	rmSync,
+	rmdirSync,
 	symlinkSync,
 	writeFileSync,
 	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import {
+	directoryReparseTestSupport,
+	symlinkTestSupport,
+} from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
 	appendImportJournalEventUnlocked,
@@ -58,7 +65,27 @@ function rewriteArtifactSessionId(
 	}
 }
 
-describe("external import service", () => {
+test.skipIf(process.platform !== "win32")(
+	"external import persistence fails closed on Windows until DACL verification is available",
+	async () => {
+		const { root, source } = fixture();
+		try {
+			await expect(
+				confirmExternalImport({
+					root,
+					provider: "codex",
+					source: { provider: "codex", path: source, projectId: PROJECT_ID },
+					projectId: PROJECT_ID,
+				}),
+			).rejects.toThrow(/unavailable on Windows.*owner and DACL safely/i);
+			expect(existsSync(join(root, ".afol", "external"))).toBe(false);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	},
+);
+
+describe.skipIf(process.platform === "win32")("external import service", () => {
 	test("previews normalized redacted records without writing state", async () => {
 		const { root, source } = fixture();
 		try {
@@ -74,7 +101,7 @@ describe("external import service", () => {
 			expect(JSON.stringify(preview)).not.toContain("redaction_canary");
 			expect(existsSync(join(root, ".afol"))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -94,7 +121,7 @@ describe("external import service", () => {
 			expect(preview.sessionRecords).toHaveLength(1);
 			expect(preview.manifest.session_count).toBe(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -138,7 +165,7 @@ describe("external import service", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -179,7 +206,7 @@ describe("external import service", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -228,7 +255,7 @@ describe("external import service", () => {
 			expect(comparisons.filter(Boolean)).toHaveLength(1);
 			expect(comparisons.filter((same) => !same)).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -280,7 +307,7 @@ describe("external import service", () => {
 				secondStable?.external_session_id,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -310,7 +337,7 @@ describe("external import service", () => {
 				second.sessionRecords[0]?.external_session_id,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -326,7 +353,7 @@ describe("external import service", () => {
 				}),
 			).rejects.toThrow(/ambiguous/);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -355,8 +382,8 @@ describe("external import service", () => {
 			expect(one.contentDigest).toBe(two.contentDigest);
 			expect(one.importId).toBe(two.importId);
 		} finally {
-			rmSync(first.root, { recursive: true, force: true });
-			rmSync(second.root, { recursive: true, force: true });
+			removeEvolutionTestRoot(first.root);
+			removeEvolutionTestRoot(second.root);
 		}
 	});
 
@@ -375,7 +402,7 @@ describe("external import service", () => {
 				}),
 			).rejects.toThrow(/maximum session count/);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -408,17 +435,25 @@ describe("external import service", () => {
 			expect(persisted.some((value) => value.includes(canary))).toBe(false);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
-	test("rejects a symlinked external artifact destination", async () => {
+	test.skipIf(
+		process.platform === "win32"
+			? !directoryReparseTestSupport.available
+			: !symlinkTestSupport.available,
+	)("rejects a reparse-point external artifact destination", async () => {
 		const { root, source } = fixture();
 		const db = openEvolutionDb(evolutionDbPath(root));
 		try {
 			const outside = join(root, "outside");
 			mkdirSync(outside);
-			symlinkSync(outside, join(root, ".afol", "external"));
+			symlinkSync(
+				outside,
+				join(root, ".afol", "external"),
+				process.platform === "win32" ? "junction" : "dir",
+			);
 			await expect(
 				confirmExternalImport({
 					root,
@@ -431,7 +466,7 @@ describe("external import service", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -491,7 +526,69 @@ describe("external import service", () => {
 			).not.toContain("redaction_canary");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test.skipIf(
+		process.platform === "win32"
+			? !directoryReparseTestSupport.available
+			: !symlinkTestSupport.available,
+	)("rejects a reparse-point project root before staging an import", async () => {
+		const { root: backingRoot, source } = fixture();
+		const linkedRoot = `${backingRoot}-linked`;
+		const db = openEvolutionDb(evolutionDbPath(backingRoot));
+		try {
+			symlinkSync(
+				backingRoot,
+				linkedRoot,
+				process.platform === "win32" ? "junction" : "dir",
+			);
+			await expect(
+				confirmExternalImport({
+					root: linkedRoot,
+					provider: "codex",
+					source: { provider: "codex", path: source, projectId: PROJECT_ID },
+					projectId: PROJECT_ID,
+					db,
+				}),
+			).rejects.toThrow(/real directory|reparse/i);
+			expect(existsSync(join(backingRoot, ".afol", "external"))).toBe(false);
+		} finally {
+			db.close();
+			if (process.platform === "win32") rmdirSync(linkedRoot);
+			else rmSync(linkedRoot, { force: true });
+			removeEvolutionTestRoot(backingRoot);
+		}
+	});
+
+	test("rejects a group/world-writable artifact parent on POSIX", async () => {
+		if (process.platform === "win32") return;
+		const { root, source } = fixture();
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			const first = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+				db,
+			});
+			const providerPath = dirname(first.artifactPath);
+			chmodSync(providerPath, 0o777);
+			await expect(
+				confirmExternalImport({
+					root,
+					provider: "codex",
+					source: { provider: "codex", path: source, projectId: PROJECT_ID },
+					projectId: PROJECT_ID,
+					db,
+				}),
+			).rejects.toThrow("external import destination is group/world writable");
+			chmodSync(providerPath, 0o700);
+		} finally {
+			db.close();
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -556,7 +653,7 @@ describe("external import service", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -571,7 +668,7 @@ describe("external import service", () => {
 				projectId: PROJECT_ID,
 				db,
 			});
-			rmSync(first.artifactPath, { recursive: true, force: true });
+			removeEvolutionTestRoot(first.artifactPath);
 			const retry = await confirmExternalImport({
 				root,
 				provider: "codex",
@@ -587,7 +684,7 @@ describe("external import service", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -707,7 +804,7 @@ describe("external import service", () => {
 			).toBe(persistedLinks);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -747,7 +844,7 @@ describe("external import service", () => {
 			expect(retry.duplicate).toBe(true);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -771,7 +868,7 @@ describe("external import service", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -797,7 +894,7 @@ describe("external import service", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -840,7 +937,7 @@ describe("external import service", () => {
 			expect(retry.duplicate).toBe(false);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -885,7 +982,7 @@ describe("external import service", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -918,7 +1015,7 @@ describe("external import service", () => {
 			).rejects.toThrow(/manifest/);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -974,7 +1071,7 @@ describe("external import service", () => {
 				expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 			} finally {
 				db.close();
-				rmSync(root, { recursive: true, force: true });
+				removeEvolutionTestRoot(root);
 			}
 		}
 	});

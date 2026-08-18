@@ -7,8 +7,9 @@ import {
 	realpathSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { withExternalPathLockSync } from "../io/session-lock";
 import { resolveProjectWritePath } from "../project/root";
-import { applyMigrations } from "./migrations";
+import { applyMigrations, EVOLUTION_SCHEMA_VERSION } from "./migrations";
 
 export const EVOLUTION_DB_RELATIVE_PATH = ".afol/state/evolution.db";
 const BUSY_TIMEOUT_MS = 5000;
@@ -176,22 +177,34 @@ export function openEvolutionDb(dbPath: string): Database {
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		ensurePrivatePermissions(dbPath);
 		db.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT_MS};`);
-		withBusyRetry(() => db.exec("PRAGMA journal_mode=WAL;"));
+		const mode = () =>
+			Object.values(
+				(db.query("PRAGMA journal_mode").get() as Record<
+					string,
+					unknown
+				> | null) ?? {},
+			).find((value) => typeof value === "string");
+		const initialize = () => {
+			withBusyRetry(() => db.exec("PRAGMA journal_mode=WAL;"));
+			if (String(mode() ?? "").toLowerCase() !== "wal") {
+				throw new Error("evolution db requires WAL journal mode");
+			}
+			db.exec("PRAGMA foreign_keys=ON;");
+			applyMigrations(db);
+		};
+		const isReady =
+			String(mode() ?? "").toLowerCase() === "wal" &&
+			(db.query("PRAGMA user_version").get() as { user_version?: unknown } | null)
+				?.user_version === EVOLUTION_SCHEMA_VERSION;
+		if (isReady) {
+			db.exec("PRAGMA foreign_keys=ON;");
+			applyMigrations(db);
+		} else {
+			withExternalPathLockSync(dbPath, initialize);
+		}
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
-		ensurePrivatePermissions(dbPath);
-		const mode = Object.values(
-			(db.query("PRAGMA journal_mode").get() as Record<
-				string,
-				unknown
-			> | null) ?? {},
-		).find((value) => typeof value === "string");
-		if (String(mode ?? "").toLowerCase() !== "wal") {
-			throw new Error("evolution db requires WAL journal mode");
-		}
-		db.exec("PRAGMA foreign_keys=ON;");
-		applyMigrations(db);
 		ensurePrivatePermissions(dbPath);
 		return db;
 	} catch (error) {

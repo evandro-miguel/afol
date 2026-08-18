@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { runPstrCommand } from "../commands/pstr";
 import { agentOperationContext } from "../core/operation-context";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
@@ -1263,16 +1264,12 @@ describe("pstr service helpers", () => {
 		}
 	});
 
-	test("watch rejects configured roots whose symlink leaves the project", () => {
+	test.skipIf(!symlinkTestSupport.available)("watch rejects configured roots whose symlink leaves the project", () => {
 		const root = createFixture();
 		const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));
 		try {
 			mkdirSync(join(outside, "secret"), { recursive: true });
-			try {
-				symlinkSync(join(outside, "secret"), join(root, "outside-link"));
-			} catch {
-				return;
-			}
+		symlinkSync(join(outside, "secret"), join(root, "outside-link"));
 			writeFileSync(
 				join(root, ".agents", "config.json"),
 				JSON.stringify({
@@ -1406,7 +1403,7 @@ describe("pstr service helpers", () => {
 		try {
 			mkdirSync(join(root, "cli", "nested", "deep"), { recursive: true });
 			const targets = getPstrWatchTargets(root, ["cli/test.ts"]).map((path) =>
-				relative(root, path),
+				relative(root, path).replaceAll("\\", "/"),
 			);
 			expect(targets).toEqual(["cli", "cli/nested", "cli/nested/deep"]);
 		} finally {
@@ -1419,7 +1416,7 @@ describe("pstr service helpers", () => {
 		try {
 			mkdirSync(join(root, "..hidden_dir", "nested"), { recursive: true });
 			const targets = getPstrWatchTargets(root, ["..hidden_dir/file.ts"]).map(
-				(path) => relative(root, path),
+				(path) => relative(root, path).replaceAll("\\", "/"),
 			);
 			expect(targets).toEqual(["..hidden_dir", "..hidden_dir/nested"]);
 		} finally {

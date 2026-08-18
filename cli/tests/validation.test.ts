@@ -8,7 +8,6 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
-	symlinkSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -199,8 +198,11 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
 		{ recursive: true },
 	);
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
-	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	// These entries are source aliases for the fixture, not symlink-security
+	// scenarios. Copying them keeps validation portable on Windows hosts where
+	// symlink creation requires Developer Mode or an elevated privilege.
+	cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+	cpSync(join(process.cwd(), "afol"), join(root, "afol"));
 	for (const args of [
 		["init"],
 		["config", "user.email", "bench@example.com"],

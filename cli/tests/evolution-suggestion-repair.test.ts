@@ -5,11 +5,11 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	evolutionDbPath,
 	normalizeObservationRecord,
@@ -153,7 +153,7 @@ describe("evolution derived-state repair", () => {
 				readFileSync(checkpointPath, "utf8").trim().split("\n").length,
 			).toBe(checkpointCount);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -200,7 +200,7 @@ describe("evolution derived-state repair", () => {
 			);
 			expect(readFileSync(checkpointPath, "utf8")).toBe(invalidCheckpoint);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -265,7 +265,7 @@ describe("evolution derived-state repair", () => {
 			try {
 				db.close();
 			} catch {}
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

@@ -13,6 +13,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	removeEvolutionTestRoot,
+	releaseEvolutionTestHandles,
+} from "./evolution-test-support";
+import {
 	appendProductionDayAllocation,
 	checkEvolutionDbHealth,
 	EVOLUTION_SCHEMA_VERSION,
@@ -320,7 +324,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			).toBeGreaterThan(0);
 			db.close();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -332,7 +336,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(result.reason).toMatch(/missing/i);
 			expect(() => recordEvaluation(root, "M-v1-legacy")).toThrow();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -373,8 +377,8 @@ describe("Evolution posterior evaluation contracts", () => {
 				recordEvaluation(root, binding.mutation_id, stream.session),
 			).toMatchObject({ state: "not_evaluable" });
 		} finally {
-			rmSync(source.root, { recursive: true, force: true });
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(source.root);
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -386,7 +390,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(readEvaluationJournal(root)).toEqual(before);
 			expect(preview.mutation_id).toBe(mutationId);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -401,7 +405,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				/project identity/i,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -423,6 +427,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			}
 			const oldDb = join(root, ".afol", "state", "evolution.db");
 			const customDb = join(root, ".afol", "state", "custom-evolution.db");
+			releaseEvolutionTestHandles();
 			renameSync(oldDb, customDb);
 			for (const suffix of ["-wal", "-shm"]) {
 				if (existsSync(`${oldDb}${suffix}`))
@@ -446,7 +451,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -470,7 +475,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			});
 			expect(result.comparable_sessions).toBeGreaterThanOrEqual(3);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -563,7 +568,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				comparable_sessions: 5,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -597,7 +602,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				).outcome.observed_results,
 			).toBeGreaterThan(0);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -630,7 +635,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				matching_observations: 0,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -642,7 +647,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(result.state).toBe("regressed");
 			expect(result.reason).toMatch(/recurrence|matching/i);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -660,7 +665,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			expect(result.state).toBe("regressed");
 			expect(result.scorecard_comparison.regressions).toBeGreaterThan(0);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -698,7 +703,7 @@ describe("Evolution posterior evaluation contracts", () => {
 					kind === "stable" ? "stable" : "needs_more_data",
 				);
 			} finally {
-				rmSync(root, { recursive: true, force: true });
+				removeEvolutionTestRoot(root);
 			}
 		}
 	});
@@ -869,7 +874,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				}),
 			).toThrow();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -897,7 +902,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				),
 			).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -953,7 +958,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				checkEvolutionDbHealth(evolutionDbPath(root), PROJECT_ID, context).ok,
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1004,7 +1009,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				readApplyJournal(root).length,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1038,7 +1043,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			);
 			expect(events.length).toBeGreaterThan(0);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1103,7 +1108,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			renameSync(backup, path);
 			expect(readEvaluationJournal(root)).toHaveLength(2);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1133,7 +1138,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				before,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1190,7 +1195,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				(caught as AggregateError).errors.map((error: Error) => error.message),
 			).toEqual(["primary write failure", "rollback truncate failure"]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1230,7 +1235,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			);
 			expect(readEvaluationJournal(root)).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1275,7 +1280,7 @@ describe("Evolution posterior evaluation contracts", () => {
 			writeFileSync(path, original);
 			expect(readEvaluationJournal(root)).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1300,7 +1305,7 @@ describe("Evolution posterior evaluation contracts", () => {
 				rmSync(path, { force: true });
 				renameSync(backup, path);
 			}
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

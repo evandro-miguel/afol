@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { runLocalStateCommand } from "../commands/local-state";
 import { runTelemetryCommand } from "../commands/telemetry";
 import {
@@ -745,13 +746,15 @@ describe("shared event ledger durability", () => {
 	});
 
 	test("rejects symlink and hardlink event targets without changing their source", () => {
-		if (process.platform === "win32") return;
 		for (const kind of ["symlink", "hardlink"] as const) {
 			const root = configureRoot(`unsafe-${kind}`);
 			try {
 				const source = join(root, `${kind}-source.jsonl`);
 				writeFileSync(source, "source-safe\n", "utf8");
-				if (kind === "symlink") symlinkSync(source, eventPath(root));
+				if (kind === "symlink") {
+					if (!symlinkTestSupport.available) continue;
+					symlinkSync(source, eventPath(root));
+				}
 				else linkSync(source, eventPath(root));
 				expect(() =>
 					appendEventLedgerRecord(root, canonicalWorkbenchRecord(`E-${kind}`)),

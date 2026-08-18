@@ -1212,39 +1212,42 @@ describe("status command", () => {
 		}
 	});
 
-	test("reports unreadable child session health in text and JSON", () => {
-		const root = createFixture();
-		const session = "260715_1400_unreadable-health";
-		const sessionDir = join(root, ".afol", "wb", session);
-		try {
-			mkdirSync(sessionDir, { recursive: true });
-			chmodSync(sessionDir, 0o000);
+	test.skipIf(process.platform === "win32")(
+		"reports unreadable child session health in text and JSON",
+		() => {
+			const root = createFixture();
+			const session = "260715_1400_unreadable-health";
+			const sessionDir = join(root, ".afol", "wb", session);
+			try {
+				mkdirSync(sessionDir, { recursive: true });
+				chmodSync(sessionDir, 0o000);
 
-			const captured = captureIo();
-			expect(runStatusCommand(root, ["--health"], captured.io)).toBe(0);
-			const text = captured.stdout.join("\n");
-			expect(text).toContain("SESSIONS: 2");
-			expect(text).toContain("unavailable: session directory unreadable");
+				const captured = captureIo();
+				expect(runStatusCommand(root, ["--health"], captured.io)).toBe(0);
+				const text = captured.stdout.join("\n");
+				expect(text).toContain("SESSIONS: 2");
+				expect(text).toContain("unavailable: session directory unreadable");
 
-			const jsonCaptured = captureIo();
-			expect(
-				runStatusCommand(root, ["--health", "--json"], jsonCaptured.io),
-			).toBe(0);
-			const payload = JSON.parse(jsonCaptured.stdout[0] ?? "{}") as {
-				data?: {
-					session_count?: number | null;
-					session_health_warnings?: string[];
+				const jsonCaptured = captureIo();
+				expect(
+					runStatusCommand(root, ["--health", "--json"], jsonCaptured.io),
+				).toBe(0);
+				const payload = JSON.parse(jsonCaptured.stdout[0] ?? "{}") as {
+					data?: {
+						session_count?: number | null;
+						session_health_warnings?: string[];
+					};
 				};
-			};
-			expect(payload.data?.session_count).toBe(2);
-			expect(payload.data?.session_health_warnings?.join("\n")).toContain(
-				"unavailable: session directory unreadable",
-			);
-		} finally {
-			chmodSync(sessionDir, 0o700);
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+				expect(payload.data?.session_count).toBe(2);
+				expect(payload.data?.session_health_warnings?.join("\n")).toContain(
+					"unavailable: session directory unreadable",
+				);
+			} finally {
+				chmodSync(sessionDir, 0o700);
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("collectSessionIds throws when wb dir is a file (ENOTDIR)", async () => {
 		const root = createFixture();

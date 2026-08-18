@@ -7,10 +7,14 @@ import {
 	renameSync,
 	rmSync,
 	symlinkSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+
+const symlinkTest = test.skipIf(!symlinkTestSupport.available);
 import {
 	resolveTaskCompletionLockPath,
 	TaskCompletionBusyError,
@@ -203,7 +207,7 @@ describe("task completion lock", () => {
 		}
 	});
 
-	test("rejects a fence symlink without modifying its target", async () => {
+	symlinkTest("rejects a fence symlink without modifying its target", async () => {
 		const projectRoot = root("fence-symlink");
 		try {
 			const lockPath = resolveTaskCompletionLockPath(
@@ -284,6 +288,7 @@ describe("task completion lock", () => {
 							readFileSync(lockPath, "utf8"),
 							"utf8",
 						);
+						if (process.platform === "win32") unlinkSync(lockPath);
 						renameSync(replacementPath, lockPath);
 						lease.assertOwned();
 					},
@@ -318,6 +323,7 @@ describe("task completion lock", () => {
 							readFileSync(fencePath, "utf8"),
 							"utf8",
 						);
+						if (process.platform === "win32") unlinkSync(fencePath);
 						renameSync(replacementPath, fencePath);
 						lease.assertOwned();
 					},

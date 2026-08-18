@@ -17,6 +17,7 @@ import {
 	scanProjectTemplateUnknownAllowedPaths,
 	scanTemplateForbiddenPaths,
 	scanTemplateToolchainClaims,
+	toolProbeSucceeded,
 } from "../schemas/template-policy";
 
 function toPosixPath(path: string): string {
@@ -399,6 +400,18 @@ describe("template forbidden-content policy", () => {
 });
 
 describe("scanTemplateToolchainClaims", () => {
+	test("accepts a successful Windows probe with a spurious timeout error", () => {
+		const probe = {
+			status: 0,
+			signal: null,
+			error: Object.assign(new Error("spawnSync bun ETIMEDOUT"), {
+				code: "ETIMEDOUT",
+			}),
+		};
+
+		expect(toolProbeSucceeded(probe)).toBe(true);
+	});
+
 	test("returns claims for bun and afol", () => {
 		const claims = scanTemplateToolchainClaims();
 		expect(claims.length).toBeGreaterThanOrEqual(2);

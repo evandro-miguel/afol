@@ -12,7 +12,7 @@ import {
 	readSync,
 	realpathSync,
 	unlinkSync,
-	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
@@ -198,14 +198,13 @@ function incrementGeneration(path: string): GenerationFence {
 			fsConstants.O_RDWR |
 				fsConstants.O_CREAT |
 				fsConstants.O_EXCL |
-				fsConstants.O_APPEND |
 				NOFOLLOW,
 			0o600,
 		);
 		created = true;
 	} catch (error) {
 		if (!isAlreadyExistsError(error)) throw error;
-		fd = openSync(path, fsConstants.O_RDWR | fsConstants.O_APPEND | NOFOLLOW);
+		fd = openSync(path, fsConstants.O_RDWR | NOFOLLOW);
 	}
 	try {
 		const fenceIdentity = identity(fd);
@@ -222,9 +221,7 @@ function incrementGeneration(path: string): GenerationFence {
 		if (!Number.isSafeInteger(next)) {
 			throw new Error("Task completion fence generation is exhausted.");
 		}
-		ftruncateSync(fd, 0);
-		writeFileSync(fd, `${next}\n`, "utf8");
-		fsyncSync(fd);
+		replaceFileContents(fd, `${next}\n`);
 		if (!pathHasIdentity(path, fenceIdentity)) {
 			throw new Error("Task completion fence ownership was lost.");
 		}
@@ -236,8 +233,18 @@ function incrementGeneration(path: string): GenerationFence {
 }
 
 function writeMetadataFd(fd: number, metadata: CompletionLockMetadata): void {
+	replaceFileContents(fd, `${JSON.stringify(metadata)}\n`);
+}
+
+function replaceFileContents(fd: number, contents: string): void {
 	ftruncateSync(fd, 0);
-	writeFileSync(fd, `${JSON.stringify(metadata)}\n`, "utf8");
+	const value = Buffer.from(contents, "utf8");
+	let offset = 0;
+	while (offset < value.length) {
+		const written = writeSync(fd, value, offset, value.length - offset, offset);
+		if (written <= 0) throw new Error("Failed to write task completion state.");
+		offset += written;
+	}
 	fsyncSync(fd);
 }
 

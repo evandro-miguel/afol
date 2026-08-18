@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { runSkillCommand } from "../commands/catalog";
 
 function mkRoot(): string {
@@ -272,7 +273,7 @@ describe("skill command", () => {
 		}
 	});
 
-	test("ignores non-directory skill entries without aborting discovery", async () => {
+	test.skipIf(!symlinkTestSupport.available)("ignores non-directory skill entries without aborting discovery", async () => {
 		const root = mkRoot();
 		try {
 			symlinkSync(

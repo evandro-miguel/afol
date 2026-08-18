@@ -13,6 +13,10 @@ import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
+function portablePath(value: string): string {
+	return value.replaceAll("\\", "/");
+}
+
 function mkProjectRoot(name: string): string {
 	const root = mkdtempSync(join(tmpdir(), `verify-command-${name}-`));
 	mkdirSync(join(root, ".agents"), { recursive: true });
@@ -111,7 +115,7 @@ describe("verify-tasks command", () => {
 
 			expect(proc.status).toBe(1);
 			expect(proc.stderr as string).toBe("");
-			expect(proc.stdout as string).toContain("Session: .afol/wb");
+			expect(portablePath(proc.stdout as string)).toContain("Session: .afol/wb");
 			expect(proc.stdout as string).toContain("Pending:");
 			expect(proc.stdout as string).not.toContain("/.afol/wb/_archive/");
 			expect(proc.stdout as string).not.toContain("/.agents/wb/");

@@ -53,6 +53,11 @@ function normalizeText(value?: string | null): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
+function normalizeWorktree(value?: string | null): string | null {
+	const normalized = normalizeText(value);
+	return normalized?.replaceAll("\\", "/") ?? null;
+}
+
 function parseBinding(input: unknown): SessionBinding | null {
 	if (input === null || typeof input !== "object" || Array.isArray(input)) {
 		return null;
@@ -70,7 +75,9 @@ function parseBinding(input: unknown): SessionBinding | null {
 	const branch =
 		typeof record.branch === "string" ? normalizeText(record.branch) : null;
 	const worktree =
-		typeof record.worktree === "string" ? normalizeText(record.worktree) : null;
+		typeof record.worktree === "string"
+			? normalizeWorktree(record.worktree)
+			: null;
 	const actor =
 		typeof record.actor === "string" ? normalizeText(record.actor) : null;
 	return { session, branch, worktree, actor, last_touched: lastTouched };
@@ -121,7 +128,7 @@ function currentContext(root: string): {
 	}
 	return {
 		branch,
-		worktree: worktree || null,
+		worktree: normalizeWorktree(worktree),
 	};
 }
 
@@ -158,7 +165,7 @@ function removeMatchedBinding(
 		return bindings.slice();
 	}
 	const targetBranch = normalizeText(target.branch ?? null);
-	const targetWorktree = normalizeText(target.worktree ?? null);
+	const targetWorktree = normalizeWorktree(target.worktree ?? null);
 	return bindings.filter((binding) => {
 		if (binding.session === targetSession) {
 			return false;
@@ -184,7 +191,7 @@ function upsertBinding(
 		throw new Error("Missing session identifier for binding.");
 	}
 	const branch = normalizeText(input.branch ?? null);
-	const worktree = normalizeText(input.worktree ?? null);
+	const worktree = normalizeWorktree(input.worktree ?? null);
 	const actor = normalizeText(input.actor ?? null);
 	const nextBinding: SessionBinding = {
 		session,

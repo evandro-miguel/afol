@@ -153,11 +153,11 @@ function projectMutationDefaults(_projectRoot: string): {
 	moveSource: string;
 	moveDestination: string;
 } {
-	const tmpDir = join(".afol", "tmp", "file-command");
+	const tmpDir = ".afol/tmp/file-command";
 	return {
-		patchPath: join(tmpDir, ".file-probe.txt"),
-		moveSource: join(tmpDir, "move-source.txt"),
-		moveDestination: join(tmpDir, "move-destination.txt"),
+		patchPath: `${tmpDir}/.file-probe.txt`,
+		moveSource: `${tmpDir}/move-source.txt`,
+		moveDestination: `${tmpDir}/move-destination.txt`,
 	};
 }
 
@@ -247,8 +247,9 @@ export function backupPath(
 	mutationId: string,
 	relativePath: string,
 ): string {
+	const safeMutationId = sanitizeForFilename(mutationId);
 	const safe = sanitizeForFilename(relativePath);
-	return join(ensureBackupDir(projectRoot), `${mutationId}-${safe}.bak`);
+	return join(ensureBackupDir(projectRoot), `${safeMutationId}-${safe}.bak`);
 }
 
 function pathIsInsideRoot(candidatePath: string, rootPath: string): boolean {
@@ -320,17 +321,21 @@ export function archiveDestination(
 	mutationId: string,
 	relativePath: string,
 ): { path: string; relativePath: string } {
+	const safeMutationId = sanitizeForFilename(mutationId);
 	const safe = sanitizeForFilename(relativePath);
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const relative = join(
 		projectPaths.mutationArchivesDir,
-		`${mutationId}-${safe}`,
+		`${safeMutationId}-${safe}`,
 	);
 	const resolved = resolveProjectWritePath(projectRoot, relative);
 	if (!resolved.ok) {
 		throw new Error(resolved.error);
 	}
-	return { path: resolved.value.path, relativePath: relative };
+	return {
+		path: resolved.value.path,
+		relativePath: relative.replaceAll("\\", "/"),
+	};
 }
 
 function applyProjectMutationDefaultsInternal<T extends CommandArgs>(

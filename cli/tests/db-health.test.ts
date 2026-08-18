@@ -1,12 +1,13 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDbCommand } from "../commands/db";
 import { openDb } from "../services/state/db";
 import { checkDbHealth } from "../services/state/db-health";
 import { hydrateSession } from "../services/state/session-state";
+import { removeTestRoot } from "./windows-test-support";
 
 type CapturedIo = {
 	stdout: string[];
@@ -77,7 +78,7 @@ describe("db health", () => {
 			expect(Array.isArray(payload.findings)).toBe(true);
 			expect(payload.data.db_exists).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -93,7 +94,7 @@ describe("db health", () => {
 			expect(report.stale_sources).toBe(0);
 			expect(report.ok).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -120,7 +121,7 @@ describe("db health", () => {
 			expect(payload.data.schema_ok).toBe(true);
 			expect(payload.data.db_exists).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -132,7 +133,7 @@ describe("db health", () => {
 			expect(await runDbCommand("health", [], root, captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("db health:");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -151,7 +152,7 @@ describe("db health", () => {
 				),
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 });

@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { runUpdateCommand } from "../commands/update";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
@@ -299,6 +300,7 @@ describe("update command", () => {
 
 	test("fails closed for a completion-lock gitignore symlink or non-regular target", () => {
 		for (const kind of ["symlink", "directory"] as const) {
+			if (kind === "symlink" && !symlinkTestSupport.available) continue;
 			const root = mkRoot();
 			try {
 				const gitignore = join(root, ".gitignore");
@@ -1820,6 +1822,7 @@ describe("update transactional public contract", () => {
 
 	test("rollback rejects backup paths outside the backup jail and through symlinks", async () => {
 		for (const mode of ["outside", "symlink"] as const) {
+			if (mode === "symlink" && !symlinkTestSupport.available) continue;
 			const root = mkRoot();
 			const outside = mkdtempSync(join(tmpdir(), "update-rollback-outside-"));
 			try {
@@ -1898,6 +1901,7 @@ describe("update transactional public contract", () => {
 	});
 
 	test("rollback revalidates targets and backup bytes inside resource locks", async () => {
+		if (!symlinkTestSupport.available) return;
 		const root = mkRoot();
 		const outside = mkdtempSync(join(tmpdir(), "update-rollback-race-"));
 		try {

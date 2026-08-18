@@ -35,7 +35,7 @@ function isStatus(value: string): value is MemoryEntry["status"] {
 function parseFrontmatter(
 	content: string,
 ): { frontmatter: MemoryFrontmatter; body: string } | null {
-	const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/m.exec(content);
+	const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/m.exec(content);
 	if (!match?.[1]) {
 		return null;
 	}

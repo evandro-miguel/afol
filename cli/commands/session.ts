@@ -514,7 +514,7 @@ function displayWorktreePath(
 		return null;
 	}
 	if (debug) {
-		return worktree;
+		return worktree.replaceAll("\\", "/");
 	}
 	return relative(projectRoot, worktree).replace(/\\/g, "/") || ".";
 }

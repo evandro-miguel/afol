@@ -2,6 +2,12 @@ name: agents-scaffold-ci
 
 on:
   workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   validate:
@@ -13,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -61,7 +69,6 @@ jobs:
           set -euo pipefail
           tool_dir="$RUNNER_TEMP/security-tools"
           mkdir -p "$tool_dir"
-          echo "$tool_dir" >> "$GITHUB_PATH"
           export GOBIN="$tool_dir"
           export GOPROXY="https://proxy.golang.org,direct"
           export GOSUMDB="sum.golang.org"
@@ -69,6 +76,8 @@ jobs:
           go install "github.com/zricethezav/gitleaks/v8@v${GITLEAKS_VERSION}"
           "$tool_dir/osv-scanner" --version
           "$tool_dir/gitleaks" version
+          echo "AFOL_OSV_SCANNER_PATH=$tool_dir/osv-scanner" >> "$GITHUB_ENV"
+          echo "AFOL_GITLEAKS_PATH=$tool_dir/gitleaks" >> "$GITHUB_ENV"
 
       - name: Release validation
         run: bun run validate:release

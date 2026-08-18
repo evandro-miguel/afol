@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
 	confirmManualSessionLink,
@@ -69,7 +70,7 @@ describe("external session linking", () => {
 			});
 			expect(mismatched.link_state).toBe("pending");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -137,7 +138,7 @@ describe("external session linking", () => {
 			expect(link.eligible_for_learning).toBe(true);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

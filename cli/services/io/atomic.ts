@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
 	closeSync,
 	existsSync,
@@ -8,7 +9,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 function fsyncPath(path: string): void {
 	let fd: number | null = null;
@@ -41,7 +42,7 @@ export function atomicWriteText(
 	mkdirSync(dir, { recursive: true });
 	const tempPath = join(
 		dir,
-		`.${sanitizeTempLabel(path)}.${process.pid}.${Date.now()}.tmp`,
+		`.${sanitizeTempLabel(basename(path)).slice(0, 64)}.${process.pid}.${randomUUID()}.tmp`,
 	);
 	try {
 		writeFileSync(tempPath, content, "utf8");

@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { loadJsonObject, loadYamlObject } from "../core/schema";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
@@ -70,7 +71,9 @@ describe("project root loader", () => {
 				return;
 			}
 			expect(loaded.value.root).toBe(root);
-			expect(loaded.value.configPath.endsWith(".afol/config.json")).toBe(true);
+			expect(
+				loaded.value.configPath.endsWith(join(".afol", "config.json")),
+			).toBe(true);
 			expect(loaded.value.configRelativePath).toBe(".afol/config.json");
 			expect(loaded.value.configSource).toBe("canonical");
 			expect(loaded.value.config.project).toBeDefined();
@@ -80,7 +83,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("canonicalizes symlinked project roots before resolving paths", () => {
+	test.skipIf(!symlinkTestSupport.available)("canonicalizes symlinked project roots before resolving paths", () => {
 		const root = mkProjectRoot("root-symlink-target");
 		const linkParent = mkdtempSync(join(tmpdir(), "project-root-link-parent-"));
 		const link = join(linkParent, "linked-project");
@@ -140,7 +143,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("rejects symlinked .afol config roots", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects symlinked .afol config roots", () => {
 		const root = mkdtempSync(join(tmpdir(), "project-root-afol-symlink-"));
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-afol-"));
 		try {
@@ -160,7 +163,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("schema readers reject symlinked parent directories", () => {
+	test.skipIf(!symlinkTestSupport.available)("schema readers reject symlinked parent directories", () => {
 		const root = mkdtempSync(join(tmpdir(), "project-root-schema-symlink-"));
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-schema-"));
 		try {
@@ -205,7 +208,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("rejects AFOL paths that cross symlinked mutable roots", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects AFOL paths that cross symlinked mutable roots", () => {
 		const root = mkProjectRoot("mutable-root-symlink");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-afol-"));
 		try {
@@ -244,7 +247,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("resolves project paths only inside the real project root", () => {
+	test.skipIf(!symlinkTestSupport.available)("resolves project paths only inside the real project root", () => {
 		const root = mkProjectRoot("path-jail");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-"));
 		try {
@@ -303,7 +306,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("rejects absolute paths and symlink escapes", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects absolute paths and symlink escapes", () => {
 		const root = mkProjectRoot("path-jail-abs");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-abs-"));
 		try {
@@ -330,7 +333,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("rejects write targets that cross symlinks inside root", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects write targets that cross symlinks inside root", () => {
 		const root = mkProjectRoot("path-jail-write-dir-symlink");
 		try {
 			mkdirSync(join(root, "real"), { recursive: true });
@@ -346,7 +349,7 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("rejects write targets when final file is a symlink", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects write targets when final file is a symlink", () => {
 		const root = mkProjectRoot("path-jail-write-file-symlink");
 		try {
 			writeFileSync(join(root, "real.txt"), "safe\n", "utf8");

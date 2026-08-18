@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { runPatchMutation } from "../commands/file/mutations/patch";
 import type { PatchArgs } from "../commands/file/shared";
 import { normalizeHash } from "../commands/file/shared";
@@ -251,7 +252,7 @@ describe("mutation safety command family", () => {
 		);
 	});
 
-	test("SEC-004 symlink operands cannot bypass protected-resource admission", () => {
+	test.skipIf(!symlinkTestSupport.available)("SEC-004 symlink operands cannot bypass protected-resource admission", () => {
 		for (const relativeTarget of [
 			".env",
 			".afol/adm/protected-control-plane.txt",

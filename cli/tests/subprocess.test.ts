@@ -8,9 +8,33 @@ import {
 	spawnFailureDetail,
 } from "../core/subprocess";
 
+type ProbeCommand = readonly [command: string, args: string[]];
+
+/**
+ * Keep subprocess probes independent from a shell on Windows.  In particular,
+ * bash/sleep may be supplied by WSL and can spend most of the timeout budget
+ * starting under the load of the complete test suite.  Bun's own runtime gives
+ * these tests the same exit, stderr, output, and timer semantics everywhere.
+ */
+function probeCommand(
+	windowsSource: string,
+	posixCommand: string,
+	posixArgs: string[],
+): ProbeCommand {
+	if (process.platform === "win32") {
+		return [process.execPath, ["-e", windowsSource]];
+	}
+	return [posixCommand, posixArgs];
+}
+
 describe("boundedSpawn", () => {
 	test("returns ok for successful command", () => {
-		const result = boundedSpawn("echo", ["hello"], { timeoutMs: 5_000 });
+		const [command, args] = probeCommand(
+			'process.stdout.write("hello")',
+			"echo",
+			["hello"],
+		);
+		const result = boundedSpawn(command, args, { timeoutMs: 5_000 });
 		expect(result.ok).toBe(true);
 		expect(result.timedOut).toBe(false);
 		expect(result.spawnError).toBeNull();
@@ -32,7 +56,11 @@ describe("boundedSpawn", () => {
 	});
 
 	test("returns failure for nonzero exit", () => {
-		const result = boundedSpawn("bash", ["-c", "exit 42"], {
+		const [command, args] = probeCommand("process.exit(42)", "bash", [
+			"-c",
+			"exit 42",
+		]);
+		const result = boundedSpawn(command, args, {
 			timeoutMs: 5_000,
 		});
 		expect(result.ok).toBe(false);
@@ -42,7 +70,12 @@ describe("boundedSpawn", () => {
 	});
 
 	test("captures stderr", () => {
-		const result = boundedSpawn("bash", ["-c", "echo errmsg >&2 && exit 1"], {
+		const [command, args] = probeCommand(
+			'process.stderr.write("errmsg\\n"); process.exit(1)',
+			"bash",
+			["-c", "echo errmsg >&2 && exit 1"],
+		);
+		const result = boundedSpawn(command, args, {
 			timeoutMs: 5_000,
 		});
 		expect(result.ok).toBe(false);
@@ -53,7 +86,12 @@ describe("boundedSpawn", () => {
 
 	test("timeout kills process and reports timedOut", () => {
 		const startedAt = Date.now();
-		const result = boundedSpawn("sleep", ["30"], {
+		const [command, args] = probeCommand(
+			"setTimeout(() => {}, 30_000)",
+			"sleep",
+			["30"],
+		);
+		const result = boundedSpawn(command, args, {
 			timeoutMs: 200,
 		});
 		const elapsed = Date.now() - startedAt;
@@ -70,22 +108,30 @@ describe("boundedSpawn", () => {
 		// skew or a platform edge case — the diagnostic must not be lost.
 		// The invariant: there is no path where timedOut=false AND spawnError=null
 		// when the spawn error contained timeout wording.
-		const result = boundedSpawn("sleep", ["30"], { timeoutMs: 10 });
+		const [command, args] = probeCommand(
+			"setTimeout(() => {}, 30_000)",
+			"sleep",
+			["30"],
+		);
+		const result = boundedSpawn(command, args, { timeoutMs: 10 });
 		expect(result.ok).toBe(false);
 		const diagnosticPreserved = result.timedOut || result.spawnError !== null;
 		expect(diagnosticPreserved).toBe(true);
 	});
 
-	test("non-timeout SIGKILL (external kill) is NOT classified as timeout", () => {
-		// Self-kill via SIGKILL within the timeout budget: not a timeout.
-		const result = boundedSpawn("bash", ["-c", "kill -9 $$"], {
-			timeoutMs: 10_000,
-		});
-		expect(result.timedOut).toBe(false);
-		expect(result.signal).toBe("SIGKILL");
-		expect(result.ok).toBe(false);
-		expect(result.spawnError).toBeNull();
-	});
+	test.skipIf(process.platform === "win32")(
+		"non-timeout SIGKILL (external kill) is NOT classified as timeout",
+		() => {
+			// Self-kill via SIGKILL within the timeout budget: not a timeout.
+			const result = boundedSpawn("bash", ["-c", "kill -9 $$"], {
+				timeoutMs: 10_000,
+			});
+			expect(result.timedOut).toBe(false);
+			expect(result.signal).toBe("SIGKILL");
+			expect(result.ok).toBe(false);
+			expect(result.spawnError).toBeNull();
+		},
+	);
 });
 
 describe("spawnFailureDetail", () => {
@@ -129,32 +175,35 @@ describe("boundedSpawn EACCES primitive", () => {
 		}
 	});
 
-	test("non-ENOENT spawn failure preserves spawnError diagnostic", () => {
-		const testDir = mkdtempSync(join(tmpdir(), "spawn-diag-"));
-		try {
-			const scriptPath = join(testDir, "nonexec.sh");
-			writeFileSync(scriptPath, "#!/usr/bin/env bash\necho hello\n", {
-				mode: 0o644,
-			});
-			const result = boundedSpawn(scriptPath, [], {
-				timeoutMs: 5_000,
-				cwd: testDir,
-			});
-			expect(
-				!result.ok &&
-					result.status === null &&
-					!result.timedOut &&
-					!result.signal,
-			).toBe(true);
-			expect(result.spawnError).not.toBeNull();
-			expect(result.spawnError).toMatch(/^EACCES:/);
-			expect(result.spawnError).not.toContain("codex-missing");
-			expect(result.spawnError).not.toContain("install-codex");
-			expect(result.spawnError).not.toContain("add-it-to-path");
-		} finally {
-			rmSync(testDir, { recursive: true, force: true });
-		}
-	});
+	test.skipIf(process.platform === "win32")(
+		"non-ENOENT spawn failure preserves spawnError diagnostic",
+		() => {
+			const testDir = mkdtempSync(join(tmpdir(), "spawn-diag-"));
+			try {
+				const scriptPath = join(testDir, "nonexec.sh");
+				writeFileSync(scriptPath, "#!/usr/bin/env bash\necho hello\n", {
+					mode: 0o644,
+				});
+				const result = boundedSpawn(scriptPath, [], {
+					timeoutMs: 5_000,
+					cwd: testDir,
+				});
+				expect(
+					!result.ok &&
+						result.status === null &&
+						!result.timedOut &&
+						!result.signal,
+				).toBe(true);
+				expect(result.spawnError).not.toBeNull();
+				expect(result.spawnError).toMatch(/^EACCES:/);
+				expect(result.spawnError).not.toContain("codex-missing");
+				expect(result.spawnError).not.toContain("install-codex");
+				expect(result.spawnError).not.toContain("add-it-to-path");
+			} finally {
+				rmSync(testDir, { recursive: true, force: true });
+			}
+		},
+	);
 });
 
 describe("boundedSpawn diagnostics", () => {
@@ -170,14 +219,15 @@ describe("boundedSpawn diagnostics", () => {
 
 describe("boundedSpawn maxBuffer diagnostics", () => {
 	test("preserves spawnError when maxBuffer is exceeded", () => {
-		const result = boundedSpawn(
+		const [command, args] = probeCommand(
+			'process.stdout.write("x".repeat(8192))',
 			"bash",
 			["-lc", "head -c 8192 /dev/zero | tr '\\0' 'x'"],
-			{
-				timeoutMs: 5_000,
-				maxBuffer: 1_024,
-			},
 		);
+		const result = boundedSpawn(command, args, {
+			timeoutMs: 5_000,
+			maxBuffer: 1_024,
+		});
 		expect(result.ok).toBe(false);
 		expect(result.timedOut).toBe(false);
 		expect(result.spawnError).not.toBeNull();

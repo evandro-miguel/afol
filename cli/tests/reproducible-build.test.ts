@@ -13,13 +13,19 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import {
+	directoryReparseTestSupport,
+	symlinkTestSupport,
+} from "./symlink-test-support";
+import {
 	buildReleaseArtifact,
 	compiledReleaseBuildArgs,
 	readMinifiedCompiledReleaseBuildReceipt,
+	releaseArtifactPath,
 } from "../dev/build-release";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const scratchRoot = join(repoRoot, ".tmp");
+const NATIVE_BUILD_TIMEOUT_MS = 30_000;
 
 function projectScratch(prefix: string): string {
 	mkdirSync(scratchRoot, { recursive: true });
@@ -35,11 +41,17 @@ function copyCleanSourceRoot(target: string): void {
 	for (const file of ["package.json", "bun.lock", "tsconfig.json"]) {
 		cpSync(join(repoRoot, file), join(target, file));
 	}
-	symlinkSync(
-		join(repoRoot, "node_modules"),
-		join(target, "node_modules"),
-		"dir",
-	);
+	if (symlinkTestSupport.available) {
+		symlinkSync(
+			join(repoRoot, "node_modules"),
+			join(target, "node_modules"),
+			process.platform === "win32" ? "junction" : "dir",
+		);
+	} else {
+		cpSync(join(repoRoot, "node_modules"), join(target, "node_modules"), {
+			recursive: true,
+		});
+	}
 }
 
 describe("deterministic release build", () => {
@@ -60,6 +72,7 @@ describe("deterministic release build", () => {
 	test("two independent clean source roots produce identical SHA-256", () => {
 		const sandbox = projectScratch("reproducible-build-");
 		try {
+			const artifact = releaseArtifactPath("dist/afol");
 			const firstRoot = join(sandbox, "first");
 			const secondRoot = join(sandbox, "second");
 			copyCleanSourceRoot(firstRoot);
@@ -67,26 +80,26 @@ describe("deterministic release build", () => {
 
 			const first = buildReleaseArtifact({
 				cwd: firstRoot,
-				outfile: "dist/afol",
+				outfile: artifact,
 			});
 			const second = buildReleaseArtifact({
 				cwd: secondRoot,
-				outfile: "dist/afol",
+				outfile: artifact,
 			});
 
-			expect(first.outfile).toBe(join(firstRoot, "dist", "afol"));
-			expect(second.outfile).toBe(join(secondRoot, "dist", "afol"));
+			expect(first.outfile).toBe(join(firstRoot, artifact));
+			expect(second.outfile).toBe(join(secondRoot, artifact));
 			expect(fileSha256(first.outfile)).toBe(first.sha256);
 			expect(first.sha256).toBe(second.sha256);
 			expect(existsSync(first.receiptPath)).toBe(true);
 			expect(
 				readMinifiedCompiledReleaseBuildReceipt(
 					first.outfile,
-					compiledReleaseBuildArgs("cli/main.ts", "dist/afol"),
+					compiledReleaseBuildArgs("cli/main.ts", artifact),
 				),
 			).toEqual({
 				artifact_sha256: first.sha256,
-				build_args: compiledReleaseBuildArgs("cli/main.ts", "dist/afol"),
+				build_args: compiledReleaseBuildArgs("cli/main.ts", artifact),
 			});
 
 			const version = spawnSync(first.outfile, ["--version"], {
@@ -99,11 +112,12 @@ describe("deterministic release build", () => {
 		} finally {
 			rmSync(sandbox, { recursive: true, force: true });
 		}
-	});
+	}, NATIVE_BUILD_TIMEOUT_MS);
 
 	test("release build binds the entrypoint to the requested source root", () => {
 		const sandbox = projectScratch("reproducible-build-entry-");
 		try {
+			const artifact = releaseArtifactPath("dist/afol");
 			const firstRoot = join(sandbox, "first");
 			const secondRoot = join(sandbox, "second");
 			mkdirSync(join(firstRoot, "cli"), { recursive: true });
@@ -121,11 +135,11 @@ describe("deterministic release build", () => {
 
 			const first = buildReleaseArtifact({
 				cwd: firstRoot,
-				outfile: "dist/afol",
+				outfile: artifact,
 			});
 			const second = buildReleaseArtifact({
 				cwd: secondRoot,
-				outfile: "dist/afol",
+				outfile: artifact,
 			});
 			const firstRun = spawnSync(first.outfile, [], {
 				cwd: firstRoot,
@@ -145,18 +159,47 @@ describe("deterministic release build", () => {
 		} finally {
 			rmSync(sandbox, { recursive: true, force: true });
 		}
-	});
+	}, NATIVE_BUILD_TIMEOUT_MS);
 
 	test("release build fails closed when the source root lacks the entrypoint", () => {
 		const root = projectScratch("reproducible-build-missing-");
 		try {
-			const outfile = join(root, "dist", "afol");
+			const artifact = releaseArtifactPath("dist/afol");
+			const outfile = join(root, artifact);
 			expect(() =>
-				buildReleaseArtifact({ cwd: root, outfile: "dist/afol" }),
+				buildReleaseArtifact({ cwd: root, outfile: artifact }),
 			).toThrow(/missing release entrypoint/);
 			expect(existsSync(outfile)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test.skipIf(!directoryReparseTestSupport.available)(
+		"release build fails closed when dist is a directory reparse point",
+		() => {
+			const root = projectScratch("reproducible-build-reparse-root-");
+			const external = projectScratch("reproducible-build-reparse-external-");
+			const artifact = releaseArtifactPath("dist/afol");
+			try {
+				mkdirSync(join(root, "cli"), { recursive: true });
+				writeFileSync(join(root, "cli", "main.ts"), "console.log('safe');\n", "utf8");
+				symlinkSync(
+					external,
+					join(root, "dist"),
+					process.platform === "win32" ? "junction" : "dir",
+				);
+
+				expect(() =>
+					buildReleaseArtifact({ cwd: root, outfile: artifact }),
+				).toThrow(/release output directory/);
+				expect(existsSync(join(external, releaseArtifactPath("afol")))).toBe(
+					false,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(external, { recursive: true, force: true });
+			}
+		},
+	);
 });

@@ -4,6 +4,7 @@ import {
 	existsSync,
 	fstatSync,
 	fsyncSync,
+	lstatSync,
 	mkdirSync,
 	openSync,
 	readFileSync,
@@ -75,6 +76,29 @@ function isAlreadyExistsError(error: unknown): boolean {
 		"code" in error &&
 		(error as { code?: unknown }).code === "EEXIST"
 	);
+}
+
+function errorCode(error: unknown): string | null {
+	return typeof error === "object" && error !== null && "code" in error
+		? typeof (error as { code?: unknown }).code === "string"
+			? (error as { code: string }).code
+			: null
+		: null;
+}
+
+function isWindowsDeletedLockTransition(error: unknown, lockPath: string): boolean {
+	if (process.platform !== "win32" || errorCode(error) !== "EPERM") {
+		return false;
+	}
+	try {
+		lstatSync(lockPath);
+		return false;
+	} catch (probeError) {
+		// The target has to be demonstrably absent. A generic EPERM (or an
+		// inaccessible existing path) remains an error; the next `wx` call is
+		// still the authority that grants ownership.
+		return errorCode(probeError) === "ENOENT";
+	}
 }
 
 function assertSessionLockName(session: string): string {
@@ -456,7 +480,10 @@ export function withSessionLock<T>(
 		try {
 			fd = openSync(lockPath, "wx");
 		} catch (error) {
-			if (!isAlreadyExistsError(error)) {
+			if (
+				!isAlreadyExistsError(error) &&
+				!isWindowsDeletedLockTransition(error, lockPath)
+			) {
 				throw error;
 			}
 			const now = Date.now();
@@ -524,7 +551,11 @@ export async function withExternalPathLock<T>(
 		try {
 			fd = openSync(lockPath, "wx");
 		} catch (error) {
-			if (!isAlreadyExistsError(error)) throw error;
+			if (
+				!isAlreadyExistsError(error) &&
+				!isWindowsDeletedLockTransition(error, lockPath)
+			)
+				throw error;
 			const now = Date.now();
 			const staleMetadata = shouldRecoverStaleLock(lockPath, now);
 			if (
@@ -557,6 +588,67 @@ export async function withExternalPathLock<T>(
 		);
 		fsyncSync(fd);
 		return await action();
+	} finally {
+		if (ownedIdentity !== null)
+			unlinkIfIdentityMatches(lockPath, ownedIdentity);
+		if (fd !== null) closeSync(fd);
+	}
+}
+
+/**
+ * Synchronous counterpart for filesystem initialization paths such as SQLite
+ * migrations. The resource key remains external to the project so callers
+ * can safely lock a configured path without deriving a project root from it.
+ */
+export function withExternalPathLockSync<T>(
+	canonicalPath: string,
+	action: () => T,
+): T {
+	const lockPath = resolveExternalPathLockPath(canonicalPath);
+	mkdirSync(dirname(lockPath), { recursive: true });
+	const startedAt = Date.now();
+	let fd: number | null = null;
+	while (fd === null) {
+		try {
+			fd = openSync(lockPath, "wx");
+		} catch (error) {
+			if (
+				!isAlreadyExistsError(error) &&
+				!isWindowsDeletedLockTransition(error, lockPath)
+			)
+				throw error;
+			const now = Date.now();
+			const staleMetadata = shouldRecoverStaleLock(lockPath, now);
+			if (
+				staleMetadata !== null &&
+				tryReclaimStaleLock(lockPath, staleMetadata)
+			) {
+				continue;
+			}
+			if (now - startedAt >= LOCK_TIMEOUT_MS) {
+				throw new Error(
+					`Timed out waiting for external path lock: ${readExistingLockHint(lockPath)}`,
+				);
+			}
+			sleepSync(LOCK_RETRY_MS);
+		}
+	}
+
+	let ownedIdentity: LockIdentity | null = null;
+	try {
+		ownedIdentity = readFdIdentity(fd);
+		writeFileSync(
+			fd,
+			`${JSON.stringify({
+				pid: process.pid,
+				acquired_at: new Date().toISOString(),
+				host: HOSTNAME,
+				resource: resolve(canonicalPath),
+			})}\n`,
+			"utf8",
+		);
+		fsyncSync(fd);
+		return action();
 	} finally {
 		if (ownedIdentity !== null)
 			unlinkIfIdentityMatches(lockPath, ownedIdentity);

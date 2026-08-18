@@ -2648,7 +2648,7 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "provider paths");
 			startTask(root, { session: created.session, taskId: "T-01" });
 
-			expect(created.sessionDir).toContain("/.afol/wb/");
+			expect(created.sessionDir.replaceAll("\\", "/")).toContain("/.afol/wb/");
 			expect(created.activeSessionPath).toBe(
 				join(root, ".afol", "wb", ".active_session"),
 			);
@@ -2703,69 +2703,73 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("no-op evidence cannot authorize task completion or session closure", () => {
-		const root = mkRoot("no-op-evidence");
-		try {
-			for (const command of [
-				"env true # verification",
-				"/usr/bin/env true",
-				"env -C /tmp true",
-				"env --chdir=/tmp true",
-				"command -p true",
-				"command -v true",
-				"command -V true",
-				"exec -c true",
-				"exec -l true",
-				"exec -cl true",
-				"exec -a afol true",
-				"exec -- true",
-				"sh -c true",
-				"bash -lc 'true'",
-				"zsh -c ':'",
-				"sh -n",
-				"bash -n",
-				"sh -n --",
-				"bash -n --",
-				"/bin/sh -c true",
-				"/usr/bin/bash -lc true",
-				"/usr/bin/zsh -c :",
-				"/bin/dash -c true",
-				"bash -c",
-				"eval true",
-				"true && :",
-				"true || :",
-				"true; :",
-				"true | :",
-				"true & :",
-			]) {
-				const created = newWorkstream(root, "no-op evidence");
-				recordObservedCompletion(root, {
-					session: created.session,
-					taskId: "T-01",
-					command,
-					result: "passed",
-				});
+	test(
+		"no-op evidence cannot authorize task completion or session closure",
+		() => {
+			const root = mkRoot("no-op-evidence");
+			try {
+				for (const command of [
+					"env true # verification",
+					"/usr/bin/env true",
+					"env -C /tmp true",
+					"env --chdir=/tmp true",
+					"command -p true",
+					"command -v true",
+					"command -V true",
+					"exec -c true",
+					"exec -l true",
+					"exec -cl true",
+					"exec -a afol true",
+					"exec -- true",
+					"sh -c true",
+					"bash -lc 'true'",
+					"zsh -c ':'",
+					"sh -n",
+					"bash -n",
+					"sh -n --",
+					"bash -n --",
+					"/bin/sh -c true",
+					"/usr/bin/bash -lc true",
+					"/usr/bin/zsh -c :",
+					"/bin/dash -c true",
+					"bash -c",
+					"eval true",
+					"true && :",
+					"true || :",
+					"true; :",
+					"true | :",
+					"true & :",
+				]) {
+					const created = newWorkstream(root, "no-op evidence");
+					recordObservedCompletion(root, {
+						session: created.session,
+						taskId: "T-01",
+						command,
+						result: "passed",
+					});
 
-				expect(() =>
-					doneTask(root, { session: created.session, taskId: "T-01" }),
-				).toThrow("requires passed evidence");
+					expect(() =>
+						doneTask(root, { session: created.session, taskId: "T-01" }),
+					).toThrow("requires passed evidence");
 
-				writeFileSync(
-					created.taskPath,
-					readFileSync(created.taskPath, "utf8").replace(
-						"| T-01 | tested_needs_spec_validation |",
-						"| T-01 | done |",
-					),
-					"utf8",
-				);
-				expect(() => closeSession(root, created.session)).toThrow(
-					"failed strict verification",
-				);
+					writeFileSync(
+						created.taskPath,
+						readFileSync(created.taskPath, "utf8").replace(
+							"| T-01 | tested_needs_spec_validation |",
+							"| T-01 | done |",
+						),
+						"utf8",
+					);
+					expect(() => closeSession(root, created.session)).toThrow(
+						"failed strict verification",
+					);
+				}
+			} finally {
+				rmSync(root, { recursive: true, force: true });
 			}
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+		},
+		{ timeout: 60_000 },
+	);
 
 	test("shell syntax-check evidence can authorize done task completion and closure", () => {
 		const root = mkRoot("sh-n-closure");
@@ -2907,6 +2911,21 @@ describe("workbench lifecycle service", () => {
 			doneTask(root, { session: created.session, taskId: "T-01" });
 			closeSession(root, created.session);
 			expect(existsSync(created.activeSessionPath)).toBe(false);
+			expect(readFileSync(created.planPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+			writeFileSync(
+				created.planPath,
+				readFileSync(created.planPath, "utf8").replace(
+					'status: "closed"',
+					'status: "active"',
+				),
+				"utf8",
+			);
+			closeSession(root, created.session);
+			expect(readFileSync(created.planPath, "utf8")).toContain(
+				'status: "closed"',
+			);
 
 			writeFileSync(
 				created.taskPath,

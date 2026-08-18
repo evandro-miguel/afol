@@ -9,7 +9,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseDoneArgs } from "../commands/workbench/args";
-import { runVerificationAsync } from "../commands/workbench/verify";
+import {
+	runVerificationAsync,
+	splitCommandLine,
+} from "../commands/workbench/verify";
 import { sha256 } from "../services/evolution/imports/digest";
 import {
 	declaredHotPathArgs,
@@ -176,6 +179,14 @@ describe("F-32 hot-path benchmark runner", () => {
 				session,
 			),
 		).toEqual(["close", "--json"]);
+	});
+
+	test("tokenizes the F-32 config verification command consistently on Windows", () => {
+		expect(splitCommandLine(F32_CONFIG_VERIFICATION_COMMAND)).toEqual([
+			"bun",
+			"-e",
+			'let c=await Bun.file(".afol/config.json").json().catch(()=>null);process.exit(c?.schema_version===1&&c?.project?.name==="f32-hot-path-fixture"?0:1)',
+		]);
 	});
 
 	test("done config verification requires the F-32 fixture schema and project", async () => {

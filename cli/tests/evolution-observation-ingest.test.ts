@@ -13,6 +13,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import {
 	appendTelemetryEvent,
 	resolveTelemetryEventPath,
@@ -478,6 +480,7 @@ describe("observation-ingest", () => {
 		"symlink",
 		"hardlink",
 	] as const)("rejects an unsafe evidence target (%s) before mutation", (mode) => {
+		if (mode === "symlink" && !symlinkTestSupport.available) return;
 		const root = fixtureRoot();
 		const session = "S-unsafe-evidence";
 		seedCompleteEvidence(root, session);
@@ -507,6 +510,7 @@ describe("observation-ingest", () => {
 		"symlink",
 		"hardlink",
 	] as const)("rejects an unsafe task target (%s) before mutation", (mode) => {
+		if (mode === "symlink" && !symlinkTestSupport.available) return;
 		const root = fixtureRoot();
 		const session = "S-unsafe-task";
 		seedCompleteEvidence(root, session);
@@ -619,7 +623,13 @@ describe("observation-ingest", () => {
 				"session task file",
 				OBSERVE_TASK_LIMITS,
 				{
-					afterOpen: () => renameSync(replacementPath, taskPath),
+					afterOpen: () => {
+						// Windows does not allow rename-overwrite while the original
+						// descriptor is open. Removing the name first preserves the
+						// replacement/identity race this test is exercising.
+						rmSync(taskPath);
+						renameSync(replacementPath, taskPath);
+					},
 				},
 			),
 		).toThrow("session task file changed during read");
@@ -1148,7 +1158,7 @@ describe("observation-ingest", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1286,7 +1296,7 @@ describe("observation-ingest", () => {
 		} finally {
 			process.env.AFOL_FEEDBACK_MODE = origMode;
 			process.env.AFOL_STATE_HOME = origState;
-			rmSync(fbRoot, { recursive: true, force: true });
+			removeEvolutionTestRoot(fbRoot);
 		}
 	});
 

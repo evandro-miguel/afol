@@ -62,22 +62,44 @@ function pathInside(root: string, target: string): boolean {
 	return offset === "" || (!offset.startsWith("..") && !isAbsolute(offset));
 }
 
+function samePath(left: string, right: string): boolean {
+	const normalizedLeft = resolve(left);
+	const normalizedRight = resolve(right);
+	return process.platform === "win32"
+		? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+		: normalizedLeft === normalizedRight;
+}
+
 function secureDirectoryIdentity(
 	path: string,
 	root: string,
 	expected?: DirectoryIdentity,
 ): DirectoryIdentity {
+	const rootStat = lstatSync(root);
+	if (!rootStat.isDirectory() || rootStat.isSymbolicLink())
+		throw new Error("external import project root must be a real directory");
+	if (!samePath(realpathSync(root), root))
+		throw new Error("external import project root crosses a reparse point");
 	const stat = lstatSync(path);
 	if (!stat.isDirectory() || stat.isSymbolicLink())
 		throw new Error("external import destination must be a real directory");
 	if (typeof process.getuid === "function" && stat.uid !== process.getuid())
 		throw new Error("external import destination has an unexpected owner");
-	if ((stat.mode & 0o022) !== 0)
+	if (process.platform !== "win32" && (stat.mode & 0o022) !== 0)
 		throw new Error("external import destination is group/world writable");
 	const canonicalRoot = realpathSync(root);
 	const canonical = realpathSync(path);
 	if (!pathInside(canonicalRoot, canonical))
 		throw new Error("external import destination escapes the project root");
+	const verified = lstatSync(path);
+	if (
+		!verified.isDirectory() ||
+		verified.isSymbolicLink() ||
+		Number(verified.dev) !== Number(stat.dev) ||
+		Number(verified.ino) !== Number(stat.ino) ||
+		!samePath(realpathSync(path), canonical)
+	)
+		throw new Error("external import destination identity changed during security verification");
 	const identity = { dev: Number(stat.dev), ino: Number(stat.ino), canonical };
 	if (
 		expected &&
@@ -85,6 +107,21 @@ function secureDirectoryIdentity(
 	)
 		throw new Error("external import destination identity changed");
 	return identity;
+}
+
+function ensureSecureImportDirectory(root: string, target: string): DirectoryIdentity {
+	const rootIdentity = secureDirectoryIdentity(root, root);
+	const segments = relative(root, target).split(/[\\/]/).filter(Boolean);
+	let current = root;
+	let parent = rootIdentity;
+	for (const segment of segments) {
+		secureDirectoryIdentity(root, root, rootIdentity);
+		secureDirectoryIdentity(current, root, parent);
+		current = join(current, segment);
+		if (!existsSync(current)) mkdirSync(current, { mode: 0o700 });
+		parent = secureDirectoryIdentity(current, root);
+	}
+	return parent;
 }
 
 function assertOpenedArtifactFile(fd: number, parent: DirectoryIdentity): void {
@@ -477,7 +514,7 @@ function writeArtifact(
 	write?: WriteBufferSync,
 ): DirectoryIdentity {
 	secureDirectoryIdentity(dirname(path), root, parent);
-	mkdirSync(path, { recursive: true, mode: 0o700 });
+	mkdirSync(path, { mode: 0o700 });
 	const stage = secureDirectoryIdentity(path, root);
 	const files = artifactFiles(preview, links);
 	for (const [name, content] of Object.entries(files)) {
@@ -500,6 +537,8 @@ function writeArtifact(
 		} finally {
 			closeSync(fd);
 		}
+		secureDirectoryIdentity(dirname(path), root, parent);
+		secureDirectoryIdentity(path, root, stage);
 	}
 	secureDirectoryIdentity(path, root, stage);
 	fsyncDirectoryChain(path, root);
@@ -769,6 +808,10 @@ export async function confirmExternalImport(
 					...optionsArg,
 				}
 			: inputOrRoot;
+	if (process.platform === "win32")
+		throw new Error(
+			"external import persistence is unavailable on Windows until the runtime can verify directory owner and DACL safely",
+		);
 	assertSafeEvolutionProjectRoot(input.root);
 	const source = sourceInput(input.provider, input.source);
 	const projectId = projectIdFor(input.root, source, input.projectId);
@@ -827,8 +870,10 @@ export async function confirmExternalImport(
 				preview.importId,
 			);
 			const providerPath = dirname(finalPath);
-			mkdirSync(providerPath, { recursive: true, mode: 0o700 });
-			const provider = secureDirectoryIdentity(providerPath, input.root);
+			const provider = ensureSecureImportDirectory(
+				input.root,
+				providerPath,
+			);
 			const existed = existsSync(finalPath);
 			if (existed) secureDirectoryIdentity(finalPath, input.root);
 			let canonicalLinks: readonly ExternalSessionLink[] = preview.links;
@@ -859,6 +904,8 @@ export async function confirmExternalImport(
 					);
 					secureDirectoryIdentity(providerPath, input.root, provider);
 					secureDirectoryIdentity(stagePath, input.root, stage);
+					if (existsSync(finalPath))
+						throw new Error("external import artifact destination appeared during staging");
 					renameSync(stagePath, finalPath);
 					installed = true;
 					secureDirectoryIdentity(finalPath, input.root, stage);

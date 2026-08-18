@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { runFileCommand } from "../commands/file";
 import {
 	parseArchiveArgs,
@@ -463,7 +464,7 @@ describe("mutation transaction hardening", () => {
 		}
 	});
 
-	test("journal backup reads reject symlink escapes", () => {
+	test.skipIf(!symlinkTestSupport.available)("journal backup reads reject symlink escapes", () => {
 		const root = mkProjectRoot();
 		const outside = writeFileTree(root, "outside.txt", "secret");
 		const link = join(resolveProjectPaths(root).abs.mutationBackupsDir, "link");
@@ -735,7 +736,7 @@ describe("file shared helpers", () => {
 				resolveProjectPaths(root).abs.mutationBackupsDir,
 			);
 			expect(archive.path).toContain(
-				resolveProjectPaths(root).mutationArchivesDir,
+				resolveProjectPaths(root).abs.mutationArchivesDir,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

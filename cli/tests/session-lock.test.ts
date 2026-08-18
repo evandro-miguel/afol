@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import * as nodeFs from "node:fs";
 import {
 	existsSync,
 	linkSync,
@@ -15,6 +16,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
+import { symlinkTestSupport } from "./symlink-test-support";
 import { dirname, join } from "node:path";
 import {
 	isMainThread,
@@ -254,7 +256,7 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
-	test("external path lock keys physical roots identically through symlinks", () => {
+	test.skipIf(!symlinkTestSupport.available)("external path lock keys physical roots identically through symlinks", () => {
 		const root = mkProjectRoot("external-lock-realpath");
 		const link = `${root}-link`;
 		try {
@@ -290,6 +292,70 @@ describe("session-lock", () => {
 		expect(entered).toBe(true);
 		expect(existsSync(lockPath)).toBe(false);
 	});
+
+	test.skipIf(process.platform !== "win32")(
+		"external path lock retries a proven deleted-lock EPERM transition",
+		async () => {
+			const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
+			const lockPath = resolveExternalPathLockPath(resource);
+			const originalOpenSync = nodeFs.openSync;
+			let injected = false;
+			const openSpy = spyOn(nodeFs, "openSync").mockImplementation(
+				(...args) => {
+					if (
+						!injected &&
+						args[0] === lockPath &&
+						args[1] === "wx"
+					) {
+						injected = true;
+						throw Object.assign(new Error("deleted lock transition"), {
+							code: "EPERM",
+						});
+					}
+					return originalOpenSync(...args);
+				},
+			);
+			try {
+				let entered = false;
+				await withExternalPathLock(resource, async () => {
+					entered = true;
+				});
+				expect(injected).toBe(true);
+				expect(entered).toBe(true);
+			} finally {
+				openSpy.mockRestore();
+				rmSync(lockPath, { force: true });
+			}
+		},
+	);
+
+	test.skipIf(process.platform !== "win32")(
+		"external path lock rejects an EPERM while the lock still exists",
+		async () => {
+			const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
+			const lockPath = resolveExternalPathLockPath(resource);
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(lockPath, "existing lock\n", "utf8");
+			const originalOpenSync = nodeFs.openSync;
+			const openSpy = spyOn(nodeFs, "openSync").mockImplementation(
+				(...args) => {
+					if (args[0] === lockPath && args[1] === "wx")
+						throw Object.assign(new Error("unproven lock transition"), {
+							code: "EPERM",
+						});
+					return originalOpenSync(...args);
+				},
+			);
+			try {
+				await expect(
+					withExternalPathLock(resource, async () => undefined),
+				).rejects.toMatchObject({ code: "EPERM" });
+			} finally {
+				openSpy.mockRestore();
+				rmSync(lockPath, { force: true });
+			}
+		},
+	);
 
 	test("external path lock never removes a replacement inode", async () => {
 		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);

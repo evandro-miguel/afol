@@ -14,6 +14,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand } from "../commands/evolve";
 import {
 	appendProductionDayAllocation,
@@ -146,7 +148,7 @@ describe("evolution static path safety", () => {
 				beforeStateEntries,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -163,7 +165,7 @@ describe("evolution static path safety", () => {
 				"must not be hardlinked",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -204,11 +206,11 @@ describe("evolution static path safety", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
-	test("rejects a symlinked intermediate state directory", () => {
+	test.skipIf(!symlinkTestSupport.available)("rejects a symlinked intermediate state directory", () => {
 		const root = fixture();
 		try {
 			const outside = join(root, "outside");
@@ -219,7 +221,7 @@ describe("evolution static path safety", () => {
 				openEvolutionDb(join(root, ".afol", "state", "evolution.db")),
 			).toThrow(/parent|reparse|symlink/i);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

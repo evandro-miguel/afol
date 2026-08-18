@@ -77,15 +77,23 @@ export async function* readJsonl(
 	state: JsonlReaderState,
 	limitsInput?: Partial<ImportLimits>,
 ): AsyncGenerator<{ line: number; value: Record<string, unknown> }> {
+	const isWindowsDrivePath = /^[A-Za-z]:[\\/]/.test(path);
 	if (
 		path.includes("\0") ||
-		/^(?:\\\\|\/\/|[A-Za-z]:[\\/])/.test(path) ||
-		path.split(/[\\/]/).some((part) => part.includes(":"))
+		/^(?:\\\\|\/\/)/.test(path) ||
+		(isWindowsDrivePath && process.platform !== "win32") ||
+		path.split(/[\\/]/).some((part, index) =>
+			part.includes(":") && !(isWindowsDrivePath && index === 0 && /^[A-Za-z]:$/.test(part)),
+		)
 	)
 		throw new Error("import source path is not a supported local path");
 	const resolvedPath = resolve(path);
 	const canonicalPath = await realpath(path);
-	if (canonicalPath !== resolvedPath)
+	const samePhysicalPath =
+		process.platform === "win32"
+			? canonicalPath.toLowerCase() === resolvedPath.toLowerCase()
+			: canonicalPath === resolvedPath;
+	if (!samePhysicalPath)
 		throw new Error("import source path must not contain symbolic links");
 	if (canonicalPath.split(sep).some((part) => part === ".."))
 		throw new Error("import source path is invalid");

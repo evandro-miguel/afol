@@ -539,11 +539,34 @@ function closeAppendHandle(handle: ReceiptAppendHandle): void {
 
 function rollbackAppendHandle(handle: ReceiptAppendHandle): void {
 	verifyAppendHandle(handle);
+	const truncateFd =
+		process.platform === "win32"
+			? openSync(handle.path, openFlags(fsConstants.O_WRONLY))
+			: handle.fd;
 	try {
-		ftruncateSync(handle.fd, handle.previousSize);
-		handle.syncFile(handle.fd);
+		if (truncateFd !== handle.fd) {
+			const opened = fstatSync(truncateFd);
+			const current = assertSafeEvolutionTarget(
+				handle.path,
+				"suggestion journal target",
+				false,
+			);
+			if (
+				!opened.isFile() ||
+				opened.nlink !== 1 ||
+				!current ||
+				!sameIdentity(handle.opened, opened) ||
+				!sameIdentity(current, opened)
+			)
+				throw new Error(
+					"suggestion journal target changed before destructive action",
+				);
+		}
+		ftruncateSync(truncateFd, handle.previousSize);
+		handle.syncFile(truncateFd);
 		syncParentDirectory(handle.path);
 	} finally {
+		if (truncateFd !== handle.fd) closeSync(truncateFd);
 		closeAppendHandle(handle);
 	}
 }

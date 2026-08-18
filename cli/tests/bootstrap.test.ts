@@ -24,6 +24,9 @@ import {
 } from "../services/bootstrap/planner";
 import { resolveExternalPathLockPath } from "../services/io/session-lock";
 import type { TemplateFileMap } from "../services/template/payload";
+import { symlinkTestSupport } from "./symlink-test-support";
+
+const symlinkTest = test.skipIf(!symlinkTestSupport.available);
 
 function sha256Hex(value: string): string {
 	return createHash("sha256").update(value).digest("hex");
@@ -181,16 +184,25 @@ describe("bootstrap planner ownership policy", () => {
 		).toMatchObject({ kind: "conflict" });
 	});
 
-	test("fails closed for a symlink or non-regular completion-lock gitignore", async () => {
-		for (const kind of ["symlink", "directory"] as const) {
-			const target = mkdtempSync(
-				join(tmpdir(), `bootstrap-gitignore-${kind}-`),
-			);
+	test("fails closed for a non-regular completion-lock gitignore", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-gitignore-directory-"));
+		try {
+			mkdirSync(join(target, ".gitignore"));
+			expect(await runBootstrapCommand([target, "--dry-run"])).toBe(4);
+			expect(
+				await runBootstrapCommand([target, "--dry-run", "--force-managed"]),
+			).toBe(4);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	symlinkTest(
+		"fails closed for a symlinked completion-lock gitignore [requires symlink privilege]",
+		async () => {
+			const target = mkdtempSync(join(tmpdir(), "bootstrap-gitignore-symlink-"));
 			try {
-				const gitignore = join(target, ".gitignore");
-				if (kind === "symlink")
-					symlinkSync(join(target, "missing-target"), gitignore);
-				else mkdirSync(gitignore);
+				symlinkSync(join(target, "missing-target"), join(target, ".gitignore"));
 				expect(await runBootstrapCommand([target, "--dry-run"])).toBe(4);
 				expect(
 					await runBootstrapCommand([target, "--dry-run", "--force-managed"]),
@@ -198,8 +210,8 @@ describe("bootstrap planner ownership policy", () => {
 			} finally {
 				rmSync(target, { recursive: true, force: true });
 			}
-		}
-	});
+		},
+	);
 
 	test("plans create/skip-identical/update-managed/preserve-project-owned", () => {
 		const managedCurrent = "managed-old";
@@ -330,7 +342,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 	});
 
-	test("rejects a target replaced by a symlink while waiting for its lock", async () => {
+	symlinkTest(
+		"rejects a target replaced by a symlink while waiting for its lock [requires symlink privilege]",
+		async () => {
 		const root = mkdtempSync(join(tmpdir(), "bootstrap-locked-target-swap-"));
 		const target = join(root, "target");
 		const outside = join(root, "outside");
@@ -357,7 +371,8 @@ describe("bootstrap provider-compatible mutable state", () => {
 			console.error = originalError;
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+		},
+	);
 
 	test("supports a nested nonexistent target with a stable canonical lock key", async () => {
 		const root = mkdtempSync(join(tmpdir(), "bootstrap-missing-parent-"));
@@ -375,7 +390,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 	});
 
-	test("rejects existing and broken target-root symlinks without replacing them", async () => {
+	symlinkTest(
+		"rejects existing and broken target-root symlinks without replacing them [requires symlink privilege]",
+		async () => {
 		const root = mkdtempSync(join(tmpdir(), "bootstrap-root-symlink-"));
 		const realTarget = join(root, "real");
 		mkdirSync(realTarget);
@@ -399,7 +416,8 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 		expect(readdirSync(realTarget)).toEqual([]);
 		rmSync(root, { recursive: true, force: true });
-	});
+		},
+	);
 
 	test("restores the exact target tree after failures in every mutation phase", async () => {
 		const cases = [
@@ -522,7 +540,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 	});
 
-	test("does not write template files through symlinked target directories", async () => {
+	symlinkTest(
+		"does not write template files through symlinked target directories [requires symlink privilege]",
+		async () => {
 		const target = mkdtempSync(join(tmpdir(), "bootstrap-symlink-target-"));
 		const outside = mkdtempSync(join(tmpdir(), "bootstrap-symlink-outside-"));
 		const errors: string[] = [];
@@ -543,7 +563,8 @@ describe("bootstrap provider-compatible mutable state", () => {
 			rmSync(target, { recursive: true, force: true });
 			rmSync(outside, { recursive: true, force: true });
 		}
-	});
+		},
+	);
 
 	test("writes mutable state baseline under .afol and configures paths", async () => {
 		const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-"));

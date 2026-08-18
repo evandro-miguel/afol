@@ -11,6 +11,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runPatchMutation } from "../commands/file/mutations/patch";
 import {
 	appendProductionDayAllocation,
@@ -282,7 +284,7 @@ describe("evolution apply service", () => {
 				),
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -317,7 +319,7 @@ describe("evolution apply service", () => {
 				),
 			).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -367,7 +369,7 @@ describe("evolution apply service", () => {
 				),
 			).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -388,7 +390,7 @@ describe("evolution apply service", () => {
 				false,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -428,7 +430,7 @@ describe("evolution apply service", () => {
 				}),
 			).toMatchObject({ status: "rolled_back", duplicate: true });
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -498,7 +500,7 @@ describe("evolution apply service", () => {
 				applyEvolutionProposal(applyInput(root, proposal, task)),
 			).toThrow("incomplete final record");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -534,7 +536,7 @@ describe("evolution apply service", () => {
 				"concurrent writer\n",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -549,7 +551,7 @@ describe("evolution apply service", () => {
 				applyEvolutionProposal(applyInput(root, proposal, task)),
 			).toThrow("mutation binding mismatch");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -572,7 +574,7 @@ describe("evolution apply service", () => {
 				),
 			).toThrow("mutation binding mismatch");
 		} finally {
-			rmSync(drift.root, { recursive: true, force: true });
+			removeEvolutionTestRoot(drift.root);
 		}
 
 		const undone = fixture();
@@ -599,7 +601,7 @@ describe("evolution apply service", () => {
 				),
 			).toThrow("mutation was undone");
 		} finally {
-			rmSync(undone.root, { recursive: true, force: true });
+			removeEvolutionTestRoot(undone.root);
 		}
 	});
 
@@ -620,7 +622,7 @@ describe("evolution apply service", () => {
 				}),
 			).toThrow("stale");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -651,7 +653,7 @@ describe("evolution apply service", () => {
 			).toMatchObject({ status: "rolled_back" });
 			expect(existsSync(join(root, targetPath))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -672,6 +674,7 @@ describe("evolution apply service", () => {
 			linkSync(journal, alias);
 			expect(() => readApplyJournal(root)).toThrow("must not be hardlinked");
 			rmSync(journal);
+			if (!symlinkTestSupport.available) return;
 			symlinkSync(alias, journal);
 			expect(() => readApplyJournal(root)).toThrow(
 				/symlink|reparse|regular file/i,
@@ -681,7 +684,7 @@ describe("evolution apply service", () => {
 			expect(readFileSync(alias)).toEqual(bytes);
 			void first;
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -703,7 +706,7 @@ describe("evolution apply service", () => {
 			expect(readFileSync(join(root, targetPath))).toEqual(before);
 			expect(readApplyJournal(root).at(-1)?.phase).toBe("commit");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -734,7 +737,7 @@ describe("evolution apply service", () => {
 			]);
 			expect(readApplyJournal(root).at(-1)?.phase).toBe("abort");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -775,7 +778,7 @@ describe("evolution apply service", () => {
 				),
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -806,7 +809,7 @@ describe("evolution apply service", () => {
 			expect(existsSync(join(root, requireTargetPath(applied)))).toBe(false);
 			expect(readApplyJournal(root).at(-1)?.phase).toBe("abort");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -832,7 +835,7 @@ describe("evolution apply service", () => {
 			expect(recoverEvolutionApplies(root)).toEqual([]);
 			expect(readApplyJournal(root).at(-1)?.phase).toBe("rollback");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -857,7 +860,7 @@ describe("evolution apply service", () => {
 				}),
 			).toThrow("committed project identity mismatch");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -880,7 +883,7 @@ describe("evolution apply service", () => {
 			expect(existsSync(join(root, requireTargetPath(applied)))).toBe(false);
 			expect(readApplyJournal(root).at(-1)?.phase).toBe("abort");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -911,7 +914,7 @@ describe("evolution apply service", () => {
 			);
 			expect(existsSync(join(root, requireTargetPath(applied)))).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -945,7 +948,7 @@ describe("evolution apply service", () => {
 			writeFileSync(join(root, requireTargetPath(applied)), "drift\n");
 			expect(() => recoverEvolutionApplies(root)).toThrow("recovery drift");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

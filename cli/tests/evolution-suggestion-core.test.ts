@@ -5,12 +5,12 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand } from "../commands/evolve";
 import { defaultOperationContext } from "../core/operation-context";
 import {
@@ -261,7 +261,7 @@ describe("evolution suggestion model", () => {
 			expect(output.join("\n")).toContain('"suggestion":null');
 			expect(existsSync(join(root, ".afol", "data", "events"))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -288,7 +288,7 @@ describe("evolution suggestion model", () => {
 			expect(output.join("\n")).not.toContain("evidence_digest");
 			expect(previewDailySuggestion(root).daily_status).toBe("shown");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -308,7 +308,7 @@ describe("evolution suggestion model", () => {
 				);
 			} finally {
 				db.close();
-				rmSync(root, { recursive: true, force: true });
+				removeEvolutionTestRoot(root);
 			}
 		}
 	});
@@ -339,7 +339,7 @@ describe("evolution suggestion model", () => {
 				"evolution active projection differs from checkpoint",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -363,7 +363,7 @@ describe("evolution suggestion model", () => {
 				"evolution projection checkpoint digest is invalid",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -392,7 +392,7 @@ describe("evolution suggestion model", () => {
 			expect(existsSync(path)).toBeTrue();
 			expect(previewDailySuggestion(root).daily_status).toBe("shown");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -431,7 +431,7 @@ describe("evolution suggestion model", () => {
 			}
 			expect(previewDailySuggestion(root).daily_status).toBe("shown");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -478,7 +478,7 @@ describe("evolution suggestion model", () => {
 				repaired.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -760,7 +760,7 @@ describe("evolution suggestion model", () => {
 			expect(JSON.stringify(decision)).not.toContain(claim.claim_token);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });
@@ -807,7 +807,7 @@ describe("daily suggestion receipts", () => {
 			expect(output.join("\n")).not.toContain("claim_token_digest");
 			expect(output.join("\n")).not.toContain("evidence_digest");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -876,7 +876,7 @@ describe("daily suggestion receipts", () => {
 			expect(readSuggestionReceiptJournal(root, PROJECT_ID)).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -908,7 +908,7 @@ describe("daily suggestion receipts", () => {
 				}),
 			).toThrow("requires a reason");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

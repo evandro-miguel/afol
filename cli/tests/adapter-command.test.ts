@@ -21,6 +21,9 @@ import {
 	writeClaudeAdapterEnabled,
 } from "../services/adapter/claude";
 import type { TemplateFileMap } from "../services/template/payload";
+import { symlinkTestSupport } from "./symlink-test-support";
+
+const symlinkTest = test.skipIf(!symlinkTestSupport.available);
 
 function createRoot(withClaudeArtifacts = true): string {
 	const root = mkdtempSync(join(tmpdir(), "adapter-cmd-"));
@@ -97,7 +100,9 @@ describe("claude adapter service", () => {
 		}
 	});
 
-	test("writeClaudeAdapterEnabled rejects symlinked config paths", () => {
+	symlinkTest(
+		"writeClaudeAdapterEnabled rejects symlinked config paths [requires symlink privilege]",
+		() => {
 		const root = mkdtempSync(join(tmpdir(), "adapter-cmd-symlink-"));
 		const outside = mkdtempSync(join(tmpdir(), "adapter-cmd-outside-"));
 		try {
@@ -118,7 +123,8 @@ describe("claude adapter service", () => {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(outside, { recursive: true, force: true });
 		}
-	});
+		},
+	);
 
 	test("findClaudeArtifacts lists present owned paths", () => {
 		const root = createRoot(true);
@@ -148,7 +154,9 @@ describe("claude adapter service", () => {
 		}
 	});
 
-	test("archiveClaudeArtifacts rejects symlinked archive roots before creating directories", () => {
+	symlinkTest(
+		"archiveClaudeArtifacts rejects symlinked archive roots before creating directories [requires symlink privilege]",
+		() => {
 		const root = createRoot(true);
 		const outside = mkdtempSync(join(tmpdir(), "adapter-archive-outside-"));
 		try {
@@ -164,7 +172,8 @@ describe("claude adapter service", () => {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(outside, { recursive: true, force: true });
 		}
-	});
+		},
+	);
 
 	test("restoreClaudeArtifacts is a no-op when template ships no Claude files", () => {
 		const root = createRoot(false);

@@ -16,6 +16,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkTestSupport } from "./symlink-test-support";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { defaultOperationContext } from "../core/operation-context";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
 import {
@@ -129,7 +131,7 @@ describe("evolution suggestion hardening", () => {
 			expect(actual).toEqual(expected);
 		} finally {
 			closeSync(fd);
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -182,7 +184,7 @@ describe("evolution suggestion hardening", () => {
 				"semantics",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -242,7 +244,7 @@ describe("evolution suggestion hardening", () => {
 			expect(serialized).not.toContain("REDACTION_CANARY_DIGEST_JOURNAL");
 			expect(serialized).toContain("REDACTED");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 	test("serializes two processes to exactly one same-day claim winner", async () => {
@@ -281,7 +283,7 @@ describe("evolution suggestion hardening", () => {
 			);
 			expect(readSuggestionReceiptJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -347,7 +349,7 @@ describe("evolution suggestion hardening", () => {
 				}),
 			).toThrow("already acknowledged");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -386,7 +388,7 @@ describe("evolution suggestion hardening", () => {
 			).toEqual([{ generation: 2, receipt_status: "claimed" }]);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -435,7 +437,7 @@ describe("evolution suggestion hardening", () => {
 				}),
 			).toThrow("configured evolution project");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -462,12 +464,11 @@ describe("evolution suggestion hardening", () => {
 				),
 			).not.toContain(claim.claim_token);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
 	test("rejects symlinked and hardlinked journal targets", () => {
-		if (process.platform === "win32") return;
 		for (const kind of ["symlink", "hardlink"] as const) {
 			const root = mkdtempSync(join(tmpdir(), `evolution-suggestion-${kind}-`));
 			configure(root);
@@ -475,7 +476,10 @@ describe("evolution suggestion hardening", () => {
 			mkdirSync(dirname(target), { recursive: true });
 			const outside = join(root, `${kind}-outside.jsonl`);
 			writeFileSync(outside, "");
-			if (kind === "symlink") symlinkSync(outside, target);
+			if (kind === "symlink") {
+				if (!symlinkTestSupport.available) continue;
+				symlinkSync(outside, target);
+			}
 			else linkSync(outside, target);
 			try {
 				expect(() =>
@@ -490,7 +494,7 @@ describe("evolution suggestion hardening", () => {
 					}),
 				).toThrow(/regular file|hardlinked|reparse|symlink/);
 			} finally {
-				rmSync(root, { recursive: true, force: true });
+				removeEvolutionTestRoot(root);
 			}
 		}
 	});
@@ -514,7 +518,7 @@ describe("evolution suggestion hardening", () => {
 			expect(claim.event.action).toBe("claimed");
 			expect(readSuggestionReceiptJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -537,7 +541,7 @@ describe("evolution suggestion hardening", () => {
 			).toThrow("write was incomplete");
 			expect(readSuggestionReceiptJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -564,7 +568,7 @@ describe("evolution suggestion hardening", () => {
 			).toThrow("append and rollback failed");
 			expect(readFileSync(path, "utf8")).toBe("replacement");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -597,7 +601,7 @@ describe("evolution suggestion hardening", () => {
 			).toEqual({ count: 0 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -623,7 +627,7 @@ describe("evolution suggestion hardening", () => {
 				"line exceeds",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -656,12 +660,11 @@ describe("evolution suggestion hardening", () => {
 				),
 			).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
 	test("preview rejects a hardlinked derived database", () => {
-		if (process.platform === "win32") return;
 		const root = mkdtempSync(join(tmpdir(), "evolution-preview-hardlink-"));
 		try {
 			configure(root);
@@ -670,7 +673,7 @@ describe("evolution suggestion hardening", () => {
 			linkSync(path, join(root, "linked-evolution.db"));
 			expect(() => previewDailySuggestion(root)).toThrow(/hardlinked/);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -705,7 +708,7 @@ describe("evolution suggestion hardening", () => {
 				/projection checkpoint is missing/,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

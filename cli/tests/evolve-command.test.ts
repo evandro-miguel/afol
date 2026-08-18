@@ -6,12 +6,12 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	statSync,
 	writeFileSync,
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand, runObserveCommand } from "../commands/evolve";
 import {
 	agentOperationContext,
@@ -226,7 +226,7 @@ describe("evolve status", () => {
 				"local interactive diagnostics required",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -267,7 +267,7 @@ describe("evolve status", () => {
 				"local interactive diagnostics required",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -294,7 +294,7 @@ describe("evolve status", () => {
 			expect(existsSync(`${dbPath}-wal`)).toBe(false);
 			expect(existsSync(`${dbPath}-shm`)).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -316,7 +316,7 @@ describe("evolve status", () => {
 			expect(payload.data.journal_health.error).toMatch(/^observations:/);
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -335,7 +335,7 @@ describe("evolve status", () => {
 				proposals: [],
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -363,7 +363,7 @@ describe("evolve status", () => {
 				4_000,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -417,7 +417,7 @@ describe("evolve status", () => {
 			});
 			expect(readFileSync(dbPath)).toEqual(before);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -459,7 +459,7 @@ describe("evolve status", () => {
 			expect(payload.data.journal_health.valid).toBe(true);
 			expect(readFileSync(dbPath)).toEqual(before);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -493,7 +493,7 @@ describe("evolve status", () => {
 			await new Promise<void>(
 				(resolve) => child?.once("exit", () => resolve()) ?? resolve(),
 			);
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -523,7 +523,7 @@ describe("evolve status", () => {
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.data).toMatchObject({ state: "rebuild_required" });
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -572,7 +572,7 @@ describe("evolve status", () => {
 				error: { code: "EVOLUTION_STATUS_FAILED" },
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -638,7 +638,7 @@ describe("evolve status", () => {
 			const journalPath = observationJournalPath(root);
 			expect(existsSync(journalPath)).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -660,7 +660,7 @@ describe("evolve status", () => {
 				error: { code: "EVOLVE_OBSERVE_FAILED" },
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -684,7 +684,7 @@ describe("evolve status", () => {
 				error: { code: "EVOLVE_OBSERVE_FAILED" },
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -706,7 +706,7 @@ describe("evolve status", () => {
 				error: { code: "approval-required" },
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -771,7 +771,7 @@ describe("evolve status", () => {
 			const journalPath = observationJournalPath(root);
 			expect(existsSync(journalPath)).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -800,7 +800,7 @@ describe("evolve status", () => {
 			});
 			expect(captured.stderr).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -840,8 +840,8 @@ describe("evolve status", () => {
 				]),
 			);
 		} finally {
-			rmSync(source, { recursive: true, force: true });
-			rmSync(target, { recursive: true, force: true });
+			removeEvolutionTestRoot(source);
+			removeEvolutionTestRoot(target);
 		}
 	});
 });

@@ -5,6 +5,7 @@ import {
 	chmodSync,
 	closeSync,
 	copyFileSync,
+	cpSync,
 	existsSync,
 	constants as fsConstants,
 	fstatSync,
@@ -27,6 +28,7 @@ import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import {
 	readMinifiedCompiledReleaseBuildReceipt,
 	compiledReleaseBuildArgs as releaseBuildArgs,
+	releaseArtifactPath,
 	writeCompiledReleaseBuildReceipt,
 } from "../dev/build-release";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
@@ -90,6 +92,7 @@ type SandboxRootIdentity = {
 	basename: string;
 	rootDev: number;
 	rootIno: number;
+	rootBirthtimeMs: number;
 	parentDev: number;
 	parentIno: number;
 };
@@ -214,6 +217,17 @@ function tokenizeCommand(command: string): string[] {
 	let quote: '"' | "'" | null = null;
 	let escaping = false;
 	for (const char of command.trim()) {
+		// POSIX-style single quotes are literal. In particular, Windows paths
+		// embedded in a `node -e '...'` scenario must retain their backslashes;
+		// treating them as escapes rewrites `D:\\...` before the child starts.
+		if (quote === "'") {
+			if (char === quote) {
+				quote = null;
+			} else {
+				current += char;
+			}
+			continue;
+		}
 		if (escaping) {
 			current += char;
 			escaping = false;
@@ -296,6 +310,15 @@ function resolveCommandInvocation(
 				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
 			};
 		}
+		// The repository wrapper is a POSIX shell script. Windows cannot spawn an
+		// extensionless shell wrapper, so source benchmarks must invoke Bun
+		// directly. Compiled runs return above through `resolveAfolExecutable`.
+		if (process.platform === "win32") {
+			return {
+				command: "bun",
+				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
+			};
+		}
 		const afolPath = join(projectRoot, "afol");
 		try {
 			accessSync(afolPath, fsConstants.X_OK);
@@ -312,6 +335,29 @@ function resolveCommandInvocation(
 
 function shellQuote(value: string): string {
 	return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function bashPath(path: string): string {
+	if (process.platform !== "win32") return path;
+	const result = boundedSpawn("bash", ["-lc", `wslpath -a -- ${shellQuote(path)}`], {
+		timeoutMs: 15_000,
+	});
+	const resolved = result.stdout.trim();
+	if (!result.ok || !resolved) {
+		throw new Error(
+			`Sandbox path conversion failed: ${outputTail(spawnFailureDetail(result))}`,
+		);
+	}
+	return resolved;
+}
+
+function isSymlinkPrivilegeError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error.code === "EACCES" || error.code === "EPERM")
+	);
 }
 
 export function ensureBenchmarkTempRoot(projectRoot: string): string {
@@ -428,7 +474,7 @@ function createSandboxRoot(projectRoot: string): string {
 	).join(" ");
 	const exportCommand = [
 		"set -euo pipefail;",
-		`tar -C ${shellQuote(projectRoot)} ${excludeFlags} -cf - . | tar -C ${shellQuote(sandboxRoot)} -xf -`,
+		`tar -C ${shellQuote(bashPath(projectRoot))} ${excludeFlags} -cf - . | tar -C ${shellQuote(bashPath(sandboxRoot))} -xf -`,
 	].join(" ");
 	const exportResult = boundedSpawn("bash", ["-lc", exportCommand], {
 		timeoutMs: 120_000,
@@ -441,7 +487,13 @@ function createSandboxRoot(projectRoot: string): string {
 	}
 	const projectNodeModules = join(projectRoot, "node_modules");
 	if (existsSync(projectNodeModules)) {
-		symlinkSync(projectNodeModules, join(sandboxRoot, "node_modules"), "dir");
+		const sandboxNodeModules = join(sandboxRoot, "node_modules");
+		try {
+			symlinkSync(projectNodeModules, sandboxNodeModules, "dir");
+		} catch (error) {
+			if (!isSymlinkPrivilegeError(error)) throw error;
+			cpSync(projectNodeModules, sandboxNodeModules, { recursive: true });
+		}
 	}
 	return sandboxRoot;
 }
@@ -457,6 +509,7 @@ function captureSandboxRootIdentity(sandboxRoot: string): SandboxRootIdentity {
 		basename: sandboxRoot.slice(parentPath.length + 1),
 		rootDev: rootStat.dev,
 		rootIno: rootStat.ino,
+		rootBirthtimeMs: rootStat.birthtimeMs,
 		parentDev: parentStat.dev,
 		parentIno: parentStat.ino,
 	};
@@ -478,6 +531,7 @@ function sandboxRootIdentityMatches(
 			parentStat.isDirectory() &&
 			rootStat.dev === identity.rootDev &&
 			rootStat.ino === identity.rootIno &&
+			rootStat.birthtimeMs === identity.rootBirthtimeMs &&
 			parentStat.dev === identity.parentDev &&
 			parentStat.ino === identity.parentIno
 		);
@@ -677,7 +731,11 @@ function executionProfile(
 }
 
 export function isCompiledBunRuntime(mainPath = Bun.main): boolean {
-	return mainPath.includes("$bunfs");
+	const normalizedPath = mainPath.replaceAll("\\", "/");
+	return (
+		normalizedPath.startsWith("/$bunfs/") ||
+		/^b:\/~bun(?:\/|$)/i.test(normalizedPath)
+	);
 }
 
 export function resolveAfolExecutable(
@@ -689,12 +747,16 @@ export function resolveAfolExecutable(
 	return isCompiledBunRuntime(mainPath) ? execPath : null;
 }
 
+export function compiledBenchmarkArtifactPath(artifactRoot: string): string {
+	return releaseArtifactPath(join(artifactRoot, "afol"));
+}
+
 export function prepareCompiledReleaseArtifact(
 	projectRoot: string,
 ): PreparedCompiledReleaseArtifact {
 	const artifactParent = ensureBenchmarkTempRoot(projectRoot);
 	const artifactRoot = mkdtempSync(join(artifactParent, "afol-bench-release-"));
-	const targetBinary = join(artifactRoot, "afol");
+	const targetBinary = compiledBenchmarkArtifactPath(artifactRoot);
 	try {
 		if (isCompiledBunRuntime()) {
 			const sourceState = benchmarkSourceState(projectRoot);

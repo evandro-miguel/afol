@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { runEvolveCommand } from "../commands/evolve";
 import {
 	agentOperationContext,
@@ -231,7 +232,7 @@ describe("evolve suggestion command boundary", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -254,7 +255,7 @@ describe("evolve suggestion command boundary", () => {
 			);
 			expect(existsSync(join(root, ".afol", "data", "events"))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -278,7 +279,7 @@ describe("evolve suggestion command boundary", () => {
 				false,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -302,7 +303,7 @@ describe("evolve suggestion command boundary", () => {
 			);
 			expect(existsSync(join(root, ".afol", "data", "events"))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -342,7 +343,7 @@ describe("evolve suggestion command boundary", () => {
 			expect(existsSync(checkpoint)).toBe(false);
 			expect(readFileSync(evolutionDbPath(root))).toEqual(beforeDb);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -369,7 +370,7 @@ describe("evolve suggestion command boundary", () => {
 			expect(serialized).not.toContain("source_refs");
 			expect(serialized).not.toContain("related_session_ids");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -406,7 +407,7 @@ describe("evolve suggestion command boundary", () => {
 			expect(JSON.stringify(payload)).not.toContain(root);
 			expect(JSON.stringify(payload)).not.toContain("not-json");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -445,7 +446,7 @@ describe("evolve suggestion command boundary", () => {
 			});
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -482,7 +483,7 @@ describe("evolve suggestion command boundary", () => {
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
 			expect(existsSync(join(root, ".afol", "data"))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -503,7 +504,7 @@ describe("evolve suggestion command boundary", () => {
 				ok: true,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -531,7 +532,7 @@ describe("evolve suggestion command boundary", () => {
 			).toBe(0);
 			expect(status.output.join("\n")).toContain('"suggestion_queue"');
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -572,7 +573,7 @@ describe("evolve suggestion command boundary", () => {
 			expect(output).toContain('"critical_alerts"');
 			expect(output).toContain("integrity_error");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -652,7 +653,7 @@ describe("evolve suggestion command boundary", () => {
 			const p95 = durations[Math.ceil(durations.length * 0.95) - 1] ?? Infinity;
 			expect(p95).toBeLessThan(150);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -711,7 +712,7 @@ describe("evolve suggestion command boundary", () => {
 				).get(`${PROJECT_ID}\u00002026-07-18`)?.suggestion_id,
 			).toBe(previewId);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -761,7 +762,7 @@ describe("evolve suggestion command boundary", () => {
 				expect(preview.suggestion).toBeNull();
 				expect(preview.pending_count).toBe(1);
 			} finally {
-				rmSync(root, { recursive: true, force: true });
+				removeEvolutionTestRoot(root);
 			}
 		}
 	});
@@ -792,7 +793,7 @@ describe("evolve suggestion command boundary", () => {
 			expect(receipt?.local_date).toBe(localDate);
 			expect(receipt?.receipt_status).toBe("shown");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -811,7 +812,7 @@ describe("evolve suggestion command boundary", () => {
 			).toBe(2);
 			expect(sink.output.join("\n")).toContain("--reason requires a value");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -864,7 +865,7 @@ describe("evolve suggestion command boundary", () => {
 					?.receipt_status,
 			).toBe("skipped");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -904,7 +905,7 @@ describe("evolve suggestion command boundary", () => {
 				reject_reason: "not actionable",
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 

@@ -28,6 +28,7 @@ import { writeMemory } from "../services/memory/crud";
 import { rebuildPstrIndex, validatePstrIndex } from "../services/pstr/builder";
 import { hydrateSession } from "../services/state/hydrate";
 import { validateState } from "../services/state/validate";
+import { removeTestRoot } from "./windows-test-support";
 
 type IoCapture = {
 	stdout: string[];
@@ -505,7 +506,7 @@ describe("context system", () => {
 				),
 			).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -516,7 +517,7 @@ describe("context system", () => {
 			expect(snapshot.sections).toEqual([]);
 			expect(getSectionIndex(root)?.sections).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -525,7 +526,7 @@ describe("context system", () => {
 		try {
 			expect(getSectionIndex(root)).toBeNull();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -537,7 +538,7 @@ describe("context system", () => {
 			expect(index?.sections.length).toBe(4);
 			expect(index?.sections[0]?.title).toBe("Decision");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -548,7 +549,7 @@ describe("context system", () => {
 			expect(snapshot.sections.length).toBe(4);
 			expect(getSectionIndex(root)).toBeNull();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -562,7 +563,7 @@ describe("context system", () => {
 			expect(section?.line_start).toBe(9);
 			expect(section?.line_end).toBe(16);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -574,7 +575,7 @@ describe("context system", () => {
 			);
 			expect(getSectionIndex(root)).toBeNull();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -584,7 +585,7 @@ describe("context system", () => {
 			rebuildSectionIndex(root);
 			expect(resolveSection(root, "spec:alpha#missing")).toBeNull();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -604,7 +605,7 @@ describe("context system", () => {
 				source_path: ".afol/adm/specs/alpha-spec.md",
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -621,7 +622,7 @@ describe("context system", () => {
 				"spec:alpha/specs-alpha-spec#notes",
 			]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -649,7 +650,7 @@ describe("context system", () => {
 			expect(Array.isArray(bundle.do_not_load)).toBe(true);
 			expect(bundle.budget.total_tokens).toBe(2000);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -670,7 +671,7 @@ describe("context system", () => {
 			);
 			expect(bundle.validation_commands).toContain("bun test");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -708,7 +709,7 @@ describe("context system", () => {
 			expect(bundle.library_refs).toContain("library:hook-alpha");
 			expect(bundle.do_not_load).toContain("raw plugin payloads");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -738,7 +739,7 @@ describe("context system", () => {
 			expect(designer.hooks).not.toContain("COORDINATION-RADAR");
 			expect(designer.tools).not.toContain("afol session radar");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -803,7 +804,7 @@ describe("context system", () => {
 				second.rule_injection.already_injected.map((rule) => rule.id),
 			).toEqual(["RULE-ALPHA"]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -862,7 +863,7 @@ describe("context system", () => {
 				body.length,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -931,7 +932,7 @@ describe("context system", () => {
 			expect(nextRuleState?.char_count).toBe(initialRuleState?.char_count);
 			expect(nextRuleState?.content_hash).toBe(initialRuleState?.content_hash);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -986,7 +987,7 @@ describe("context system", () => {
 				state.identities[identity]?.rules["RULE-ALPHA"]?.content_hash,
 			).toBeTruthy();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1053,7 +1054,7 @@ describe("context system", () => {
 				"RULE-PRESENT",
 			]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1097,7 +1098,7 @@ describe("context system", () => {
 			expect(payload.error.message).toContain("Invalid rule injection state");
 			expect(readFileSync(statePath, "utf8")).toBe("{not-json\n");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1151,7 +1152,7 @@ describe("context system", () => {
 				"|file:cli/commands/context.ts",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1224,7 +1225,7 @@ describe("context system", () => {
 			);
 			expect(bundle.rule_injection.budget.used_chars).toBe(18);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1297,7 +1298,7 @@ describe("context system", () => {
 			const identity = Object.keys(state.identities)[0] ?? "";
 			expect(state.identities[identity]?.rules["RULE-BIG"]).toBeUndefined();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1317,7 +1318,7 @@ describe("context system", () => {
 			expect(bundle.rules.length).toBeGreaterThan(0);
 			expect(bundle.skills.length).toBeGreaterThan(0);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1339,7 +1340,7 @@ describe("context system", () => {
 			expect(bundle.hook_contributions).toEqual([]);
 			expect(bundle.expanded_sections).toBeUndefined();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1358,7 +1359,7 @@ describe("context system", () => {
 			expect(bundle.expanded_sections?.length).toBeGreaterThan(0);
 			expect(bundle.expanded_sections?.[0]?.snippet).toContain("## Overview");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1375,7 +1376,7 @@ describe("context system", () => {
 			expect(bundle.mode).toBe("tokenmax");
 			expect(bundle.budget.total_tokens).toBe(8000);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1390,7 +1391,7 @@ describe("context system", () => {
 			expect(bundle.gaps).toContain("missing task record");
 			expect(bundle.gaps).toContain("no hydrated session state");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1404,7 +1405,7 @@ describe("context system", () => {
 			expect(bundle.refs).toEqual([]);
 			expect(bundle.gaps).toContain("no matching spec sections");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1425,7 +1426,7 @@ describe("context system", () => {
 				"entire .afol/memory/** trees",
 			]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1443,7 +1444,7 @@ describe("context system", () => {
 			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-REJECTED");
 			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-INVALIDATED");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1549,7 +1550,7 @@ describe("context system", () => {
 				bundle.library_refs.filter((ref) => ref === "library:alpha#CLAIM-BOTH"),
 			).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1568,7 +1569,7 @@ describe("context system", () => {
 			).toBe(true);
 			expect(bundle.library_refs.join(" ")).not.toContain("CLAIM-INVALID");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1580,7 +1581,7 @@ describe("context system", () => {
 			expect(getSectionIndex(root)?.sections.length).toBe(4);
 			expect(captured.stdout[0]).toContain("ctx build: ok sections=4");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1593,7 +1594,7 @@ describe("context system", () => {
 			expect(captured.stdout[0]).toContain("ctx: choose an action");
 			expect(captured.stdout[0]).toContain("hint: run afol ctx build");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1615,7 +1616,7 @@ describe("context system", () => {
 			expect(payload.data.sections).toBe(0);
 			expect(payload.data.write_actions).toEqual(["build"]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1635,7 +1636,7 @@ describe("context system", () => {
 			expect(existsSync(sectionIndexPath(root))).toBe(false);
 			expect(captured.stderr[0]).toContain("afol ctx build");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1659,7 +1660,7 @@ describe("context system", () => {
 			expect(payload.error?.code).toBe("CTX_TRUST_ERROR");
 			expect(payload.error?.message).toContain("afol ctx build");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1679,7 +1680,7 @@ describe("context system", () => {
 			expect(existsSync(sectionIndexPath(root))).toBe(false);
 			expect(captured.stderr[0]).toContain("afol ctx build");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1695,7 +1696,7 @@ describe("context system", () => {
 			expect(payload.action).toBe("ctx.summary");
 			expect(payload.ok).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1721,7 +1722,7 @@ describe("context system", () => {
 			expect(payload.data.snapshot.sections).toHaveLength(4);
 			expect(payload.snapshot.sections).toHaveLength(4);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1749,7 +1750,7 @@ describe("context system", () => {
 			expect(payload.exit_code).toBe(2);
 			expect(payload.error.code).toBe("approval-required");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1779,7 +1780,7 @@ describe("context system", () => {
 			expect(captured.stdout[0]).toContain("refs:");
 			expect(captured.stdout[0]).toContain("pstr_refs:");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1832,7 +1833,7 @@ describe("context system", () => {
 			else process.env.AFOL_CI = saved.AFOL_CI;
 			if (saved.CI === undefined) delete process.env.CI;
 			else process.env.CI = saved.CI;
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1897,7 +1898,7 @@ describe("context system", () => {
 				"warnings: RULE-BIG: rule exceeds max_chars_per_rule (25/20)",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1939,7 +1940,7 @@ describe("context system", () => {
 			expect(payload.data.pstr_refs).toEqual([]);
 			expect(payload.pstr_refs).toEqual([]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -1967,7 +1968,7 @@ describe("context system", () => {
 			).toBe(1);
 			expect(captured.stderr[0]).toContain("missing pstr index snapshot");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2006,7 +2007,7 @@ describe("context system", () => {
 			expect(payload.exit_code).toBe(1);
 			expect(payload.error.message).toContain("stale pstr index snapshot");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2044,7 +2045,7 @@ describe("context system", () => {
 			expect(payload.exit_code).toBe(1);
 			expect(payload.error.message).toContain("stale pstr index snapshot");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2103,7 +2104,7 @@ describe("context system", () => {
 			expect(typeof payload.hooks).toBe("number");
 			expect(typeof payload.data.hooks).toBe("number");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2158,7 +2159,7 @@ describe("context system", () => {
 			expect(payload.data.refs).toBeUndefined();
 			expect(payload.refs).toBeUndefined();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2238,7 +2239,7 @@ describe("context system", () => {
 			expect(payload.error.message).toContain("RULE-REQUIRED");
 			expect(payload.error.message).toContain("max_chars_per_rule");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2301,7 +2302,7 @@ describe("context system", () => {
 			expect(payload.error.message).toContain("rule markdown file missing");
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2346,7 +2347,7 @@ describe("context system", () => {
 			expect(payload.error.message).toContain("Invalid rules index");
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2405,7 +2406,7 @@ describe("context system", () => {
 			expect(payload.data.pstr_refs.length).toBeGreaterThan(0);
 			expect(payload.pstr_refs.length).toBeGreaterThan(0);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2468,7 +2469,7 @@ describe("context system", () => {
 			expect(Array.isArray(payload.library_refs)).toBe(true);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2510,7 +2511,7 @@ describe("context system", () => {
 			).toEqual(["RULE-ALPHA"]);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2551,7 +2552,7 @@ describe("context system", () => {
 			);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2591,7 +2592,7 @@ describe("context system", () => {
 			);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2651,7 +2652,7 @@ describe("context system", () => {
 				payload.data.rule_injection.injected.map((rule) => rule.id),
 			).toEqual(["RULE-ALPHA"]);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2695,7 +2696,7 @@ describe("context system", () => {
 				expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2746,7 +2747,7 @@ describe("context system", () => {
 			expect(payload.data.rule_injection.omitted).toEqual([]);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2770,7 +2771,7 @@ describe("context system", () => {
 			);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2799,7 +2800,7 @@ describe("context system", () => {
 			).toBe(2);
 			expect(captured.stderr[0]).toContain("Invalid ctx mode");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2838,7 +2839,7 @@ describe("context system", () => {
 			expect(payload.exit_code).toBe(2);
 			expect(payload.error.message).toContain("Invalid ctx mode");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2862,7 +2863,7 @@ describe("context system", () => {
 			expect(payload.title).toBe("Overview");
 			expect(payload.line_start).toBe(9);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2894,7 +2895,7 @@ describe("context system", () => {
 			expect(payload.data.section.title).toBe("Overview");
 			expect(payload.section.line_start).toBe(9);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2947,7 +2948,7 @@ describe("context system", () => {
 			expect(Array.isArray(payload.gaps)).toBe(true);
 			expect(Array.isArray(payload.project_health)).toBe(true);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -2978,7 +2979,7 @@ describe("context system", () => {
 			};
 			expect(payload.bundle?.task_id).toBe("T-01");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -3053,7 +3054,7 @@ describe("context system", () => {
 			expect(payload.bundle).toBeUndefined();
 			expect(payload.data.bundle).toBeUndefined();
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -3087,7 +3088,7 @@ describe("context system", () => {
 			expect(payload.data.bundle?.task_id).toBe("T-01");
 			expect(payload.bundle?.task_id).toBe("T-01");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -3114,7 +3115,7 @@ describe("context system", () => {
 			).toBe(true);
 			expect(payload.gaps).toEqual(expect.any(Array));
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -3142,7 +3143,7 @@ describe("context system", () => {
 			expect(captured.stdout[0]).toContain("afol ctx section");
 			expect(captured.stdout[0]).toContain("bun test");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 
@@ -3183,7 +3184,7 @@ describe("context system", () => {
 			expect(payload.data.tools.join("\n")).toContain("afol ctx section");
 			expect(payload.tools.join("\n")).toContain("bun test");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeTestRoot(root);
 		}
 	});
 });

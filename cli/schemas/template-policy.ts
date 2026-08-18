@@ -196,6 +196,15 @@ export type ToolchainClaim = {
 	error?: string;
 };
 
+type ToolProbeResult = {
+	status: number | null;
+	signal: string | null;
+};
+
+export function toolProbeSucceeded(result: ToolProbeResult): boolean {
+	return result.status === 0 && result.signal === null;
+}
+
 /**
  * Verify that each claimed tool is actually available in the environment.
  * - `bun` is CRITICAL — must be available for any operation
@@ -208,7 +217,7 @@ export function scanTemplateToolchainClaims(): ToolchainClaim[] {
 			stdio: "ignore",
 			timeout: 5000,
 		});
-		if (!result.error && result.status === 0) {
+		if (toolProbeSucceeded(result)) {
 			return { tool, available: true, critical };
 		}
 		return {

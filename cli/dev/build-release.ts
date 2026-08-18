@@ -2,13 +2,28 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	assertReleaseOutputFileStable,
+	prepareReleaseOutputFile,
+} from "./release-output";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_OUTFILE = "dist/afol";
 const ENTRY = "cli/main.ts";
+
+/** Bun appends .exe to compiled output on Windows when it is not supplied. */
+export function releaseArtifactPath(outfile: string): string {
+	if (
+		process.platform !== "win32" ||
+		basename(outfile).toLowerCase().endsWith(".exe")
+	) {
+		return outfile;
+	}
+	return `${outfile}.exe`;
+}
 
 export const DEFAULT_BUILD_COMMAND = "bun run build:deterministic";
 
@@ -27,6 +42,10 @@ export function compiledReleaseBuildArgs(
 		"--outfile",
 		outfile,
 	];
+}
+
+function portableRelativePath(from: string, to: string): string {
+	return relative(from, to).replaceAll("\\", "/");
 }
 
 export type BuildReleaseArtifactOptions = {
@@ -56,8 +75,12 @@ export function compiledReleaseBuildReceiptPath(outfile: string): string {
 export function writeCompiledReleaseBuildReceipt(
 	outfile: string,
 	buildArgs: string[],
+	cwd?: string,
 ): string {
 	const receiptPath = compiledReleaseBuildReceiptPath(outfile);
+	const outputGuard = cwd
+		? prepareReleaseOutputFile(cwd, receiptPath)
+		: null;
 	writeFileSync(
 		receiptPath,
 		`${JSON.stringify(
@@ -70,6 +93,7 @@ export function writeCompiledReleaseBuildReceipt(
 		)}\n`,
 		"utf8",
 	);
+	if (outputGuard) assertReleaseOutputFileStable(outputGuard, true);
 	return receiptPath;
 }
 
@@ -109,14 +133,16 @@ export function buildReleaseArtifact(
 	options: BuildReleaseArtifactOptions = {},
 ): BuildReleaseArtifactResult {
 	const cwd = resolve(options.cwd ?? REPO_ROOT);
-	const outfile = resolve(cwd, options.outfile ?? DEFAULT_OUTFILE);
+	const outfile = releaseArtifactPath(
+		resolve(cwd, options.outfile ?? DEFAULT_OUTFILE),
+	);
 	const entry = join(cwd, ENTRY);
 	if (!existsSync(entry)) {
 		throw new Error(`missing release entrypoint: ${entry}`);
 	}
-	mkdirSync(dirname(outfile), { recursive: true });
-	const entryArgument = relative(cwd, entry) || ENTRY;
-	const outfileArgument = relative(cwd, outfile) || outfile;
+	const artifactGuard = prepareReleaseOutputFile(cwd, outfile);
+	const entryArgument = portableRelativePath(cwd, entry) || ENTRY;
+	const outfileArgument = portableRelativePath(cwd, outfile) || outfile;
 
 	const result = spawnSync(
 		"bun",
@@ -141,10 +167,12 @@ export function buildReleaseArtifact(
 		);
 	}
 
+	assertReleaseOutputFileStable(artifactGuard, true);
 	const sha256 = sha256Hex(readFileSync(outfile));
 	const receiptPath = writeCompiledReleaseBuildReceipt(
 		outfile,
 		compiledReleaseBuildArgs(entryArgument, outfileArgument),
+		cwd,
 	);
 	return { outfile, sha256, receiptPath };
 }
