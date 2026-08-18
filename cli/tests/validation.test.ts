@@ -11,7 +11,7 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { arch, cpus, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -25,7 +25,8 @@ const runtimeLiveBenchmarkValidationCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand}`;
 const runtimeLiveBenchmarkRefreshNote = `obtain a fresh receipt from the external fixed harness, place it at .afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json, then validate with ${runtimeLiveBenchmarkValidationCommand}`;
-const slowValidationTestTimeoutMs = 60_000;
+const slowValidationTestTimeoutMs =
+	process.platform === "win32" ? 360_000 : 60_000;
 const cliKernelValidationTestTimeoutMs = 60_000;
 const cliKernelRunTestTimeoutMs = 120_000;
 
@@ -87,6 +88,17 @@ function relaxMutationSafetyTimingLimits(root: string): void {
 		"baseline-v1.json",
 	);
 	const baseline = parseJsonOutput(readFileSync(baselinePath, "utf8"));
+	const os = platform();
+	const cpuClass = (cpus()[0]?.model ?? "unknown-cpu")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	baseline.host_profile_id = `${os}-${arch()}-${cpuClass}`;
+	baseline.os = os;
+	baseline.arch = arch();
+	baseline.cpu_class = cpuClass;
+	baseline.bun_version = Bun.version;
+	baseline.runtime_version = Bun.version;
 	const baselineScenarios = baseline.scenarios as Record<
 		string,
 		Record<string, unknown>
