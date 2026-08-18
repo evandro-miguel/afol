@@ -25,7 +25,7 @@
 		"toolchain:diff": "bun run cli/dev/toolchain-smoke.ts",
 		"validate:toolchain": "bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		"test": "bun test",
-		"test:full": "bun test --only-failures",
+		"test:full": "bun run cli/dev/full-test.ts",
 		"test:unit": "bun test cli/tests",
 		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
 		"coverage": "bun test --coverage --coverage-reporter=text",
