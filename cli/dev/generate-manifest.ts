@@ -68,6 +68,10 @@ function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
+function canonicalTemplateContent(content: Buffer): Buffer {
+	return Buffer.from(content.toString("utf8").replaceAll("\r\n", "\n"), "utf8");
+}
+
 function managedHashRoot(repoRoot: string, manifestPath: string): string {
 	return manifestPath.startsWith("src/project-template/")
 		? join(repoRoot, "src/project-template")
@@ -127,6 +131,7 @@ function refreshManagedHashes(
 	}
 
 	const root = managedHashRoot(repoRoot, manifestPath);
+	const isTemplateManifest = manifestPath.startsWith("src/project-template/");
 	const refreshed: Record<string, string> = {};
 	const paths = manifestPath.startsWith("src/project-template/")
 		? collectTemplateManagedHashPaths(root)
@@ -136,7 +141,10 @@ function refreshManagedHashes(
 		if (!existsSync(absolutePath)) {
 			continue;
 		}
-		refreshed[path] = sha256Hex(readFileSync(absolutePath));
+		const content = readFileSync(absolutePath);
+		refreshed[path] = sha256Hex(
+			isTemplateManifest ? canonicalTemplateContent(content) : content,
+		);
 	}
 	return refreshed;
 }
@@ -147,7 +155,7 @@ function refreshManagedHashPayload(path: string): {
 } {
 	const payload = readJsonObject(path);
 	const repoRoot = resolve(import.meta.dir, "..", "..");
-	const relativePath = relative(repoRoot, path);
+	const relativePath = relative(repoRoot, path).split("\\").join("/");
 	const managedHashes = refreshManagedHashes(
 		repoRoot,
 		relativePath,

@@ -44,6 +44,11 @@ interface SessionLockMetadata extends LockIdentity {
 	mtimeMs: number;
 }
 
+export type SessionLockOptions = {
+	/** Narrow test seam; never used by normal callers. */
+	beforeStaleLockIdentityCheck?: () => void;
+};
+
 export type SessionLockObservation = {
 	present: boolean;
 	active: boolean;
@@ -458,6 +463,7 @@ export function observeSessionLock(
 function tryReclaimStaleLock(
 	lockPath: string,
 	expected: SessionLockMetadata,
+	beforeIdentityCheck?: () => void,
 ): boolean {
 	const reclaimPath = `${lockPath}.reclaim`;
 	let reclaimFd: number | null = null;
@@ -498,6 +504,7 @@ function tryReclaimStaleLock(
 		) {
 			return false;
 		}
+		beforeIdentityCheck?.();
 		return unlinkIfIdentityMatches(lockPath, expected);
 	} finally {
 		if (reclaimIdentity !== null) {
@@ -511,6 +518,7 @@ export function withSessionLock<T>(
 	root: string,
 	session: string,
 	action: () => T,
+	options: SessionLockOptions = {},
 ): T {
 	const lockPath = resolveSessionLockPath(root, session);
 	const currentDepth = heldLocks.get(lockPath) ?? 0;
@@ -541,7 +549,11 @@ export function withSessionLock<T>(
 			const staleMetadata = shouldRecoverStaleLock(lockPath, now);
 			if (
 				staleMetadata !== null &&
-				tryReclaimStaleLock(lockPath, staleMetadata)
+				tryReclaimStaleLock(
+					lockPath,
+					staleMetadata,
+					options.beforeStaleLockIdentityCheck,
+				)
 			) {
 				continue;
 			}

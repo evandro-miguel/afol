@@ -113,7 +113,9 @@ function zeroOwnershipCounts(): OwnershipCounts {
 }
 
 function readText(path: string): string {
-	return existsSync(path) ? readFileSync(path, "utf8") : "";
+	return existsSync(path)
+		? readFileSync(path, "utf8").replaceAll("\r\n", "\n")
+		: "";
 }
 
 function planCompletionLockGitignore(projectRoot: string): UpdateOperation {
@@ -916,7 +918,7 @@ function collectRemovedTemplateOperations(
 				(entry?.owner === "managed" || (!entry && directHash !== undefined)) &&
 				(entry?.hash ?? directHash) !== undefined &&
 				!statSync(absolutePath).isDirectory() &&
-				sha256Hex(readFileSync(absolutePath, "utf8")) ===
+				sha256Hex(readText(absolutePath)) ===
 					(entry?.hash ?? directHash)
 			) {
 				return {
