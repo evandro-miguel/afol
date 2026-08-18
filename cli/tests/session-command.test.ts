@@ -296,7 +296,7 @@ describe("session context service", () => {
 			expect(spawnSpy).toHaveBeenCalledWith(
 				"git",
 				["rev-parse", "--git-dir", "--show-toplevel"],
-				expect.objectContaining({ timeout: 1_000 }),
+				expect.objectContaining({ timeout: 5_000 }),
 			);
 		} finally {
 			spawnSpy.mockRestore();
