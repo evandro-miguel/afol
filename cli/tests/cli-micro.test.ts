@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
 	CLI_MICRO_THRESHOLDS,
 	collectCliMicroThresholdNotes,
@@ -16,6 +17,7 @@ describe("CLI micro benchmark thresholds", () => {
 			),
 		).toEqual([
 			`threshold-exceeded:max_wall_clock_ms:${CLI_MICRO_THRESHOLDS.max_wall_clock_ms + 1}>${CLI_MICRO_THRESHOLDS.max_wall_clock_ms}`,
+			`token-rule:non-ideal(>5k):${CLI_MICRO_THRESHOLDS.max_output_tokens + 1}tokens`,
 			`threshold-exceeded:max_output_tokens:${CLI_MICRO_THRESHOLDS.max_output_tokens + 1}>${CLI_MICRO_THRESHOLDS.max_output_tokens}`,
 		]);
 	});
@@ -59,5 +61,44 @@ describe("CLI micro benchmark thresholds", () => {
 				"D:/tools/bin/afol.exe",
 			),
 		).toEqual({ command: "D:/tools/bin/afol.exe", args: [] });
+	});
+
+	test("accounts for stdout and stderr and keeps 5k output diagnostic", () => {
+		const tempRoot = join(process.cwd(), ".afol", "tmp", "tests");
+		mkdirSync(tempRoot, { recursive: true });
+		const root = mkdtempSync(join(tempRoot, "cli-micro-stderr-"));
+		try {
+			const scriptPath = join(root, "emit-output.js");
+			writeFileSync(
+				scriptPath,
+				"process.stdout.write('x'); process.stderr.write('y');",
+				"utf8",
+			);
+			const results = runCliMicroBenchmark(
+				root,
+				{
+					max_wall_clock_ms: 60_000,
+					max_output_tokens: 1,
+				},
+				{
+					command: process.execPath,
+					args: [scriptPath],
+				},
+			);
+			expect(results.every((result) => result.output_bytes === 2)).toBe(true);
+			expect(
+				results.every((result) => result.estimated_output_tokens === 1),
+			).toBe(true);
+			expect(
+				collectCliMicroThresholdNotes(0, 5_001).some((note) =>
+					note.startsWith("token-rule:non-ideal(>5k):"),
+				),
+			).toBe(true);
+			expect(collectCliMicroThresholdNotes(0, 5_001)).not.toContainEqual(
+				"threshold-exceeded:max_output_tokens:5001>5000",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });

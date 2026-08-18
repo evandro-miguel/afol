@@ -88,6 +88,30 @@
       "resolution_hint": "spec requirement waived with explicit reason",
       "resolved_at": "2026-08-18T00:40:26.859Z",
       "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
+    },
+    {
+      "session_id": "260816_2020_simplicity-preserving-integrity-remediation",
+      "created_at": "2026-08-17T01:20:45.380Z",
+      "updated_at": "2026-08-17T01:20:52.916Z",
+      "status": "resolved",
+      "theme": "simplicity-preserving-integrity-remediation",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04",
+        "T-05",
+        "T-06"
+      ],
+      "missing": [],
+      "resolution_hint": "linked to roadmap feature and parent spec",
+      "feature_id": "F-29",
+      "parent_spec": "260715_afol-1-0-linux-wsl-finalization_spec_01",
+      "resolved_at": "2026-08-17T01:20:52.916Z",
+      "parent_spec_path": ".afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md",
+      "parent_spec_sha256": "3dd78382bcebd119551ffa68a0e8047811bc32abed320d0d786eb17b1f7d668e",
+      "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+      "roadmap_sha256": "c6ab558334d31eb8e83ad8ee37d1e699acb4b94c8b4ba188a38cc8712d570f96"
     }
   ]
 }

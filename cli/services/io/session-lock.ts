@@ -26,6 +26,8 @@ const LOCK_OWNERLESS_WRITE_WINDOW_MS = 250;
 const LOCK_WAIT_BUFFER = new Int32Array(new SharedArrayBuffer(4));
 const heldLocks = new Map<string, number>();
 const HOSTNAME = hostname().toLowerCase();
+const PROCESS_STARTED_AT_MS = Date.now() - process.uptime() * 1_000;
+const PROCESS_START_TOKEN = readProcessStartToken(process.pid);
 
 interface LockIdentity {
 	dev: bigint;
@@ -35,6 +37,7 @@ interface LockIdentity {
 interface SessionLockMetadata extends LockIdentity {
 	isParsed: boolean;
 	pid?: number;
+	processStartToken?: string;
 	acquiredAtMs: number | null;
 	host?: string;
 	raw: string | null;
@@ -179,6 +182,23 @@ function parseLockMetadataText(raw: string): unknown {
 	}
 }
 
+function readProcessStartToken(pid: number): string | null {
+	if (process.platform !== "linux") return null;
+	try {
+		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+		const commandEnd = stat.lastIndexOf(")");
+		if (commandEnd < 0) return null;
+		const fields = stat
+			.slice(commandEnd + 1)
+			.trim()
+			.split(/\s+/);
+		const token = fields[19];
+		return token && /^\d+$/.test(token) ? token : null;
+	} catch {
+		return null;
+	}
+}
+
 function readFdIdentity(fd: number): LockIdentity {
 	const stats = fstatSync(fd, { bigint: true });
 	return { dev: stats.dev, ino: stats.ino };
@@ -233,6 +253,7 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 		}
 		const payload = parsed as {
 			pid?: unknown;
+			process_start_token?: unknown;
 			acquired_at?: unknown;
 			host?: unknown;
 		};
@@ -240,6 +261,11 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 		const pid =
 			typeof pidRaw === "number" && Number.isInteger(pidRaw) && pidRaw > 0
 				? pidRaw
+				: undefined;
+		const processStartToken =
+			typeof payload.process_start_token === "string" &&
+			/^\d+$/.test(payload.process_start_token)
+				? payload.process_start_token
 				: undefined;
 		const acquiredAtRaw = payload.acquired_at;
 		const acquiredAtMs =
@@ -257,6 +283,7 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 			...(host?.length ? { host } : {}),
 			isParsed: true,
 			...(pid !== undefined ? { pid } : {}),
+			...(processStartToken !== undefined ? { processStartToken } : {}),
 			raw: raw,
 			mtimeMs,
 		};
@@ -292,6 +319,21 @@ function isProcessAlive(pid: number): boolean {
 	}
 }
 
+function lockOwnerIsAlive(metadata: SessionLockMetadata): boolean {
+	if (metadata.pid === undefined || !isProcessAlive(metadata.pid)) return false;
+	if (metadata.processStartToken !== undefined) {
+		const currentToken = readProcessStartToken(metadata.pid);
+		if (currentToken !== null) {
+			return currentToken === metadata.processStartToken;
+		}
+	}
+	return !(
+		metadata.pid === process.pid &&
+		metadata.acquiredAtMs !== null &&
+		metadata.acquiredAtMs < PROCESS_STARTED_AT_MS - LOCK_STALE_AGE_MS
+	);
+}
+
 function shouldRecoverStaleLock(
 	lockPath: string,
 	nowMs: number,
@@ -306,7 +348,7 @@ function shouldRecoverStaleLock(
 		if (metadata.host === undefined || metadata.host !== HOSTNAME) {
 			return null;
 		}
-		if (isProcessAlive(metadata.pid)) {
+		if (lockOwnerIsAlive(metadata)) {
 			return null;
 		}
 		const ageMs =
@@ -342,7 +384,7 @@ function observationFromMetadata(
 		metadata.isParsed &&
 		metadata.pid !== undefined &&
 		metadata.host === HOSTNAME &&
-		isProcessAlive(metadata.pid)
+		lockOwnerIsAlive(metadata)
 	) {
 		return {
 			present: true,
@@ -427,6 +469,9 @@ function tryReclaimStaleLock(
 			reclaimFd,
 			`${JSON.stringify({
 				pid: process.pid,
+				...(PROCESS_START_TOKEN !== null
+					? { process_start_token: PROCESS_START_TOKEN }
+					: {}),
 				acquired_at: new Date().toISOString(),
 				host: HOSTNAME,
 			})}\n`,
@@ -517,6 +562,9 @@ export function withSessionLock<T>(
 			fd,
 			`${JSON.stringify({
 				pid: process.pid,
+				...(PROCESS_START_TOKEN !== null
+					? { process_start_token: PROCESS_START_TOKEN }
+					: {}),
 				acquired_at: new Date().toISOString(),
 				host: HOSTNAME,
 				session,
@@ -586,6 +634,9 @@ export async function withExternalPathLock<T>(
 			fd,
 			`${JSON.stringify({
 				pid: process.pid,
+				...(PROCESS_START_TOKEN !== null
+					? { process_start_token: PROCESS_START_TOKEN }
+					: {}),
 				acquired_at: new Date().toISOString(),
 				host: HOSTNAME,
 				resource: resolve(canonicalPath),

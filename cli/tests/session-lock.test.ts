@@ -256,6 +256,24 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
+	test("records the Linux process-start identity in acquired locks", () => {
+		const root = mkProjectRoot("process-start-identity");
+		try {
+			const session = "process-start-identity-session";
+			const lockPath = resolveSessionLockPath(root, session);
+			withSessionLock(root, session, () => {
+				const metadata = JSON.parse(readFileSync(lockPath, "utf8")) as {
+					process_start_token?: unknown;
+				};
+				if (process.platform === "linux") {
+					expect(metadata.process_start_token).toMatch(/^\d+$/);
+				}
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test.skipIf(!symlinkTestSupport.available)(
 		"external path lock keys physical roots identically through symlinks",
 		() => {

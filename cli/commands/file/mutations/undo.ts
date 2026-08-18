@@ -1,4 +1,5 @@
 import {
+	assertMutationJournalIntegrity,
 	findLatestSupportedMutation,
 	findMutationById,
 	type MutationRecord,
@@ -26,6 +27,7 @@ function runUndoMutationLocked(
 	args: UndoArgs,
 	projectRoot: string,
 ): CommandResult {
+	assertMutationJournalIntegrity(projectRoot);
 	let target: MutationRecord | null;
 	try {
 		target = args.mutationId

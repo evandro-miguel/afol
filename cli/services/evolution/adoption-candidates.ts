@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import {
 	closeSync,
 	existsSync,
+	fstatSync,
 	fsyncSync,
+	ftruncateSync,
 	lstatSync,
 	mkdirSync,
 	openSync,
@@ -27,6 +29,7 @@ const MAX_SESSION_FILES = 24;
 const MAX_SESSION_FILE_BYTES = 32_768;
 const MAX_EVIDENCE_FILE_BYTES = 65_536;
 const MAX_PUBLIC_TEXT_BYTES = 512;
+const ADOPTION_REVIEW_JOURNAL_LOCK = "__evolution-adoption-reviews__";
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const RECORD_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const EXPLICIT_LABELS = [
@@ -116,6 +119,14 @@ export type LearningReviewStatus = {
 	session_id: string;
 	required: Array<{ id: string; fingerprint: string }>;
 	terminal: boolean;
+};
+
+export type AdoptionReviewAppendOptions = {
+	/** Narrow fault-injection seam for durability tests. */
+	writeBytes?: (fd: number, value: Buffer) => number;
+	syncFile?: (fd: number) => void;
+	syncDirectory?: (directory: string) => void;
+	truncateFile?: (fd: number, size: number) => void;
 };
 
 function digest(value: string): string {
@@ -341,7 +352,10 @@ export function adoptionReviewJournalPath(root: string): string {
 		"adoption-reviews.jsonl",
 	);
 }
-export function readAdoptionReviewEvents(root: string): AdoptionReviewEvent[] {
+function withAdoptionReviewJournalLock<T>(root: string, action: () => T): T {
+	return withSessionLock(root, ADOPTION_REVIEW_JOURNAL_LOCK, action);
+}
+function readAdoptionReviewEventsUnlocked(root: string): AdoptionReviewEvent[] {
 	const path = adoptionReviewJournalPath(root);
 	if (!existsSync(path)) return [];
 	const ids = new Set<string>();
@@ -380,6 +394,11 @@ export function readAdoptionReviewEvents(root: string): AdoptionReviewEvent[] {
 			return [event];
 		});
 }
+export function readAdoptionReviewEvents(root: string): AdoptionReviewEvent[] {
+	return withAdoptionReviewJournalLock(root, () =>
+		readAdoptionReviewEventsUnlocked(root),
+	);
+}
 export function appendAdoptionReviewEvent(
 	root: string,
 	session: string,
@@ -387,6 +406,7 @@ export function appendAdoptionReviewEvent(
 		AdoptionReviewEvent,
 		"record_type" | "schema_version" | "id" | "session_id"
 	>,
+	options: AdoptionReviewAppendOptions = {},
 ): AdoptionReviewEvent {
 	if (!SESSION_ID.test(session))
 		throw new Error("evolve candidates session is invalid");
@@ -411,28 +431,118 @@ export function appendAdoptionReviewEvent(
 		Number.isNaN(Date.parse(input.created_at))
 	)
 		throw new Error("evolve candidates review is invalid");
-	return withSessionLock(root, session, () => {
-		const existing = readAdoptionReviewEvents(root);
-		if (existing.some((entry) => entry.id === event.id))
-			throw new Error("adoption review event id already exists");
+	return withAdoptionReviewJournalLock(root, () => {
+		const existing = readAdoptionReviewEventsUnlocked(root);
+		if (
+			existing.some(
+				(entry) =>
+					entry.session_id === session &&
+					entry.fingerprint === event.fingerprint,
+			)
+		)
+			throw new Error(
+				"evolve candidates review already has a terminal decision",
+			);
 		const path = adoptionReviewJournalPath(root);
 		mkdirSync(resolve(path, ".."), { recursive: true, mode: 0o700 });
 		const fd = openSync(path, "a", 0o600);
+		const previousSize = fstatSync(fd).size;
+		const line = Buffer.from(`${JSON.stringify(event)}\n`, "utf8");
+		let attemptedWrite = false;
+		let committed = false;
+		let primaryError: unknown;
+		let rollbackError: unknown;
 		try {
-			writeSync(fd, `${JSON.stringify(event)}\n`, null, "utf8");
-			fsyncSync(fd);
+			let offset = 0;
+			while (offset < line.byteLength) {
+				attemptedWrite = true;
+				const written = (
+					options.writeBytes ??
+					((target, value) =>
+						writeSync(target, value, 0, value.byteLength, null))
+				)(fd, line.subarray(offset));
+				if (!Number.isInteger(written) || written <= 0)
+					throw new Error(
+						"adoption review journal write did not make progress",
+					);
+				offset += written;
+			}
+			(options.syncFile ?? fsyncSync)(fd);
+			if (process.platform !== "win32") {
+				const parentFd = openSync(resolve(path, ".."), "r");
+				try {
+					(options.syncDirectory ?? ((_: string) => fsyncSync(parentFd)))(
+						resolve(path, ".."),
+					);
+				} finally {
+					closeSync(parentFd);
+				}
+			}
+			committed = true;
+		} catch (error) {
+			primaryError = error;
+			if (attemptedWrite) {
+				try {
+					(options.truncateFile ?? ftruncateSync)(fd, previousSize);
+					(options.syncFile ?? fsyncSync)(fd);
+					if (process.platform !== "win32") {
+						const parentFd = openSync(resolve(path, ".."), "r");
+						try {
+							fsyncSync(parentFd);
+						} finally {
+							closeSync(parentFd);
+						}
+					}
+				} catch (errorDuringRollback) {
+					rollbackError = errorDuringRollback;
+				}
+			}
 		} finally {
 			closeSync(fd);
 		}
-		if (process.platform !== "win32") {
-			const parentFd = openSync(resolve(path, ".."), "r");
-			try {
-				fsyncSync(parentFd);
-			} finally {
-				closeSync(parentFd);
-			}
+		if (primaryError !== undefined) {
+			if (rollbackError !== undefined)
+				throw new AggregateError(
+					[primaryError, rollbackError],
+					"adoption review journal append and rollback failed",
+				);
+			throw primaryError;
 		}
+		if (!committed) throw new Error("adoption review journal append failed");
 		return event;
+	});
+}
+
+export function reviewAdoptionCandidate(input: {
+	root: string;
+	session: string;
+	candidateId: string;
+	decision: AdoptionReviewDecision;
+	reason: string;
+	createdAt: string;
+}): AdoptionReviewEvent {
+	return withAdoptionReviewJournalLock(input.root, () => {
+		const result = discoverAdoptionCandidates({
+			root: input.root,
+			session: input.session,
+			limit: MAX_CANDIDATES,
+		});
+		const candidate = result.candidates.find(
+			(entry) => entry.id === input.candidateId,
+		);
+		if (!candidate)
+			throw new Error("evolve candidates review candidate is missing or stale");
+		if (candidate.review_state !== "candidate_available")
+			throw new Error(
+				"evolve candidates review already has a terminal decision",
+			);
+		return appendAdoptionReviewEvent(input.root, input.session, {
+			candidate_id: candidate.id,
+			fingerprint: candidate.fingerprint,
+			decision: input.decision,
+			reason: input.reason,
+			created_at: input.createdAt,
+		});
 	});
 }
 
@@ -457,11 +567,21 @@ export function learningReviewStatus(
 			result.review_state === "approved" ||
 			result.review_state === "rejected" ||
 			result.review_state === "already_adopted" ||
-			result.review_state === "duplicate",
+			result.review_state === "duplicate" ||
+			result.review_state === "conflict",
 	};
 }
 /** Read-only, deterministic discovery of explicit continuity statements. */
 export function discoverAdoptionCandidates(input: {
+	root: string;
+	session?: string;
+	limit?: number;
+}): AdoptionCandidateResult {
+	return withAdoptionReviewJournalLock(input.root, () =>
+		discoverAdoptionCandidatesUnlocked(input),
+	);
+}
+function discoverAdoptionCandidatesUnlocked(input: {
 	root: string;
 	session?: string;
 	limit?: number;

@@ -376,7 +376,11 @@ function normalizeOptionalRelativePath(
 	return normalized;
 }
 
-function matchesFile(rule: RuleEntry, filePath: string | null): boolean {
+function matchesFile(
+	rule: RuleEntry,
+	filePath: string | null,
+	globs: Map<string, Bun.Glob>,
+): boolean {
 	if (!filePath) {
 		return true;
 	}
@@ -386,9 +390,11 @@ function matchesFile(rule: RuleEntry, filePath: string | null): boolean {
 	if (rule.fileGlobs.length === 0 && rule.exactFiles.length === 0) {
 		return true;
 	}
-	return rule.fileGlobs.some((pattern) =>
-		new Bun.Glob(pattern).match(filePath),
-	);
+	return rule.fileGlobs.some((pattern) => {
+		const glob = globs.get(pattern) ?? new Bun.Glob(pattern);
+		globs.set(pattern, glob);
+		return glob.match(filePath);
+	});
 }
 
 function matchesInject(rule: RuleEntry, inject: string | null): boolean {
@@ -425,6 +431,7 @@ export function resolveRulesWithDiagnostics(
 		options.maxCharsTotal,
 		defaults.maxCharsTotal,
 	);
+	const globs = new Map<string, Bun.Glob>();
 	let totalChars = 0;
 	const matchingRules = listRules(projectRoot, {
 		strictIndex: options.strictIndex,
@@ -446,7 +453,7 @@ export function resolveRulesWithDiagnostics(
 				matchesListFilter(rule.domains, wantedDomains) &&
 				matchesListFilter(rule.surfaces, wantedSurfaces) &&
 				matchesListFilter(rule.languages, wantedLanguages) &&
-				matchesFile(rule, filePath)
+				matchesFile(rule, filePath, globs)
 			);
 		})
 		.sort((a, b) => {

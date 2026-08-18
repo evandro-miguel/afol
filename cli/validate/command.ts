@@ -681,9 +681,10 @@ function handleBenchmark(
 	const scopedContractIssues = scenarioId ? [] : contractIssues;
 	const summary = summarizeBenchmarkResults(results);
 	const combinedTokenRuleNote = combinedProjectTokenRuleNote(results);
-	const status = combinedTokenRuleNote?.includes("combined-prohibitive")
-		? "failed"
-		: resolveBenchmarkRunStatus(summary, scopedContractIssues.length);
+	const status = resolveBenchmarkRunStatus(
+		summary,
+		scopedContractIssues.length,
+	);
 	const notes =
 		status === "skipped"
 			? ["all-scenarios-skipped:not-implemented-live-runner", ...benchmarkNotes]

@@ -18,7 +18,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { DEFAULT_BENCH_MODEL } from "../services/benchmark/types";
 import {
 	resolveTaskCompletionLockPath,
 	withTaskCompletionLock,
@@ -603,6 +602,15 @@ describe("validate selector", () => {
 				"cli/mcp/adapter.ts",
 			],
 		});
+		expect(
+			selectPacks({
+				scope: "default",
+				changedPaths: ["cli/validate/runtime-live.ts"],
+			}),
+		).toEqual({
+			selected_pack_ids: ["runtime-live-agent"],
+			reasons: ["runtime-live-change:cli/validate/runtime-live.ts"],
+		});
 		expect(selection.selected_pack_ids).toEqual([
 			"mcp-parity",
 			"mutation-safety",
@@ -1158,6 +1166,25 @@ describe("validate registry", () => {
 			expect(issues).toContain("missing-baseline:routing-accuracy");
 			expect(issues).toContain(
 				"baseline-schema-version-mismatch:cli-kernel-local:0.0.0",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects duplicate scenario IDs across packs", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const duplicate = snapshot.scenariosByPack["cli-kernel-local"]?.[0];
+			if (!duplicate)
+				throw new Error("Expected cli-kernel-local fixture scenario");
+			snapshot.scenariosByPack["token-economy"] = [
+				...(snapshot.scenariosByPack["token-economy"] ?? []),
+				{ ...duplicate, pack_id: "token-economy" },
+			];
+			expect(validateRegistryContract(snapshot)).toContain(
+				`duplicate-scenario-id:${duplicate.scenario_id}`,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1911,6 +1938,54 @@ describe("scenario benchmark execution", () => {
 			const resolved = ensureBenchmarkTempRoot(root);
 			expect(resolved).toBe(join(root, ".afol", "tmp"));
 			expect(existsSync(resolved)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("reports the largest varying UTF-8 sample instead of a percentile", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "max-utf8-sample",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: "node -e ''",
+				result_schema: "1.0.0",
+				oracle: "max-sample-output",
+				thresholds: {},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const samples = [
+				{ stdout: "é".repeat(100), stderr: "" },
+				{ stdout: "x".repeat(150), stderr: "é".repeat(26) },
+				{ stdout: "", stderr: "😀".repeat(51) },
+			];
+			let sampleIndex = 0;
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: samples.length,
+				warmupCount: 0,
+				seams: {
+					runSample: () => {
+						const sample = samples[sampleIndex++];
+						if (!sample) throw new Error("sample fixture exhausted");
+						return {
+							duration_ms: 1,
+							exit_code: 0,
+							signal: null,
+							spawn_error: null,
+							stdout: sample.stdout,
+							stderr: sample.stderr,
+						};
+					},
+				},
+			});
+
+			expect(result.passed).toBe(true);
+			expect(result.metrics.output_bytes).toBe(204);
+			expect(result.metrics.output_tokens).toBe(51);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -4164,6 +4239,33 @@ describe("scenario benchmark execution", () => {
 			expect(prohibitive.result.status).toBe("failed");
 			expect(prohibitive.result.pass).toBe(false);
 			expect(prohibitive.result.notes[0]).toBe(tokenRuleProhibitiveNote);
+
+			for (const [outputTokens, expectedStatus, expectedNote] of [
+				[5_000, "passed", null],
+				[5_001, "passed", "token-rule:non-ideal(>5k):5001tokens"],
+				[10_000, "passed", "token-rule:non-ideal(>5k):10000tokens"],
+				[10_001, "failed", "token-rule:prohibitive(>10k):10001tokens"],
+			] as const) {
+				const boundary = withCapturedConsoleError(() =>
+					buildResult(
+						root,
+						makeScenario(`token-boundary-${outputTokens}`, outputTokens * 4),
+						baselinePath,
+						baseline,
+					),
+				);
+				expect(boundary.result.output_tokens).toBe(outputTokens);
+				expect(boundary.result.status).toBe(expectedStatus);
+				if (expectedNote) {
+					expect(boundary.result.notes).toContain(expectedNote);
+				} else {
+					expect(
+						boundary.result.notes.some((note) =>
+							note.startsWith("token-rule:"),
+						),
+					).toBe(false);
+				}
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -4183,6 +4285,20 @@ describe("scenario benchmark execution", () => {
 				{ status: "passed", output_tokens: 6_000 },
 			]),
 		).toBe("token-rule:combined-prohibitive(>10k):12000tokens");
+
+		const boundaryNotes = new Map<number, string | null>([
+			[5_000, null],
+			[5_001, "token-rule:combined-non-ideal(>5k):5001tokens"],
+			[10_000, "token-rule:combined-non-ideal(>5k):10000tokens"],
+			[10_001, "token-rule:combined-prohibitive(>10k):10001tokens"],
+		]);
+		for (const [outputTokens, expected] of boundaryNotes) {
+			expect(
+				combinedProjectTokenRuleNote([
+					{ status: "passed", output_tokens: outputTokens },
+				]),
+			).toBe(expected);
+		}
 	});
 });
 
@@ -4348,6 +4464,51 @@ describe("runtime live validation helpers", () => {
 		}
 	});
 
+	test("rejects a saved archive whose observed model diverges from F-31", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const scenarios = snapshot.scenariosByPack["runtime-live-agent"] ?? [];
+			const savedResultPath = getRuntimeLiveSavedResultPath(root);
+			const savedResult = readJson(
+				join(
+					process.cwd(),
+					".afol/data/benchmarks/results/2026-07-12T22-48-33.054Z_comprehensive-live.json",
+				),
+			);
+			for (const result of savedResult.results as Array<
+				Record<string, unknown>
+			>) {
+				result.model = "different-model/medium";
+			}
+			savedResult.timestamp = new Date().toISOString();
+			const runtimeSnapshot = readJson(getRuntimeLiveSnapshotPath(root));
+			runtimeSnapshot.generated_at = savedResult.timestamp;
+			writeFileSync(
+				getRuntimeLiveSnapshotPath(root),
+				`${JSON.stringify(runtimeSnapshot, null, 2)}\n`,
+			);
+			writeFileSync(
+				savedResultPath,
+				`${JSON.stringify(savedResult, null, 2)}\n`,
+			);
+			const results = buildRuntimeLiveAgentResults(
+				root,
+				scenarios,
+				join(
+					root,
+					".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
+				),
+			);
+			expect(results.results.every((entry) => entry.status === "failed")).toBe(
+				true,
+			);
+			expect(results.notes[0]).toStartWith("runtime-live-profile-mismatch:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("validates an externally produced receipt through its fresh snapshot", () => {
 		const root = createFixtureRoot();
 		try {
@@ -4376,12 +4537,81 @@ describe("runtime live validation helpers", () => {
 		}
 	});
 
-	test("profile constants align with spec child canonical values", () => {
-		// Spec child 260423_2006 defines default live benchmark profile:
-		//   runtime: codex, model: gpt-5.4-mini, reasoning_effort: medium
-		expect(DEFAULT_BENCH_MODEL).toBe("gpt-5.4-mini/medium");
-		// The validation layer enforces this fixed external-harness profile from
-		// the receipt snapshot and payload; AFOL never executes that profile.
+	test("preserves the observed external harness profile and byte fields", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const scenarios = snapshot.scenariosByPack["runtime-live-agent"] ?? [];
+			const snapshotPath = getRuntimeLiveSnapshotPath(root);
+			const receipt = readJson(snapshotPath);
+			receipt.benchmark_profile = {
+				runtime: "codex",
+				model: "gpt-5.4-mini",
+				reasoning_effort: "medium",
+			};
+			receipt.generated_at = new Date().toISOString();
+			delete receipt.saved_result_path;
+			const receiptScenarios = receipt.scenarios as Array<
+				Record<string, unknown>
+			>;
+			receiptScenarios[0] = {
+				...receiptScenarios[0],
+				context_bytes: 11,
+				prompt_bytes: 13,
+				output_bytes: 17,
+			};
+			writeFileSync(snapshotPath, `${JSON.stringify(receipt, null, 2)}\n`);
+			const results = buildRuntimeLiveAgentResults(
+				root,
+				scenarios,
+				join(
+					root,
+					".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
+				),
+			);
+			const mapped = results.results.find(
+				(entry) => entry.scenario_id === "live-governed-task",
+			);
+			expect(mapped?.context_bytes).toBe(11);
+			expect(mapped?.output_bytes).toBe(17);
+			expect(mapped?.notes).toContain(
+				"live-runner-profile:gpt-5.4-mini/medium",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a receipt whose observed profile diverges from F-31", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const scenarios = snapshot.scenariosByPack["runtime-live-agent"] ?? [];
+			const snapshotPath = getRuntimeLiveSnapshotPath(root);
+			const receipt = readJson(snapshotPath);
+			receipt.benchmark_profile = {
+				runtime: "codex",
+				model: "different-model",
+				reasoning_effort: "medium",
+			};
+			receipt.generated_at = new Date().toISOString();
+			delete receipt.saved_result_path;
+			writeFileSync(snapshotPath, `${JSON.stringify(receipt, null, 2)}\n`);
+			const results = buildRuntimeLiveAgentResults(
+				root,
+				scenarios,
+				join(
+					root,
+					".afol/data/benchmarks/catalog/baselines/runtime-live-agent/baseline-v1.json",
+				),
+			);
+			expect(results.results.every((entry) => entry.status === "failed")).toBe(
+				true,
+			);
+			expect(results.notes[0]).toStartWith("runtime-live-profile-mismatch:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("runtime-live-agent catalog scenarios map to all live-runner scenario IDs", () => {

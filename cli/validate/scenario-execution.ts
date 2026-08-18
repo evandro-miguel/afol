@@ -141,6 +141,21 @@ export interface ScenarioSampleRun {
 	stderr: string;
 }
 
+/** Measure only user-visible stdout and stderr from measured samples. */
+export function maxSampleOutputBytes(
+	samples: ReadonlyArray<Pick<ScenarioSampleRun, "stdout" | "stderr">>,
+): number {
+	return samples.reduce(
+		(maximum, sample) =>
+			Math.max(
+				maximum,
+				Buffer.byteLength(sample.stdout, "utf8") +
+					Buffer.byteLength(sample.stderr, "utf8"),
+			),
+		0,
+	);
+}
+
 function argvCharCount(command: string): number {
 	return Array.from(command.trim()).length;
 }
@@ -1684,13 +1699,7 @@ function runSandboxScenarioCommand(
 				],
 	);
 	const durations = samples.map((sample) => sample.duration_ms);
-	const representativeSample =
-		samples.findLast(
-			(sample) => Buffer.byteLength(sample.stdout, "utf8") > 0,
-		) ?? samples.at(-1);
-	const outputBytes = representativeSample
-		? Buffer.byteLength(representativeSample.stdout, "utf8")
-		: 0;
+	const outputBytes = maxSampleOutputBytes(samples);
 	const successfulSamples = samples.filter((sample) =>
 		scenarioSamplePassed(sample, expectedExit),
 	).length;
@@ -1875,15 +1884,7 @@ export function runScenarioCommand(
 		];
 	});
 	const durations = samples.map((sample) => sample.duration_ms);
-	const representativeSample =
-		[...samples]
-			.reverse()
-			.find((sample) => Buffer.byteLength(sample.stdout, "utf8") > 0) ??
-		samples[samples.length - 1] ??
-		samples[0];
-	const outputBytes = representativeSample
-		? Buffer.byteLength(representativeSample.stdout, "utf8")
-		: 0;
+	const outputBytes = maxSampleOutputBytes(samples);
 	const successfulSamples = samples.filter((sample) =>
 		scenarioSamplePassed(sample, expectedExit),
 	).length;

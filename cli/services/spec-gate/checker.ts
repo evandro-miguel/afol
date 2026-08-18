@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { resolveAdmPaths } from "../adm";
+import { dirname, join } from "node:path";
 import { readSessionGovernanceMetadata } from "../governance/pending-specs";
+import { findCanonicalSpecDocuments } from "../governance/spec-resolver";
 import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type { SpecCheckResult, SpecCheckStatus } from "./types";
@@ -24,12 +24,6 @@ type TaskFrontmatter = {
 	feature_id?: unknown;
 	roadmap_feature?: unknown;
 	parent_spec?: unknown;
-};
-
-type SpecFrontmatter = {
-	doc_type?: unknown;
-	id?: unknown;
-	status?: unknown;
 };
 
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
@@ -151,56 +145,6 @@ function findTaskMetadata(
 		parentSpec: readString(frontmatter.parent_spec) || metadata.parentSpec,
 		pendingSpec: metadata.pendingSpec,
 	};
-}
-
-function collectMarkdownFiles(rootDir: string): string[] {
-	const out: string[] = [];
-	const stack = [rootDir];
-	while (stack.length > 0) {
-		const dir = stack.pop();
-		if (!dir || !existsSync(dir)) {
-			continue;
-		}
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			const entryPath = join(dir, entry.name);
-			if (entry.isSymbolicLink()) {
-				continue;
-			}
-			if (entry.isDirectory()) {
-				stack.push(entryPath);
-				continue;
-			}
-			if (entry.isFile() && entry.name.endsWith(".md")) {
-				out.push(entryPath);
-			}
-		}
-	}
-	return out;
-}
-
-function findSpecFile(root: string, specId: string): string | null {
-	for (const specsRoot of [
-		resolveAdmPaths(root).specsDir,
-		join(root, "docs", "arc", "SPECS"),
-	]) {
-		for (const specPath of collectMarkdownFiles(specsRoot)) {
-			const parsed = parseFrontmatter(readFileSync(specPath, "utf8"));
-			if (!parsed) {
-				continue;
-			}
-			const frontmatter = parsed as SpecFrontmatter;
-			if (readString(frontmatter.doc_type) !== "spec") {
-				continue;
-			}
-			if (readString(frontmatter.id) === specId) {
-				return specPath;
-			}
-			if (basename(specPath) === `${specId}.md`) {
-				return specPath;
-			}
-		}
-	}
-	return null;
 }
 
 function isSpecCheckResult(value: unknown): value is SpecCheckResult {
@@ -341,8 +285,9 @@ export function checkSpecCompatibility(
 			}),
 		);
 	}
-	const specPath = findSpecFile(root, metadata.parentSpec);
-	if (!specPath) {
+	const matches = findCanonicalSpecDocuments(root, metadata.parentSpec);
+	const spec = matches.length === 1 ? matches[0] : undefined;
+	if (!spec || !["spec", "spec-child"].includes(spec.docType)) {
 		return saveResult(
 			root,
 			buildResult({
@@ -354,14 +299,7 @@ export function checkSpecCompatibility(
 			}),
 		);
 	}
-	const parsed = parseFrontmatter(readFileSync(specPath, "utf8"));
-	const frontmatter =
-		parsed && typeof parsed === "object" && !Array.isArray(parsed)
-			? (parsed as SpecFrontmatter)
-			: null;
-	const status = frontmatter
-		? readString(frontmatter.status).toLowerCase()
-		: "";
+	const status = spec.status;
 	return saveResult(
 		root,
 		buildResult({

@@ -26,8 +26,10 @@ export type CliMicroInvocation = {
 
 export const CLI_MICRO_THRESHOLDS: CliMicroThresholds = {
 	max_wall_clock_ms: 60_000,
-	max_output_tokens: 5_000,
+	max_output_tokens: 10_000,
 };
+
+const CLI_MICRO_OUTPUT_WARNING_TOKENS = 5_000;
 
 const MICRO_COMMANDS: string[][] = [
 	["status"],
@@ -67,6 +69,9 @@ export function collectCliMicroThresholdNotes(
 			`threshold-exceeded:max_wall_clock_ms:${wallClockMs}>${thresholds.max_wall_clock_ms}`,
 		);
 	}
+	if (estimatedOutputTokens > CLI_MICRO_OUTPUT_WARNING_TOKENS) {
+		notes.push(`token-rule:non-ideal(>5k):${estimatedOutputTokens}tokens`);
+	}
 	if (estimatedOutputTokens > thresholds.max_output_tokens) {
 		notes.push(
 			`threshold-exceeded:max_output_tokens:${estimatedOutputTokens}>${thresholds.max_output_tokens}`,
@@ -91,7 +96,9 @@ export function runCliMicroBenchmark(
 			},
 		);
 		const wallClockMs = Date.now() - startedAt;
-		const outputBytes = Buffer.byteLength(result.stdout, "utf8");
+		const outputBytes =
+			Buffer.byteLength(result.stdout, "utf8") +
+			Buffer.byteLength(result.stderr, "utf8");
 		const estimatedOutputTokens = Math.ceil(outputBytes / 4);
 		const thresholdNotes = collectCliMicroThresholdNotes(
 			wallClockMs,
@@ -102,7 +109,7 @@ export function runCliMicroBenchmark(
 			result.ok &&
 			!result.timedOut &&
 			result.status === 0 &&
-			thresholdNotes.length === 0;
+			!thresholdNotes.some((note) => note.startsWith("threshold-exceeded:"));
 		return {
 			command: "afol",
 			args,

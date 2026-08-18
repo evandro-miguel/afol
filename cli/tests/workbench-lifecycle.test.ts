@@ -2988,6 +2988,10 @@ describe("workbench lifecycle service", () => {
 			const continuationTask = readFileSync(continuation.taskPath, "utf8");
 			expect(continuationTask).toContain('feature_id: "F-30"');
 			expect(continuationTask).toContain('parent_spec: "carry-open-spec"');
+			expect(continuationTask).toContain(
+				`continuation_of: "${created.session}"`,
+			);
+			expect(continuationTask).toContain('carry_open_tasks: "T-02"');
 			expect(continuationTask).toContain("| T-01 | pending |");
 			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
 				continuationId,
@@ -3143,6 +3147,81 @@ describe("workbench lifecycle service", () => {
 			expect(
 				readSessionContext(root).bindings.map((entry) => entry.session),
 			).toEqual(["other"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close carry-open recovers an already-created continuation after a crash", () => {
+		const root = mkRoot("close-carry-open-recovery");
+		try {
+			const created = newWorkstream(root, "carry-open-recovery", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["deferred"],
+			});
+			const continuation = newWorkstream(
+				root,
+				"carry-open-recovery continuation",
+				{
+					continuationOf: created.session,
+					carryOpenTasks: ["T-01"],
+					featureId: "F-30",
+					parentSpec: "carry-open-spec",
+					tasks: ["T-01: deferred"],
+				},
+			);
+			const source = readFileSync(created.taskPath, "utf8")
+				.replace('status: "open"', 'status: "open"')
+				.replace(
+					/^\| T-01 \|.*$/m,
+					`| T-01 | moved | agent | deferred destination=${continuation.session} reason=dependency pending |`,
+				);
+			writeFileSync(created.taskPath, source, "utf8");
+
+			const result = closeSession(root, created.session, {
+				carryOpen: true,
+				reason: "dependency pending",
+			});
+			expect(result.continuation).toBe(continuation.session);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close carry-open rejects an unrelated continuation destination", () => {
+		const root = mkRoot("close-carry-open-recovery-mismatch");
+		try {
+			const created = newWorkstream(root, "carry-open-recovery", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["deferred"],
+			});
+			const unrelated = newWorkstream(root, "unrelated", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["unrelated task"],
+			});
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8").replace(
+					/^\| T-01 \|.*$/m,
+					`| T-01 | moved | agent | deferred destination=${unrelated.session} reason=dependency pending |`,
+				),
+				"utf8",
+			);
+
+			expect(() =>
+				closeSession(root, created.session, {
+					carryOpen: true,
+					reason: "dependency pending",
+				}),
+			).toThrow(
+				"Carry-open recovery continuation linkage does not match source.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -3368,6 +3447,30 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("does not recover a close event from incoherent durable task state", () => {
+		const root = mkRoot("incoherent-close-without-event");
+		try {
+			const created = newWorkstream(root, "incoherent close without event");
+			const closedAt = "2026-07-09T22:30:00.000Z";
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8")
+					.replace('status: "active"', 'status: "closed"')
+					.replace(
+						/^updated_at: .*$/m,
+						`updated_at: ${JSON.stringify(closedAt)}\nclosed_at: ${JSON.stringify(closedAt)}`,
+					),
+				"utf8",
+			);
+
+			expect(() => closeSession(root, created.session)).toThrow(
+				"incoherent durable close state",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("closeSession reconciles a committed close after interruption", () => {
 		const root = mkRoot("close-recovery");
 		try {
@@ -3575,6 +3678,14 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("close-timestamp-no-milliseconds");
 		try {
 			const created = newWorkstream(root, "close timestamp no milliseconds");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
 			const closedAt = "2026-07-09T22:30:00Z";
 			writeFileSync(
 				created.taskPath,
@@ -6428,6 +6539,60 @@ describe("task completion authorization and transitions", () => {
 			const task = readFileSync(created.taskPath, "utf8");
 			expect(task).toContain("| T-01 | in_progress |");
 			expect(task).toContain("| T-02 | in_progress |");
+		} finally {
+			console.error = originalError;
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("single-task done rejects a changed task attempt after verification", async () => {
+		const root = mkRoot("single-done-attempt-fence");
+		const originalError = console.error;
+		const originalLog = console.log;
+		const errors: string[] = [];
+		try {
+			const created = newWorkstream(root, "single done attempt fence", {
+				tasks: ["only task"],
+				noSpecRequiredReason: "fixture",
+			});
+			const markerPath = join(root, "verification-started.txt");
+			const verifierPath = join(root, "slow-verifier.ts");
+			writeFileSync(
+				verifierPath,
+				`await Bun.write(${JSON.stringify(markerPath)}, "started"); await Bun.sleep(300);`,
+			);
+			startTask(root, { session: created.session, taskId: "T-01" });
+			console.error = (...values: unknown[]) =>
+				errors.push(values.map(String).join(" "));
+			console.log = () => {};
+			const completion = runDoneCommand(
+				["--session", created.session, "T-01", "--test", `bun ${verifierPath}`],
+				root,
+			);
+			for (
+				let attempts = 0;
+				attempts < 100 && !existsSync(markerPath);
+				attempts += 1
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			expect(existsSync(markerPath)).toBe(true);
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "problem",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "in_progress",
+			});
+			expect(await completion).toBe(2);
+			expect(errors.join("\n")).toContain(
+				"Task T-01 attempt changed during verification.",
+			);
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(0);
 		} finally {
 			console.error = originalError;
 			console.log = originalLog;

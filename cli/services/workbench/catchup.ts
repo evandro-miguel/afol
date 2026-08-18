@@ -234,11 +234,7 @@ function recentSessionsHint(root: string): string {
 }
 
 function readOpenPendingSpecCount(root: string): number {
-	try {
-		return listOpenPendingSpecs(root).length;
-	} catch {
-		return 0;
-	}
+	return listOpenPendingSpecs(root).length;
 }
 
 function appendPendingSpecDiagnostics(

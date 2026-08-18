@@ -1165,6 +1165,7 @@ async function executeDoneLocked(
 
 	let observedCompletion: ReturnType<typeof completeObservedTask> | null = null;
 	if (parsed.verifications.length === 1) {
+		const snapshot = taskAttemptSnapshot(root, parsed);
 		const verificationSpec = parsed.verifications[0] as VerificationSpec;
 		const command =
 			parsed.testCommands[0] ?? formatVerificationCommand(verificationSpec);
@@ -1178,6 +1179,7 @@ async function executeDoneLocked(
 			{
 				session: parsed.session,
 				taskId: parsed.taskId,
+				taskAttemptSnapshot: snapshot,
 				command,
 				exitCode: verification.exitCode,
 				...(verification.signal ? { signal: verification.signal } : {}),
@@ -1198,6 +1200,7 @@ async function executeDoneLocked(
 		}
 	}
 	if (parsed.testShellCommand) {
+		const snapshot = taskAttemptSnapshot(root, parsed);
 		const verification = await runVerificationAsync(
 			root,
 			{ mode: "shell", command: parsed.testShellCommand },
@@ -1212,6 +1215,7 @@ async function executeDoneLocked(
 			{
 				session: parsed.session,
 				taskId: parsed.taskId,
+				taskAttemptSnapshot: snapshot,
 				command: parsed.testShellCommand,
 				exitCode: verification.exitCode,
 				...(verification.signal ? { signal: verification.signal } : {}),

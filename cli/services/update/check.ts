@@ -5,7 +5,7 @@ import { createPatch } from "diff";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
 import {
 	isClaudeAdapterPath,
-	readClaudeAdapterEnabled,
+	readClaudeAdapterConfigState,
 } from "../adapter/claude";
 import {
 	type BootstrapManifestEntry,
@@ -670,7 +670,8 @@ function planUpdateOperations(
 			continue;
 		}
 
-		if (entry.currentContent.length === 0) {
+		const targetExists = Object.hasOwn(currentFiles, entry.path);
+		if (!targetExists) {
 			if (owner === "project-owned" || owner === "ignored") {
 				operations.push({
 					kind: "preserve-project-owned",
@@ -812,7 +813,7 @@ function planUpdateOperations(
 			continue;
 		}
 		templateFiles[path] = templateEntry;
-		if (typeof currentFiles[path] === "string") {
+		if (Object.hasOwn(currentFiles, path)) {
 			genericCurrentFiles[path] = currentFiles[path] ?? "";
 		}
 	}
@@ -946,15 +947,16 @@ export function checkTemplateUpdate(
 	projectRoot: string,
 	removedPaths: readonly UpdateFilePath[] = REMOVED_TEMPLATE_PATHS,
 ): UpdateCheckResult {
-	const claudeEnabled = readClaudeAdapterEnabled(projectRoot);
-	const updateTargets = claudeEnabled
-		? UPDATE_TARGETS
-		: UPDATE_TARGETS.filter((path) => !isClaudeAdapterPath(path));
+	const claudeConfig = readClaudeAdapterConfigState(projectRoot);
+	const updateTargets =
+		claudeConfig === "enabled"
+			? UPDATE_TARGETS
+			: UPDATE_TARGETS.filter((path) => !isClaudeAdapterPath(path));
 	const currentFiles: Record<string, string> = {};
 	for (const path of updateTargets) {
-		const content = readText(join(projectRoot, path));
-		if (content.length > 0) {
-			currentFiles[path] = content;
+		const absolutePath = join(projectRoot, path);
+		if (existsSync(absolutePath)) {
+			currentFiles[path] = readText(absolutePath);
 		}
 	}
 

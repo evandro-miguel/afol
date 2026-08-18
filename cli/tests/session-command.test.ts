@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import * as childProcessModule from "node:child_process";
 import { spawnSync } from "node:child_process";
 import * as nodeFs from "node:fs";
 import {
@@ -259,6 +260,50 @@ afterEach(() => {
 });
 
 describe("session context service", () => {
+	test.each([
+		["nonzero git exit", 7],
+		["git timeout", null],
+	] as const)("%s degrades context resolution to null", (_label, status) => {
+		const root = createProjectRoot("git-context-degraded");
+		const spawnSpy = spyOn(childProcessModule, "spawnSync").mockImplementation(
+			(() =>
+				({
+					pid: 1,
+					output: [null, "", ""],
+					status,
+					signal: null,
+					stdout: "",
+					stderr: "",
+					...(status === null
+						? {
+								error: Object.assign(new Error("git timed out"), {
+									code: "ETIMEDOUT",
+								}),
+							}
+						: {}),
+				}) as unknown as ReturnType<
+					typeof spawnSync
+				>) as unknown as typeof childProcessModule.spawnSync,
+		);
+		try {
+			bindSession(root, {
+				session: "S-GIT-DEGRADED",
+				branch: "fixture",
+				worktree: root,
+			});
+
+			expect(resolveContextSession(root)).toBeNull();
+			expect(spawnSpy).toHaveBeenCalledWith(
+				"git",
+				["rev-parse", "--git-dir", "--show-toplevel"],
+				expect.objectContaining({ timeout: 1_000 }),
+			);
+		} finally {
+			spawnSpy.mockRestore();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("malformed context fails closed and is not overwritten", () => {
 		const root = createProjectRoot("malformed-context");
 		const path = join(root, ".afol", "wb", "session-context.json");
