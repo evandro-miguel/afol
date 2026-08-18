@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
@@ -8,6 +8,7 @@ import {
 	claimDailySuggestion,
 	readSuggestionReceiptJournal,
 } from "../services/evolution/suggestion-journal";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const DIGEST = "a".repeat(64);
@@ -121,7 +122,7 @@ describe("suggestion journal DB fast path", () => {
 			expect(readSuggestionReceiptJournal(root, PROJECT_ID)).toHaveLength(2);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });
