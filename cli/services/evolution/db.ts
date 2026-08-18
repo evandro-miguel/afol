@@ -192,19 +192,21 @@ export function openEvolutionDb(dbPath: string): Database {
 			db.exec("PRAGMA foreign_keys=ON;");
 			applyMigrations(db);
 		};
-		const isReady =
-			String(mode() ?? "").toLowerCase() === "wal" &&
-			(
-				db.query("PRAGMA user_version").get() as {
-					user_version?: unknown;
-				} | null
-			)?.user_version === EVOLUTION_SCHEMA_VERSION;
-		if (isReady) {
-			db.exec("PRAGMA foreign_keys=ON;");
-			applyMigrations(db);
-		} else {
-			withExternalPathLockSync(dbPath, initialize);
-		}
+		withExternalPathLockSync(dbPath, () => {
+			const isReady =
+				String(mode() ?? "").toLowerCase() === "wal" &&
+				(
+					db.query("PRAGMA user_version").get() as {
+						user_version?: unknown;
+					} | null
+				)?.user_version === EVOLUTION_SCHEMA_VERSION;
+			if (isReady) {
+				db.exec("PRAGMA foreign_keys=ON;");
+				applyMigrations(db);
+			} else {
+				initialize();
+			}
+		});
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
