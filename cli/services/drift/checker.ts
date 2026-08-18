@@ -1,8 +1,9 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
 import { boundedSpawn } from "../../core/subprocess";
 import { validateAdmMigration } from "../adm";
+import { findCanonicalSpecDocuments } from "../governance/spec-resolver";
 import { collectFreshnessReport } from "../local-state/freshness";
 import { resolveProjectPaths } from "../project/paths";
 import { openDb } from "../state/db";
@@ -46,33 +47,6 @@ function makeFinding(
 		...(expected !== undefined ? { expected } : {}),
 		...(actual !== undefined ? { actual } : {}),
 	};
-}
-
-function walkFiles(root: string): string[] {
-	if (!existsSync(root)) {
-		return [];
-	}
-	const out: string[] = [];
-	const stack: string[] = [root];
-	while (stack.length > 0) {
-		const current = stack.pop();
-		if (!current) {
-			continue;
-		}
-		for (const entry of readdirSync(current, { withFileTypes: true }).sort(
-			(a, b) => a.name.localeCompare(b.name),
-		)) {
-			const entryPath = join(current, entry.name);
-			if (entry.isDirectory()) {
-				stack.push(entryPath);
-				continue;
-			}
-			if (entry.isFile()) {
-				out.push(entryPath);
-			}
-		}
-	}
-	return out;
 }
 
 function readText(path: string): string {
@@ -197,11 +171,8 @@ function parseSpecIndex(root: string): SpecIndexRow[] {
 }
 
 function findSpecFile(root: string, specId: string): string | null {
-	const specsRoot = join(root, ".afol", "adm", "specs");
-	const match = walkFiles(specsRoot).find(
-		(path) => basename(path) === `${specId}.md`,
-	);
-	return match ? relative(root, match).replace(/\\/g, "/") : null;
+	const matches = findCanonicalSpecDocuments(root, specId);
+	return matches.length === 1 ? (matches[0]?.relativePath ?? null) : null;
 }
 
 function hasDocTypeFrontmatter(path: string): boolean {

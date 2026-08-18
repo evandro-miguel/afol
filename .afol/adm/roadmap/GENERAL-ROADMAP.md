@@ -922,6 +922,8 @@ Follow-on slices under this direction:
     - .afol/adm/specs/260726_governance-contract-reconciliation_spec-child_01.md
     - .afol/adm/specs/260806_release-promotion-remediation_spec-child_01.md
     - .afol/adm/specs/260727_release-benchmark-timing-and-baseline-contract_spec-child_01.md
+    - .afol/adm/specs/260816_core-integrity-remediation_spec-child_01.md
+    - .afol/adm/specs/260816_simplicity-preserving-integrity-remediation_spec-child_01.md
 - Scope:
   - Reconcile specs index rows and frontmatter through blocking drift checks.
   - Add offline local diagnostics and integrity evidence while preserving
@@ -940,6 +942,11 @@ Follow-on slices under this direction:
   - Reconcile accepted F-01, F-11, F-13, and F-15 governance contracts with
     the AFOL-only TypeScript runtime while retaining their pre-reconciliation
     bytes in a verified AFOL migration archive.
+  - Remediate verified mutation crash-durability, spec-resolution,
+    benchmark-provenance, and lifecycle-concurrency defects under focused
+    fault-injection and exact-commit release evidence.
+  - Close residual integrity and fast-path defects without new persistent
+    infrastructure, default global blockers, or speculative refactors.
 - Out of scope:
   - Windows, macOS, ARM, MCP, remote feedback, network sync, and result/v2.
   - F-12 reopening, F-23 through F-28 reservation, global installation,
@@ -953,6 +960,11 @@ Follow-on slices under this direction:
     reproducible, and recorded without claiming unsupported platforms.
   - Focused tests, project validation, release gates, and required security
     scans pass; unresolved failures remain visible blockers.
+- Simplicity-preserving integrity remediation: session
+  `260816_2020_simplicity-preserving-integrity-remediation` closed all six
+  tasks with focused fault injection, 2180/0 full tests, 12/12 token/kernel
+  benchmarks, security scans, independent GO review, and release validation on
+  candidate `098a83cc`; final governance-only commit is revalidated separately.
 - Closure note: final-status session `260715_1811_afol-1-0-final-status`
   accepted diagnostics evidence `E-20260715172724325-99e5fa`, F-29 release
   command evidence `E-20260715180931454-766e6a` plus observed artifact

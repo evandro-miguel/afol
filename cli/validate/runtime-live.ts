@@ -22,6 +22,11 @@ const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
 const LIVE_BENCHMARK_SNAPSHOT_SCHEMA_VERSION = "1.0.0";
 const LIVE_BENCHMARK_STALE_AFTER_DAYS = 7;
 const LIVE_BENCHMARK_RESULT_SCHEMA_VERSION = "2.0.0";
+const LIVE_BENCHMARK_FIXED_PROFILE: LiveRunnerProfile = {
+	runtime: "codex",
+	model: "gpt-5.4-mini",
+	reasoning_effort: "medium",
+};
 const LIVE_BENCHMARK_SCENARIO_IDS: Record<string, string> = {
 	"governed-task-lifecycle": "live-implement-start-complete-evidence",
 	"file-inspection-vs-command": "live-implement-next-governance-preflight",
@@ -49,6 +54,7 @@ interface LiveRunnerScenarioResult {
 	retry_count: number;
 	context_bytes: number;
 	prompt_bytes: number;
+	output_bytes: number;
 	input_tokens: number;
 	output_tokens: number;
 	total_tokens: number;
@@ -108,6 +114,18 @@ function parseLiveRunnerProfile(
 	};
 }
 
+function assertFixedHarnessProfile(profile: LiveRunnerProfile): void {
+	if (
+		profile.runtime !== LIVE_BENCHMARK_FIXED_PROFILE.runtime ||
+		profile.model !== LIVE_BENCHMARK_FIXED_PROFILE.model ||
+		profile.reasoning_effort !== LIVE_BENCHMARK_FIXED_PROFILE.reasoning_effort
+	) {
+		throw new Error(
+			`runtime-live-profile-mismatch:runtime=${profile.runtime},model=${profile.model},reasoning=${profile.reasoning_effort};expected:${LIVE_BENCHMARK_FIXED_PROFILE.runtime}/${LIVE_BENCHMARK_FIXED_PROFILE.model}/${LIVE_BENCHMARK_FIXED_PROFILE.reasoning_effort};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
+		);
+	}
+}
+
 function parseLiveRunnerScenarioResult(
 	data: unknown,
 	sourcePath: string,
@@ -142,6 +160,8 @@ function parseLiveRunnerScenarioResult(
 			asOptionalNumber(data.context_bytes, `${sourcePath}.context_bytes`) ?? 0,
 		prompt_bytes:
 			asOptionalNumber(data.prompt_bytes, `${sourcePath}.prompt_bytes`) ?? 0,
+		output_bytes:
+			asOptionalNumber(data.output_bytes, `${sourcePath}.output_bytes`) ?? 0,
 		input_tokens:
 			asOptionalNumber(
 				tokenUsage?.input_tokens,
@@ -245,6 +265,25 @@ function requiredNumber(value: unknown, key: string): number {
 	return parsed;
 }
 
+function parseArchivedModelProfile(
+	value: unknown,
+	sourcePath: string,
+): Pick<LiveRunnerProfile, "model" | "reasoning_effort"> {
+	const [model, reasoningEffort, ...rest] = asString(value, sourcePath).split(
+		"/",
+	);
+	if (
+		model === undefined ||
+		model === "" ||
+		reasoningEffort === undefined ||
+		reasoningEffort === "" ||
+		rest.length > 0
+	) {
+		throw new Error(`runtime-live-archive-model-invalid:${sourcePath}`);
+	}
+	return { model, reasoning_effort: reasoningEffort };
+}
+
 function parseSavedRunArchive(
 	data: Record<string, unknown>,
 	sourcePath: string,
@@ -264,6 +303,45 @@ function parseSavedRunArchive(
 		);
 	}
 	const generatedAt = asString(data.timestamp, `${sourcePath}.timestamp`);
+	const archivedProfiles = data.results.map((entry, index) => {
+		if (!isObject(entry)) {
+			throw new Error(
+				`Invalid saved benchmark result: ${sourcePath}.results[${index}]`,
+			);
+		}
+		return parseArchivedModelProfile(
+			entry.model,
+			`${sourcePath}.results[${index}].model`,
+		);
+	});
+	const benchmarkProfile = archivedProfiles[0];
+	if (!benchmarkProfile) {
+		throw new Error(
+			`Invalid saved benchmark results array: ${sourcePath}.results`,
+		);
+	}
+	if (
+		archivedProfiles.some(
+			(profile) =>
+				profile.model !== benchmarkProfile.model ||
+				profile.reasoning_effort !== benchmarkProfile.reasoning_effort,
+		)
+	) {
+		throw new Error(`runtime-live-archive-profile-inconsistent:${sourcePath}`);
+	}
+	const topLevelProfile = asOptionalObject(
+		data.benchmark_profile,
+		`${sourcePath}.benchmark_profile`,
+	);
+	const explicitRuntime =
+		asOptionalString(data.runtime, `${sourcePath}.runtime`) ??
+		asOptionalString(
+			topLevelProfile?.runtime,
+			`${sourcePath}.benchmark_profile.runtime`,
+		);
+	// Schema 2.0.0 archives record model/reasoning per result but no runtime;
+	// their legacy Codex producer is the only compatible runtime fallback.
+	const runtime = explicitRuntime ?? "codex";
 	const scenarios = data.results.map((entry, index) => {
 		if (!isObject(entry)) {
 			throw new Error(
@@ -308,6 +386,7 @@ function parseSavedRunArchive(
 			retry_count: 0,
 			context_bytes: 0,
 			prompt_bytes: 0,
+			output_bytes: 0,
 			input_tokens: requiredNumber(
 				tokens?.input,
 				`${sourcePath}.results[${index}].tokens.input`,
@@ -336,9 +415,8 @@ function parseSavedRunArchive(
 		context_bytes_total: 0,
 		prompt_bytes_total: 0,
 		benchmark_profile: {
-			runtime: "codex",
-			model: "gpt-5.4-mini",
-			reasoning_effort: "medium",
+			runtime,
+			...benchmarkProfile,
 		},
 		scenarios,
 	};
@@ -358,18 +436,12 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 			`runtime-live-artifact-pack-mismatch:${snapshotPackId};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
-	const snapshotProfile = parseLiveRunnerProfile(
-		snapshot.benchmark_profile,
-		`${snapshotPath}.benchmark_profile`,
+	assertFixedHarnessProfile(
+		parseLiveRunnerProfile(
+			snapshot.benchmark_profile,
+			`${snapshotPath}.benchmark_profile`,
+		),
 	);
-	if (
-		snapshotProfile.model !== "gpt-5.4-mini" ||
-		snapshotProfile.reasoning_effort !== "medium"
-	) {
-		throw new Error(
-			`runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
-		);
-	}
 	const savedResultPathRaw = asOptionalString(
 		snapshot.saved_result_path,
 		`${snapshotPath}.saved_result_path`,
@@ -437,14 +509,7 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 			`runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
 		);
 	}
-	if (
-		payload.benchmark_profile.model !== "gpt-5.4-mini" ||
-		payload.benchmark_profile.reasoning_effort !== "medium"
-	) {
-		throw new Error(
-			`runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/medium;${LIVE_BENCHMARK_REFRESH_GUIDANCE}`,
-		);
-	}
+	assertFixedHarnessProfile(payload.benchmark_profile);
 	return {
 		snapshotPathRelative: resolveRelativePath(
 			projectRoot,
@@ -670,7 +735,7 @@ function buildRuntimeLiveScenarioResult(
 		output_tokens: mappedScenario.output_tokens,
 		total_tokens: mappedScenario.total_tokens,
 		context_bytes: mappedScenario.context_bytes,
-		output_bytes: mappedScenario.prompt_bytes,
+		output_bytes: mappedScenario.output_bytes,
 		tool_call_count: mappedScenario.tool_call_count,
 		tool_success_rate: mappedScenario.tool_success_rate,
 	};

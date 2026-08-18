@@ -37,6 +37,22 @@ export function atomicWriteText(
 	content: string,
 	options: { syncDirectory?: boolean } = {},
 ): void {
+	atomicWrite(path, content, options);
+}
+
+export function atomicWriteBytes(
+	path: string,
+	content: Uint8Array,
+	options: { syncDirectory?: boolean } = {},
+): void {
+	atomicWrite(path, content, options);
+}
+
+function atomicWrite(
+	path: string,
+	content: string | Uint8Array,
+	options: { syncDirectory?: boolean } = {},
+): void {
 	const dir = dirname(path);
 	mkdirSync(dir, { recursive: true });
 	const tempPath = join(
@@ -44,7 +60,7 @@ export function atomicWriteText(
 		`.${sanitizeTempLabel(path)}.${process.pid}.${Date.now()}.tmp`,
 	);
 	try {
-		writeFileSync(tempPath, content, "utf8");
+		writeFileSync(tempPath, content);
 		fsyncPath(tempPath);
 		renameSync(tempPath, path);
 		if (options.syncDirectory !== false) {

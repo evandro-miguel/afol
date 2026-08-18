@@ -49,6 +49,7 @@ import {
 	scalarValue,
 } from "./session-lifecycle-state";
 import { loadEvidenceEntries, sessionPaths } from "./session-reader";
+import { parseStateBoardTaskRow } from "./state-board";
 import type { EvidenceEntry, EvidenceProvenance, TaskState } from "./types";
 
 export type { SessionLifecycleState } from "./session-lifecycle-state";
@@ -81,8 +82,6 @@ import {
 	verifyWorkbenchTasks,
 } from "./verify";
 
-const TASK_ROW_RE =
-	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 const BLOCKING_STATES = new Set([
 	"pending",
 	"in_progress",
@@ -267,6 +266,8 @@ export function sanitizeEvidenceCommand(command: string): string {
 }
 
 export type NewWorkstreamMetadata = {
+	continuationOf?: string;
+	carryOpenTasks?: string[];
 	intent?: string;
 	featureId?: string;
 	parentSpec?: string;
@@ -778,17 +779,17 @@ function assertTaskInProgressLocked(
 }
 
 function parseTaskRow(line: string): TaskRow | null {
-	const match = line.trim().match(TASK_ROW_RE);
-	if (!match?.[1] || !match[2]) {
+	const parsed = parseStateBoardTaskRow(line);
+	if (!parsed) {
 		return null;
 	}
-	const notes = (match[4] ?? "").trim();
+	const notes = parsed.notes;
 	const attemptMatch = notes.match(/(?:^|\s)attempt=(\d+)(?=\s|$)/);
 	return {
 		line,
-		taskId: match[1],
-		state: match[2].trim(),
-		owner: (match[3] ?? "").trim(),
+		taskId: parsed.taskId,
+		state: parsed.state,
+		owner: parsed.owner,
 		notes,
 		attempt: Number.parseInt(attemptMatch?.[1] ?? "0", 10),
 	};
@@ -888,6 +889,8 @@ function carryOpenMetadata(
 	return {
 		theme: `${theme} continuation`,
 		metadata: {
+			continuationOf: session,
+			carryOpenTasks: taskRows.map((row) => row.taskId),
 			intent: `Carry open from ${session}: ${reason}`,
 			featureId,
 			parentSpec,
@@ -915,6 +918,80 @@ function carryOpenTransitionChain(state: string): readonly TaskState[] {
 		return ["problem", "moved"];
 	}
 	throw new Error(`Cannot carry open task in state ${state}.`);
+}
+
+function continuationFrontmatterValue(
+	document: ReturnType<typeof readTaskLifecycleState>["document"],
+	key: string,
+): string | null {
+	if (document.kind !== "frontmatter") return null;
+	const values = document.lines
+		.map((line) => scalarValue(line, key))
+		.filter((value): value is string => value !== undefined && value !== null);
+	return values.length === 1 ? (values[0]?.trim() ?? null) : null;
+}
+
+function carriedContinuationSession(
+	root: string,
+	source: ReturnType<typeof readTaskLifecycleState>["document"],
+	taskRows: readonly TaskRow[],
+): string | null {
+	const carriedRows = taskRows.filter((row) => row.state === "moved");
+	if (carriedRows.length === 0) return null;
+	const destinations = new Set(
+		carriedRows.map(
+			(row) => /(?:^|\s)destination=([^\s|]+)/.exec(row.notes)?.[1] ?? "",
+		),
+	);
+	if (destinations.size !== 1 || destinations.has("")) {
+		throw new Error(
+			"Carry-open recovery has an invalid source destination mapping.",
+		);
+	}
+	const continuation = [...destinations][0];
+	if (
+		!continuation ||
+		!existsSync(sessionPaths(root, continuation).sessionDir)
+	) {
+		throw new Error("Carry-open recovery continuation is missing.");
+	}
+	const continuationState = readTaskLifecycleState(
+		sessionPaths(root, continuation).taskPath,
+		continuation,
+	);
+	const expectedFeature = continuationFrontmatterValue(source, "feature_id");
+	const expectedParentSpec = continuationFrontmatterValue(
+		source,
+		"parent_spec",
+	);
+	const sourceSession = continuationFrontmatterValue(source, "session_id");
+	const expectedTasks = carriedRows
+		.map((row) => row.taskId)
+		.sort()
+		.join(",");
+	if (
+		continuationFrontmatterValue(
+			continuationState.document,
+			"continuation_of",
+		) !== sourceSession ||
+		continuationFrontmatterValue(continuationState.document, "feature_id") !==
+			expectedFeature ||
+		continuationFrontmatterValue(continuationState.document, "parent_spec") !==
+			expectedParentSpec ||
+		continuationFrontmatterValue(
+			continuationState.document,
+			"governance_status",
+		) !== "governed" ||
+		continuationFrontmatterValue(
+			continuationState.document,
+			"carry_open_tasks",
+		) !== expectedTasks
+	) {
+		throw new Error(
+			"Carry-open recovery continuation linkage does not match source.",
+		);
+	}
+	return continuation;
 }
 
 function ensureSessionOpenForMutation(root: string, session: string): void {
@@ -1173,6 +1250,14 @@ export function newWorkstream(
 		if (metadata?.parentSpec) {
 			metadataLines.push(`- parent_spec: ${metadata.parentSpec}`);
 		}
+		if (metadata?.continuationOf) {
+			metadataLines.push(`- continuation_of: ${metadata.continuationOf}`);
+		}
+		if (metadata?.carryOpenTasks?.length) {
+			metadataLines.push(
+				`- carry_open_tasks: ${metadata.carryOpenTasks.join(",")}`,
+			);
+		}
 		if (metadata?.noSpecRequiredReason) {
 			metadataLines.push(
 				`- no_spec_required_reason: ${metadata.noSpecRequiredReason}`,
@@ -1215,6 +1300,15 @@ export function newWorkstream(
 			createdAt,
 			...(metadata ? { metadata } : {}),
 		});
+		if (metadata?.continuationOf) {
+			planFrontmatter.continuation_of = metadata.continuationOf;
+			taskFrontmatter.continuation_of = metadata.continuationOf;
+		}
+		if (metadata?.carryOpenTasks?.length) {
+			const carryOpenTasks = [...metadata.carryOpenTasks].sort();
+			planFrontmatter.carry_open_tasks = carryOpenTasks;
+			taskFrontmatter.carry_open_tasks = carryOpenTasks;
+		}
 
 		atomicWriteText(
 			paths.planPath,
@@ -2407,7 +2501,7 @@ export function doneTask(
 export type CompleteObservedTaskInput = Omit<
 	RecordEvidenceInput,
 	"result" | "provenance" | "exitCode"
-> & { exitCode: number };
+> & { exitCode: number; taskAttemptSnapshot?: number };
 
 export type CompleteObservedTaskResult = {
 	evidence: EvidenceEntry;
@@ -2497,6 +2591,18 @@ export function completeObservedTask(
 ): CompleteObservedTaskResult {
 	return withSessionLock(root, input.session, () => {
 		ensureSessionOpenForMutation(root, input.session);
+		if (input.taskAttemptSnapshot !== undefined) {
+			const task = ensureTaskExists(
+				sessionPaths(root, input.session).taskPath,
+				input.session,
+				input.taskId,
+			);
+			if (task.attempt !== input.taskAttemptSnapshot) {
+				throw new VerificationRunConflictError(
+					`Task ${input.taskId} attempt changed during verification.`,
+				);
+			}
+		}
 		const warnings: string[] = [];
 		const deferredEventRecords: Record<string, unknown>[] = [];
 		const evidence = recordEvidence(
@@ -2692,6 +2798,7 @@ export function closeSession(
 			: "# Log\n";
 		const logSummary = readLogSummary(originalLog);
 		let continuation: NewWorkstreamResult | undefined;
+		let recoveredContinuation: string | undefined;
 		let continuationTheme = "";
 		const rollbackContinuation = () => {
 			if (!continuation) return;
@@ -2759,7 +2866,12 @@ export function closeSession(
 					throw new Error(`Session ${session} has blocking tasks: ${labels}`);
 				}
 			} else if (options.carryOpen) {
-				throw new Error(`Session ${session} has no open tasks to carry.`);
+				recoveredContinuation =
+					carriedContinuationSession(root, state.document, taskRows) ??
+					undefined;
+				if (!recoveredContinuation) {
+					throw new Error(`Session ${session} has no open tasks to carry.`);
+				}
 			}
 			const verification = verifyWorkbenchTasks(paths.sessionDir, true);
 			if (options.admitLegacyBaseline) {
@@ -2865,16 +2977,31 @@ export function closeSession(
 				rollbackContinuation();
 				throw error;
 			}
-		} else if (!summary) {
-			if (logSummary?.startsWith("Report waived:")) {
-				if (reportStatus === "missing") {
-					reportStatus = "waived";
+		} else {
+			// An omitted close event can be recovered after an interrupted auxiliary
+			// write, but only if the durable close is strictly terminally coherent.
+			if (!closeEventRecorded) {
+				const verification = verifyWorkbenchTasks(paths.sessionDir, true);
+				if (!verification.allCompleted) {
+					const message =
+						verification.issues.map((issue) => issue.message).join("; ") ||
+						"strict verification failed";
+					throw new Error(
+						`Session ${session} has incoherent durable close state: ${message}`,
+					);
 				}
-				summarySource = "waiver";
-			} else if (logSummary) {
-				summarySource = "log";
-			} else if (reportStatus === "existing") {
-				summarySource = "state";
+			}
+			if (!summary) {
+				if (logSummary?.startsWith("Report waived:")) {
+					if (reportStatus === "missing") {
+						reportStatus = "waived";
+					}
+					summarySource = "waiver";
+				} else if (logSummary) {
+					summarySource = "log";
+				} else if (reportStatus === "existing") {
+					summarySource = "state";
+				}
 			}
 		}
 
@@ -2976,6 +3103,7 @@ export function closeSession(
 			summary_source: summarySource,
 		};
 		if (continuation) result.continuation = continuation.session;
+		else if (recoveredContinuation) result.continuation = recoveredContinuation;
 		return result;
 	});
 	finishMeasurement(result.join("\n"));

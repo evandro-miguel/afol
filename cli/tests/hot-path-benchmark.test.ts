@@ -11,14 +11,19 @@ import { join } from "node:path";
 import { parseDoneArgs } from "../commands/workbench/args";
 import { runVerificationAsync } from "../commands/workbench/verify";
 import { sha256 } from "../services/evolution/imports/digest";
+import { HOT_PATH_BENCHMARK_MARKER } from "../services/hot-path/instrumentation";
 import {
+	captureBenchmarkMarker,
 	declaredHotPathArgs,
 	executionProfile,
 	F32_CONFIG_VERIFICATION_COMMAND,
 	resolveHotPathLauncherArgv,
 	runHotPathScenario,
 } from "../validate/hot-path-benchmark";
-import { runScenarioCommand } from "../validate/scenario-execution";
+import {
+	maxSampleOutputBytes,
+	runScenarioCommand,
+} from "../validate/scenario-execution";
 import type { HotPathScenarioConfig, Scenario } from "../validate/types";
 
 function runScenario(config: HotPathScenarioConfig) {
@@ -64,6 +69,25 @@ function runScenario(config: HotPathScenarioConfig) {
 }
 
 describe("F-32 hot-path benchmark runner", () => {
+	test("measures the largest varying stdout/stderr sample in UTF-8 bytes", () => {
+		const samples = [
+			{ stdout: "é".repeat(100), stderr: "" },
+			{ stdout: "x".repeat(150), stderr: "é".repeat(26) },
+			{ stdout: "", stderr: "😀".repeat(51) },
+		];
+
+		expect(maxSampleOutputBytes(samples)).toBe(
+			Buffer.byteLength(samples[2]?.stderr ?? "", "utf8"),
+		);
+	});
+
+	test("excludes the instrumentation marker from measured stderr", () => {
+		const captured = captureBenchmarkMarker(
+			`visible stderr\n${HOT_PATH_BENCHMARK_MARKER}{"counters":{},"measurements":{}}`,
+		);
+		expect(captured.output).toBe("visible stderr");
+	});
+
 	test("source runtime launches the Bun runtime with the external entrypoint", () => {
 		expect(
 			resolveHotPathLauncherArgv(

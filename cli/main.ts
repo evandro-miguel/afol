@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { captureDiagnostic } from "./core/diagnostic";
 import { envelopeErr, stringifyEnvelope } from "./core/envelope";
 import {
 	defaultOperationContext,
@@ -388,7 +387,12 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "status") {
 		const { runStatusCommand } = await import("./commands/status");
-		return runStatusCommand(project.value.root, resolution.args);
+		return runStatusCommand(
+			project.value.root,
+			resolution.args,
+			undefined,
+			project.value,
+		);
 	}
 
 	if (resolution.kind === "new") {
@@ -755,6 +759,7 @@ export async function runWithDiagnostics(
 	try {
 		return await invoke(argv);
 	} catch (error) {
+		const { captureDiagnostic } = await import("./core/diagnostic");
 		const diagnostic = captureDiagnostic(error);
 		const integrity = diagnostic.kind === "integrity";
 		const code = integrity ? "INTEGRITY_ERROR" : "UNEXPECTED_ERROR";

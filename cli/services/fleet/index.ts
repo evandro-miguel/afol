@@ -64,15 +64,6 @@ export type FleetProjectDecision = {
 	next_command: string | null;
 };
 
-type ExclusionSegment =
-	| ".git"
-	| "temp"
-	| "template"
-	| "templates"
-	| "migration"
-	| "migrations"
-	| ".tmp";
-
 export const FLEET_MAX_PROJECTS = 25;
 const FLEET_MAX_GIT_PATHS = 25;
 const FLEET_DEFAULT_PATH_LIMIT = 3;
@@ -85,15 +76,7 @@ const HISTORY_VALIDATION_FAILURE_IDS = new Set([
 ]);
 const DEFAULT_FLEET_ENTRYPOINT = "afol";
 
-const EXCLUDED_PATH_SEGMENTS = new Set<ExclusionSegment>([
-	".git",
-	"temp",
-	"template",
-	"templates",
-	"migration",
-	"migrations",
-	".tmp",
-]);
+const AFOL_OWNED_DIRTY_PREFIXES = [".afol/"] as const;
 
 export type FleetGitState = "clean" | "dirty" | "unavailable";
 
@@ -280,11 +263,8 @@ function toMax(
 
 function isExcludedDirtyPath(relativePath: string): boolean {
 	const normalized = relativePath.replace(/\\/g, "/");
-	if (!normalized) return true;
-	const segments = normalized.split("/");
-	return segments.some(
-		(segment) =>
-			segment === "" || EXCLUDED_PATH_SEGMENTS.has(segment as ExclusionSegment),
+	return AFOL_OWNED_DIRTY_PREFIXES.some((prefix) =>
+		normalized.startsWith(prefix),
 	);
 }
 

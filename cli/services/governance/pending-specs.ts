@@ -5,6 +5,10 @@ import { resolveAdmPaths } from "../adm/paths";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
+import {
+	findCanonicalSpecDocuments,
+	listCanonicalSpecDocuments,
+} from "./spec-resolver";
 
 export type GovernanceStatus = "governed" | "pending_spec" | "unbound";
 
@@ -892,50 +896,36 @@ export function resolveGovernanceCatalog(
 		throw new Error(`Roadmap feature is not active: ${featureId}`);
 	const relative = (path: string) =>
 		path.slice(resolve(root).length + 1).replaceAll("\\", "/");
-	const normalizedParentSpec = parentSpec
-		.replaceAll("\\", "/")
-		.replace(/^\.\//, "");
-	const matches = readdirSync(adm.specsDir, { withFileTypes: true })
-		.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-		.map((entry) => join(adm.specsDir, entry.name))
-		.filter((path) => {
-			const fm = parseFrontmatter(readFileSync(path, "utf8"));
-			return (
-				trimString(fm?.id) === parentSpec ||
-				path.endsWith(`/${parentSpec}.md`) ||
-				relative(path) === normalizedParentSpec
-			);
-		});
+	const matches = findCanonicalSpecDocuments(root, parentSpec);
 	if (matches.length !== 1)
 		throw new Error(`Parent spec must resolve uniquely: ${parentSpec}`);
-	let specPath = matches[0] as string;
+	let document = matches[0];
+	if (!document)
+		throw new Error(`Parent spec must resolve uniquely: ${parentSpec}`);
+	let specPath = document.path;
 	const requestedSpecPath = specPath;
-	let spec = readFileSync(specPath, "utf8");
-	let fm = parseFrontmatter(spec);
+	let spec = document.content;
+	let fm = document.frontmatter;
 	if (!fm || trimString(fm.doc_type) !== "spec")
 		throw new Error(`Parent spec doc_type must be spec: ${parentSpec}`);
 	if (!fm) throw new Error(`Parent spec frontmatter is invalid: ${parentSpec}`);
 	let resolvedResidual = false;
 	if (trimString(fm.status) === "final") {
-		const residuals = readdirSync(adm.specsDir, { withFileTypes: true })
-			.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-			.map((entry) => join(adm.specsDir, entry.name))
-			.filter((path) => {
-				const child = parseFrontmatter(readFileSync(path, "utf8"));
-				return (
-					trimString(child?.doc_type) === "spec-child" &&
-					trimString(child?.status) === "active" &&
-					trimString(child?.roadmap_feature) === featureId &&
-					trimString(child?.parent_spec) === parentSpec
-				);
-			});
+		const residuals = listCanonicalSpecDocuments(root).filter(
+			(candidate) =>
+				candidate.docType === "spec-child" &&
+				candidate.status === "active" &&
+				trimString(candidate.frontmatter.roadmap_feature) === featureId &&
+				trimString(candidate.frontmatter.parent_spec) === parentSpec,
+		);
 		if (residuals.length !== 1)
 			throw new Error(
 				`Parent spec is final without one active residual child: ${parentSpec}`,
 			);
-		specPath = residuals[0] as string;
-		spec = readFileSync(specPath, "utf8");
-		fm = parseFrontmatter(spec);
+		document = residuals[0] as (typeof residuals)[number];
+		specPath = document.path;
+		spec = document.content;
+		fm = document.frontmatter;
 		resolvedResidual = true;
 	}
 	if (featureStatus === "final" && !resolvedResidual)
@@ -985,6 +975,11 @@ export function resolvePendingSpec(
 		if (!entry) {
 			throw new Error(
 				`pending_spec entry not found for session ${input.session}`,
+			);
+		}
+		if (entry.status !== "open") {
+			throw new Error(
+				`pending_spec entry is not open for session ${input.session}: ${entry.status}`,
 			);
 		}
 		return withGovernanceRollback(root, input.session, () => {

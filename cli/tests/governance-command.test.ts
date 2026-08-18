@@ -458,7 +458,7 @@ describe("governance command", () => {
 			},
 		);
 
-		expect(exitCode).toBe(0);
+		expect(exitCode).toBe(1);
 		const envelope = JSON.parse(stdout[0] ?? "{}");
 		expect(envelope.data.waived).toEqual(["open-1"]);
 		expect(envelope.data.skipped).toEqual(["already-waived"]);

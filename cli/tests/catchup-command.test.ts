@@ -874,6 +874,30 @@ describe("catchup --fix session repair", () => {
 		}
 	});
 
+	test("catchup fails closed when the pending spec index is corrupt", async () => {
+		const { root } = createRoot("260614_1404_corrupt-pending-spec");
+		try {
+			const pendingPath = join(
+				root,
+				".afol",
+				"data",
+				"governance",
+				"pending-specs.json",
+			);
+			mkdirSync(join(root, ".afol", "data", "governance"), {
+				recursive: true,
+			});
+			writeFileSync(pendingPath, "{broken", "utf8");
+			const out = captureIo();
+			const code = await runCatchupCommand(["--json"], root, out.io);
+			expect(code).toBe(2);
+			expect(out.stdout).toEqual([]);
+			expect(out.stderr.join("\n")).toContain("Invalid pending spec index");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("applyCatchupRepair is fail-closed when context file is unreadable", () => {
 		const root = mkdtempSync(join(tmpdir(), "catchup-fix-unreadable-"));
 		try {

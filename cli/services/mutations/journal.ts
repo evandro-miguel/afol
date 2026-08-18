@@ -1,9 +1,17 @@
-import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import {
+	closeSync,
+	existsSync,
+	fsyncSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	writeSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
-import { resolveProjectWritePath } from "../project/root";
+import { resolveProjectPath, resolveProjectWritePath } from "../project/root";
 
 export type MutationKind = "patch" | "move" | "archive" | "update";
 export type MutationStatus =
@@ -222,7 +230,8 @@ export function appendMutationRecords(
 	}
 	const path = resolveJournalPath(projectRoot);
 	withMutationJournalLock(projectRoot, () => {
-		mkdirSync(resolve(path, ".."), { recursive: true });
+		const directory = dirname(path);
+		mkdirSync(directory, { recursive: true });
 		const payload = records
 			.map((record) =>
 				JSON.stringify({
@@ -231,7 +240,24 @@ export function appendMutationRecords(
 				}),
 			)
 			.join("\n");
-		appendFileSync(path, `${payload}\n`, { encoding: "utf8" });
+		const fd = openSync(path, "a");
+		try {
+			writeSync(fd, `${payload}\n`, undefined, "utf8");
+			fsyncSync(fd);
+		} finally {
+			closeSync(fd);
+		}
+		// Make creation/append visibility durable when the filesystem supports it.
+		try {
+			const directoryFd = openSync(directory, "r");
+			try {
+				fsyncSync(directoryFd);
+			} finally {
+				closeSync(directoryFd);
+			}
+		} catch {
+			// Directory fsync is unsupported by some filesystems; file fsync remains required.
+		}
 	});
 }
 
@@ -253,10 +279,117 @@ export function loadMutationJournal(projectRoot: string): MutationRecord[] {
 }
 
 export function assertMutationJournalIntegrity(projectRoot: string): void {
+	recoverPreparedMutations(projectRoot);
 	const result = loadMutationJournalStrict(projectRoot);
 	if (result.issues.length > 0) {
 		throw new Error(`Mutation journal corruption: ${result.issues.join("; ")}`);
 	}
+}
+
+function fileHash(path: string): string | null {
+	return existsSync(path)
+		? createHash("sha256").update(readFileSync(path)).digest("hex")
+		: null;
+}
+
+function resolveJournalRecordPath(
+	projectRoot: string,
+	storedPath: string,
+): string | null {
+	const root = resolve(projectRoot);
+	const candidate = isAbsolute(storedPath)
+		? relative(root, storedPath)
+		: storedPath;
+	const result = resolveProjectPath(root, candidate);
+	return result.ok ? result.value.path : null;
+}
+
+function resolveJournalBackupRecordPath(
+	projectRoot: string,
+	storedPath: string,
+): string | null {
+	const root = resolve(projectRoot);
+	const candidate = isAbsolute(storedPath)
+		? relative(root, storedPath)
+		: storedPath;
+	const resolved = resolveProjectWritePath(root, candidate);
+	if (!resolved.ok) return null;
+	const backupsRoot = resolve(
+		root,
+		resolveProjectPaths(root).mutationBackupsDir,
+	);
+	const backupRelative = relative(backupsRoot, resolved.value.path);
+	if (
+		backupRelative === ".." ||
+		backupRelative.startsWith(`..${sep}`) ||
+		isAbsolute(backupRelative)
+	)
+		return null;
+	return resolved.value.path;
+}
+
+function preparedRecoveryStatus(
+	projectRoot: string,
+	record: MutationRecord,
+): MutationStatus | null {
+	if (record.kind === "undo") return null;
+	const source = resolveJournalRecordPath(projectRoot, record.sourcePath);
+	const destination = record.destinationPath
+		? resolveJournalRecordPath(projectRoot, record.destinationPath)
+		: null;
+	if (!source || (record.destinationPath && !destination)) return null;
+	const sourceHash = fileHash(source);
+	const destinationHash = destination ? fileHash(destination) : null;
+	if (record.kind === "patch") {
+		if (sourceHash === record.afterHash) return "committed";
+		if (record.beforeExisted === false && sourceHash === null)
+			return "rolled_back";
+		if (record.beforeExisted !== false && sourceHash === record.beforeHash)
+			return "rolled_back";
+		return null;
+	}
+	if (!destination) return null;
+	if (sourceHash === null && destinationHash === record.afterHash)
+		return "committed";
+	if (sourceHash !== record.beforeHash) return null;
+	if (!record.destinationExisted && destinationHash === null)
+		return "rolled_back";
+	if (record.destinationExisted && record.overwrittenBackupPath) {
+		const backupPath = resolveJournalBackupRecordPath(
+			projectRoot,
+			record.overwrittenBackupPath,
+		);
+		if (!backupPath) return null;
+		const backupHash = fileHash(backupPath);
+		if (backupHash !== null && destinationHash === backupHash)
+			return "rolled_back";
+	}
+	if (record.kind === "archive" && destinationHash === null)
+		return "rolled_back";
+	return null;
+}
+
+/** Reconciles only byte-provable interrupted operations; ambiguous state remains fail-closed. */
+export function recoverPreparedMutations(projectRoot: string): void {
+	withMutationJournalLock(projectRoot, () => {
+		const snapshot = loadMutationJournalStrictLocked(projectRoot);
+		if (
+			snapshot.issues.some((issue) => !issue.startsWith("unmatched-prepared:"))
+		)
+			return;
+		const terminalIds = new Set(
+			snapshot.records
+				.filter((record) =>
+					["applied", "committed", "rolled_back"].includes(record.status),
+				)
+				.map((record) => record.id),
+		);
+		for (const record of snapshot.records) {
+			if (record.status !== "prepared" || terminalIds.has(record.id)) continue;
+			const status = preparedRecoveryStatus(projectRoot, record);
+			if (status) appendMutationRecord(projectRoot, { ...record, status });
+		}
+	});
 }
 
 export type MutationJournalReadResult = {
@@ -304,6 +437,8 @@ function loadMutationJournalStrictLocked(
 	for (const record of records) {
 		if (record.status === "prepared" && !terminalIds.has(record.id)) {
 			issues.push(`unmatched-prepared:${record.id}`);
+			if (record.kind === "undo")
+				issues.push(`unrecoverable-prepared-undo:${record.id}`);
 		}
 	}
 	return { records, issues };

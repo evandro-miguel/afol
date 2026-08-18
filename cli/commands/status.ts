@@ -20,7 +20,10 @@ import {
 	type ProjectConfigSource,
 	resolveProjectPaths,
 } from "../services/project/paths";
-import { loadProjectRoot } from "../services/project/root";
+import {
+	type LoadedProjectRoot,
+	loadProjectRoot,
+} from "../services/project/root";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import {
 	type CatchupReport,
@@ -508,13 +511,20 @@ function pickTaskFile(
 	return first ? join(sessionDir, first) : null;
 }
 
-function computeSessionHealth(projectRoot: string): {
+function computeSessionHealth(
+	projectRoot: string,
+	workbenchSnapshot = loadWorkBenchIndexSnapshot(projectRoot),
+): {
 	sessionCount: number | null;
 	sessionHealth: string[];
 } {
 	try {
-		const sessions = collectSessionIds(projectRoot);
-		const warnings = detectSessionHealth(projectRoot);
+		const sessions =
+			workbenchSnapshot?.sessions ?? collectSessionIds(projectRoot);
+		const warnings = detectSessionHealth(
+			projectRoot,
+			workbenchSnapshot ? { workbenchSnapshot } : {},
+		);
 		return {
 			sessionCount: sessions.length,
 			sessionHealth: warnings.map((w) => w.message),
@@ -527,8 +537,11 @@ function computeSessionHealth(projectRoot: string): {
 	}
 }
 
-function defaultSessionCount(projectRoot: string): number {
-	return loadWorkBenchIndexSnapshot(projectRoot)?.sessions.length ?? 0;
+function defaultSessionCount(
+	projectRoot: string,
+	workbenchSnapshot = loadWorkBenchIndexSnapshot(projectRoot),
+): number {
+	return workbenchSnapshot?.sessions.length ?? 0;
 }
 
 function mergeStatusEntries(current: string[], additions: string[]): string[] {
@@ -555,25 +568,33 @@ function readStatusSnapshot(
 	taskId: string | null,
 	includeHealthFindings: boolean,
 	includeCatchup: boolean,
+	loadedProject?: LoadedProjectRoot,
 ): StatusSnapshot {
-	const loaded = loadProjectRoot(projectRoot);
-	if (!loaded.ok) {
-		const error = new Error(loaded.error.message);
-		(error as Error & { code?: number }).code = loaded.error.code;
-		throw error;
+	let project: LoadedProjectRoot;
+	if (loadedProject) {
+		project = loadedProject;
+	} else {
+		const loaded = loadProjectRoot(projectRoot);
+		if (!loaded.ok) {
+			const error = new Error(loaded.error.message);
+			(error as Error & { code?: number }).code = loaded.error.code;
+			throw error;
+		}
+		project = loaded.value;
 	}
 
-	const projectPaths = resolveProjectPaths(loaded.value.root);
+	const projectPaths = resolveProjectPaths(project.root);
 	const lockPath = projectPaths.abs.lockFile;
 	const activeSessionPath = projectPaths.abs.activeSessionFile;
+	const workbenchSnapshot = loadWorkBenchIndexSnapshot(project.root);
 
 	let healthInfo: Pick<StatusSnapshot, "sessionCount" | "sessionHealth"> = {
-		sessionCount: defaultSessionCount(loaded.value.root),
+		sessionCount: defaultSessionCount(project.root, workbenchSnapshot),
 	};
 	if (includeHealthFindings) {
 		try {
 			countHotPathOperation("status.health");
-			healthInfo = computeHealthImpl(loaded.value.root);
+			healthInfo = computeHealthImpl(project.root, workbenchSnapshot);
 		} catch {
 			healthInfo = {
 				sessionCount: null,
@@ -582,7 +603,7 @@ function readStatusSnapshot(
 		}
 	}
 	const globalFindings = includeHealthFindings
-		? collectGlobalStatusFindings(loaded.value.root)
+		? collectGlobalStatusFindings(project.root)
 		: [];
 	const warnings = globalFindings.map((finding) =>
 		finding.next
@@ -590,7 +611,7 @@ function readStatusSnapshot(
 			: finding.validation,
 	);
 	const selectedSession =
-		resolveEffectiveSession(loaded.value.root, {
+		resolveEffectiveSession(project.root, {
 			...(freshnessSession ? { explicit: freshnessSession } : {}),
 			allowGlobalFallback: defaultAllowGlobalFallback(),
 		})?.session ?? null;
@@ -599,8 +620,8 @@ function readStatusSnapshot(
 		? (() => {
 				countHotPathOperation("status.catchup");
 				return catchupSession
-					? computeCatchupImpl(loaded.value.root, { session: catchupSession })
-					: computeCatchupImpl(loaded.value.root, {});
+					? computeCatchupImpl(project.root, { session: catchupSession })
+					: computeCatchupImpl(project.root, {});
 			})()
 		: undefined;
 
@@ -616,8 +637,8 @@ function readStatusSnapshot(
 			blockers: ["none"],
 			next: mergeStatusEntries(["none"], []),
 			warnings,
-			configPath: loaded.value.configPath,
-			configSource: loaded.value.configSource,
+			configPath: project.configPath,
+			configSource: project.configSource,
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
@@ -625,13 +646,13 @@ function readStatusSnapshot(
 		};
 	}
 
-	const taskFilePath = pickTaskFile(loaded.value.root, selectedSession, taskId);
+	const taskFilePath = pickTaskFile(project.root, selectedSession, taskId);
 	if (!taskFilePath) {
 		if (taskId) {
 			throw taskNotFoundError(taskId, selectedSession);
 		}
 		const status =
-			sessionLifecycleState(loaded.value.root, selectedSession) === "corrupt"
+			sessionLifecycleState(project.root, selectedSession) === "corrupt"
 				? "corrupt"
 				: "none";
 		const problemReason = compactProblemReason(status);
@@ -646,8 +667,8 @@ function readStatusSnapshot(
 			warnings,
 			...(problemReason ? { problemReason } : {}),
 			...(safeNextAction ? { safeNextAction } : {}),
-			configPath: loaded.value.configPath,
-			configSource: loaded.value.configSource,
+			configPath: project.configPath,
+			configSource: project.configSource,
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
@@ -682,8 +703,8 @@ function readStatusSnapshot(
 		next: mergeStatusEntries(extractFieldList(content, "NEXT"), []),
 		...(problemReason ? { problemReason } : {}),
 		...(safeNextAction ? { safeNextAction } : {}),
-		configPath: loaded.value.configPath,
-		configSource: loaded.value.configSource,
+		configPath: project.configPath,
+		configSource: project.configSource,
 		lockPath,
 		activeSessionPath,
 		taskFilePath,
@@ -743,6 +764,7 @@ export function runStatusCommand(
 	projectRoot: string,
 	args: string[],
 	io: CommandIo = DEFAULT_IO,
+	loadedProject?: LoadedProjectRoot,
 ): number {
 	const finishMeasurement = beginHotPathMeasurement("status");
 	let parsed: {
@@ -770,6 +792,7 @@ export function runStatusCommand(
 			parsed.taskId,
 			parsed.health,
 			parsed.catchup,
+			loadedProject,
 		);
 	} catch (error) {
 		return writeStatusError(error, parsed.json, io);
