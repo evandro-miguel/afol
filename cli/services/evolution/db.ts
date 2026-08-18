@@ -172,27 +172,27 @@ export function openEvolutionDb(dbPath: string): Database {
 	assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 	assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
 	ensurePrivatePermissions(dbPath);
-	const db = new Database(dbPath);
-	try {
-		assertSafeEvolutionTarget(dbPath, "evolution db", false);
-		ensurePrivatePermissions(dbPath);
-		db.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT_MS};`);
-		const mode = () =>
-			Object.values(
-				(db.query("PRAGMA journal_mode").get() as Record<
-					string,
-					unknown
-				> | null) ?? {},
-			).find((value) => typeof value === "string");
-		const initialize = () => {
-			withBusyRetry(() => db.exec("PRAGMA journal_mode=WAL;"));
-			if (String(mode() ?? "").toLowerCase() !== "wal") {
-				throw new Error("evolution db requires WAL journal mode");
-			}
-			db.exec("PRAGMA foreign_keys=ON;");
-			applyMigrations(db);
-		};
-		withExternalPathLockSync(dbPath, () => {
+	return withExternalPathLockSync(dbPath, () => {
+		const db = new Database(dbPath);
+		try {
+			assertSafeEvolutionTarget(dbPath, "evolution db", false);
+			ensurePrivatePermissions(dbPath);
+			db.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT_MS};`);
+			const mode = () =>
+				Object.values(
+					(db.query("PRAGMA journal_mode").get() as Record<
+						string,
+						unknown
+					> | null) ?? {},
+				).find((value) => typeof value === "string");
+			const initialize = () => {
+				withBusyRetry(() => db.exec("PRAGMA journal_mode=WAL;"));
+				if (String(mode() ?? "").toLowerCase() !== "wal") {
+					throw new Error("evolution db requires WAL journal mode");
+				}
+				db.exec("PRAGMA foreign_keys=ON;");
+				applyMigrations(db);
+			};
 			const isReady =
 				String(mode() ?? "").toLowerCase() === "wal" &&
 				(
@@ -206,16 +206,16 @@ export function openEvolutionDb(dbPath: string): Database {
 			} else {
 				initialize();
 			}
-		});
-		assertSafeEvolutionTarget(dbPath, "evolution db", false);
-		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
-		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
-		ensurePrivatePermissions(dbPath);
-		return db;
-	} catch (error) {
-		db.close();
-		throw error;
-	}
+			assertSafeEvolutionTarget(dbPath, "evolution db", false);
+			assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
+			assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
+			ensurePrivatePermissions(dbPath);
+			return db;
+		} catch (error) {
+			db.close();
+			throw error;
+		}
+	});
 }
 
 export function closeEvolutionDb(db: Database): void {
