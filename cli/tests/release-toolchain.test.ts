@@ -398,7 +398,7 @@ describe("release and toolchain contracts", () => {
 		);
 		expect(scripts["validate:release"]).toContain("bun run validate:project");
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
-		expect(scripts["test:full"]).toBe("bun test --only-failures");
+		expect(scripts["test:full"]).toBe("bun run cli/dev/full-test.ts");
 		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
 		expect(scripts["validate:ux-governance"]).toBe(

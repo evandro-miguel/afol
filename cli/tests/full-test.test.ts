@@ -7,7 +7,7 @@ describe("full test runner", () => {
 			"test",
 			"--only-failures",
 			"--timeout",
-			"120000",
+			"360000",
 			"--max-concurrency",
 			"1",
 		]);

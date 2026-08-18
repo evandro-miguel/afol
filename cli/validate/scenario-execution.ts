@@ -195,6 +195,7 @@ interface CompletionLockMetadataSnapshot {
 	pid: number;
 	host: string;
 	owner_token: string;
+	ownership_probe: string;
 	generation: number;
 	acquired_at: string;
 	heartbeat_at: string;
@@ -493,7 +494,11 @@ function createSandboxRoot(projectRoot: string): string {
 	if (existsSync(projectNodeModules)) {
 		const sandboxNodeModules = join(sandboxRoot, "node_modules");
 		try {
-			symlinkSync(projectNodeModules, sandboxNodeModules, "dir");
+			symlinkSync(
+				projectNodeModules,
+				sandboxNodeModules,
+				process.platform === "win32" ? "junction" : "dir",
+			);
 		} catch (error) {
 			if (!isSymlinkPrivilegeError(error)) throw error;
 			cpSync(projectNodeModules, sandboxNodeModules, { recursive: true });
@@ -959,6 +964,7 @@ function parseCompletionLockMetadata(
 			"heartbeat_at",
 			"host",
 			"owner_token",
+			"ownership_probe",
 			"pid",
 		];
 		if (keys.length !== expectedKeys.length) return null;
@@ -971,6 +977,8 @@ function parseCompletionLockMetadata(
 			!value.host ||
 			typeof value.owner_token !== "string" ||
 			!value.owner_token ||
+			typeof value.ownership_probe !== "string" ||
+			!value.ownership_probe ||
 			typeof value.generation !== "number" ||
 			!Number.isSafeInteger(value.generation) ||
 			value.generation < 0 ||
@@ -985,6 +993,7 @@ function parseCompletionLockMetadata(
 			pid: value.pid,
 			host: value.host,
 			owner_token: value.owner_token,
+			ownership_probe: value.ownership_probe,
 			generation: value.generation,
 			acquired_at: value.acquired_at,
 			heartbeat_at: value.heartbeat_at,
@@ -1078,6 +1087,7 @@ function immutableCompletionMetadataMatches(
 		before.pid === after.pid &&
 		before.host === after.host &&
 		before.owner_token === after.owner_token &&
+		before.ownership_probe === after.ownership_probe &&
 		before.generation === after.generation &&
 		before.acquired_at === after.acquired_at &&
 		Date.parse(after.heartbeat_at) >= Date.parse(before.heartbeat_at)

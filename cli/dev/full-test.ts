@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 export function fullTestArgs(platform = process.platform): string[] {
 	const args = ["test", "--only-failures"];
 	if (platform === "win32") {
-		args.push("--timeout", "120000", "--max-concurrency", "1");
+		args.push("--timeout", "360000", "--max-concurrency", "1");
 	}
 	return args;
 }

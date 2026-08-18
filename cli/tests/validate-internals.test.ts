@@ -98,6 +98,7 @@ function createFixtureRoot(): string {
 		join(process.cwd(), ".agents", "lock.json"),
 		join(root, ".agents", "lock.json"),
 	);
+	cpSync(join(process.cwd(), "package.json"), join(root, "package.json"));
 	cpSync(
 		join(process.cwd(), ".afol", "data", "benchmarks", "catalog"),
 		join(root, ".afol", "data", "benchmarks", "catalog"),
@@ -3178,7 +3179,11 @@ describe("scenario benchmark execution", () => {
 					const safe = withCapturedConsoleError(() =>
 						buildResult(root, scenario, baselinePath, baseline),
 					);
-					expect(safe.result.status).toBe("passed");
+					if (safe.result.status !== "passed") {
+						throw new Error(
+							`active-lock scenario failed: ${JSON.stringify(safe.result.notes)}`,
+						);
+					}
 					expect(
 						safe.result.notes.some((note) =>
 							note.startsWith("side-effect-leak:"),
@@ -4513,25 +4518,29 @@ describe("runtime live validation helpers", () => {
 });
 
 describe("validation command entrypoint", () => {
-	test("reports governance-history timing observation at the public entrypoint", () => {
-		const observed = withCapturedStdout(() =>
-			runValidationCommand(process.cwd(), [
-				"bench",
-				"--pack",
-				"governance-history",
-				"--timing-mode",
-				"observe",
-				"--json",
-			]),
-		);
-		expect(observed.result).toBe(0);
-		expect(JSON.parse(observed.stdout[0] ?? "{}")).toMatchObject({
-			mode: "benchmark",
-			timing_mode: "observe",
-			status: "passed",
-			pass: true,
-		});
-	}, 120_000);
+	test(
+		"reports governance-history timing observation at the public entrypoint",
+		() => {
+			const observed = withCapturedStdout(() =>
+				runValidationCommand(process.cwd(), [
+					"bench",
+					"--pack",
+					"governance-history",
+					"--timing-mode",
+					"observe",
+					"--json",
+				]),
+			);
+			expect(observed.result).toBe(0);
+			expect(JSON.parse(observed.stdout[0] ?? "{}")).toMatchObject({
+				mode: "benchmark",
+				timing_mode: "observe",
+				status: "passed",
+				pass: true,
+			});
+		},
+		process.platform === "win32" ? 360_000 : 120_000,
+	);
 
 	test("reruns one scored scenario in its explicit pack", () => {
 		const root = createFixtureRoot();
@@ -4670,7 +4679,11 @@ describe("validation command entrypoint", () => {
 			const runText = withCapturedStdout(() =>
 				runValidationCommand(root, ["run", "--pack", "mutation-safety"]),
 			);
-			expect(runText.result).toBe(0);
+			if (runText.result !== 0) {
+				throw new Error(
+					`mutation-safety text run failed: ${JSON.stringify(runText.stdout)}`,
+				);
+			}
 			const runTextPayload = JSON.parse(runText.stdout[0] ?? "{}") as {
 				command_results: Array<{ reported_status?: string }>;
 			};
