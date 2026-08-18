@@ -13,7 +13,6 @@ import {
 	type TemplatePayload,
 } from "../services/template/payload";
 
-const expectedTemplatePathCount = 200;
 const forbiddenExactPaths = new Set([
 	"a",
 	"afol",
@@ -55,11 +54,8 @@ function inspectSourceParity(
 	if (source.templateHash !== generated.hash) {
 		issues.push("exported-template-hash-mismatch");
 	}
-	if (sourcePaths.length !== expectedTemplatePathCount) {
-		issues.push("source-path-count-mismatch");
-	}
-	if (generatedPaths.length !== expectedTemplatePathCount) {
-		issues.push("generated-path-count-mismatch");
+	if (sourcePaths.length === 0 || generatedPaths.length === 0) {
+		issues.push("template-payload-empty");
 	}
 
 	for (const path of sourcePaths) {

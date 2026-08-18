@@ -73,7 +73,7 @@ function mkProjectRoot(): string {
 		"utf8",
 	);
 	cpSync(
-		join(process.cwd(), ".agents", "lock.json"),
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
 		join(agentsDir, "lock.json"),
 	);
 	return root;

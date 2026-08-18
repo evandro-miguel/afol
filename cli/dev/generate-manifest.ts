@@ -11,22 +11,19 @@ import {
 import { join, relative, resolve } from "node:path";
 
 import { kernelRegistry } from "../registry";
-import { buildManifestCommands } from "../services/manifest/commands";
+import {
+	buildManifestCommandStability,
+	buildManifestCommands,
+} from "../services/manifest/commands";
 import { buildToolCatalog } from "../services/manifest/tools";
 
-const MANIFEST_PATHS = [
-	".agents/manifest.json",
-	"src/project-template/.agents/manifest.json",
-] as const;
+const MANIFEST_PATHS = ["src/project-template/.agents/manifest.json"] as const;
 
 const TOOL_CATALOG_PATHS = [
-	".afol/adm/tools.json",
 	"src/project-template/.afol/adm/tools.json",
 ] as const;
 
 const MANAGED_HASH_PATHS = [
-	".agents/manifest.json",
-	".agents/lock.json",
 	"src/project-template/.agents/manifest.json",
 	"src/project-template/.agents/lock.json",
 ] as const;
@@ -48,6 +45,7 @@ const TEMPLATE_MANAGED_HASH_DIRS = [
 
 type ManifestPayload = {
 	commands?: unknown;
+	command_stability?: unknown;
 	managed_hashes?: unknown;
 	[key: string]: unknown;
 };
@@ -69,9 +67,12 @@ function sha256Hex(content: Buffer): string {
 }
 
 function managedHashRoot(repoRoot: string, manifestPath: string): string {
-	return manifestPath.startsWith("src/project-template/")
-		? join(repoRoot, "src/project-template")
-		: repoRoot;
+	if (!manifestPath.startsWith("src/project-template/")) {
+		throw new Error(
+			`managed hash path must belong to the public template: ${manifestPath}`,
+		);
+	}
+	return join(repoRoot, "src/project-template");
 }
 
 function toTemplatePath(root: string, absolutePath: string): string {
@@ -169,6 +170,7 @@ function refreshManifest(path: string): { changed: boolean; content: string } {
 	const next = {
 		...manifest,
 		commands: buildManifestCommands(kernelRegistry.commands),
+		command_stability: buildManifestCommandStability(kernelRegistry.commands),
 	};
 	const content = formatJson(next);
 	const changed = readFileSync(path, "utf8") !== content;

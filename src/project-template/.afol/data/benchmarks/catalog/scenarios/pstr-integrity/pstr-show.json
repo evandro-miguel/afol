@@ -3,7 +3,9 @@
   "scenario_id": "pstr-show",
   "scenario_version": "1.0.0",
   "pack_id": "pstr-integrity",
-  "command": "afol ps show",
+  "command": "afol pstr show --json",
+  "sandbox": true,
+  "coverage": { "subcommands": ["pstr show|sh --json"] },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

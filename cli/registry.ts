@@ -56,6 +56,7 @@ export type CommandSideEffect =
 	| "generated";
 
 export type CommandCategory = "core" | "workflow" | "inspect" | "ops";
+export type CommandStability = "stable" | "experimental" | "compatibility";
 
 export type CommandSubcommandSpec = {
 	usage: string;
@@ -75,9 +76,14 @@ export type CommandSpec = {
 	guidance?: readonly string[];
 	subcommands?: readonly CommandSubcommandSpec[];
 	requires_approval?: boolean;
+	stability: CommandStability;
 };
 
-const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
+type CommandSpecInput = Omit<CommandSpec, "stability"> & {
+	stability?: CommandStability;
+};
+
+const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 	{
 		command: "status",
 		aliases: ["s"],
@@ -1744,10 +1750,32 @@ export function requiresApprovalForSideEffect(
 	return sideEffect !== "read";
 }
 
-function withApprovalMetadata(spec: CommandSpec): CommandSpec {
+const EXPERIMENTAL_COMMANDS = new Set([
+	"fleet",
+	"hydrate",
+	"library",
+	"memory",
+	"evolve",
+	"ux",
+	"bench",
+	"project-benchmark",
+	"adapter",
+	"telemetry",
+	"receipt",
+]);
+const COMPATIBILITY_COMMANDS = new Set(["legacy", "render"]);
+
+function commandStability(command: string): CommandStability {
+	if (COMPATIBILITY_COMMANDS.has(command)) return "compatibility";
+	if (EXPERIMENTAL_COMMANDS.has(command)) return "experimental";
+	return "stable";
+}
+
+function withApprovalMetadata(spec: CommandSpecInput): CommandSpec {
 	const withMetadata: CommandSpec = {
 		...spec,
 		requires_approval: requiresApprovalForSideEffect(spec.sideEffect),
+		stability: spec.stability ?? commandStability(spec.command),
 	};
 	if (spec.subcommands) {
 		withMetadata.subcommands = spec.subcommands.map((subcommand) => ({

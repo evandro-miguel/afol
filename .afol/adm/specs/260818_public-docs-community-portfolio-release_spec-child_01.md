@@ -39,10 +39,20 @@ risk_level: medium
 
 ## Acceptance
 
-- [ ] A new user can verify, install, initialize, complete an evidenced task,
+- [x] A new user can verify, install, initialize, complete an evidenced task,
       and troubleshoot from a clean clone without private documentation.
-- [ ] Case study states role, constraints, architecture, hard problems,
+- [x] Case study states role, constraints, architecture, hard problems,
       trade-offs, reproducible metrics, and unresolved limitations.
 - [ ] Community and security files pass GitHub public-health checks.
 - [ ] The release candidate is ready for explicit authorization to rename the
       remote, change visibility, configure rulesets, and publish immutably.
+
+## Evidence
+
+- The public candidate at `03afc0f` includes the landing README, getting
+  started, architecture, command reference, security model, troubleshooting,
+  upgrade/rollback, release process, known limitations, roadmap, and case
+  study without references to private operator documentation.
+- The CI-verified release gate exercised the documented binary build and clean
+  checkout flows. Hosted GitHub public-health and publication checks remain
+  pending and are intentionally not checked above.

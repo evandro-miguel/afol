@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: bearer-token synthetic redaction fixture
 import {
 	applyMigrations,
 	EVOLUTION_MIGRATIONS,

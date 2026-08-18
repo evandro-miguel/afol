@@ -178,6 +178,7 @@
       "aliases": [
         "s"
       ],
+      "stability": "stable",
       "category": "core",
       "type": "core",
       "side_effect": "read",
@@ -214,6 +215,7 @@
       "aliases": [
         "fb"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -267,6 +269,7 @@
         "ck",
         "check"
       ],
+      "stability": "stable",
       "category": "core",
       "type": "core",
       "side_effect": "read",
@@ -323,6 +326,7 @@
       "aliases": [
         "i"
       ],
+      "stability": "stable",
       "category": "core",
       "type": "core",
       "side_effect": "write",
@@ -344,6 +348,7 @@
       "aliases": [
         "st"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -380,6 +385,7 @@
       "aliases": [
         "d"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -431,6 +437,7 @@
       "aliases": [
         "tr"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -462,6 +469,7 @@
       "aliases": [
         "n"
       ],
+      "stability": "stable",
       "category": "core",
       "type": "core",
       "side_effect": "write",
@@ -498,6 +506,7 @@
       "aliases": [
         "l"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "append",
@@ -524,6 +533,7 @@
       "aliases": [
         "qt"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -560,6 +570,7 @@
       "aliases": [
         "gov"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -611,6 +622,7 @@
       "aliases": [
         "e"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "append",
@@ -662,6 +674,7 @@
       "aliases": [
         "lg"
       ],
+      "stability": "compatibility",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -683,6 +696,7 @@
       "aliases": [
         "hk"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -714,6 +728,7 @@
       "aliases": [
         "r"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -745,6 +760,7 @@
       "aliases": [
         "sk"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -776,6 +792,7 @@
       "aliases": [
         "c"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -817,6 +834,7 @@
       "aliases": [
         "f"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "write",
@@ -856,6 +874,7 @@
       "tool": "afol",
       "wrapper_command": "afol fleet",
       "aliases": [],
+      "stability": "experimental",
       "category": "ops",
       "type": "ops",
       "side_effect": "write",
@@ -887,6 +906,7 @@
       "aliases": [
         "up"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "write",
@@ -928,6 +948,7 @@
       "aliases": [
         "b"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -954,6 +975,7 @@
       "aliases": [
         "vf"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "read",
@@ -980,6 +1002,7 @@
       "aliases": [
         "vt"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "read",
@@ -1006,6 +1029,7 @@
       "aliases": [
         "ls"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
@@ -1037,6 +1061,7 @@
       "aliases": [
         "ps"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1108,6 +1133,7 @@
       "aliases": [
         "cx"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
@@ -1159,6 +1185,7 @@
       "aliases": [
         "stt"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1174,6 +1201,7 @@
       "aliases": [
         "hy"
       ],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
@@ -1187,6 +1215,7 @@
       "tool": "afol",
       "wrapper_command": "afol render",
       "aliases": [],
+      "stability": "compatibility",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
@@ -1202,6 +1231,7 @@
       "aliases": [
         "lb"
       ],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1273,6 +1303,7 @@
       "aliases": [
         "mm"
       ],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1342,6 +1373,7 @@
       "tool": "afol",
       "wrapper_command": "afol evolve",
       "aliases": [],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1448,6 +1480,7 @@
       "aliases": [
         "ad"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1463,6 +1496,7 @@
       "aliases": [
         "sp"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1497,6 +1531,7 @@
       "tool": "afol",
       "wrapper_command": "afol ux",
       "aliases": [],
+      "stability": "experimental",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",
@@ -1536,6 +1571,7 @@
       "tool": "afol",
       "wrapper_command": "afol adr",
       "aliases": [],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "write",
@@ -1577,6 +1613,7 @@
       "aliases": [
         "cl"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "append",
@@ -1598,6 +1635,7 @@
       "aliases": [
         "ht"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "read",
@@ -1637,6 +1675,7 @@
       "tool": "afol",
       "wrapper_command": "afol db",
       "aliases": [],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "read",
@@ -1652,6 +1691,7 @@
       "aliases": [
         "dr"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "read",
@@ -1667,6 +1707,7 @@
       "aliases": [
         "mt"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "write",
@@ -1703,6 +1744,7 @@
       "aliases": [
         "sw"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "read",
@@ -1718,6 +1760,7 @@
       "aliases": [
         "sc"
       ],
+      "stability": "stable",
       "category": "ops",
       "type": "ops",
       "side_effect": "write",
@@ -1769,6 +1812,7 @@
       "aliases": [
         "be"
       ],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1810,6 +1854,7 @@
       "aliases": [
         "pb"
       ],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "generated",
@@ -1861,6 +1906,7 @@
       "aliases": [
         "cu"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1887,6 +1933,7 @@
       "aliases": [
         "pf"
       ],
+      "stability": "stable",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1908,6 +1955,7 @@
       "aliases": [
         "adp"
       ],
+      "stability": "experimental",
       "category": "ops",
       "type": "ops",
       "side_effect": "write",
@@ -1939,6 +1987,7 @@
       "aliases": [
         "tel"
       ],
+      "stability": "experimental",
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
@@ -1968,6 +2017,7 @@
       "tool": "afol",
       "wrapper_command": "afol receipt",
       "aliases": [],
+      "stability": "experimental",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "append",
@@ -1989,6 +2039,7 @@
       "aliases": [
         "ss"
       ],
+      "stability": "stable",
       "category": "workflow",
       "type": "workflow",
       "side_effect": "write",

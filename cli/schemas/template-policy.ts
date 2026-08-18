@@ -31,6 +31,7 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	".agents/agents",
 	".agents/agents-mcp",
 	".agents/skills-sync.manifest.json",
+	".agents/skills/ux-design/**",
 	".afol/skills/**",
 	"CLAUDE.md",
 	".claude/**",

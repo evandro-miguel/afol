@@ -1,6 +1,7 @@
 import type { CommandSpec } from "../../registry";
 
 export type ManifestCommands = Record<string, string[]>;
+export type ManifestCommandStability = Record<string, CommandSpec["stability"]>;
 
 export function buildManifestCommands(
 	commands: readonly CommandSpec[],
@@ -12,4 +13,12 @@ export function buildManifestCommands(
 	}
 
 	return manifestCommands;
+}
+
+export function buildManifestCommandStability(
+	commands: readonly CommandSpec[],
+): ManifestCommandStability {
+	return Object.fromEntries(
+		commands.map((spec) => [spec.command, spec.stability]),
+	);
 }

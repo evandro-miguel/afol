@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: bearer-token synthetic redaction fixture
 import {
 	agentOperationContext,
 	defaultOperationContext,

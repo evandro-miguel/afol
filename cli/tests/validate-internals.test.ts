@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: linux-home-path synthetic path fixture
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -90,6 +91,9 @@ function createRepoLocalTestRoot(prefix: string): string {
 function createFixtureRoot(): string {
 	const root = createRepoLocalTestRoot("validate-internals-");
 	mkdirSync(join(root, ".agents"), { recursive: true });
+	mkdirSync(join(root, "src", "project-template", ".agents"), {
+		recursive: true,
+	});
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
 	writeFileSync(
 		join(root, ".afol", "config.json"),
@@ -97,8 +101,12 @@ function createFixtureRoot(): string {
 		"utf8",
 	);
 	cpSync(
-		join(process.cwd(), ".agents", "lock.json"),
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
 		join(root, ".agents", "lock.json"),
+	);
+	cpSync(
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
+		join(root, "src", "project-template", ".agents", "lock.json"),
 	);
 	cpSync(join(process.cwd(), "package.json"), join(root, "package.json"));
 	cpSync(
@@ -2092,13 +2100,19 @@ describe("scenario benchmark execution", () => {
 		let artifactRoot: string | undefined;
 		try {
 			cpSync(
-				join(process.cwd(), ".afol", "config.json"),
+				join(process.cwd(), "src", "project-template", ".afol", "config.json"),
 				join(fixtureRoot, ".afol", "config.json"),
 			);
 			mkdirSync(join(fixtureRoot, ".agents"), { recursive: true });
 			for (const metadataFile of ["lock.json", "manifest.json"]) {
 				cpSync(
-					join(process.cwd(), ".agents", metadataFile),
+					join(
+						process.cwd(),
+						"src",
+						"project-template",
+						".agents",
+						metadataFile,
+					),
 					join(fixtureRoot, ".agents", metadataFile),
 				);
 			}

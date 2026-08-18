@@ -197,7 +197,7 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 		join(root, ".afol", "config.json"),
 	);
 	cpSync(
-		join(process.cwd(), ".agents", "lock.json"),
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
 		join(root, ".agents", "lock.json"),
 	);
 	cpSync(

@@ -53,9 +53,9 @@ update check, plan, and apply flows with conflict detection.
 2026-06-20 versioning addendum:
 
 - Version metadata is checked before update/apply with `bun run version:check`.
-- `afol --version` must match the repo's registered release version before any
-  global update/install. If it diverges and there is no registered release
-  provenance, do not promote or install globally.
+- `afol --version` must match the canonical `package.json` version before any
+  global update/install. If it diverges and there is no release provenance
+  bound to that source file, do not promote or install globally.
 - Release provenance must be generated and validated with
   `bun run release:provenance:release` before release promotion.
 

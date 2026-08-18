@@ -24,9 +24,10 @@ coverage that already lives in specs and benchmark scenarios.
 
 ## Experience Maps
 
-Use the project-local `ux-design` skill for any journey that crosses agents,
-workbench state, maintenance cadence, memory, library, rules, specs, benchmark
-evidence, or warnings. Those journeys must include:
+Use separately licensed UX guidance for journeys that cross agents, workbench
+state, maintenance cadence, memory, library, rules, specs, benchmark evidence,
+or warnings. AFOL does not vendor third-party UX guidance. Those journeys must
+include:
 
 - facts, assumptions, and unknowns
 - current and target experience maps

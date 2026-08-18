@@ -91,8 +91,8 @@ and do not expand the release candidate.
 - [ ] All six child specs are final with exact-commit evidence.
 - [ ] No release-blocking security, governance, Windows, or CI acceptance is
       pending.
-- [ ] A clean public clone builds and tests without private repository state.
-- [ ] Public history and current content pass privacy, secret, symlink, large
+- [x] A clean public clone builds and tests without private repository state.
+- [x] Public history and current content pass privacy, secret, symlink, large
       file, dependency vulnerability, and third-party license checks.
 - [ ] Stable, experimental, planned, supported, and unsupported claims match
       runtime behavior and native CI evidence.
@@ -100,6 +100,11 @@ and do not expand the release candidate.
       attestations from the exact tagged commit.
 - [ ] Final repository visibility, immutable release publication, remote
       rename, and global installation occur only after explicit user approval.
+
+Local readiness evidence is bound to public candidate commit `03afc0f` in
+`/home/ozy/01_projects/dev/afol/afol.public-candidate`. Hosted native CI,
+attestation publication, rulesets, visibility changes, and immutable release
+publication remain open and require external evidence or explicit approval.
 
 ## Non-Goals
 

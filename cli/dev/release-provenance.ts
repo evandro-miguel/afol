@@ -35,7 +35,7 @@ import {
 	writeReleaseSecurityScanReport,
 } from "./security-scan";
 
-const VERSION_REGISTRY_PATH = ".afol/adm/source/release-version.json";
+const VERSION_SOURCE_PATH = "package.json";
 const RELEASE_SECURITY_EVIDENCE_MAX_AGE_MS = 30 * 60 * 1000;
 const RELEASE_SECURITY_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const SEMVER_PATTERN =
@@ -45,8 +45,8 @@ type ReleaseProvenance = {
 	artifact: string;
 	package_name: string;
 	version: string;
-	version_registry_path: string;
-	version_registry_sha256: string;
+	version_source_path: string;
+	version_source_sha256: string;
 	sha256: string;
 	size_bytes: number;
 	bun: string;
@@ -91,16 +91,11 @@ type PackageMetadata = {
 	version: string;
 };
 
-type VersionRegistry = {
-	packageName: string;
-	currentVersion: string;
-};
-
-type ResolvedVersionRegistry = {
+type ResolvedVersionSource = {
 	packageName: string;
 	version: string;
-	registryPath: string;
-	registrySha256: string;
+	sourcePath: string;
+	sourceSha256: string;
 };
 
 type ProvenanceSecurityScanner = ReleaseProvenance["security_scanners"][number];
@@ -139,58 +134,19 @@ function readPackageMetadata(cwd: string): PackageMetadata {
 	return { name: raw.name, version: raw.version };
 }
 
-function resolveVersionRegistry(cwd: string): ResolvedVersionRegistry | null {
-	const registryPath = join(cwd, VERSION_REGISTRY_PATH);
-	if (!existsSync(registryPath)) {
-		return null;
-	}
-
-	const raw = JSON.parse(
-		readFileSync(registryPath, "utf8"),
-	) as Partial<VersionRegistry>;
-	if (typeof raw.packageName !== "string" || raw.packageName.length === 0) {
-		throw new Error(
-			`${VERSION_REGISTRY_PATH} packageName must be a non-empty string`,
-		);
-	}
-	if (
-		typeof raw.currentVersion !== "string" ||
-		raw.currentVersion.length === 0
-	) {
-		throw new Error(
-			`${VERSION_REGISTRY_PATH} currentVersion must be a non-empty string`,
-		);
-	}
-	assertValidVersion(
-		raw.currentVersion,
-		`${VERSION_REGISTRY_PATH} currentVersion`,
-	);
-
+function resolveVersionSource(cwd: string): ResolvedVersionSource {
 	const metadata = readPackageMetadata(cwd);
-	if (raw.packageName !== metadata.name) {
+	if (CLI_PACKAGE_NAME !== metadata.name || CLI_VERSION !== metadata.version) {
 		throw new Error(
-			`${VERSION_REGISTRY_PATH} packageName ${JSON.stringify(raw.packageName)} does not match package.json name ${JSON.stringify(metadata.name)}`,
-		);
-	}
-	if (raw.currentVersion !== metadata.version) {
-		throw new Error(
-			`package.json version ${JSON.stringify(metadata.version)} is not the registered release version ${JSON.stringify(raw.currentVersion)} in ${VERSION_REGISTRY_PATH}`,
-		);
-	}
-	if (
-		CLI_PACKAGE_NAME !== raw.packageName ||
-		CLI_VERSION !== raw.currentVersion
-	) {
-		throw new Error(
-			`generated version metadata ${JSON.stringify(`${CLI_PACKAGE_NAME}@${CLI_VERSION}`)} does not match registered release version ${JSON.stringify(`${raw.packageName}@${raw.currentVersion}`)} in ${VERSION_REGISTRY_PATH}`,
+			`generated version metadata ${JSON.stringify(`${CLI_PACKAGE_NAME}@${CLI_VERSION}`)} does not match package metadata ${JSON.stringify(`${metadata.name}@${metadata.version}`)} in ${VERSION_SOURCE_PATH}`,
 		);
 	}
 
 	return {
-		packageName: raw.packageName,
-		version: raw.currentVersion,
-		registryPath: VERSION_REGISTRY_PATH,
-		registrySha256: sha256Hex(readFileSync(registryPath)),
+		packageName: metadata.name,
+		version: metadata.version,
+		sourcePath: VERSION_SOURCE_PATH,
+		sourceSha256: sha256Hex(readFileSync(join(cwd, VERSION_SOURCE_PATH))),
 	};
 }
 
@@ -551,12 +507,7 @@ export function buildReleaseProvenance(
 	const stats = statSync(artifactPath);
 	const lockMetadata = readLockMetadata(cwd);
 	const commitSha = runGitCommand(cwd, ["rev-parse", "HEAD"]);
-	const versionRegistry = resolveVersionRegistry(cwd);
-	if (options.releaseMode && !versionRegistry) {
-		throw new Error(
-			`missing required ${VERSION_REGISTRY_PATH} for release provenance`,
-		);
-	}
+	const versionSource = resolveVersionSource(cwd);
 	const compiledReceipt = readMinifiedCompiledReleaseBuildReceipt(
 		artifactPath,
 		compiledReleaseBuildArgs("cli/main.ts", artifact),
@@ -581,10 +532,10 @@ export function buildReleaseProvenance(
 			);
 	const provenance: ReleaseProvenance = {
 		artifact,
-		package_name: CLI_PACKAGE_NAME,
-		version: CLI_VERSION,
-		version_registry_path: versionRegistry?.registryPath ?? "unknown",
-		version_registry_sha256: versionRegistry?.registrySha256 ?? "unknown",
+		package_name: versionSource.packageName,
+		version: versionSource.version,
+		version_source_path: versionSource.sourcePath,
+		version_source_sha256: versionSource.sourceSha256,
 		sha256: sha256Hex(bytes),
 		size_bytes: stats.size,
 		bun: process.versions.bun ?? "unknown",

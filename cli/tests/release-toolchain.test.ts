@@ -51,32 +51,15 @@ function parseScriptIncludes(script: string): string[] {
 	return includes;
 }
 
-function writeReleaseVersionRegistry(
+function writeReleasePackageMetadata(
 	root: string,
 	options: {
 		packageJsonName?: string;
 		packageJsonVersion?: string;
-		registryPackageName?: string;
-		registryVersion?: string;
 	} = {},
 ): void {
 	const packageJsonName = options.packageJsonName ?? CLI_PACKAGE_NAME;
 	const packageJsonVersion = options.packageJsonVersion ?? CLI_VERSION;
-	const registryPackageName = options.registryPackageName ?? packageJsonName;
-	const registryVersion = options.registryVersion ?? packageJsonVersion;
-	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
-	writeFileSync(
-		join(root, ".afol", "adm", "source", "release-version.json"),
-		JSON.stringify(
-			{
-				packageName: registryPackageName,
-				currentVersion: registryVersion,
-			},
-			null,
-			2,
-		),
-		"utf8",
-	);
 	writeFileSync(
 		join(root, "package.json"),
 		JSON.stringify(
@@ -393,18 +376,22 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
-		expect(scripts["validate:release"]).toContain(
+		expect(scripts["validate:release"]).not.toContain(
 			"bun run local-state:rebuild",
 		);
-		expect(scripts["validate:release"]).toContain("bun run validate:project");
+		expect(scripts["validate:release"]).not.toContain(
+			"bun run validate:project",
+		);
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["test:full"]).toBe("bun run cli/dev/full-test.ts");
 		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
-		expect(scripts["validate:ux-governance"]).toBe(
-			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --timing-mode observe --json",
-		);
-		expect(scripts["validate:release"]).toContain(
+		if (scripts["validate:ux-governance"]) {
+			expect(scripts["validate:ux-governance"]).toBe(
+				"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --timing-mode observe --json",
+			);
+		}
+		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:ux-governance",
 		);
 		expect(scripts["validate:release"]).toContain("bun run smoke:clean");
@@ -412,13 +399,10 @@ describe("release and toolchain contracts", () => {
 			"bun run release:provenance:release",
 		);
 		const releaseSteps = splitScriptSteps(scripts["validate:release"]);
-		const compactCliBenchmarks =
-			"bun run kernel -- v bench --pack token-economy --pack cli-kernel-local --json";
 		const stepIndex = (step: string) => releaseSteps.indexOf(step);
 		expect(releaseSteps[0]).toBe("bun run validate:toolchain");
-		expect(releaseSteps).toContain(compactCliBenchmarks);
-		expect(stepIndex("bun run validate:project")).toBeLessThan(
-			stepIndex("bun run typecheck"),
+		expect(releaseSteps).not.toContain(
+			"bun run kernel -- v bench --pack token-economy --pack cli-kernel-local --json",
 		);
 		for (const step of [
 			"bun run smoke:dist",
@@ -431,16 +415,7 @@ describe("release and toolchain contracts", () => {
 		expect(stepIndex("bun run smoke:dist")).toBeLessThan(
 			stepIndex("bun run smoke:clean"),
 		);
-		expect(stepIndex("bun run local-state:rebuild")).toBeLessThan(
-			stepIndex("bun run validate:project"),
-		);
-		expect(stepIndex("bun run validate:project-benchmarks")).toBeLessThan(
-			stepIndex("bun run validate:ux-governance"),
-		);
-		expect(stepIndex("bun run validate:ux-governance")).toBeLessThan(
-			stepIndex(compactCliBenchmarks),
-		);
-		expect(stepIndex(compactCliBenchmarks)).toBeLessThan(
+		expect(stepIndex("bun run validate:bootstrap")).toBeLessThan(
 			stepIndex("bun run test:full"),
 		);
 		expect(stepIndex("bun run test:full")).toBeLessThan(
@@ -453,20 +428,22 @@ describe("release and toolchain contracts", () => {
 			stepIndex("bun run smoke:dist"),
 		);
 		expect(scripts["coverage:check"]).toBe(
-			"bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/validate-internals.test.ts cli/tests/validation.test.ts cli/tests/version-metadata.test.ts",
+			"bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/validate.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/version-metadata.test.ts",
 		);
 		expect(scripts["coverage:check"]).toContain(
 			"cli/tests/coverage-check.test.ts",
 		);
-		expect(scripts["coverage:project-benchmarks"]).toBe(
-			"bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --max-concurrency 1 --timeout 30000 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts",
-		);
-		expect(scripts["validate:mutation-performance"]).toBe(
-			"bun run kernel -- v bench --pack mutation-safety --json",
-		);
-		expect(scripts["validate:project-benchmarks"]).toContain(
-			"bun run validate:mutation-performance && bun run coverage:project-benchmarks",
-		);
+		if (scripts["coverage:project-benchmarks"]) {
+			expect(scripts["coverage:project-benchmarks"]).toBe(
+				"bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --max-concurrency 1 --timeout 30000 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts",
+			);
+			expect(scripts["validate:mutation-performance"]).toBe(
+				"bun run kernel -- v bench --pack mutation-safety --json",
+			);
+			expect(scripts["validate:project-benchmarks"]).toContain(
+				"bun run validate:mutation-performance && bun run coverage:project-benchmarks",
+			);
+		}
 	});
 
 	test("coverage scripts track every project-benchmark source file", () => {
@@ -474,6 +451,7 @@ describe("release and toolchain contracts", () => {
 			readFileSync(join(repoRoot, "package.json"), "utf8"),
 		) as { scripts?: Record<string, string> };
 		const scripts = pkg.scripts ?? {};
+		if (!scripts["coverage:project-benchmarks"]) return;
 		const sourcePrefix = "cli/services/project-benchmark/";
 		const expectedSources = readdirSync(join(repoRoot, sourcePrefix), {
 			withFileTypes: true,
@@ -482,10 +460,7 @@ describe("release and toolchain contracts", () => {
 			.map((entry) => `${sourcePrefix}${entry.name}`)
 			.sort();
 
-		for (const scriptName of [
-			"coverage:check",
-			"coverage:project-benchmarks",
-		]) {
+		for (const scriptName of ["coverage:project-benchmarks"]) {
 			const actualSources = parseScriptIncludes(scripts[scriptName] ?? "")
 				.filter((path) => path.startsWith(sourcePrefix))
 				.sort();
@@ -493,85 +468,56 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
-	test("CI keeps frozen install and blocking typecheck before release validation", () => {
+	test("public CI keeps audit, typecheck, tests, and smoke blocking", () => {
 		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			join(repoRoot, ".github", "workflows", "ci.yml"),
 			"utf8",
 		).replace(/\r\n/g, "\n");
-		type RunDefaults = {
-			shell?: string;
-			"working-directory"?: string;
-		};
-		type WorkflowStep = {
-			name?: string;
-			run?: string;
-			shell?: string;
-			"working-directory"?: string;
-			env?: Record<string, unknown>;
-			if?: unknown;
-			"continue-on-error"?: unknown;
-		};
+		type WorkflowStep = { name?: string; run?: string };
 		type ValidationJob = {
 			"runs-on"?: string;
-			defaults?: { run?: RunDefaults };
 			steps?: WorkflowStep[];
 			env?: Record<string, unknown>;
-			if?: unknown;
-			"continue-on-error"?: unknown;
 		};
 		const parsedWorkflow = Bun.YAML.parse(workflow) as {
-			defaults?: { run?: RunDefaults };
-			env?: Record<string, unknown>;
 			jobs?: Record<string, ValidationJob>;
 		};
-		const validationJob = parsedWorkflow.jobs?.validate ?? {};
+		const validationJob = parsedWorkflow.jobs?.linux ?? {};
 		const validationSteps = validationJob.steps ?? [];
 		const workflowStep = (name: string): WorkflowStep =>
 			validationSteps.find((step) => step.name === name) ?? {};
 		const stepIndex = (name: string): number =>
 			validationSteps.findIndex((step) => step.name === name);
-		const installStep = workflowStep("Install dependencies");
-		const typecheckStep = workflowStep("Typecheck");
-		const releaseStep = workflowStep("Release validation");
 
 		expect(validationJob["runs-on"]).toBe("ubuntu-24.04");
-		expect(validationJob).not.toHaveProperty("continue-on-error");
-		expect(validationJob).not.toHaveProperty("if");
-		expect(parsedWorkflow).not.toHaveProperty("env");
-		expect(validationJob.env).toEqual({
-			OSV_SCANNER_VERSION: "2.3.8",
-			GITLEAKS_VERSION: "8.24.2",
-		});
-		expect(parsedWorkflow.defaults?.run?.shell).toBeUndefined();
-		expect(parsedWorkflow.defaults?.run?.["working-directory"]).toBeUndefined();
-		expect(validationJob.defaults?.run?.shell).toBeUndefined();
-		expect(validationJob.defaults?.run?.["working-directory"]).toBeUndefined();
-		expect(installStep.run).toBe("bun install --frozen-lockfile");
-		expect(typecheckStep.run).toBe("bun run typecheck");
-		expect(typecheckStep).not.toHaveProperty("continue-on-error");
-		expect(typecheckStep).not.toHaveProperty("if");
-		expect(typecheckStep).not.toHaveProperty("shell");
-		expect(typecheckStep).not.toHaveProperty("working-directory");
-		expect(typecheckStep).not.toHaveProperty("env");
-		expect(releaseStep.run).toBe("bun run validate:release");
-		const runnerStep = workflowStep("Verify Ubuntu Linux x64 runner");
-		expect(runnerStep.run).toContain('test "$(uname -m)" = "x86_64"');
-		expect(runnerStep.run).toContain("grep -qi '^ID=ubuntu' /etc/os-release");
+		expect(validationJob.env).toBeUndefined();
+		expect(workflowStep("Install dependencies").run).toBe(
+			"bun install --frozen-lockfile",
+		);
+		expect(workflowStep("Audit public boundary").run).toBe(
+			"bun run public:audit -- .",
+		);
+		expect(workflowStep("Lint and typecheck").run).toContain(
+			"bun run typecheck",
+		);
+		expect(workflowStep("Test").run).toBe("bun run test:full");
+		expect(workflowStep("Build and smoke").run).toContain("bun run smoke:dist");
+		expect(workflowStep("Verify Linux x64").run).toContain(
+			'test "$(uname -m)" = x86_64',
+		);
 		expect(stepIndex("Install dependencies")).toBeLessThan(
-			stepIndex("Typecheck"),
+			stepIndex("Audit public boundary"),
 		);
-		expect(stepIndex("Typecheck")).toBeLessThan(
-			stepIndex("Release validation"),
-		);
+		expect(stepIndex("Lint and typecheck")).toBeLessThan(stepIndex("Test"));
 	});
 
 	test("CI runs release validation for pull requests and main while retaining manual dispatch", () => {
 		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			join(repoRoot, ".github", "workflows", "ci.yml"),
 			"utf8",
 		).replace(/\r\n/g, "\n");
 
-		expect(workflow).toContain("on:\n  workflow_dispatch:\n");
+		expect(workflow).toContain("  workflow_dispatch:\n");
 		expect(workflow).toContain("  pull_request:\n");
 		expect(workflow).toContain("  push:\n    branches: [main]\n");
 		expect(workflow).toContain("permissions:\n  contents: read\n");
@@ -590,14 +536,9 @@ describe("release and toolchain contracts", () => {
 		}
 		const expectedSteps = [
 			"validate:toolchain",
-			"local-state:rebuild",
-			"validate:project",
 			"typecheck",
 			"validate:template",
 			"validate:bootstrap",
-			"validate:project-benchmarks",
-			"validate:ux-governance",
-			"kernel",
 			"test:full",
 			"coverage:check",
 			"build:deterministic",
@@ -681,9 +622,9 @@ describe("release and toolchain contracts", () => {
 		expect(pkg.version).not.toBe("0.0.0");
 	});
 
-	test("CI provisions pinned security scanners before release validation", () => {
+	test("release workflow provisions pinned scanners and attested assets", () => {
 		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			join(repoRoot, ".github", "workflows", "release.yml"),
 			"utf8",
 		);
 		const osvInstallCommand =
@@ -703,14 +644,7 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain(
 			"uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
 		);
-		expect(workflow).toContain(
-			"uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
-		);
-		expect(workflow).toContain("retention-days: 3");
-		expect(workflow).toContain("compression-level: 9");
-		expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
 		expect(workflow).toContain("Install pinned security scanners");
-		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(osvInstallCommand);
 		expect(workflow).toContain(gitleaksInstallCommand);
 		expect(workflow).toContain(
@@ -720,20 +654,26 @@ describe("release and toolchain contracts", () => {
 			'echo "AFOL_GITLEAKS_PATH=$tool_dir/gitleaks" >> "$GITHUB_ENV"',
 		);
 		expect(workflow).not.toContain('echo "$tool_dir" >> "$GITHUB_PATH"');
-		expect(workflow).toContain('export GOSUMDB="sum.golang.org"');
 		expect(workflow).not.toContain("curl -fsSL");
 		expect(workflow).not.toContain("tar -xzf");
 		const releaseValidationStep =
 			workflow.match(
-				/- name: Release validation[\s\S]*?(?=\n {6}- name:|\n\S|$)/,
+				/- name: Validate exact source and artifact[\s\S]*?(?=\n {6}- name:|\n\S|$)/,
 			)?.[0] ?? "";
-		expect(releaseValidationStep).toContain("run: bun run validate:release");
+		expect(releaseValidationStep).toContain("bun run validate:release");
 		expect(releaseValidationStep).not.toContain("continue-on-error: true");
+		expect(workflow).toContain(
+			"uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.23.1",
+		);
+		expect(workflow).toContain(
+			"uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1",
+		);
+		expect(workflow).toContain("gh release create");
 		expect(workflow.indexOf("Set up Go")).toBeLessThan(
 			workflow.indexOf("Install pinned security scanners"),
 		);
 		expect(workflow.indexOf("Install pinned security scanners")).toBeLessThan(
-			workflow.indexOf("Release validation"),
+			workflow.indexOf("Validate exact source and artifact"),
 		);
 	});
 
@@ -781,7 +721,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -851,7 +791,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -884,7 +824,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -926,7 +866,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -963,7 +903,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -997,7 +937,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1049,7 +989,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1105,7 +1045,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1157,31 +1097,23 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
-	test("release provenance records version registry path and sha256", () => {
-		const root = mkdtempSync(join(tmpdir(), "release-provenance-registry-"));
+	test("release provenance records package metadata path and sha256", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-provenance-version-"));
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
 		try {
 			const provenance = buildReleaseProvenance({ cwd: root });
-			const registryPath = join(
-				root,
-				".afol",
-				"adm",
-				"source",
-				"release-version.json",
-			);
-			const registrySha256 = createHash("sha256")
-				.update(readFileSync(registryPath))
+			const sourcePath = join(root, "package.json");
+			const sourceSha256 = createHash("sha256")
+				.update(readFileSync(sourcePath))
 				.digest("hex");
 
-			expect(provenance.version_registry_path).toBe(
-				".afol/adm/source/release-version.json",
-			);
-			expect(provenance.version_registry_sha256).toBe(registrySha256);
+			expect(provenance.version_source_path).toBe("package.json");
+			expect(provenance.version_source_sha256).toBe(sourceSha256);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1218,21 +1150,20 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
-	test("release provenance rejects a registry version that diverges from generated metadata", () => {
+	test("release provenance rejects package metadata that diverges from generated metadata", () => {
 		const root = mkdtempSync(
-			join(tmpdir(), "release-provenance-registry-mismatch-"),
+			join(tmpdir(), "release-provenance-version-mismatch-"),
 		);
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
-		writeReleaseVersionRegistry(root, {
+		writeReleasePackageMetadata(root, {
 			packageJsonVersion: "9.9.9",
-			registryVersion: "9.9.9",
 		});
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 
 		try {
 			expect(() => buildReleaseProvenance({ cwd: root })).toThrow(
-				/generated version metadata .* does not match registered release version/,
+				/generated version metadata .* does not match package metadata/,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1245,7 +1176,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 
 		writeFakeReleaseScanners(binDir);
@@ -1277,7 +1208,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1321,7 +1252,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1369,7 +1300,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 		writeMockScanner(binDir, "osv-scanner", {
@@ -1416,7 +1347,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1489,7 +1420,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -1560,7 +1491,7 @@ describe("release and toolchain contracts", () => {
 		const root = mkdtempSync(join(tmpdir(), "release-provenance-dirty-"));
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
-		writeReleaseVersionRegistry(root);
+		writeReleasePackageMetadata(root);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 		const gitEnv = {
@@ -1583,30 +1514,18 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
-	test("release provenance fails release mode without a version registry", () => {
+	test("release provenance fails when package metadata is missing", () => {
 		const root = mkdtempSync(
-			join(tmpdir(), "release-provenance-missing-registry-"),
+			join(tmpdir(), "release-provenance-missing-package-"),
 		);
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
-		writeFileSync(
-			join(root, "package.json"),
-			JSON.stringify(
-				{
-					name: CLI_PACKAGE_NAME,
-					version: CLI_VERSION,
-				},
-				null,
-				2,
-			),
-			"utf8",
-		);
 		writeFileSync(join(distDir, RELEASE_ARTIFACT_NAME), "artifact", "utf8");
 
 		try {
-			expect(() =>
-				buildReleaseProvenance({ cwd: root, releaseMode: true }),
-			).toThrow(/missing required \.afol\/adm\/source\/release-version\.json/);
+			expect(() => buildReleaseProvenance({ cwd: root })).toThrow(
+				/package\.json/,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

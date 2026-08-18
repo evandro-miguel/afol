@@ -95,7 +95,15 @@ function configureEvolution(
 ): void {
 	const source = JSON.parse(
 		readFileSync(
-			join(import.meta.dir, "..", "..", ".afol", "config.json"),
+			join(
+				import.meta.dir,
+				"..",
+				"..",
+				"src",
+				"project-template",
+				".afol",
+				"config.json",
+			),
 			"utf8",
 		),
 	) as {

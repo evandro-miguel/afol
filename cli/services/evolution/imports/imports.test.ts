@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+// public-audit-allow: bearer-token synthetic redaction fixture
 import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

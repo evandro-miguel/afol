@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: bearer-token synthetic redaction fixture
 import type { TelemetryEvent } from "../services/events/telemetry";
 import { normalizeObservationRecord } from "../services/evolution/observation-model";
 import {

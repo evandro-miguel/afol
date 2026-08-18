@@ -246,11 +246,8 @@ describe("template forbidden-content policy", () => {
 		}
 	});
 
-	test("live src/project-template carries current AFOL tools catalog", async () => {
+	test("live src/project-template carries a generated AFOL tools catalog", async () => {
 		const projectRoot = process.cwd();
-		const rootCatalog = JSON.parse(
-			await readFile(join(projectRoot, ".afol/adm/tools.json"), "utf8"),
-		);
 		const templateCatalog = JSON.parse(
 			await readFile(
 				join(projectRoot, "src/project-template/.afol/adm/tools.json"),
@@ -258,17 +255,17 @@ describe("template forbidden-content policy", () => {
 			),
 		);
 
-		expect(templateCatalog).toEqual(rootCatalog);
+		expect(templateCatalog.generated_from).toBe("cli/registry.ts");
+		expect(templateCatalog.tools.length).toBeGreaterThan(0);
+		expect(
+			templateCatalog.tools.every(
+				(entry: { stability?: unknown }) => typeof entry.stability === "string",
+			),
+		).toBe(true);
 	});
 
-	test("live src/project-template carries current benchmark registry", async () => {
+	test("live src/project-template carries a complete benchmark registry", async () => {
 		const projectRoot = process.cwd();
-		const rootRegistry = JSON.parse(
-			await readFile(
-				join(projectRoot, ".afol/data/benchmarks/catalog/registry.json"),
-				"utf8",
-			),
-		);
 		const templateRegistry = JSON.parse(
 			await readFile(
 				join(
@@ -279,45 +276,35 @@ describe("template forbidden-content policy", () => {
 			),
 		);
 
-		expect(templateRegistry).toEqual(rootRegistry);
 		expect(templateRegistry.coverage?.exemptions).toEqual([]);
 		expect(templateRegistry.coverage?.subcommand_exemptions).toEqual([]);
 	});
 
-	test("workbench benchmark scenarios stay in template parity", async () => {
+	test("workbench benchmark scenarios are valid public template fixtures", async () => {
 		const projectRoot = process.cwd();
 		const relativeCatalog =
 			".afol/data/benchmarks/catalog/scenarios/workbench-parity";
-		const rootCatalog = join(projectRoot, relativeCatalog);
 		const templateCatalog = join(
 			projectRoot,
 			"src/project-template",
 			relativeCatalog,
 		);
-		const rootFiles = (await readdir(rootCatalog))
-			.filter((name) => name.endsWith(".json"))
-			.sort();
 		const templateFiles = (await readdir(templateCatalog))
 			.filter((name) => name.endsWith(".json"))
 			.sort();
-		expect(templateFiles).toEqual(rootFiles);
-		for (const name of rootFiles) {
-			const rootScenario = JSON.parse(
-				await readFile(join(rootCatalog, name), "utf8"),
-			) as Record<string, unknown>;
+		expect(templateFiles.length).toBeGreaterThan(0);
+		for (const name of templateFiles) {
 			const templateScenario = JSON.parse(
 				await readFile(join(templateCatalog, name), "utf8"),
 			) as Record<string, unknown>;
-			delete rootScenario.compiled_binary;
-			expect(templateScenario).toEqual(rootScenario);
+			expect(typeof templateScenario.scenario_id).toBe("string");
+			expect(templateScenario.compiled_binary).toBeUndefined();
 		}
 	});
 
-	test("live repo and src/project-template do not vendor global agentic-folder-sys skill", async () => {
+	test("src/project-template does not vendor global agentic-folder-sys skill", async () => {
 		const projectRoot = process.cwd();
 		const forbiddenPaths = [
-			".agents/skills/agentic-folder-sys",
-			".afol/adm/source/universal-skills/skills/agentic-folder-sys",
 			"src/project-template/.agents/skills/agentic-folder-sys",
 			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-folder-sys",
 		];
@@ -326,10 +313,8 @@ describe("template forbidden-content policy", () => {
 		);
 
 		const metadataFiles = [
-			".agents/manifest.json",
-			".agents/lock.json",
-			".afol/adm/source/universal-skills/index.json",
-			".afol/adm/source/universal-skills/profiles/core.json",
+			"src/project-template/.agents/manifest.json",
+			"src/project-template/.agents/lock.json",
 			"src/project-template/.afol/adm/source/universal-skills/index.json",
 			"src/project-template/.afol/adm/source/universal-skills/profiles/core.json",
 		];
@@ -366,11 +351,9 @@ describe("template forbidden-content policy", () => {
 		expect(lockManagedHashes).toEqual([]);
 	});
 
-	test("live repo and template exclude retired agentic-scaffold-mcp seed", async () => {
+	test("template excludes retired agentic-scaffold-mcp seed", async () => {
 		const projectRoot = process.cwd();
 		const forbiddenPaths = [
-			".agents/skills/agentic-scaffold-mcp",
-			".afol/adm/source/universal-skills/skills/agentic-scaffold-mcp",
 			"src/project-template/.agents/skills/agentic-scaffold-mcp",
 			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-scaffold-mcp",
 		];
@@ -379,10 +362,6 @@ describe("template forbidden-content policy", () => {
 		).toEqual([]);
 
 		const metadataFiles = [
-			".agents/manifest.json",
-			".agents/lock.json",
-			".afol/adm/source/universal-skills/index.json",
-			".afol/adm/source/universal-skills/profiles/core.json",
 			"src/project-template/.agents/manifest.json",
 			"src/project-template/.agents/lock.json",
 			"src/project-template/.afol/adm/source/universal-skills/index.json",

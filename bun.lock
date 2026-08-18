@@ -6,6 +6,7 @@
       "name": "afol",
       "dependencies": {
         "diff": "^9.0.0",
+        "valibot": "^1.4.2",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.16",
@@ -16,7 +17,6 @@
         "knip": "^6.15.0",
         "oxlint": "^1.67.0",
         "typescript": "7.0.2",
-        "valibot": "^1.4.2",
       },
     },
   },

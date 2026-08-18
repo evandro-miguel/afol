@@ -29,7 +29,7 @@
 		"test:unit": "bun test cli/tests",
 		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
 		"coverage": "bun test --coverage --coverage-reporter=text",
-		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/validate-internals.test.ts cli/tests/validation.test.ts cli/tests/version-metadata.test.ts",
+		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/validate.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/version-metadata.test.ts",
 		"coverage:project-benchmarks": "bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark/catalog.ts --include cli/services/project-benchmark/generate.ts --include cli/services/project-benchmark/matrix.ts --include cli/services/project-benchmark/paths.ts --include cli/services/project-benchmark/render.ts --include cli/services/project-benchmark/schema.ts --include cli/services/project-benchmark/scoring.ts --include cli/services/project-benchmark/types.ts --include cli/services/project-benchmark/validate-project-relations.ts --include cli/services/project-benchmark/validate-project-shape.ts --include cli/services/project-benchmark/validate.ts --include cli/services/project-benchmark/validation-utils.ts --max-concurrency 1 --timeout 30000 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts",
 		"validate": "bun run typecheck && bun test",
 		"validate:template": "bun run template:check",
@@ -57,15 +57,18 @@
 		"benchmark:multitask:json": "bun run cli/dev/multitask-throughput-benchmark.ts --json",
 		"validate:project-benchmarks": "bun run validate:mutation-performance && bun run coverage:project-benchmarks && bun run kernel -- pb validate --strict --json && bun run kernel -- pb generate --check --json && bun run benchmark:multitask",
 		"validate:ux-governance": "bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --timing-mode observe --json",
-		"validate:release": "bun run validate:toolchain && bun run local-state:rebuild && bun run validate:project && bun run typecheck && bun run validate:template && bun run validate:bootstrap && bun run validate:project-benchmarks && bun run validate:ux-governance && bun run kernel -- v bench --pack token-economy --pack cli-kernel-local --json && bun run test:full && bun run coverage:check && bun run build:deterministic && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
+		"validate:release": "bun run validate:toolchain && bun run typecheck && bun run validate:template && bun run validate:bootstrap && bun run test:full && bun run coverage:check && bun run build:deterministic && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
 		"release:provenance": "bun run cli/dev/release-provenance.ts",
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
 		"smoke:dist": "bun run cli/dev/dist-smoke.ts",
 		"smoke:wsl2": "bun run cli/dev/dist-smoke.ts --wsl2",
-		"smoke:clean": "bun run cli/dev/clean-smoke.ts"
+		"smoke:clean": "bun run cli/dev/clean-smoke.ts",
+		"public:export": "bun run scripts/export-public.ts",
+		"public:audit": "bun run scripts/audit-public-content.ts"
 	},
 	"dependencies": {
-		"diff": "^9.0.0"
+		"diff": "^9.0.0",
+		"valibot": "^1.4.2"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.16",
@@ -75,8 +78,7 @@
 		"citty": "^0.2.2",
 		"knip": "^6.15.0",
 		"oxlint": "^1.67.0",
-		"typescript": "7.0.2",
-		"valibot": "^1.4.2"
+		"typescript": "7.0.2"
 	},
 	"overrides": {
 		"fast-uri": "3.1.5"

@@ -37,7 +37,18 @@ risk_level: high
 
 ## Acceptance
 
-- [ ] `LICENSE` and `THIRD_PARTY_NOTICES.md` are complete and accurate.
-- [ ] Every distributed third-party file has proven compatible licensing.
+- [x] `LICENSE` and `THIRD_PARTY_NOTICES.md` are complete and accurate.
+- [x] Every distributed third-party file has proven compatible licensing.
 - [ ] License compliance and SBOM generation pass in CI.
-- [ ] No runtime dependency is hidden only in development dependencies.
+- [x] No runtime dependency is hidden only in development dependencies.
+
+## Evidence
+
+- The public candidate at `03afc0f` carries MIT `LICENSE`, scoped third-party
+  notices, and only AFOL-owned template skills.
+- The unverified third-party `ux-design` skill is excluded from both the
+  generated template and public export.
+- `valibot` is a runtime dependency; factory-only AJV tooling and its lockfile
+  entries are removed by the allowlisted export.
+- Hosted CI SBOM/license evidence remains pending and is intentionally not
+  checked above.

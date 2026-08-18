@@ -1,0 +1,45 @@
+{
+  "files": [
+    ".gitattributes",
+    ".gitignore",
+    ".gitleaks.toml",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SUPPORT.md",
+    "CHANGELOG.md",
+    "ROADMAP.md",
+    "THIRD_PARTY_NOTICES.md",
+    "afol",
+    "bun.lock",
+    "package.json",
+    "tsconfig.json"
+  ],
+  "directories": [
+    ".github",
+    "cli",
+    "examples",
+    "scripts",
+    "src"
+  ],
+  "mapped_directories": {
+    "docs/public": "docs",
+    "src/project-template/.afol": ".afol",
+    "src/project-template/.agents": ".agents"
+  },
+  "exclude": [
+    "cli/tests/active-canon-migration.test.ts",
+    "cli/tests/bench-command.test.ts",
+    "cli/tests/benchmark-scenarios.test.ts",
+    "cli/tests/evolution-benchmark-baseline.test.ts",
+    "cli/tests/evolution-governance-schema.test.ts",
+    "cli/tests/governance-contract-reconciliation.test.ts",
+    "cli/tests/multitask-throughput-contract.test.ts",
+    "cli/tests/skill-command.test.ts",
+    "cli/tests/validate-internals.test.ts",
+    "cli/tests/validation.test.ts",
+    "src/project-template/.agents/skills/ux-design"
+  ]
+}
