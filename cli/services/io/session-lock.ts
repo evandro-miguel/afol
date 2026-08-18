@@ -94,8 +94,11 @@ function isWindowsDeletedLockTransition(
 		return false;
 	}
 	try {
-		lstatSync(lockPath);
-		return false;
+		const stat = lstatSync(lockPath);
+		// Windows may report EPERM while another process owns a visible regular
+		// lock or while its deletion is pending. Treat this only as contention;
+		// the next exclusive create remains the sole ownership authority.
+		return stat.isFile() && !stat.isSymbolicLink();
 	} catch (probeError) {
 		// The target has to be demonstrably absent. A generic EPERM (or an
 		// inaccessible existing path) remains an error; the next `wx` call is

@@ -329,27 +329,42 @@ describe("session-lock", () => {
 	);
 
 	test.skipIf(process.platform !== "win32")(
-		"external path lock rejects an EPERM while the lock still exists",
+		"external path lock treats EPERM on a visible regular lock as contention",
 		async () => {
 			const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
 			const lockPath = resolveExternalPathLockPath(resource);
 			mkdirSync(dirname(lockPath), { recursive: true });
 			writeFileSync(lockPath, "existing lock\n", "utf8");
 			const originalOpenSync = nodeFs.openSync;
+			let injected = false;
 			const openSpy = spyOn(nodeFs, "openSync").mockImplementation(
 				(...args) => {
-					if (args[0] === lockPath && args[1] === "wx")
+					if (!injected && args[0] === lockPath && args[1] === "wx") {
+						injected = true;
 						throw Object.assign(new Error("unproven lock transition"), {
 							code: "EPERM",
 						});
+					}
 					return originalOpenSync(...args);
 				},
 			);
+			// The lock implementation retries synchronously, so a same-thread timer
+			// cannot release the fixture. Use a separate process to model the Windows
+			// owner finishing its delete-pending transition.
+			const release = Bun.spawn({
+				cmd: [
+					process.execPath,
+					"-e",
+					`import { rmSync } from "node:fs"; setTimeout(() => rmSync(${JSON.stringify(lockPath)}, { force: true }), 25);`,
+				],
+				stdout: "ignore",
+				stderr: "ignore",
+			});
 			try {
-				await expect(
-					withExternalPathLock(resource, async () => undefined),
-				).rejects.toMatchObject({ code: "EPERM" });
+				await withExternalPathLock(resource, async () => undefined);
+				expect(injected).toBe(true);
 			} finally {
+				await release.exited;
 				openSpy.mockRestore();
 				rmSync(lockPath, { force: true });
 			}
