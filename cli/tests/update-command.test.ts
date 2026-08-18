@@ -706,6 +706,7 @@ describe("update command", () => {
 					changes?: {
 						total?: number;
 						paths?: string[];
+						pathsTruncated?: boolean;
 					};
 					ownershipSource?: Record<string, number>;
 					filePreviews?: unknown[];
@@ -724,7 +725,8 @@ describe("update command", () => {
 				currentRevision: "old",
 				changes: {
 					total: expect.any(Number),
-					paths: expect.arrayContaining([".agents/manifest.json"]),
+					paths: expect.any(Array),
+					pathsTruncated: true,
 				},
 			});
 			expect(parsed.data?.ownershipSource?.managed).toBeGreaterThan(0);
@@ -740,7 +742,11 @@ describe("update command", () => {
 				exit_code: number;
 				data?: {
 					hasSource?: boolean;
-					changes?: { total?: number; paths?: string[] };
+					changes?: {
+						total?: number;
+						paths?: string[];
+						pathsTruncated?: boolean;
+					};
 					filePreviews?: unknown[];
 					operations?: unknown[];
 				};
@@ -753,7 +759,8 @@ describe("update command", () => {
 				hasSource: true,
 				changes: {
 					total: expect.any(Number),
-					paths: expect.arrayContaining([".agents/manifest.json"]),
+					paths: expect.any(Array),
+					pathsTruncated: true,
 				},
 			});
 
