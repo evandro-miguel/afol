@@ -276,9 +276,13 @@ export function runVerificationAsync(
 		const terminate = (status: ObservedVerificationStatus): void => {
 			if (settled || forcedStatus) return;
 			forcedStatus = status;
-			terminateProcessTree(child, false);
-			forceKill = setTimeout(() => terminateProcessTree(child, true), 100);
-			forceKill.unref();
+			if (process.platform === "win32") {
+				terminateProcessTree(child, true);
+			} else {
+				terminateProcessTree(child, false);
+				forceKill = setTimeout(() => terminateProcessTree(child, true), 100);
+				forceKill.unref();
+			}
 		};
 		const countOutput = (chunk: Buffer | string): void => {
 			outputBytes += Buffer.isBuffer(chunk)
