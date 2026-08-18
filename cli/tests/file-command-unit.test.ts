@@ -679,7 +679,10 @@ describe("mutation transaction hardening", () => {
 	});
 
 	test("journal recovery rejects overwrite backups outside the backup root or through symlinks", () => {
-		for (const useSymlink of [false, true]) {
+		const backupVariants = symlinkTestSupport.available
+			? [false, true]
+			: [false];
+		for (const useSymlink of backupVariants) {
 			const root = mkProjectRoot();
 			try {
 				writeFileTree(root, "notes/source.txt", "source");
