@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
 import {
 	accessSync,
@@ -87,6 +87,11 @@ const RUNTIME_STATE_GUARD_PATHS = [
 // Linux exposes O_PATH to open unreadable directories by descriptor; Bun does
 // not currently publish it through fs.constants.
 const LINUX_O_PATH = 0x200000;
+const SANDBOX_IDENTITY_GUARD_PATH = join(
+	".afol",
+	"tmp",
+	".sandbox-root-identity",
+);
 
 type SandboxRootIdentity = {
 	basename: string;
@@ -95,6 +100,7 @@ type SandboxRootIdentity = {
 	rootBirthtimeMs: number;
 	parentDev: number;
 	parentIno: number;
+	guardToken: string;
 };
 
 export function resolveScenarioSampleCount(
@@ -514,6 +520,16 @@ function captureSandboxRootIdentity(sandboxRoot: string): SandboxRootIdentity {
 	if (!rootStat.isDirectory() || !parentStat.isDirectory()) {
 		throw new Error(`Invalid benchmark sandbox root: ${sandboxRoot}`);
 	}
+	const guardPath = join(sandboxRoot, SANDBOX_IDENTITY_GUARD_PATH);
+	mkdirSync(dirname(guardPath), { recursive: true });
+	let guardToken: string;
+	try {
+		guardToken = readFileSync(guardPath, "utf8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		guardToken = randomUUID();
+		writeFileSync(guardPath, guardToken, { encoding: "utf8", flag: "wx" });
+	}
 	return {
 		basename: sandboxRoot.slice(parentPath.length + 1),
 		rootDev: rootStat.dev,
@@ -521,6 +537,7 @@ function captureSandboxRootIdentity(sandboxRoot: string): SandboxRootIdentity {
 		rootBirthtimeMs: rootStat.birthtimeMs,
 		parentDev: parentStat.dev,
 		parentIno: parentStat.ino,
+		guardToken,
 	};
 }
 
@@ -542,7 +559,9 @@ function sandboxRootIdentityMatches(
 			rootStat.ino === identity.rootIno &&
 			rootStat.birthtimeMs === identity.rootBirthtimeMs &&
 			parentStat.dev === identity.parentDev &&
-			parentStat.ino === identity.parentIno
+			parentStat.ino === identity.parentIno &&
+			readFileSync(join(sandboxRoot, SANDBOX_IDENTITY_GUARD_PATH), "utf8") ===
+				identity.guardToken
 		);
 	} catch {
 		return false;
