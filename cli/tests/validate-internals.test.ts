@@ -76,7 +76,10 @@ import {
 	loadJsonObject,
 } from "../validate/shared";
 import type { Baseline, RegistrySnapshot, Scenario } from "../validate/types";
-import { symlinkTestSupport } from "./symlink-test-support";
+import {
+	directoryReparseTestSupport,
+	symlinkTestSupport,
+} from "./symlink-test-support";
 
 function createRepoLocalTestRoot(prefix: string): string {
 	const testTempRoot = join(process.cwd(), ".afol", "tmp", "tests");
@@ -306,6 +309,12 @@ function createBenchExecutionFixtureRoot(): string {
 				join(process.cwd(), "node_modules"),
 				join(root, "node_modules"),
 				"dir",
+			);
+		} else if (directoryReparseTestSupport.available) {
+			symlinkSync(
+				join(process.cwd(), "node_modules"),
+				join(root, "node_modules"),
+				"junction",
 			);
 		} else {
 			cpSync(join(process.cwd(), "node_modules"), join(root, "node_modules"), {
