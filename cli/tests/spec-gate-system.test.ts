@@ -651,6 +651,52 @@ describe("spec-gate system", () => {
 		}
 	});
 
+	test("activateRoadmapFeature preserves structured parent spec frontmatter", () => {
+		const root = createFixture();
+		try {
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const parentPath = join(root, ".afol", "adm", "specs", "parent-spec.md");
+			mkdirSync(dirname(roadmapPath), { recursive: true });
+			writeFileSync(
+				roadmapPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+				"utf8",
+			);
+			const original = [
+				"---",
+				"doc_type: spec",
+				"id: parent-spec",
+				"status: planned",
+				"roadmap_feature: F-31",
+				"owners:",
+				"  - product",
+				"  - platform",
+				"links:",
+				"  roadmap: .afol/adm/roadmap.md",
+				"  plan: .afol/adm/plans/parent.md",
+				"---",
+				"",
+				"# Parent",
+				"",
+			].join("\n");
+			writeFileSync(parentPath, original, "utf8");
+
+			activateRoadmapFeature(root, "F-31", "parent-spec");
+
+			expect(readFileSync(parentPath, "utf8")).toBe(
+				original.replace("status: planned", 'status: "active"'),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("activateRoadmapFeature rejects final features without rewriting the roadmap", () => {
 		const root = createFixture();
 		try {

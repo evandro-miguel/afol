@@ -138,6 +138,25 @@ function renderFrontmatter(record: Record<string, unknown>): string {
 	return `---\n${lines.join("\n")}\n---\n\n`;
 }
 
+function replaceFrontmatterScalar(
+	content: string,
+	key: string,
+	value: string,
+): string {
+	const match = FRONTMATTER_RE.exec(content);
+	if (!match) throw new Error("Document frontmatter is invalid");
+	const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const fieldPattern = new RegExp(`^${escapedKey}[ \\t]*:[^\\r\\n]*`, "gm");
+	const matches = match[0].match(fieldPattern) ?? [];
+	if (matches.length !== 1)
+		throw new Error(`Frontmatter field must resolve uniquely: ${key}`);
+	const updatedBlock = match[0].replace(
+		fieldPattern,
+		`${key}: ${yamlScalar(value)}`,
+	);
+	return updatedBlock + content.slice(match[0].length);
+}
+
 function parseFrontmatter(content: string): Record<string, unknown> | null {
 	const match = FRONTMATTER_RE.exec(content);
 	if (!match?.[1]) {
@@ -931,13 +950,9 @@ function activateRoadmapFeatureLocked(
 
 	const updates: Array<[string, string]> = [];
 	if (parent && parentStatus === "activated") {
-		const frontmatter = parseFrontmatter(parentDocument);
-		if (!frontmatter)
-			throw new Error(`Parent spec frontmatter is invalid: ${parent}`);
-		const body = parentDocument.replace(FRONTMATTER_RE, "");
 		updates.push([
 			parentPath,
-			renderFrontmatter({ ...frontmatter, status: "active" }) + body,
+			replaceFrontmatterScalar(parentDocument, "status", "active"),
 		]);
 	}
 	if (status === "planned") {
