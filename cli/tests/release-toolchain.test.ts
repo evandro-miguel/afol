@@ -443,15 +443,17 @@ describe("release and toolchain contracts", () => {
 		);
 	});
 
-	test("CI runs only when manually dispatched", () => {
+	test("CI runs automatically on development and promotion branches", () => {
 		const workflow = readFileSync(
 			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
 			"utf8",
 		);
 
-		expect(workflow).toContain("on:\n  workflow_dispatch:\n");
-		expect(workflow).not.toMatch(/\n {2}push:/);
-		expect(workflow).not.toMatch(/\n {2}pull_request:/);
+		expect(workflow).toContain("  pull_request:\n    branches: [dev, main]\n");
+		expect(workflow).toContain("  push:\n    branches: [dev, main]\n");
+		expect(workflow).toContain("  workflow_dispatch:\n");
+		expect(workflow).toContain("permissions:\n  contents: read\n");
+		expect(workflow).toContain("cancel-in-progress: true");
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {
@@ -549,9 +551,11 @@ describe("release and toolchain contracts", () => {
 		) as {
 			private?: boolean;
 			version?: string;
+			license?: string;
 		};
 
 		expect(pkg.private).toBe(true);
+		expect(pkg.license).toBe("MIT");
 		expect(pkg.version).toMatch(SEMVER_PATTERN);
 		expect(pkg.version).toContain("-");
 		expect(pkg.version).not.toBe("0.0.0");
