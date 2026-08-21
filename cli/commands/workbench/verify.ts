@@ -25,7 +25,13 @@ function pathIsInside(root: string, candidate: string): boolean {
 	);
 }
 
+const SESSION_ID_TARGET_RE = /^\d{6}_\d{4}_[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
 export function resolveVerifyTargetPath(root: string, target: string): string {
+	const normalized = target.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+	if (SESSION_ID_TARGET_RE.test(normalized)) {
+		return resolveVerifySessionPath(root, normalized);
+	}
 	const result = resolveProjectPath(root, target);
 	if (!result.ok) {
 		throw new Error(result.error);

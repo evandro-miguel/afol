@@ -15,8 +15,11 @@ import {
 	runVerifyTasksCommand,
 } from "../commands/workbench";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import { evidenceTransitionAdmissionPath } from "../services/project/evidence-transition-admission";
 import { LEGACY_EVIDENCE_BASELINE_FILE } from "../services/project/legacy-evidence-baseline";
+import { isSessionClosed } from "../services/workbench/lifecycle";
 
 type CapturedIo = {
 	stdout: string[];
@@ -162,6 +165,13 @@ async function captureEvidenceAdmit(
 	root: string,
 	args: string[],
 ): Promise<{ code: number; stdout: string[]; stderr: string[] }> {
+	return captureEvidenceCommand(root, ["admit", ...args]);
+}
+
+async function captureEvidenceCommand(
+	root: string,
+	args: string[],
+): Promise<{ code: number; stdout: string[]; stderr: string[] }> {
 	const previousStdout = console.log;
 	const previousStderr = console.error;
 	const stdout: string[] = [];
@@ -173,7 +183,7 @@ async function captureEvidenceAdmit(
 		stderr.push(parts.map(String).join(" "));
 	};
 	try {
-		const code = await runEvidenceCommand(["admit", ...args], root);
+		const code = await runEvidenceCommand(args, root);
 		return { code, stdout, stderr };
 	} finally {
 		console.log = previousStdout;
@@ -229,6 +239,219 @@ describe("afol evidence admit", () => {
 			expect(payload.data?.written).toBe(false);
 			expect(payload.data?.dry_run).toBe(true);
 			expect(existsSync(baselinePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit admits and closes one terminal post-cutoff debt", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-open";
+		try {
+			writeOpenSession(root, session);
+			writeFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				`${JSON.stringify({
+					task_id: "T-01",
+					command: "true",
+					result: "failed",
+					exit_code: 1,
+					id: "E-transition-failed",
+					created_at: "2026-08-18T16:20:00.000Z",
+					provenance: "observed",
+				})}\n`,
+				"utf8",
+			);
+			rebuildIndexes(root);
+
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"approved transition repair",
+				"--confirm",
+				"--json",
+			]);
+			expect(result.code).toBe(0);
+			expect(isSessionClosed(root, session)).toBe(true);
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(true);
+			const admission = JSON.parse(
+				readFileSync(evidenceTransitionAdmissionPath(root), "utf8"),
+			) as { admissions: Array<Record<string, unknown>> };
+			expect(admission.admissions).toEqual([
+				expect.objectContaining({
+					session_id: session,
+					task_id: "T-01",
+					issue_type: "failed_evidence",
+					approval: "approved transition repair",
+				}),
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit leaves durable admission for a nonzero close retry", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-retry";
+		const args = [
+			"transition-admit",
+			"--session",
+			session,
+			"--task-id",
+			"T-01",
+			"--policy",
+			"no-op-evidence-v1",
+			"--issue",
+			"AFOL-96",
+			"--approval",
+			"approved transition retry",
+			"--confirm",
+			"--json",
+		];
+		try {
+			writeOpenSession(root, session);
+			writeFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				`${JSON.stringify({
+					task_id: "T-01",
+					command: "true",
+					result: "failed",
+					exit_code: 1,
+					id: "E-transition-retry",
+					created_at: "2026-08-18T16:20:00.000Z",
+					provenance: "observed",
+				})}\n`,
+				"utf8",
+			);
+			rebuildIndexes(root);
+			const eventPath = resolveWorkbenchEventLogPath(root);
+			rmSync(eventPath, { force: true });
+			mkdirSync(eventPath, { recursive: true });
+
+			const failedClose = await captureEvidenceCommand(root, args);
+			expect(failedClose.code).not.toBe(0);
+			expect(isSessionClosed(root, session)).toBe(false);
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(true);
+
+			rmSync(eventPath, { recursive: true, force: true });
+			const retried = await captureEvidenceCommand(root, args);
+			expect(retried.code).toBe(0);
+			expect(isSessionClosed(root, session)).toBe(true);
+			const admission = JSON.parse(
+				readFileSync(evidenceTransitionAdmissionPath(root), "utf8"),
+			) as { admissions: Array<Record<string, unknown>> };
+			expect(admission.admissions).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit refuses more than one eligible debt", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-multi";
+		try {
+			writeOpenSession(root, session);
+			const taskPath = join(
+				root,
+				".afol",
+				"wb",
+				session,
+				`${session}_task_01.md`,
+			);
+			writeFileSync(
+				taskPath,
+				readFileSync(taskPath, "utf8").replace(
+					"| T-01 | done | worker | open session task |",
+					"| T-01 | done | worker | open session task |\n| T-02 | done | worker | second task |",
+				),
+				"utf8",
+			);
+			const failed = (taskId: string) =>
+				JSON.stringify({
+					task_id: taskId,
+					command: "true",
+					result: "failed",
+					exit_code: 1,
+					id: `E-transition-${taskId}`,
+					created_at: "2026-08-18T16:20:00.000Z",
+					provenance: "observed",
+				});
+			writeFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				`${failed("T-01")}\n${failed("T-02")}\n`,
+				"utf8",
+			);
+			rebuildIndexes(root);
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"reject multiple debt",
+				"--confirm",
+			]);
+			expect(result.code).toBe(2);
+			expect(result.stderr.join("\n")).toContain("exactly one eligible");
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit refuses mixed no-op and real failed evidence", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-mixed-ledger";
+		try {
+			writeOpenSession(root, session);
+			const failed = (id: string, command: string) =>
+				JSON.stringify({
+					task_id: "T-01",
+					command,
+					result: "failed",
+					exit_code: 1,
+					id,
+					created_at: "2026-08-18T16:20:00.000Z",
+					provenance: "observed",
+				});
+			writeFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				`${failed("E-transition-noop", "true")}\n${failed("E-transition-real", "bun test cli/tests/evidence-admit.test.ts")}\n`,
+				"utf8",
+			);
+			rebuildIndexes(root);
+
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"reject mixed ledger",
+				"--confirm",
+			]);
+			expect(result.code).toBe(2);
+			expect(result.stderr.join("\n")).toContain("not debt caused");
+			expect(isSessionClosed(root, session)).toBe(false);
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

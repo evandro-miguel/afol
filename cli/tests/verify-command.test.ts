@@ -148,6 +148,24 @@ describe("verify-tasks command", () => {
 		}
 	});
 
+	test("resolves a bare session id for positional strict verification", () => {
+		const root = mkProjectRoot("bare-session");
+		try {
+			const created = newWorkstream(root, "verify-bare-session");
+			const proc = runKernel(root, ["vf", created.session, "--strict"]);
+
+			expect(proc.status).toBe(1);
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain(
+				`Session: .afol/wb/${created.session}`,
+			);
+			expect(proc.stdout as string).toContain("Open Tasks:");
+			expect(proc.stdout as string).not.toContain("missing_session");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("passes strict verification when done tasks have passed evidence", () => {
 		const root = mkProjectRoot("strict");
 		try {

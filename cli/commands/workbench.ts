@@ -11,6 +11,7 @@ import {
 	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
 import { beginHotPathMeasurement } from "../services/hot-path/instrumentation";
+import { withSessionLock } from "../services/io/session-lock";
 import {
 	TRANSITION_ADMISSION_POLICY,
 	transitionAdmitEvidence,
@@ -25,6 +26,7 @@ import {
 	appendTimelineEntry,
 	assertClosedTaskReverificationEligible,
 	assertObservedBatchTasksReady,
+	closeSession,
 	completeObservedTask,
 	completeObservedTasks,
 	completeVerificationRun,
@@ -542,14 +544,35 @@ export async function runEvidenceTransitionAdmitCommand(
 				"transition-admit --confirm requires a trusted interactive local context.",
 			);
 		}
-		const result = transitionAdmitEvidence(root, {
-			sessionId: session,
-			taskId,
-			policy,
-			issue,
-			approval,
-			confirm,
-		});
+		const execute = () => {
+			const admission = transitionAdmitEvidence(
+				root,
+				{
+					sessionId: session,
+					taskId,
+					policy,
+					issue,
+					approval,
+					confirm,
+				},
+				{ allowOpen: true },
+			);
+			if (!confirm) return admission;
+			const close = closeSession(root, session, {
+				admitTransitionAdmission: true,
+			});
+			return {
+				...admission,
+				close: {
+					status: "closed" as const,
+					warnings: [...close],
+					report: close.report,
+				},
+			};
+		};
+		const result = confirm
+			? withSessionLock(root, session, execute)
+			: execute();
 		if (hasJsonFlag(args))
 			console.log(
 				stringifyEnvelope(
@@ -932,6 +955,16 @@ type DoneLockedFailure = {
 
 type DoneLockedResult = DoneLockedSuccess | DoneLockedFailure;
 
+class DoneLockLostError extends Error {
+	readonly result: DoneLockedFailure;
+
+	constructor(result: DoneLockedFailure) {
+		super(result.message);
+		this.name = "DoneLockLostError";
+		this.result = result;
+	}
+}
+
 type DoneOutput = {
 	stdout: (value: string) => void;
 	stderr: (value: string) => void;
@@ -1069,7 +1102,7 @@ async function executeDoneLocked(
 			try {
 				lease.assertOwned();
 			} catch {
-				return {
+				throw new DoneLockLostError({
 					ok: false,
 					message: `verification lock ownership was lost at step ${index + 1}/${prepared.run.step_count}`,
 					status: "lock_lost",
@@ -1078,7 +1111,7 @@ async function executeDoneLocked(
 					stepIndex: index + 1,
 					stepCount: prepared.run.step_count,
 					evidenceIds,
-				};
+				});
 			}
 			let evidence: ReturnType<typeof recordVerificationRunStep>;
 			try {
@@ -1450,12 +1483,18 @@ export async function runDoneCommand(
 		if (doneArgs.taskIds.length > 1) {
 			return await runDoneBatch(root, doneArgs, ctx, output);
 		}
-		const result = await withTaskCompletionLock(
-			root,
-			doneArgs.session,
-			doneArgs.taskId,
-			(lease) => executeDoneLocked(root, doneArgs, ctx, lease),
-		);
+		let result: DoneLockedResult;
+		try {
+			result = await withTaskCompletionLock(
+				root,
+				doneArgs.session,
+				doneArgs.taskId,
+				(lease) => executeDoneLocked(root, doneArgs, ctx, lease),
+			);
+		} catch (error) {
+			if (!(error instanceof DoneLockLostError)) throw error;
+			result = error.result;
+		}
 		if (!result.ok) {
 			if (doneArgs.json) {
 				const data = {

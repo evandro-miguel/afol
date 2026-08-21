@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import * as nodeFs from "node:fs";
 import {
 	chmodSync,
 	existsSync,
@@ -357,7 +358,7 @@ describe("release and toolchain contracts", () => {
 		expect(pkg.devDependencies?.typescript).toBe("7.0.2");
 		expect(scripts.typecheck).toBe("tsc --noEmit -p tsconfig.json");
 		expect(scripts["typecheck:ts7:informative"]).toBeUndefined();
-		expect(scripts["lint:biome"]).toBe("biome check cli");
+		expect(scripts["lint:biome"]).toContain("biome check cli");
 		expect(scripts["lint:knip"]).toBe(
 			"knip --dependencies --use-tsconfig-files --max-issues 0",
 		);
@@ -411,6 +412,17 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).toContain(
 			"bun run release:provenance:release",
 		);
+		expect(scripts["release:windows"]).toBe(
+			"bun run test:full && bun run build && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
+		);
+		const windowsReleaseSteps = splitScriptSteps(scripts["release:windows"]);
+		expect(windowsReleaseSteps).toHaveLength(6);
+		expect(windowsReleaseSteps[0]).toBe("bun run test:full");
+		expect(windowsReleaseSteps[1]).toBe("bun run build");
+		expect(windowsReleaseSteps[2]).toBe("bun run validate:security:release");
+		expect(windowsReleaseSteps[3]).toBe("bun run release:provenance:release");
+		expect(windowsReleaseSteps[4]).toBe("bun run smoke:dist");
+		expect(windowsReleaseSteps[5]).toBe("bun run smoke:clean");
 		const releaseSteps = splitScriptSteps(scripts["validate:release"]);
 		const compactCliBenchmarks =
 			"bun run kernel -- v bench --pack token-economy --pack cli-kernel-local --json";
@@ -467,6 +479,108 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:project-benchmarks"]).toContain(
 			"bun run validate:mutation-performance && bun run coverage:project-benchmarks",
 		);
+	});
+
+	test("release build receipt write cleans temporary outputs on write failure", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-receipt-write-failure-"));
+		const artifactPath = join(root, RELEASE_ARTIFACT);
+		const artifactDir = join(root, "dist");
+		mkdirSync(artifactDir, { recursive: true });
+		writeFileSync(artifactPath, "artifact", "utf8");
+		const artifactParts = RELEASE_ARTIFACT.split(/[\\/]/);
+		const receiptFileName = `${artifactParts[artifactParts.length - 1]}.build.json`;
+
+		const originalWriteFileSync = nodeFs.writeFileSync;
+		let writeAttempts = 0;
+		const writeSpy = spyOn(nodeFs, "writeFileSync").mockImplementation(
+			(...args: Parameters<typeof nodeFs.writeFileSync>) => {
+				const path = args[0];
+				if (
+					typeof path === "string" &&
+					path
+						.replaceAll("\\", "/")
+						.includes(`${RELEASE_ARTIFACT_NAME}.build.json`) &&
+					++writeAttempts === 1
+				) {
+					throw new Error("simulated write failure");
+				}
+				return originalWriteFileSync(...args);
+			},
+		);
+		try {
+			expect(() =>
+				writeCompiledReleaseBuildReceipt(
+					artifactPath,
+					compiledReleaseBuildArgs("cli/main.ts", RELEASE_ARTIFACT),
+					root,
+				),
+			).toThrow("simulated write failure");
+			expect(
+				readdirSync(artifactDir).filter((entry) =>
+					entry.startsWith(receiptFileName),
+				),
+			).toHaveLength(0);
+		} finally {
+			writeSpy.mockRestore();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release build receipt writes can be retried after a transient write failure", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-receipt-reacquire-"));
+		const artifactPath = join(root, RELEASE_ARTIFACT);
+		const artifactDir = join(root, "dist");
+		mkdirSync(artifactDir, { recursive: true });
+		writeFileSync(artifactPath, "artifact", "utf8");
+		const artifactParts = RELEASE_ARTIFACT.split(/[\\/]/);
+		const receiptFileName = `${artifactParts[artifactParts.length - 1]}.build.json`;
+
+		const originalWriteFileSync = nodeFs.writeFileSync;
+		let writeAttempts = 0;
+		const writeSpy = spyOn(nodeFs, "writeFileSync").mockImplementation(
+			(...args: Parameters<typeof nodeFs.writeFileSync>) => {
+				const path = args[0];
+				if (
+					typeof path === "string" &&
+					path
+						.replaceAll("\\", "/")
+						.includes(`${RELEASE_ARTIFACT_NAME}.build.json`) &&
+					++writeAttempts === 1
+				) {
+					throw new Error("simulated write failure");
+				}
+				return originalWriteFileSync(...args);
+			},
+		);
+		try {
+			expect(() =>
+				writeCompiledReleaseBuildReceipt(
+					artifactPath,
+					compiledReleaseBuildArgs("cli/main.ts", RELEASE_ARTIFACT),
+					root,
+				),
+			).toThrow("simulated write failure");
+			expect(() =>
+				writeCompiledReleaseBuildReceipt(
+					artifactPath,
+					compiledReleaseBuildArgs("cli/main.ts", RELEASE_ARTIFACT),
+					root,
+				),
+			).not.toThrow();
+			const receiptPath = join(artifactDir, receiptFileName);
+			const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+			expect(receipt.artifact_sha256).toBe(
+				createHash("sha256").update("artifact").digest("hex"),
+			);
+			expect(
+				readdirSync(artifactDir).filter((entry) =>
+					entry.startsWith(receiptFileName),
+				),
+			).toHaveLength(1);
+		} finally {
+			writeSpy.mockRestore();
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test("coverage scripts track every project-benchmark source file", () => {
@@ -576,6 +690,86 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain("  push:\n    branches: [main]\n");
 		expect(workflow).toContain("permissions:\n  contents: read\n");
 		expect(workflow).toContain("with:\n          fetch-depth: 0\n");
+	});
+
+	test("Windows CI uses the canonical release sequence script", () => {
+		const workflow = readFileSync(
+			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			"utf8",
+		).replace(/\r\n/g, "\n");
+		const parsedWorkflow = Bun.YAML.parse(workflow) as {
+			jobs?: {
+				windows?: {
+					env?: Record<string, unknown>;
+					steps?: Array<{
+						name?: string;
+						run?: string;
+						shell?: string;
+					}>;
+				};
+			};
+		};
+		const windowsSteps = parsedWorkflow.jobs?.windows?.steps ?? [];
+		const windowsScannerStep = windowsSteps.find(
+			(step) => step.name === "Install pinned security scanners",
+		);
+		const windowsReleaseStep = windowsSteps.find(
+			(step) => step.name === "Run native Windows release sequence",
+		);
+		expect(parsedWorkflow.jobs?.windows?.env).toEqual({
+			OSV_SCANNER_VERSION: "2.3.8",
+			GITLEAKS_VERSION: "8.24.2",
+		});
+		expect(windowsScannerStep?.shell).toBe("pwsh");
+		expect(windowsScannerStep?.run).toContain(
+			'$toolDir = Join-Path $env:RUNNER_TEMP "security-tools"',
+		);
+		expect(windowsScannerStep?.run).toContain(
+			'go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@v$env:OSV_SCANNER_VERSION"',
+		);
+		expect(windowsScannerStep?.run).toContain(
+			'go install "github.com/zricethezav/gitleaks/v8@v$env:GITLEAKS_VERSION"',
+		);
+		expect(windowsScannerStep?.run).toContain(
+			'$osvPath = Join-Path $toolDir "osv-scanner.exe"',
+		);
+		expect(windowsScannerStep?.run).toContain(
+			'$gitleaksPath = Join-Path $toolDir "gitleaks.exe"',
+		);
+		expect(windowsScannerStep?.run).toContain(
+			'"AFOL_OSV_SCANNER_PATH=$osvPath" | Out-File -FilePath $env:GITHUB_ENV',
+		);
+		expect(windowsScannerStep?.run).toContain(
+			'"AFOL_GITLEAKS_PATH=$gitleaksPath" | Out-File -FilePath $env:GITHUB_ENV',
+		);
+		expect(windowsScannerStep?.run).not.toContain("GITHUB_PATH");
+		expect(windowsReleaseStep).toBeDefined();
+		expect(windowsReleaseStep?.run).toBe("bun run release:windows");
+		expect(
+			windowsSteps.findIndex((step) => step.name === "Set up Go"),
+		).toBeLessThan(
+			windowsSteps.findIndex(
+				(step) => step.name === "Install pinned security scanners",
+			),
+		);
+		expect(
+			windowsSteps.findIndex(
+				(step) => step.name === "Install pinned security scanners",
+			),
+		).toBeLessThan(
+			windowsSteps.findIndex(
+				(step) => step.name === "Run native Windows release sequence",
+			),
+		);
+
+		const pkg = JSON.parse(
+			readFileSync(join(repoRoot, "package.json"), "utf8"),
+		) as {
+			scripts?: Record<string, string>;
+		};
+		expect(pkg.scripts?.["release:windows"]).toBe(
+			"bun run test:full && bun run build && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
+		);
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {

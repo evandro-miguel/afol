@@ -1,21 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as nodeFs from "node:fs";
 import {
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	renameSync,
 	rmSync,
-	symlinkSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { symlinkTestSupport } from "./symlink-test-support";
-
-const symlinkTest = test.skipIf(!symlinkTestSupport.available);
-
 import {
 	resolveTaskCompletionLockPath,
 	TaskCompletionBusyError,
@@ -25,316 +22,265 @@ import {
 function root(name: string): string {
 	return mkdtempSync(join(tmpdir(), `completion-lock-${name}-`));
 }
-
+function metadata(pid = process.pid): string {
+	const now = new Date().toISOString();
+	return `${JSON.stringify({ pid, host: hostname().toLowerCase(), owner_token: "owner", ownership_probe: "probe", generation: 1, acquired_at: now, heartbeat_at: now })}\n`;
+}
+function legacyMetadata(pid = process.pid): string {
+	const now = new Date().toISOString();
+	return `${JSON.stringify({ pid, host: hostname().toLowerCase(), owner_token: "owner", generation: 1, acquired_at: now, heartbeat_at: now })}\n`;
+}
 function deferred(): { promise: Promise<void>; resolve: () => void } {
 	let resolve = (): void => {};
-	const promise = new Promise<void>((done) => {
-		resolve = done;
-	});
-	return { promise, resolve };
+	return {
+		promise: new Promise((done) => {
+			resolve = done;
+		}),
+		resolve,
+	};
 }
 
-describe("task completion lock", () => {
-	test("serializes a canonical project/session/task and rejects live-owner takeover", async () => {
-		const projectRoot = root("serialize");
-		const entered = deferred();
-		const release = deferred();
+describe("task completion lock v2", () => {
+	test("publishes a regular immutable file lease and removes it after release", async () => {
+		const projectRoot = root("file");
+		const lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01");
+		try {
+			await withTaskCompletionLock(projectRoot, "s", "T-01", async () => {
+				expect(lstatSync(lockPath).isFile()).toBe(true);
+				expect(JSON.parse(readFileSync(lockPath, "utf8")).generation).toBe(1);
+			});
+			expect(existsSync(lockPath)).toBe(false);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("serializes a live successor race through link no-replace", async () => {
+		const projectRoot = root("race"),
+			entered = deferred(),
+			release = deferred();
+		let active = 0,
+			maximum = 0;
 		try {
 			const first = withTaskCompletionLock(
 				projectRoot,
-				"session-a",
+				"s",
 				"T-01",
 				async () => {
+					active++;
+					maximum = Math.max(maximum, active);
 					entered.resolve();
 					await release.promise;
+					active--;
 				},
-				{ heartbeatMs: 10 },
 			);
 			await entered.promise;
-			const blocked = withTaskCompletionLock(
+			const second = withTaskCompletionLock(
 				projectRoot,
-				"session-a",
-				"T-01",
-				async () => {},
-				{ timeoutMs: 40, heartbeatMs: 10 },
-			);
-			await expect(blocked).rejects.toBeInstanceOf(TaskCompletionBusyError);
-			await expect(blocked).rejects.toMatchObject({
-				code: "task_completion_busy",
-			});
-			release.resolve();
-			await first;
-			expect(
-				existsSync(
-					resolveTaskCompletionLockPath(projectRoot, "session-a", "T-01"),
-				),
-			).toBe(false);
-		} finally {
-			release.resolve();
-			rmSync(projectRoot, { recursive: true, force: true });
-		}
-	});
-
-	test("done rejects a same-task nested completion attempt with a typed busy error", async () => {
-		const projectRoot = root("nested-same-task");
-		let nestedActionRan = false;
-		try {
-			await withTaskCompletionLock(
-				projectRoot,
-				"session-a",
+				"s",
 				"T-01",
 				async () => {
-					await expect(
-						withTaskCompletionLock(
-							projectRoot,
-							"session-a",
-							"T-01",
-							async () => {
-								nestedActionRan = true;
-							},
-							{ timeoutMs: 40, heartbeatMs: 10 },
-						),
-					).rejects.toMatchObject({
-						code: "task_completion_busy",
-					});
+					active++;
+					maximum = Math.max(maximum, active);
+					active--;
 				},
-				{ heartbeatMs: 10 },
+				{ timeoutMs: 40 },
 			);
-			expect(nestedActionRan).toBe(false);
-			expect(
-				existsSync(
-					resolveTaskCompletionLockPath(projectRoot, "session-a", "T-01"),
-				),
-			).toBe(false);
+			await expect(second).rejects.toBeInstanceOf(TaskCompletionBusyError);
+			release.resolve();
+			await first;
+			expect(maximum).toBe(1);
+		} finally {
+			release.resolve();
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("recovers only a dead legacy file and advances the fence", async () => {
+		const projectRoot = root("legacy-file"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01");
+		let generation = 0;
+		try {
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(`${lockPath}.fence`, "4\n");
+			writeFileSync(lockPath, metadata(2_147_483_647));
+			await withTaskCompletionLock(projectRoot, "s", "T-01", async (lease) => {
+				generation = lease.generation;
+			});
+			expect(generation).toBe(5);
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
-
-	test("recovers only a provably dead local owner and advances fencing", async () => {
-		const projectRoot = root("dead-owner");
+	test("recovers a dead v1 legacy file without an ownership probe", async () => {
+		const projectRoot = root("legacy-v1-file"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01");
+		let generation = 0;
 		try {
-			const lockPath = resolveTaskCompletionLockPath(
-				projectRoot,
-				"session-a",
-				"T-01",
-			);
 			mkdirSync(dirname(lockPath), { recursive: true });
-			writeFileSync(`${lockPath}.fence`, "4\n", "utf8");
-			writeFileSync(
-				lockPath,
-				`${JSON.stringify({
-					pid: 2_147_483_647,
-					host: hostname().toLowerCase(),
-					owner_token: "dead-owner",
-					generation: 4,
-					acquired_at: "2026-01-01T00:00:00.000Z",
-					heartbeat_at: "2026-01-01T00:00:00.000Z",
-				})}\n`,
-				"utf8",
-			);
-
-			let generation = 0;
+			writeFileSync(`${lockPath}.fence`, "4\n");
+			writeFileSync(lockPath, legacyMetadata(2_147_483_647));
 			await withTaskCompletionLock(
 				projectRoot,
-				"session-a",
+				"s",
 				"T-01",
 				async (lease) => {
 					generation = lease.generation;
 				},
+				{ timeoutMs: 40 },
 			);
 			expect(generation).toBe(5);
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
-
-	test("fails closed when fencing ownership changes", async () => {
-		const projectRoot = root("fencing");
+	test("recovers only a dead legacy directory", async () => {
+		const projectRoot = root("legacy-directory"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01");
 		try {
+			mkdirSync(lockPath, { recursive: true });
+			writeFileSync(join(lockPath, "owner.json"), metadata(2_147_483_647));
 			await expect(
-				withTaskCompletionLock(
-					projectRoot,
-					"session-a",
-					"T-01",
-					async (lease) => {
-						const lockPath = resolveTaskCompletionLockPath(
-							projectRoot,
-							"session-a",
-							"T-01",
-						);
-						writeFileSync(
-							`${lockPath}.fence`,
-							`${lease.generation + 1}\n`,
-							"utf8",
-						);
-						lease.assertOwned();
-					},
-				),
-			).rejects.toThrow("ownership was lost");
-			const fencePath = `${resolveTaskCompletionLockPath(
-				projectRoot,
-				"session-a",
-				"T-01",
-			)}.fence`;
-			expect(readFileSync(fencePath, "utf8").trim()).toBe("2");
+				withTaskCompletionLock(projectRoot, "s", "T-01", async () => {}),
+			).resolves.toBeUndefined();
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
-
-	test("removes the acquired lock when fence initialization fails", async () => {
-		const projectRoot = root("fence-init");
+	test("does not reclaim an active prepared candidate", async () => {
+		const projectRoot = root("active-prepared"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01"),
+			prepared = `${lockPath}.prepared-active`;
 		try {
-			const lockPath = resolveTaskCompletionLockPath(
-				projectRoot,
-				"session-a",
-				"T-01",
-			);
-			mkdirSync(`${lockPath}.fence`, { recursive: true });
-
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(prepared, metadata());
 			await expect(
-				withTaskCompletionLock(
-					projectRoot,
-					"session-a",
-					"T-01",
-					async () => {},
-				),
-			).rejects.toThrow();
-			expect(existsSync(lockPath)).toBe(false);
-			expect(existsSync(`${lockPath}.fence`)).toBe(true);
+				withTaskCompletionLock(projectRoot, "s", "T-01", async () => {}, {
+					timeoutMs: 40,
+				}),
+			).resolves.toBeUndefined();
+			expect(existsSync(prepared)).toBe(true);
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
-
-	symlinkTest(
-		"rejects a fence symlink without modifying its target",
-		async () => {
-			const projectRoot = root("fence-symlink");
-			try {
-				const lockPath = resolveTaskCompletionLockPath(
-					projectRoot,
-					"session-a",
-					"T-01",
-				);
-				const targetPath = join(projectRoot, "preserve.txt");
-				mkdirSync(dirname(lockPath), { recursive: true });
-				writeFileSync(targetPath, "preserve\n", "utf8");
-				symlinkSync(targetPath, `${lockPath}.fence`, "file");
-
-				await expect(
-					withTaskCompletionLock(
-						projectRoot,
-						"session-a",
-						"T-01",
-						async () => {},
-					),
-				).rejects.toThrow();
-				expect(readFileSync(targetPath, "utf8")).toBe("preserve\n");
-				expect(existsSync(lockPath)).toBe(false);
-			} finally {
-				rmSync(projectRoot, { recursive: true, force: true });
-			}
-		},
-	);
-
-	for (const [name, content] of [
-		["empty", ""],
-		["partial", "4"],
-		["malformed", "four\n"],
-	] as const) {
-		test(`rejects ${name} persisted fence generation data`, async () => {
-			const projectRoot = root(`fence-${name}`);
-			try {
-				const lockPath = resolveTaskCompletionLockPath(
-					projectRoot,
-					"session-a",
-					"T-01",
-				);
-				mkdirSync(dirname(lockPath), { recursive: true });
-				writeFileSync(`${lockPath}.fence`, content, "utf8");
-
-				await expect(
-					withTaskCompletionLock(
-						projectRoot,
-						"session-a",
-						"T-01",
-						async () => {},
-					),
-				).rejects.toThrow("invalid generation data");
-				expect(existsSync(lockPath)).toBe(false);
-				expect(readFileSync(`${lockPath}.fence`, "utf8")).toBe(content);
-			} finally {
-				rmSync(projectRoot, { recursive: true, force: true });
-			}
-		});
-	}
-
-	test("assertOwned rejects an atomic same-metadata replacement", async () => {
-		const projectRoot = root("atomic-replacement");
-		let lockPath = "";
+	test("removes a dead prepared orphan before acquiring", async () => {
+		const projectRoot = root("stale-prepared"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01"),
+			prepared = `${lockPath}.prepared-stale`;
+		try {
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(prepared, metadata(2_147_483_647));
+			await withTaskCompletionLock(projectRoot, "s", "T-01", async () => {});
+			expect(existsSync(prepared)).toBe(false);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("does not reclaim forged prepared artifacts", async () => {
+		const projectRoot = root("forged"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01"),
+			prepared = `${lockPath}.prepared-forged`;
+		try {
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(prepared, "forged\n");
+			await withTaskCompletionLock(projectRoot, "s", "T-01", async () => {});
+			expect(existsSync(prepared)).toBe(true);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("releases via rename without deleting a successor", async () => {
+		const projectRoot = root("successor"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01");
 		try {
 			await expect(
-				withTaskCompletionLock(
-					projectRoot,
-					"session-a",
-					"T-01",
-					async (lease) => {
-						lockPath = resolveTaskCompletionLockPath(
-							projectRoot,
-							"session-a",
-							"T-01",
-						);
-						const replacementPath = `${lockPath}.replacement`;
-						writeFileSync(
-							replacementPath,
-							readFileSync(lockPath, "utf8"),
-							"utf8",
-						);
-						if (process.platform === "win32") unlinkSync(lockPath);
-						renameSync(replacementPath, lockPath);
-						lease.assertOwned();
-					},
-					{ heartbeatMs: 60_000 },
-				),
+				withTaskCompletionLock(projectRoot, "s", "T-01", async () => {
+					renameSync(lockPath, `${lockPath}.tombstone-crash`);
+					writeFileSync(lockPath, metadata());
+				}),
 			).rejects.toThrow("ownership was lost");
 			expect(existsSync(lockPath)).toBe(true);
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
-
-	test("assertOwned rejects an atomic same-generation fence replacement", async () => {
-		const projectRoot = root("atomic-fence-replacement");
-		let fencePath = "";
+	test("reacquires after a crash immediately after canonical-to-tombstone rename", async () => {
+		const projectRoot = root("crash-after-rename"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01"),
+			originalRename = nodeFs.renameSync;
+		let injected = false;
+		const rename = spyOn(nodeFs, "renameSync").mockImplementation(((
+			from: Parameters<typeof nodeFs.renameSync>[0],
+			to: Parameters<typeof nodeFs.renameSync>[1],
+		) => {
+			const result = originalRename(from, to);
+			if (String(from) === lockPath && !injected) {
+				injected = true;
+				throw new Error("crash-after-rename");
+			}
+			return result;
+		}) as typeof nodeFs.renameSync);
+		try {
+			await withTaskCompletionLock(projectRoot, "s", "T-01", async () => {});
+			expect(injected).toBe(true);
+			await expect(
+				withTaskCompletionLock(projectRoot, "s", "T-01", async () => {}),
+			).resolves.toBeUndefined();
+		} finally {
+			rename.mockRestore();
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("leaves a forged tombstone artifact as an observable orphan", async () => {
+		const projectRoot = root("forged-tombstone"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01"),
+			forged = `${lockPath}.tombstone-forged`;
+		try {
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(forged, "forged\n");
+			await withTaskCompletionLock(projectRoot, "s", "T-01", async () => {});
+			expect(existsSync(forged)).toBe(true);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("fails a successful action after heartbeat ownership loss aborts it", async () => {
+		const projectRoot = root("abort-after-loss"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01");
 		try {
 			await expect(
 				withTaskCompletionLock(
 					projectRoot,
-					"session-a",
+					"s",
 					"T-01",
-					async (lease) => {
-						const lockPath = resolveTaskCompletionLockPath(
-							projectRoot,
-							"session-a",
-							"T-01",
-						);
-						fencePath = `${lockPath}.fence`;
-						const replacementPath = `${fencePath}.replacement`;
-						writeFileSync(
-							replacementPath,
-							readFileSync(fencePath, "utf8"),
-							"utf8",
-						);
-						if (process.platform === "win32") unlinkSync(fencePath);
-						renameSync(replacementPath, fencePath);
-						lease.assertOwned();
+					async () => {
+						unlinkSync(lockPath);
+						await new Promise((resolve) => setTimeout(resolve, 30));
 					},
-					{ heartbeatMs: 60_000 },
+					{ heartbeatMs: 1 },
 				),
 			).rejects.toThrow("ownership was lost");
-			expect(existsSync(fencePath)).toBe(true);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+	test("preserves an action-thrown lock-lost error after heartbeat loss", async () => {
+		const projectRoot = root("action-error-after-loss"),
+			lockPath = resolveTaskCompletionLockPath(projectRoot, "s", "T-01"),
+			actionError = new Error("action lock_lost");
+		try {
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"s",
+					"T-01",
+					async () => {
+						unlinkSync(lockPath);
+						await new Promise((resolve) => setTimeout(resolve, 30));
+						throw actionError;
+					},
+					{ heartbeatMs: 1 },
+				),
+			).rejects.toBe(actionError);
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}

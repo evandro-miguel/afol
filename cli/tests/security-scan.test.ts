@@ -127,6 +127,8 @@ function runSecurityScan(
 			encoding: "utf8",
 			env: {
 				...process.env,
+				AFOL_OSV_SCANNER_PATH: undefined,
+				AFOL_GITLEAKS_PATH: undefined,
 				...envOverrides,
 				PATH: pathDir ?? mkdtempSync(join(tmpdir(), "security-scan-path-")),
 			},
