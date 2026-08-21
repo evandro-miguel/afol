@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
 
@@ -297,16 +297,4 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 
 	assertProjectPathsSafe(projectRoot, paths);
 	return { ...paths, abs: absolute(projectRoot, paths) };
-}
-
-export function readJsonObjectIfExists(
-	path: string,
-): Record<string, unknown> | null {
-	if (!existsSync(path)) {
-		return null;
-	}
-	const parsed = JSON.parse(readFileSync(path, "utf8"));
-	return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-		? (parsed as Record<string, unknown>)
-		: null;
 }
