@@ -57,6 +57,7 @@ type BulkWaiveError = {
 
 type ActivateFeatureArgs = {
 	featureId: string;
+	parentSpec: string;
 	json: boolean;
 };
 
@@ -211,6 +212,7 @@ function parseBulkWaiveArgs(args: string[]): BulkWaiveArgs {
 
 function parseActivateFeatureArgs(args: string[]): ActivateFeatureArgs {
 	let featureId = "";
+	let parentSpec = "";
 	let json = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -225,11 +227,17 @@ function parseActivateFeatureArgs(args: string[]): ActivateFeatureArgs {
 			index += 1;
 			continue;
 		}
+		if (arg === "--parent-spec") {
+			if (!value) throw new Error("Missing value for --parent-spec.");
+			parentSpec = value;
+			index += 1;
+			continue;
+		}
 		throw new Error(`Unknown governance activate-feature argument: ${arg}`);
 	}
 	if (!featureId.trim())
 		throw new Error("governance activate-feature requires --feature-id.");
-	return { featureId: featureId.trim(), json };
+	return { featureId: featureId.trim(), parentSpec: parentSpec.trim(), json };
 }
 
 function resolveDefaultSession(root: string): string {
@@ -317,7 +325,11 @@ function runActivateFeatureCommand(
 	io: GovernanceIo,
 ): number {
 	const parsed = parseActivateFeatureArgs(args);
-	const result = activateRoadmapFeature(root, parsed.featureId);
+	const result = activateRoadmapFeature(
+		root,
+		parsed.featureId,
+		parsed.parentSpec || undefined,
+	);
 	if (parsed.json) {
 		io.stdout(
 			stringifyEnvelope(
@@ -331,6 +343,13 @@ function runActivateFeatureCommand(
 			? `roadmap feature activated: ${result.featureId}`
 			: `roadmap feature already active: ${result.featureId}`,
 	);
+	if (result.parentSpec) {
+		io.stdout(
+			result.parentStatus === "activated"
+				? `parent spec activated: ${result.parentSpec}`
+				: `parent spec already active: ${result.parentSpec}`,
+		);
+	}
 	return 0;
 }
 

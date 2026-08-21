@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-08-02T00:00:00+00:00"
+updated_at: "2026-08-21T14:00:20+00:00"
 ---
 
 # SPECS INDEX
@@ -16,10 +16,10 @@ updated_at: "2026-08-02T00:00:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 86 |
+| Total | 90 |
 | Draft | 0 |
-| Active | 7 |
-| Final | 61 |
+| Active | 9 |
+| Final | 63 |
 | Superseded | 18 |
 
 ## Index
@@ -106,7 +106,10 @@ updated_at: "2026-08-02T00:00:00+00:00"
 | 260726_governance-contract-reconciliation_spec-child_01 | governance-contract-reconciliation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260727_release-benchmark-timing-and-baseline-contract_spec-child_01 | release-benchmark-timing-and-baseline-contract | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260806_release-promotion-remediation_spec-child_01 | release-promotion-remediation | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260812_2006_fleet-safe-downstream-updates_spec_01 | fleet-safe-downstream-updates | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260816_core-integrity-remediation_spec-child_01 | core-integrity-remediation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
 | 260816_simplicity-preserving-integrity-remediation_spec-child_01 | simplicity-preserving-integrity-remediation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md |
+| 260821_flat-roadmap-windows-activation_spec-child_01 | flat-roadmap-windows-activation | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md, spec_test: .afol/adm/specs/F-29/spec-tests/260821_flat-roadmap-windows-activation_spec-test_01.md |
 | 260728_2359_session-resolution-reliability_spec-child_01 | session-resolution-reliability | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md, related: .afol/adm/specs/260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01.md |
 | 260716_1234_agent-cli-sequential-verification-runs_spec-child_01 | agent-cli-sequential-verification-runs | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
 | 260717_agent-submission-and-batch-review_spec_01 | external-receipts-and-harness-profiles | final | F-31 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-007-agent-submission-review-boundary.md, related: F-30 Evolution remains separate under ADR-008 |

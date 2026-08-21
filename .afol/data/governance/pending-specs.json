@@ -67,6 +67,25 @@
       "parent_spec_sha256": "3dd78382bcebd119551ffa68a0e8047811bc32abed320d0d786eb17b1f7d668e",
       "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
       "roadmap_sha256": "c6ab558334d31eb8e83ad8ee37d1e699acb4b94c8b4ba188a38cc8712d570f96"
+    },
+    {
+      "session_id": "260821_0853_windows-roadmap-governance",
+      "created_at": "2026-08-21T13:53:46.740Z",
+      "updated_at": "2026-08-21T14:07:24.224Z",
+      "status": "resolved",
+      "theme": "windows-roadmap-governance",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "linked to roadmap feature and parent spec",
+      "feature_id": "F-29",
+      "parent_spec": "260715_afol-1-0-linux-wsl-finalization_spec_01",
+      "resolved_at": "2026-08-21T14:07:24.224Z",
+      "parent_spec_path": ".afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md",
+      "parent_spec_sha256": "ebe949c4c42844631f06f9608ef37e10c5cbe28feed8502e01e6866c2cac243f",
+      "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+      "roadmap_sha256": "d3b3c2c325b20beae36d66a21660445e0c4ebd4965babfbe4831f8182b5e05b1"
     }
   ]
 }

@@ -434,9 +434,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Link roadmap feature/spec (session optional if bound)",
 			},
 			{
-				usage: "gov af -F <F-id>",
+				usage: "gov af -F <F-id> [-P <spec-id>]",
 				sideEffect: "write",
-				description: "Activate a planned roadmap feature (active is a no-op)",
+				description:
+					"Activate a planned roadmap feature and optional planned parent spec",
 			},
 			{
 				usage: 'gov rs -S <id> --no-spec-required -r "<reason>"',

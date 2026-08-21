@@ -8,7 +8,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 
 import { kernelRegistry } from "../registry";
 import { buildManifestCommands } from "../services/manifest/commands";
@@ -46,6 +46,24 @@ const TEMPLATE_MANAGED_HASH_DIRS = [
 	".afol/adm/source/universal-skills",
 ] as const;
 
+const TEXT_FILE_EXTENSIONS = new Set([
+	".css",
+	".csv",
+	".html",
+	".ini",
+	".js",
+	".json",
+	".jsx",
+	".md",
+	".toml",
+	".ts",
+	".tsx",
+	".txt",
+	".xml",
+	".yaml",
+	".yml",
+]);
+
 type ManifestPayload = {
 	commands?: unknown;
 	managed_hashes?: unknown;
@@ -68,8 +86,31 @@ function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
+function canonicalManagedBytes(path: string, content: Buffer): Buffer {
+	if (
+		!TEXT_FILE_EXTENSIONS.has(extname(path).toLowerCase()) ||
+		content.includes(0)
+	) {
+		return content;
+	}
+
+	const text = content.toString("utf8");
+	if (!Buffer.from(text, "utf8").equals(content)) {
+		return content;
+	}
+	return Buffer.from(text.replaceAll("\r\n", "\n"), "utf8");
+}
+
+export function hashManagedFile(path: string): string {
+	return sha256Hex(canonicalManagedBytes(path, readFileSync(path)));
+}
+
+function isTemplateManifestPath(manifestPath: string): boolean {
+	return manifestPath.replaceAll("\\", "/").startsWith("src/project-template/");
+}
+
 function managedHashRoot(repoRoot: string, manifestPath: string): string {
-	return manifestPath.startsWith("src/project-template/")
+	return isTemplateManifestPath(manifestPath)
 		? join(repoRoot, "src/project-template")
 		: repoRoot;
 }
@@ -113,7 +154,7 @@ function collectTemplateManagedHashPaths(root: string): string[] {
 	return [...paths].sort();
 }
 
-function refreshManagedHashes(
+export function refreshManagedHashes(
 	repoRoot: string,
 	manifestPath: string,
 	managedHashes: unknown,
@@ -128,7 +169,7 @@ function refreshManagedHashes(
 
 	const root = managedHashRoot(repoRoot, manifestPath);
 	const refreshed: Record<string, string> = {};
-	const paths = manifestPath.startsWith("src/project-template/")
+	const paths = isTemplateManifestPath(manifestPath)
 		? collectTemplateManagedHashPaths(root)
 		: Object.keys(managedHashes).sort();
 	for (const path of paths) {
@@ -136,7 +177,7 @@ function refreshManagedHashes(
 		if (!existsSync(absolutePath)) {
 			continue;
 		}
-		refreshed[path] = sha256Hex(readFileSync(absolutePath));
+		refreshed[path] = hashManagedFile(absolutePath);
 	}
 	return refreshed;
 }

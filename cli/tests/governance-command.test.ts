@@ -128,6 +128,34 @@ function writeRoadmapFeature(
 	return roadmapPath;
 }
 
+function writeParentSpec(
+	root: string,
+	status: string,
+	roadmapFeature = "F-31",
+	contentOverrides = "",
+	lineEnding = "\n",
+): string {
+	const path = join(root, ".afol", "adm", "specs", "parent-spec.md");
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+	writeFileSync(
+		path,
+		[
+			"---",
+			"doc_type: spec",
+			"id: parent-spec",
+			`status: ${status}`,
+			`roadmap_feature: ${roadmapFeature}`,
+			contentOverrides.trimEnd(),
+			"---",
+			"",
+			"# Parent",
+			"",
+		].join(lineEnding),
+		"utf8",
+	);
+	return path;
+}
+
 describe("governance command", () => {
 	test("returns the pending index through the command envelope", () => {
 		const stdout: string[] = [];
@@ -251,6 +279,111 @@ describe("governance command", () => {
 		).toBe(2);
 		expect(stderr[0]).toContain("final");
 		expect(readFileSync(roadmapPath, "utf8")).toBe(before);
+	});
+
+	test("activate-feature converges the matching planned parent spec and roadmap", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "planned");
+		const specPath = writeParentSpec(root, "planned");
+		const stdout: string[] = [];
+
+		expect(
+			runGovernanceCommand(
+				"activate-feature",
+				["--feature-id", "F-31", "--parent-spec", "parent-spec"],
+				root,
+				{ stdout: (message) => stdout.push(message), stderr: () => undefined },
+			),
+		).toBe(0);
+		expect(readFileSync(roadmapPath, "utf8")).toContain("- Status: active");
+		expect(readFileSync(specPath, "utf8")).toContain('status: "active"');
+		expect(stdout).toEqual([
+			"roadmap feature activated: F-31",
+			"parent spec activated: parent-spec",
+		]);
+	});
+
+	test("activate-feature parses a CRLF parent spec", () => {
+		const root = createFixture();
+		writeRoadmapFeature(root, "F-31", "planned");
+		const specPath = writeParentSpec(root, "planned", "F-31", "", "\r\n");
+
+		expect(
+			runGovernanceCommand(
+				"activate-feature",
+				["--feature-id", "F-31", "--parent-spec", "parent-spec"],
+				root,
+				{ stdout: () => undefined, stderr: () => undefined },
+			),
+		).toBe(0);
+		expect(readFileSync(specPath, "utf8")).toContain('status: "active"');
+	});
+
+	test("activate-feature accepts the compact parent-spec flag", () => {
+		const root = createFixture();
+		writeRoadmapFeature(root, "F-31", "planned");
+		writeParentSpec(root, "planned");
+		const args = normalizeScopedFlags("governance", [
+			"-F",
+			"F-31",
+			"-P",
+			"parent-spec",
+		]);
+		expect(args).toEqual([
+			"--feature-id",
+			"F-31",
+			"--parent-spec",
+			"parent-spec",
+		]);
+		expect(
+			runGovernanceCommand("activate-feature", args, root, {
+				stdout: () => undefined,
+				stderr: () => undefined,
+			}),
+		).toBe(0);
+	});
+
+	test("activate-feature activates a planned parent when the feature is already active", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "active");
+		const specPath = writeParentSpec(root, "planned");
+		const stdout: string[] = [];
+
+		expect(
+			runGovernanceCommand(
+				"activate-feature",
+				["--feature-id", "F-31", "--parent-spec", "parent-spec"],
+				root,
+				{ stdout: (message) => stdout.push(message), stderr: () => undefined },
+			),
+		).toBe(0);
+		expect(readFileSync(roadmapPath, "utf8")).toContain("- Status: active");
+		expect(readFileSync(specPath, "utf8")).toContain('status: "active"');
+		expect(stdout).toEqual([
+			"roadmap feature already active: F-31",
+			"parent spec activated: parent-spec",
+		]);
+	});
+
+	test("activate-feature validates the parent before mutating the roadmap", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "planned");
+		const specPath = writeParentSpec(root, "final");
+		const roadmapBefore = readFileSync(roadmapPath, "utf8");
+		const specBefore = readFileSync(specPath, "utf8");
+		const stderr: string[] = [];
+
+		expect(
+			runGovernanceCommand(
+				"activate-feature",
+				["--feature-id", "F-31", "--parent-spec", "parent-spec"],
+				root,
+				{ stdout: () => undefined, stderr: (message) => stderr.push(message) },
+			),
+		).toBe(2);
+		expect(stderr[0]).toContain("cannot be activated");
+		expect(readFileSync(roadmapPath, "utf8")).toBe(roadmapBefore);
+		expect(readFileSync(specPath, "utf8")).toBe(specBefore);
 	});
 
 	test("activate-feature keeps compact output and denies restricted callers", () => {

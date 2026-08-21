@@ -4,6 +4,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +17,7 @@ import {
 	resolveGovernanceCatalog,
 	resolvePendingSpec,
 } from "../services/governance/pending-specs";
+import { listCanonicalSpecDocuments } from "../services/governance/spec-resolver";
 import {
 	abandonAdr,
 	acceptAdr,
@@ -135,10 +137,15 @@ function writePendingGovernanceFixture(
 	root: string,
 	specStatus = "active",
 	specFeature = "F-22",
+	roadmapLayout: "nested" | "flat" = "nested",
 ) {
-	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	const roadmapPath =
+		roadmapLayout === "flat"
+			? join(root, ".afol", "adm", "roadmap.md")
+			: join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md");
+	mkdirSync(dirname(roadmapPath), { recursive: true });
 	writeFileSync(
-		join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+		roadmapPath,
 		"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-22.md\n",
 		"utf8",
 	);
@@ -210,7 +217,188 @@ function writeLegacySpec(root: string, id: string, status: string): string {
 	return path;
 }
 
+function supportsSymlink(type: "file" | "dir" | "junction"): boolean {
+	const root = mkdtempSync(join(tmpdir(), "spec-gate-symlink-probe-"));
+	const target = join(root, type === "file" ? "target.md" : "target");
+	const link = join(root, "link");
+	try {
+		if (type === "file") writeFileSync(target, "probe\n", "utf8");
+		else mkdirSync(target);
+		symlinkSync(target, link, type);
+		return true;
+	} catch {
+		return false;
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+}
+
+const supportsFileSymlink = supportsSymlink("file");
+const supportsDirectoryLink = supportsSymlink(
+	process.platform === "win32" ? "junction" : "dir",
+);
+
 describe("spec-gate system", () => {
+	test.skipIf(!supportsFileSymlink)(
+		"governance catalog rejects a symlinked flat roadmap outside the project root",
+		() => {
+			const root = createFixture();
+			const outside = mkdtempSync(join(tmpdir(), "spec-gate-roadmap-outside-"));
+			try {
+				const roadmapPath = join(root, ".afol", "adm", "roadmap.md");
+				const outsideRoadmap = join(outside, "roadmap.md");
+				writeFileSync(
+					outsideRoadmap,
+					"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-22.md\n",
+					"utf8",
+				);
+				symlinkSync(outsideRoadmap, roadmapPath, "file");
+				writeFileSync(
+					join(root, ".afol", "adm", "specs", "spec-22.md"),
+					"---\ndoc_type: spec\nid: spec-22\nstatus: active\nroadmap_feature: F-22\n---\n\n# Spec\n",
+					"utf8",
+				);
+
+				expect(() => resolveGovernanceCatalog(root, "F-22", "spec-22")).toThrow(
+					/symlink|reparse|outside|unsafe/i,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test.skipIf(!supportsDirectoryLink)(
+		"governance activation rejects a linked roadmap directory even when it resolves inside the project root",
+		() => {
+			const root = createFixture();
+			try {
+				const targetDirectory = join(root, "roadmap-target");
+				mkdirSync(targetDirectory);
+				writeFileSync(
+					join(targetDirectory, "GENERAL-ROADMAP.md"),
+					"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+					"utf8",
+				);
+				symlinkSync(
+					targetDirectory,
+					join(root, ".afol", "adm", "roadmap"),
+					process.platform === "win32" ? "junction" : "dir",
+				);
+
+				expect(() => activateRoadmapFeature(root, "F-31")).toThrow(
+					/symlink|reparse|unsafe/i,
+				);
+				expect(
+					readFileSync(join(targetDirectory, "GENERAL-ROADMAP.md"), "utf8"),
+				).toContain("- Status: planned");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test("canonical spec resolution parses LF and CRLF without changing content", () => {
+		const root = createFixture();
+		try {
+			const documents = [
+				["lf-spec", "\n"],
+				["crlf-spec", "\r\n"],
+			] as const;
+			for (const [id, lineEnding] of documents) {
+				const content = [
+					"---",
+					"doc_type: spec",
+					`id: ${id}`,
+					"status: active",
+					"roadmap_feature: F-29",
+					"---",
+					"",
+					`# ${id}`,
+				].join(lineEnding);
+				writeFileSync(
+					join(root, ".afol", "adm", "specs", `${id}.md`),
+					content,
+					"utf8",
+				);
+			}
+			const found = listCanonicalSpecDocuments(root);
+			expect(found.map((document) => document.id)).toEqual([
+				"crlf-spec",
+				"lf-spec",
+			]);
+			expect(found.map((document) => document.content)).toEqual([
+				readFileSync(
+					join(root, ".afol", "adm", "specs", "crlf-spec.md"),
+					"utf8",
+				),
+				readFileSync(join(root, ".afol", "adm", "specs", "lf-spec.md"), "utf8"),
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance catalog falls back to the flat roadmap layout", () => {
+		const root = createFixture();
+		try {
+			writePendingGovernanceFixture(root, "active", "F-22", "flat");
+			expect(resolveGovernanceCatalog(root, "F-22", "spec-22")).toMatchObject({
+				roadmapPath: ".afol/adm/roadmap.md",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance catalog prefers the nested roadmap when both layouts exist", () => {
+		const root = createFixture();
+		try {
+			writePendingGovernanceFixture(root);
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap.md"),
+				"# Roadmap\n\n### F-22 Other\n\n- Status: planned\n",
+				"utf8",
+			);
+			expect(resolveGovernanceCatalog(root, "F-22", "spec-22")).toMatchObject({
+				roadmapPath: ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance resolution accepts platform paths and rejects paths outside the root", () => {
+		const root = createFixture();
+		try {
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			mkdirSync(dirname(roadmapPath), { recursive: true });
+			const platformSpecPath = join(".afol", "adm", "specs", "spec-22.md");
+			const outsideSpecPath = join(root, "..", "outside-spec.md");
+			writeFileSync(
+				roadmapPath,
+				`# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: ${outsideSpecPath}\n- Governing spec: ${platformSpecPath}\n`,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "spec-22.md"),
+				"---\ndoc_type: spec\nid: spec-22\nstatus: active\nroadmap_feature: F-22\n---\n\n# Spec\n",
+				"utf8",
+			);
+			expect(resolveGovernanceCatalog(root, "F-22", "spec-22")).toMatchObject({
+				specPath: ".afol/adm/specs/spec-22.md",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("governance catalog requires an active canonical roadmap feature section", () => {
 		for (const roadmap of [
 			"# Roadmap\n\nF-22 appears only in prose.\n",
@@ -361,6 +549,103 @@ describe("spec-gate system", () => {
 				status: "already_active",
 			});
 			expect(readFileSync(roadmapPath, "utf8")).toBe(activeRoadmap);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("activateRoadmapFeature updates the flat roadmap fallback", () => {
+		const root = createFixture();
+		try {
+			const roadmapPath = join(root, ".afol", "adm", "roadmap.md");
+			writeFileSync(
+				roadmapPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+				"utf8",
+			);
+			expect(activateRoadmapFeature(root, "F-31")).toEqual({
+				featureId: "F-31",
+				status: "activated",
+			});
+			expect(readFileSync(roadmapPath, "utf8")).toContain("- Status: active");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("activateRoadmapFeature prefers the nested roadmap when both layouts exist", () => {
+		const root = createFixture();
+		try {
+			const nestedPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const flatPath = join(root, ".afol", "adm", "roadmap.md");
+			mkdirSync(dirname(nestedPath), { recursive: true });
+			writeFileSync(
+				nestedPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+				"utf8",
+			);
+			writeFileSync(
+				flatPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: active\n",
+				"utf8",
+			);
+			expect(activateRoadmapFeature(root, "F-31")).toEqual({
+				featureId: "F-31",
+				status: "activated",
+			});
+			expect(readFileSync(nestedPath, "utf8")).toContain("- Status: active");
+			expect(readFileSync(flatPath, "utf8")).toContain("- Status: active");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("activateRoadmapFeature converges after an interruption between parent and roadmap writes", () => {
+		const root = createFixture();
+		try {
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const parentPath = join(root, ".afol", "adm", "specs", "parent-spec.md");
+			mkdirSync(dirname(roadmapPath), { recursive: true });
+			writeFileSync(
+				roadmapPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+				"utf8",
+			);
+			writeFileSync(
+				parentPath,
+				"---\ndoc_type: spec\nid: parent-spec\nstatus: planned\nroadmap_feature: F-31\n---\n\n# Parent\n",
+				"utf8",
+			);
+			expect(() =>
+				activateRoadmapFeature(root, "F-31", "parent-spec", {
+					failAfterFirstWrite: true,
+				}),
+			).toThrow("Injected governance activation failure");
+			expect(readFileSync(roadmapPath, "utf8")).toContain("- Status: planned");
+			expect(readFileSync(parentPath, "utf8")).toContain('status: "active"');
+
+			expect(activateRoadmapFeature(root, "F-31", "parent-spec")).toMatchObject(
+				{
+					featureId: "F-31",
+					status: "activated",
+					parentSpec: "parent-spec",
+					parentStatus: "already_active",
+				},
+			);
+			expect(readFileSync(roadmapPath, "utf8")).toContain("- Status: active");
+			expect(readFileSync(parentPath, "utf8")).toContain('status: "active"');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
