@@ -5,6 +5,58 @@ Canonical AFOL scaffold factory for terminal-first LLM-assisted development.
 `afol` is the only supported public CLI. The old `.agents` command/runtime
 system has been retired and must not be restored.
 
+## Release Scope
+
+AFOL is currently a prerelease CLI for Linux x64. WSL2 is validated as a
+Linux x64 environment. Windows-native, macOS, Linux ARM, and hosted-service
+support are not claimed.
+
+The supported distribution artifact is the standalone compiled `afol` binary.
+The package remains private because npm is not a release channel.
+
+## Install A Published Release
+
+Download these assets from the selected entry on the
+[GitHub Releases page](https://github.com/evandro-miguel/afol/releases):
+
+- `afol`
+- `afol.sha256`
+- `afol.provenance.json`
+
+Verify the downloaded binary before installing it:
+
+```bash
+expected_sha="$(awk '{print $1}' afol.sha256)"
+actual_sha="$(sha256sum afol | awk '{print $1}')"
+test "$actual_sha" = "$expected_sha" && install -Dm755 afol "$HOME/.local/bin/afol"
+```
+
+Ensure `$HOME/.local/bin` is already on `PATH`, then verify the installed
+command from outside an AFOL source checkout:
+
+```bash
+command -v afol
+test ! -L "$(command -v afol)"
+afol --version
+afol --help >/dev/null
+```
+
+Initialize a project only after reviewing the dry-run:
+
+```bash
+cd /path/to/project
+afol init --dry-run
+afol init
+afol validate project
+```
+
+To uninstall the standalone CLI, remove only the installed binary. Project
+state under `.afol/**` is user data and is not removed automatically.
+
+## License
+
+AFOL is available under the [MIT License](./LICENSE).
+
 ## Current Architecture
 
 - `$HOME/.local/bin/afol`: installed public CLI; it must be a real compiled

@@ -36,6 +36,23 @@ the release-scoped AFOL health check or the observed WSL2 smoke, so this
 runbook keeps those as separate local checks. The manifest check is also part
 of `validate:toolchain` and may be run early to catch registry drift sooner.
 
+## Public Distribution Contract
+
+The initial public channel is a GitHub prerelease containing the standalone
+Linux x64 `afol` binary, `afol.sha256`, and `afol.provenance.json`. The npm
+package remains private and is not a distribution channel. WSL2 is evidence
+for the Linux x64 artifact; it does not establish Windows-native support.
+
+The source is distributed under the MIT License. Public release review must
+confirm that `LICENSE` is present and that package metadata declares `MIT`;
+local tests, security scans, and artifact provenance cannot substitute for
+that license grant.
+
+The GitHub Actions workflow runs for pull requests and pushes targeting the
+`dev` or `main` release lanes and remains manually dispatchable. Hosted runner
+availability is reported separately from product correctness. A missing or
+administratively unavailable hosted run is never described as green.
+
 ## Required Tools on PATH
 
 | Tool | Purpose | Required for Real Release |
