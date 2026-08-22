@@ -23,6 +23,13 @@ import {
 	planCompletionLockGitignoreOperation,
 } from "../services/bootstrap/planner";
 import { resolveExternalPathLockPath } from "../services/io/session-lock";
+import {
+	validateFilesIndex,
+	validateRulesIndex,
+	validateSkillsIndex,
+	validateSpecsIndex,
+} from "../services/local-state/project-indexes";
+import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 import type { TemplateFileMap } from "../services/template/payload";
 
 function sha256Hex(value: string): string {
@@ -1209,6 +1216,85 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(exitCode).toBe(2);
 			expect(existsSync(join(target, ".afol", "config.json"))).toBe(false);
 		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("bootstrap local-state index build", () => {
+	test("fresh apply builds local-state indexes and prints ok", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-local-state-ok-"));
+		const logs: string[] = [];
+		const originalLog = console.log;
+		console.log = (...values: unknown[]) => logs.push(values.join(" "));
+		try {
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+
+			const output = logs.join("\n");
+			expect(output).toContain("local_state_index: ok");
+			for (const name of ["rules", "skills", "specs", "files", "workbench"]) {
+				expect(
+					existsSync(join(target, ".afol", "data", "index", `${name}.json`)),
+				).toBe(true);
+			}
+			expect(validateWorkBenchIndex(target).ok).toBe(true);
+			for (const check of [
+				validateRulesIndex(target),
+				validateSkillsIndex(target),
+				validateSpecsIndex(target),
+				validateFilesIndex(target),
+			]) {
+				expect(check.ok).toBe(true);
+			}
+		} finally {
+			console.log = originalLog;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("index build failure keeps init successful with a rebuild hint", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-local-state-fail-"));
+		const logs: string[] = [];
+		const originalLog = console.log;
+		console.log = (...values: unknown[]) => logs.push(values.join(" "));
+		try {
+			mkdirSync(join(target, ".afol", "data", "index"), { recursive: true });
+			mkdirSync(join(target, ".afol", "data", "index", "workbench.json"));
+			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
+				0,
+			);
+
+			expect(logs.join("\n")).toContain(
+				"local_state_index: failed; next: run afol local-state rebuild",
+			);
+			// The completed scaffold must survive the index failure.
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
+			expect(existsSync(join(target, "AGENTS.md"))).toBe(true);
+		} finally {
+			console.log = originalLog;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("dry-run does not build local-state indexes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-local-state-dry-"));
+		const logs: string[] = [];
+		const originalLog = console.log;
+		console.log = (...values: unknown[]) => logs.push(values.join(" "));
+		try {
+			expect(await runBootstrapCommand([target, "--dry-run"])).toBe(0);
+
+			expect(logs.join("\n")).not.toContain("local_state_index:");
+			expect(
+				existsSync(join(target, ".afol", "data", "index", "workbench.json")),
+			).toBe(false);
+			expect(
+				existsSync(join(target, ".afol", "data", "index", "rules.json")),
+			).toBe(false);
+		} finally {
+			console.log = originalLog;
 			rmSync(target, { recursive: true, force: true });
 		}
 	});

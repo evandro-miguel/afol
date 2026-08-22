@@ -38,6 +38,8 @@ import {
 	isValidProjectUuid,
 } from "../services/evolution/config";
 import { withExternalPathLock } from "../services/io/session-lock";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import {
 	CANONICAL_PROJECT_CONFIG_PATH,
 	normalizeProjectRelativePath,
@@ -831,6 +833,21 @@ function resolveBootstrapWritePath(targetRoot: string, path: string): string {
 	return resolved.value.path;
 }
 
+/**
+ * Build local-state indexes once after a successful apply so fresh installs
+ * pass `afol validate project` without a manual `afol local-state rebuild`.
+ * Index failures must not roll back a completed scaffold.
+ */
+function buildLocalStateIndexes(targetRoot: string): boolean {
+	try {
+		rebuildWorkBenchIndex(targetRoot);
+		rebuildProjectIndexes(targetRoot);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export async function runBootstrapCommand(
 	args: string[],
 	runtime: BootstrapRuntime = {},
@@ -1088,6 +1105,12 @@ export async function runBootstrapCommand(
 						}
 					}
 				}
+				const indexOk = buildLocalStateIndexes(parsed.targetRoot);
+				console.log(
+					indexOk
+						? "local_state_index: ok"
+						: "local_state_index: failed; next: run afol local-state rebuild",
+				);
 				return 0;
 			} catch (error) {
 				if (snapshot !== null) {
