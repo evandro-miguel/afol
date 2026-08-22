@@ -1,6 +1,7 @@
 import { resolveProjectPaths } from "../../services/project/paths";
 import type { NewWorkstreamMetadata } from "../../services/workbench/lifecycle";
 import { selectSingleOpenTask } from "../../services/workbench/lifecycle";
+import { type FlagDef, parseFlagSpec } from "../flag-spec";
 import type {
 	CloseArgs,
 	DoneArgs,
@@ -469,184 +470,160 @@ function assertDoneVerificationLimits(
 	}
 }
 
-export function parseDoneArgs(args: string[], root: string): DoneArgs {
-	let session = "";
-	let taskId = "";
-	const testCommands: string[] = [];
-	let testShellCommand: string | null = null;
-	const verifications: VerificationSpec[] = [];
-	let evidenceCommand: string | null = null;
-	let evidenceResult: string | null = null;
-	let requireSpecCheck = false;
-	let artifact = "";
-	let note = "";
-	let json = false;
-	let verificationTimeoutMs = DEFAULT_VERIFICATION_TIMEOUT_MS;
-	for (let i = 0; i < args.length; i += 1) {
-		const arg = args[i];
-		const value = args[i + 1];
-		if (arg === "--") {
-			if (testCommands.length > 0 || testShellCommand) {
+type DoneFlagState = {
+	session: string;
+	taskId: string;
+	testCommands: string[];
+	testShellCommand: string | null;
+	verifications: VerificationSpec[];
+	evidenceCommand: string | null;
+	evidenceResult: string | null;
+	requireSpecCheck: boolean;
+	artifact: string;
+	note: string;
+	json: boolean;
+	verificationTimeoutMs: number;
+};
+
+const DONE_FLAG_SPECS: FlagDef<DoneFlagState>[] = [
+	{
+		names: ["--"],
+		kind: "terminator",
+		apply: (state, rest) => {
+			if (state.testCommands.length > 0 || state.testShellCommand) {
 				throw new Error(
 					"Cannot combine positional verification with --test or --test-shell in done.",
 				);
 			}
-			const argv = args.slice(i + 1);
-			if (argv.length === 0) {
+			if (rest.length === 0) {
 				throw new Error("Missing verification command after -- in done.");
 			}
-			assertNonEmptyVerificationCommand(argv[0] ?? "", "positional", argv);
+			assertNonEmptyVerificationCommand(rest[0] ?? "", "positional", rest);
 			const verification: VerificationSpec = {
 				mode: "argv",
-				executable: argv[0] ?? "",
-				args: argv.slice(1),
+				executable: rest[0] ?? "",
+				args: rest.slice(1),
 			};
 			assertDoneVerificationLimits([verification]);
-			verifications.push(verification);
-			break;
-		}
-		if (arg === "--json" || arg === "-j") {
-			json = true;
-			continue;
-		}
-		if (arg === "--session") {
-			if (!value) {
-				throw new Error("Missing value for --session in done.");
-			}
-			session = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--task-id") {
-			if (!value) {
-				throw new Error("Missing value for --task-id in done.");
-			}
-			taskId = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--test") {
-			if (!value) {
-				throw new Error("Missing value for --test in done.");
-			}
-			if (testShellCommand) {
+			state.verifications.push(verification);
+		},
+	},
+	{ names: ["--json", "-j"], kind: "flag", key: "json" },
+	{ names: ["--session"], kind: "value", key: "session" },
+	{ names: ["--task-id"], kind: "value", key: "taskId" },
+	{
+		names: ["--test"],
+		kind: "value",
+		apply: (state, raw) => {
+			if (state.testShellCommand) {
 				throw new Error("Cannot use both --test and --test-shell in done.");
 			}
-			const argv = splitCommandLine(value);
-			assertNonEmptyVerificationCommand(value, "--test", argv);
+			const argv = splitCommandLine(raw);
+			assertNonEmptyVerificationCommand(raw, "--test", argv);
 			const verification: VerificationSpec = {
 				mode: "argv",
 				executable: argv[0] ?? "",
 				args: argv.slice(1),
 			};
-			testCommands.push(value);
-			verifications.push(verification);
-			assertDoneVerificationLimits(verifications);
-			i += 1;
-			continue;
-		}
-		if (arg === "--verification-timeout-ms") {
-			if (!value) {
-				throw new Error("Missing value for --verification-timeout-ms in done.");
-			}
-			const parsedTimeout = Number(value);
-			if (!Number.isFinite(parsedTimeout)) {
+			state.testCommands.push(raw);
+			state.verifications.push(verification);
+			assertDoneVerificationLimits(state.verifications);
+		},
+	},
+	{
+		names: ["--verification-timeout-ms"],
+		kind: "value",
+		validate: (_state, raw) => {
+			if (!Number.isFinite(Number(raw))) {
 				throw new Error(
 					"Invalid --verification-timeout-ms in done: expected a finite integer.",
 				);
 			}
-			verificationTimeoutMs = resolveVerificationTimeoutMs(parsedTimeout);
-			i += 1;
-			continue;
-		}
-		if (arg === "--test-shell") {
-			if (!value) {
-				throw new Error("Missing value for --test-shell in done.");
-			}
-			if (testCommands.length > 0) {
+		},
+		apply: (state, raw) => {
+			state.verificationTimeoutMs = resolveVerificationTimeoutMs(Number(raw));
+		},
+	},
+	{
+		names: ["--test-shell"],
+		kind: "value",
+		apply: (state, raw) => {
+			if (state.testCommands.length > 0) {
 				throw new Error("Cannot use both --test and --test-shell in done.");
 			}
-			if (testShellCommand) {
+			if (state.testShellCommand) {
 				throw new Error("done supports only one --test-shell value.");
 			}
-			assertNonEmptyVerificationCommand(value, "--test-shell");
-			testShellCommand = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--command") {
-			if (!value) {
-				throw new Error("Missing value for --command in done.");
-			}
-			evidenceCommand = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--result") {
-			if (!value) {
-				throw new Error("Missing value for --result in done.");
-			}
-			evidenceResult = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--require-spec-check") {
-			requireSpecCheck = true;
-			continue;
-		}
-		if (arg === "--artifact") {
-			if (!value) {
-				throw new Error("Missing value for --artifact in done.");
-			}
-			artifact = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--note") {
-			if (!value) {
-				throw new Error("Missing value for --note in done.");
-			}
-			note = value;
-			i += 1;
-			continue;
-		}
-		if (arg && !arg.startsWith("-") && !taskId) {
-			taskId = arg;
-			continue;
-		}
-		throw new Error(`Unknown done argument: ${arg}`);
-	}
-	if (!taskId) {
+			assertNonEmptyVerificationCommand(raw, "--test-shell");
+			state.testShellCommand = raw;
+		},
+	},
+	{ names: ["--command"], kind: "value", key: "evidenceCommand" },
+	{ names: ["--result"], kind: "value", key: "evidenceResult" },
+	{ names: ["--require-spec-check"], kind: "flag", key: "requireSpecCheck" },
+	{ names: ["--artifact"], kind: "value", key: "artifact" },
+	{ names: ["--note"], kind: "value", key: "note" },
+];
+
+export function parseDoneArgs(args: string[], root: string): DoneArgs {
+	const initialState: DoneFlagState = {
+		session: "",
+		taskId: "",
+		testCommands: [],
+		testShellCommand: null,
+		verifications: [],
+		evidenceCommand: null,
+		evidenceResult: null,
+		requireSpecCheck: false,
+		artifact: "",
+		note: "",
+		json: false,
+		verificationTimeoutMs: DEFAULT_VERIFICATION_TIMEOUT_MS,
+	};
+	const parsed = parseFlagSpec(
+		args,
+		{
+			flags: DONE_FLAG_SPECS,
+			context: "done",
+			positional: (state, arg) => {
+				if (!arg || arg.startsWith("-") || state.taskId) return false;
+				state.taskId = arg;
+				return true;
+			},
+		},
+		initialState,
+	);
+	if (!parsed.taskId) {
 		throw new Error("Missing --task-id for done.");
 	}
 	let taskIds: string[];
 	try {
-		taskIds = parseTaskSelector(taskId);
+		taskIds = parseTaskSelector(parsed.taskId);
 	} catch {
 		throw new DoneArgumentError("Invalid done task selector.");
 	}
 	if (
-		(evidenceCommand && !evidenceResult) ||
-		(!evidenceCommand && evidenceResult)
+		(parsed.evidenceCommand && !parsed.evidenceResult) ||
+		(!parsed.evidenceCommand && parsed.evidenceResult)
 	) {
 		throw new Error(
 			"done requires both --command and --result when recording evidence.",
 		);
 	}
 	return {
-		session: resolveSession(root, session, "done"),
-		taskId: taskIds[0] ?? taskId,
+		session: resolveSession(root, parsed.session, "done"),
+		taskId: taskIds[0] ?? parsed.taskId,
 		taskIds,
-		testCommands,
-		testShellCommand,
-		verifications,
-		verificationTimeoutMs,
-		evidenceCommand,
-		evidenceResult,
-		...(artifact ? { artifact } : {}),
-		...(note ? { note } : {}),
-		requireSpecCheck,
-		json,
+		testCommands: parsed.testCommands,
+		testShellCommand: parsed.testShellCommand,
+		verifications: parsed.verifications,
+		verificationTimeoutMs: parsed.verificationTimeoutMs,
+		evidenceCommand: parsed.evidenceCommand,
+		evidenceResult: parsed.evidenceResult,
+		...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+		...(parsed.note ? { note: parsed.note } : {}),
+		requireSpecCheck: parsed.requireSpecCheck,
+		json: parsed.json,
 	};
 }
 

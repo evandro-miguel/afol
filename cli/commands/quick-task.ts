@@ -18,6 +18,7 @@ import {
 	newWorkstream,
 	startTasks,
 } from "../services/workbench/lifecycle";
+import { type FlagDef, parseFlagSpec } from "./flag-spec";
 import {
 	formatHintLine,
 	nextCommandHint,
@@ -63,110 +64,107 @@ export function deriveQuickTaskIds(metadata: NewWorkstreamMetadata): string[] {
 	return Array.from({ length: count }, (_, index) => formatTaskId(index + 1));
 }
 
-export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
-	let theme = "";
-	let json = false;
-	let command = "";
-	let artifact = "";
-	let note = "";
-	const metadata: NewWorkstreamMetadata = {};
-	let noSpecRequired = false;
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
-		const value = args[index + 1];
-		if (!arg) {
-			continue;
-		}
-		if (arg === "--json" || arg === "-j") {
-			json = true;
-			continue;
-		}
-		if (!theme && !arg.startsWith("-")) {
-			theme = arg;
-			continue;
-		}
-		if (arg === "--feature-id") {
-			if (!value)
-				throw new Error("Missing value for --feature-id in quick-task.");
-			metadata.featureId = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--parent-spec") {
-			if (!value)
-				throw new Error("Missing value for --parent-spec in quick-task.");
-			metadata.parentSpec = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--no-spec-required") {
-			noSpecRequired = true;
-			continue;
-		}
-		if (arg === "--reason") {
-			if (!value) throw new Error("Missing value for --reason in quick-task.");
-			metadata.noSpecRequiredReason = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--task") {
-			if (!value) throw new Error("Missing value for --task in quick-task.");
-			metadata.task ??= value;
-			metadata.tasks ??= [];
-			metadata.tasks.push(value);
-			if (metadata.tasks.length > QUICK_TASK_MAX_TASKS) {
+type QuickTaskFlagState = {
+	theme: string;
+	json: boolean;
+	command: string;
+	artifact: string;
+	note: string;
+	noSpecRequired: boolean;
+	metadata: NewWorkstreamMetadata;
+};
+
+const QUICK_TASK_FLAG_SPECS: FlagDef<QuickTaskFlagState>[] = [
+	{ names: ["--json", "-j"], kind: "flag", key: "json" },
+	{
+		names: ["--feature-id"],
+		kind: "value",
+		apply: (state, raw) => {
+			state.metadata.featureId = raw;
+		},
+	},
+	{
+		names: ["--parent-spec"],
+		kind: "value",
+		apply: (state, raw) => {
+			state.metadata.parentSpec = raw;
+		},
+	},
+	{ names: ["--no-spec-required"], kind: "flag", key: "noSpecRequired" },
+	{
+		names: ["--reason"],
+		kind: "value",
+		apply: (state, raw) => {
+			state.metadata.noSpecRequiredReason = raw;
+		},
+	},
+	{
+		names: ["--task"],
+		kind: "multi",
+		apply: (state, raw) => {
+			state.metadata.task ??= raw;
+			state.metadata.tasks ??= [];
+			state.metadata.tasks.push(raw);
+			if (state.metadata.tasks.length > QUICK_TASK_MAX_TASKS) {
 				throw new Error(
 					`quick-task supports at most ${QUICK_TASK_MAX_TASKS} tasks.`,
 				);
 			}
-			index += 1;
-			continue;
-		}
-		if (arg === "--command") {
-			if (!value) throw new Error("Missing value for --command in quick-task.");
-			command = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--artifact") {
-			if (!value)
-				throw new Error("Missing value for --artifact in quick-task.");
-			artifact = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--note") {
-			if (!value) throw new Error("Missing value for --note in quick-task.");
-			note = value;
-			index += 1;
-			continue;
-		}
-		throw new Error(`Unknown quick-task argument: ${arg}`);
-	}
-	if (!theme) {
+		},
+	},
+	{ names: ["--command"], kind: "value", key: "command" },
+	{ names: ["--artifact"], kind: "value", key: "artifact" },
+	{ names: ["--note"], kind: "value", key: "note" },
+];
+
+export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
+	const initialState: QuickTaskFlagState = {
+		theme: "",
+		json: false,
+		command: "",
+		artifact: "",
+		note: "",
+		noSpecRequired: false,
+		metadata: {},
+	};
+	const parsed = parseFlagSpec(
+		args,
+		{
+			flags: QUICK_TASK_FLAG_SPECS,
+			context: "quick-task",
+			skipFalsyArgs: true,
+			positional: (state, arg) => {
+				if (!arg || state.theme || arg.startsWith("-")) return false;
+				state.theme = arg;
+				return true;
+			},
+		},
+		initialState,
+	);
+	if (!parsed.theme) {
 		throw new Error("Missing theme for quick-task.");
 	}
-	if (!command.trim()) throw new Error("quick-task requires --command.");
-	if (metadata.noSpecRequiredReason && !noSpecRequired) {
+	if (!parsed.command.trim()) throw new Error("quick-task requires --command.");
+	if (parsed.metadata.noSpecRequiredReason && !parsed.noSpecRequired) {
 		throw new Error("Missing --no-spec-required for quick-task reason.");
 	}
-	if (noSpecRequired && !metadata.noSpecRequiredReason?.trim()) {
+	if (parsed.noSpecRequired && !parsed.metadata.noSpecRequiredReason?.trim()) {
 		throw new Error("Missing --reason for --no-spec-required in quick-task.");
 	}
 	const hasBinding = Boolean(
-		metadata.featureId?.trim() && metadata.parentSpec?.trim(),
+		parsed.metadata.featureId?.trim() && parsed.metadata.parentSpec?.trim(),
 	);
-	if (hasBinding && noSpecRequired)
+	if (hasBinding && parsed.noSpecRequired)
 		throw new Error(
 			"quick-task governance binding and waiver are mutually exclusive.",
 		);
 	return {
-		theme,
-		json,
-		metadata,
-		command,
-		...(artifact ? { artifact } : {}),
-		...(note ? { note } : {}),
+		theme: parsed.theme,
+		json: parsed.json,
+		metadata: parsed.metadata,
+		command: parsed.command,
+		...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+		...(parsed.note ? { note: parsed.note } : {}),
 	};
 }
 

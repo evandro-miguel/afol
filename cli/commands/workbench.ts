@@ -57,6 +57,7 @@ import {
 	formatVerifyReport,
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
+import { type FlagDef, parseFlagSpec } from "./flag-spec";
 import {
 	DoneArgumentError,
 	hasJsonFlag,
@@ -573,11 +574,13 @@ export async function runEvidenceTransitionAdmitCommand(
 	}
 }
 
+type EvidenceAdmitIssueType = "missing_evidence" | "failed_evidence";
+
 type EvidenceAdmitArgs = {
 	session: string;
 	taskIds: string[];
 	allMissing: boolean;
-	issueType?: "missing_evidence" | "failed_evidence";
+	issueType?: EvidenceAdmitIssueType;
 	reason: string;
 	issueUrl?: string;
 	baselineId?: string;
@@ -586,127 +589,117 @@ type EvidenceAdmitArgs = {
 	json: boolean;
 };
 
+type EvidenceAdmitFlagState = {
+	session: string;
+	taskIds: string[];
+	allMissing: boolean;
+	issueType: EvidenceAdmitIssueType | undefined;
+	reason: string;
+	issueUrl: string;
+	baselineId: string;
+	cutoffSessionId: string;
+	confirm: boolean;
+	dryRun: boolean;
+	json: boolean;
+};
+
+const EVIDENCE_ADMIT_FLAG_SPECS: FlagDef<EvidenceAdmitFlagState>[] = [
+	{ names: ["--json", "-j"], kind: "flag", key: "json" },
+	{ names: ["--confirm"], kind: "flag", key: "confirm" },
+	{ names: ["--dry-run"], kind: "flag", key: "dryRun" },
+	{ names: ["--all-missing"], kind: "flag", key: "allMissing" },
+	{
+		names: ["--session", "-S"],
+		kind: "value",
+		key: "session",
+		rejectDashValue: true,
+	},
+	{
+		names: ["--task-id", "-T"],
+		kind: "multi",
+		key: "taskIds",
+		rejectDashValue: true,
+	},
+	{
+		names: ["--issue-type"],
+		kind: "value",
+		key: "issueType",
+		rejectDashValue: true,
+		validate: (_state, raw) => {
+			if (raw !== "missing_evidence" && raw !== "failed_evidence") {
+				throw new Error(
+					`Invalid --issue-type ${raw}; use missing_evidence or failed_evidence.`,
+				);
+			}
+		},
+	},
+	{
+		names: ["--reason", "-r", "--approval"],
+		kind: "value",
+		key: "reason",
+		rejectDashValue: true,
+		useMatchedNameInError: true,
+	},
+	{ names: ["--issue"], kind: "value", key: "issueUrl", rejectDashValue: true },
+	{
+		names: ["--baseline-id"],
+		kind: "value",
+		key: "baselineId",
+		rejectDashValue: true,
+	},
+	{
+		names: ["--cutoff-session-id"],
+		kind: "value",
+		key: "cutoffSessionId",
+		rejectDashValue: true,
+	},
+];
+
 function parseEvidenceAdmitArgs(
 	args: string[],
 	root: string,
 ): EvidenceAdmitArgs {
-	let session = "";
-	const taskIds: string[] = [];
-	let allMissing = false;
-	let issueType: "missing_evidence" | "failed_evidence" | undefined;
-	let reason = "";
-	let issueUrl = "";
-	let baselineId = "";
-	let cutoffSessionId = "";
-	let confirm = false;
-	let dryRun = false;
-	let json = false;
+	const initialState: EvidenceAdmitFlagState = {
+		session: "",
+		taskIds: [],
+		allMissing: false,
+		issueType: undefined,
+		reason: "",
+		issueUrl: "",
+		baselineId: "",
+		cutoffSessionId: "",
+		confirm: false,
+		dryRun: false,
+		json: false,
+	};
+	const parsed = parseFlagSpec(
+		args,
+		{ flags: EVIDENCE_ADMIT_FLAG_SPECS, context: "evidence admit" },
+		initialState,
+	);
 
-	for (let i = 0; i < args.length; i += 1) {
-		const arg = args[i];
-		const value = args[i + 1];
-		if (arg === "--json" || arg === "-j") {
-			json = true;
-			continue;
-		}
-		if (arg === "--confirm") {
-			confirm = true;
-			continue;
-		}
-		if (arg === "--dry-run") {
-			dryRun = true;
-			continue;
-		}
-		if (arg === "--all-missing") {
-			allMissing = true;
-			continue;
-		}
-		if (arg === "--session" || arg === "-S") {
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --session in evidence admit.");
-			}
-			session = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--task-id" || arg === "-T") {
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --task-id in evidence admit.");
-			}
-			taskIds.push(value);
-			i += 1;
-			continue;
-		}
-		if (arg === "--issue-type") {
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --issue-type in evidence admit.");
-			}
-			if (value !== "missing_evidence" && value !== "failed_evidence") {
-				throw new Error(
-					`Invalid --issue-type ${value}; use missing_evidence or failed_evidence.`,
-				);
-			}
-			issueType = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--reason" || arg === "-r" || arg === "--approval") {
-			if (!value || value.startsWith("-")) {
-				throw new Error(`Missing value for ${arg} in evidence admit.`);
-			}
-			reason = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--issue") {
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --issue in evidence admit.");
-			}
-			issueUrl = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--baseline-id") {
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --baseline-id in evidence admit.");
-			}
-			baselineId = value;
-			i += 1;
-			continue;
-		}
-		if (arg === "--cutoff-session-id") {
-			if (!value || value.startsWith("-")) {
-				throw new Error(
-					"Missing value for --cutoff-session-id in evidence admit.",
-				);
-			}
-			cutoffSessionId = value;
-			i += 1;
-			continue;
-		}
-		throw new Error(`Unknown evidence admit argument: ${arg}`);
-	}
-
-	if (!reason.trim()) {
+	if (!parsed.reason.trim()) {
 		throw new Error(
 			"Missing nonempty --reason (or --approval) for evidence admit.",
 		);
 	}
-	if (!allMissing && taskIds.length === 0) {
+	if (!parsed.allMissing && parsed.taskIds.length === 0) {
 		throw new Error("evidence admit requires --task-id <id> or --all-missing.");
 	}
 
 	return {
-		session: resolveSession(root, session, "evidence admit"),
-		taskIds,
-		allMissing,
-		...(issueType ? { issueType } : {}),
-		reason,
-		...(issueUrl ? { issueUrl } : {}),
-		...(baselineId ? { baselineId } : {}),
-		...(cutoffSessionId ? { cutoffSessionId } : {}),
-		confirm: confirm && !dryRun,
-		json,
+		session: resolveSession(root, parsed.session, "evidence admit"),
+		taskIds: parsed.taskIds,
+		allMissing: parsed.allMissing,
+		...(parsed.issueType ? { issueType: parsed.issueType } : {}),
+		reason: parsed.reason,
+		...(parsed.issueUrl ? { issueUrl: parsed.issueUrl } : {}),
+		...(parsed.baselineId ? { baselineId: parsed.baselineId } : {}),
+		...(parsed.cutoffSessionId
+			? { cutoffSessionId: parsed.cutoffSessionId }
+			: {}),
+		confirm: parsed.confirm && !parsed.dryRun,
+		json: parsed.json,
 	};
 }
 
