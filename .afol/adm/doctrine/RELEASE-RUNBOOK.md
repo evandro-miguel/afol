@@ -48,10 +48,14 @@ confirm that `LICENSE` is present and that package metadata declares `MIT`;
 local tests, security scans, and artifact provenance cannot substitute for
 that license grant.
 
-The GitHub Actions workflow runs for pull requests and pushes targeting the
-`dev` or `main` release lanes and remains manually dispatchable. Hosted runner
-availability is reported separately from product correctness. A missing or
-administratively unavailable hosted run is never described as green.
+Release validation is local-first. Per ADR-009, automatic hosted CI runs are
+disabled: the GitHub Actions workflow exists only as an opt-in manual
+dispatch and consumes no runner time in normal development. The local chain
+(`validate:release` including Gitleaks, OSV Scanner, deterministic build,
+provenance, and smokes) against the exact candidate SHA is the release
+evidence. A hosted run, when manually dispatched and billing permits, is
+supplementary observation; its absence or administrative unavailability is
+never described as green or treated as a product failure.
 
 ## Required Tools on PATH
 

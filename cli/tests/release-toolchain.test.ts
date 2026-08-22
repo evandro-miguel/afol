@@ -443,17 +443,18 @@ describe("release and toolchain contracts", () => {
 		);
 	});
 
-	test("CI runs automatically on development and promotion branches", () => {
+	test("CI is manual-dispatch only per ADR-009", () => {
 		const workflow = readFileSync(
 			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
 			"utf8",
 		);
 
-		expect(workflow).toContain("  pull_request:\n    branches: [dev, main]\n");
-		expect(workflow).toContain("  push:\n    branches: [dev, main]\n");
 		expect(workflow).toContain("  workflow_dispatch:\n");
+		expect(workflow).not.toMatch(/\n {2}push:/);
+		expect(workflow).not.toMatch(/\n {2}pull_request:/);
 		expect(workflow).toContain("permissions:\n  contents: read\n");
 		expect(workflow).toContain("cancel-in-progress: true");
+		expect(workflow).toContain("ADR-009");
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {
