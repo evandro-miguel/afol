@@ -29,4 +29,4 @@ spec_waiver_reason: ""
 | T-02 | done | worker | Define public distribution and licensing contract attempt=5 |
 | T-03 | done | worker | Complete public documentation attempt=1 |
 | T-04 | done | worker | Add automatic CI gates attempt=1 |
-| T-05 | problem | worker | Validate the unpublished release candidate attempt=2 reason=Full%20candidate%20validation%20is%20deferred%20by%20the%20user's%20instruction%20not%20to%20run%20Bun%20tests%20now%3B%20validate%3Arelease%2C%20typecheck%2C%20release%20provenance%2C%20and%20final%20smoke%20remain%20unobserved%20for%20this%20modified%20tree. |
+| T-05 | in_progress | worker | Validate the unpublished release candidate attempt=3 |
