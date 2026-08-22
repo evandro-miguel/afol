@@ -170,6 +170,104 @@ function formatUnknownCommandHint(command: string): string {
 	return `err unknown-command command=${command} hint="run afol -h"`;
 }
 
+type RouteInput = {
+	firstArg: string | undefined;
+	topLevel: string;
+	topLevelKind: string;
+	rest: string[];
+	normalized: string[];
+};
+
+type KindRoute = (input: RouteInput) => CommandResolution;
+
+function actionScopedArgs(scope: string, rest: string[]): string[] {
+	const normalizedAction = normalizeActionAndArgs(scope, rest);
+	return normalizedAction.action
+		? [normalizedAction.action, ...normalizedAction.args]
+		: normalizedAction.args;
+}
+
+/** Direct-kind routes keyed by canonical command kind; first match wins. */
+const KIND_ROUTES: Record<string, KindRoute> = Object.freeze({
+	status: ({ normalized }) => ({
+		kind: "status",
+		args: normalizeStatusInvocation(normalized),
+	}),
+	validate: ({ rest }) => ({ kind: "validate", args: rest }),
+	init: ({ rest }) => ({ kind: "init", args: rest }),
+	feedback: ({ rest }) => ({ kind: "feedback", args: rest }),
+	bootstrap: ({ rest }) => ({ kind: "bootstrap", args: rest }),
+	new: ({ rest }) => ({ kind: "new", args: normalizeScopedFlags("new", rest) }),
+	start: ({ firstArg, rest }) => {
+		const startArgs = normalizeScopedFlags("start", rest);
+		return {
+			kind: "start",
+			args: firstArg === "st" ? ["--compact", ...startArgs] : startArgs,
+		};
+	},
+	evidence: ({ rest }) => ({
+		kind: "evidence",
+		args: normalizeScopedFlags("evidence", rest),
+	}),
+	legacy: ({ rest }) => ({
+		kind: "legacy",
+		args: normalizeScopedFlags("legacy", rest),
+	}),
+	done: ({ rest }) => ({
+		kind: "done",
+		args: normalizeScopedFlags("done", rest),
+	}),
+	transition: ({ rest }) => ({
+		kind: "transition",
+		args: normalizeScopedFlags("transition", rest),
+	}),
+	close: ({ rest }) => ({
+		kind: "close",
+		args: normalizeScopedFlags("close", rest),
+	}),
+	log: ({ rest }) => ({ kind: "log", args: normalizeScopedFlags("log", rest) }),
+	quickTask: ({ rest }) => ({
+		kind: "quickTask",
+		args: normalizeScopedFlags("quickTask", rest),
+	}),
+	verifyTasks: ({ rest }) => ({
+		kind: "verifyTasks",
+		args: normalizeScopedFlags("verifyTasks", rest),
+	}),
+	hook: ({ rest }) => ({ kind: "hook", args: rest }),
+	rule: ({ rest }) => ({ kind: "rule", args: rest }),
+	skill: ({ rest }) => ({ kind: "skill", args: rest }),
+	update: ({ rest }) => ({
+		kind: "update",
+		args: actionScopedArgs("update", rest),
+	}),
+	file: ({ rest }) => ({ kind: "file", args: actionScopedArgs("file", rest) }),
+	fleet: ({ rest }) => ({ kind: "fleet", args: rest }),
+	localState: ({ rest }) => ({
+		kind: "localState",
+		args: actionScopedArgs("localState", rest),
+	}),
+	catchup: ({ rest }) => ({
+		kind: "catchup",
+		args: normalizeScopedFlags("catchup", rest),
+	}),
+	preflight: ({ rest }) => ({ kind: "preflight", args: rest }),
+	adm: ({ rest }) => {
+		const { action, args } = normalizeActionAndArgs("adm", rest);
+		return { kind: "subcommand", group: "adm", action, args };
+	},
+});
+
+const SUBCOMMAND_ROUTE: KindRoute = ({ firstArg, topLevelKind, rest }) => {
+	const { action, args } = normalizeActionAndArgs(topLevelKind, rest);
+	return {
+		kind: "subcommand",
+		group: topLevelKind,
+		action,
+		args: maybeCompactCtxAliasArgs(firstArg, action, args),
+	};
+};
+
 export function resolveCommand(args: string[]): CommandResolution {
 	const firstArg = args[0];
 	if (args.length === 1 && firstArg && kernelRegistry.isHelpAlias(firstArg)) {
@@ -188,6 +286,7 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	const topLevelKind = kernelRegistry.resolveKind(topLevel);
+
 	if (topLevel === "render" && topLevelKind === "memory") {
 		return {
 			kind: "subcommand",
@@ -197,154 +296,20 @@ export function resolveCommand(args: string[]): CommandResolution {
 		};
 	}
 
-	if (topLevelKind === "validate") {
-		return { kind: "validate", args: rest };
-	}
-
-	if (topLevelKind === "init") {
-		return { kind: "init", args: rest };
-	}
-
-	if (topLevelKind === "status") {
-		return { kind: "status", args: normalizeStatusInvocation(normalized) };
-	}
-
-	if (topLevelKind === "feedback") {
-		return { kind: "feedback", args: rest };
-	}
-
-	if (topLevelKind === "bootstrap") {
-		return { kind: "bootstrap", args: rest };
-	}
-
-	if (topLevelKind === "new") {
-		return { kind: "new", args: normalizeScopedFlags("new", rest) };
-	}
-
-	if (topLevelKind === "start") {
-		const startArgs = normalizeScopedFlags("start", rest);
-		return {
-			kind: "start",
-			args: firstArg === "st" ? ["--compact", ...startArgs] : startArgs,
-		};
-	}
-
-	if (topLevelKind === "evidence") {
-		return { kind: "evidence", args: normalizeScopedFlags("evidence", rest) };
-	}
-
-	if (topLevelKind === "legacy") {
-		return { kind: "legacy", args: normalizeScopedFlags("legacy", rest) };
-	}
-
-	if (topLevelKind === "done") {
-		return { kind: "done", args: normalizeScopedFlags("done", rest) };
-	}
-
-	if (topLevelKind === "transition") {
-		return {
-			kind: "transition",
-			args: normalizeScopedFlags("transition", rest),
-		};
-	}
-
-	if (topLevelKind === "close") {
-		return { kind: "close", args: normalizeScopedFlags("close", rest) };
-	}
-
-	if (topLevelKind === "log") {
-		return { kind: "log", args: normalizeScopedFlags("log", rest) };
-	}
-
-	if (topLevelKind === "quickTask") {
-		return {
-			kind: "quickTask",
-			args: normalizeScopedFlags("quickTask", rest),
-		};
-	}
-
-	if (topLevelKind === "verifyTasks") {
-		return {
-			kind: "verifyTasks",
-			args: normalizeScopedFlags("verifyTasks", rest),
-		};
-	}
-
-	if (topLevelKind === "hook") {
-		return { kind: "hook", args: rest };
-	}
-
-	if (topLevelKind === "rule") {
-		return { kind: "rule", args: rest };
-	}
-
-	if (topLevelKind === "skill") {
-		return { kind: "skill", args: rest };
-	}
-
-	if (topLevelKind === "update") {
-		const normalizedAction = normalizeActionAndArgs("update", rest);
-		return {
-			kind: "update",
-			args: normalizedAction.action
-				? [normalizedAction.action, ...normalizedAction.args]
-				: normalizedAction.args,
-		};
-	}
-
-	if (topLevelKind === "file") {
-		const normalizedAction = normalizeActionAndArgs("file", rest);
-		return {
-			kind: "file",
-			args: normalizedAction.action
-				? [normalizedAction.action, ...normalizedAction.args]
-				: normalizedAction.args,
-		};
-	}
-
-	if (topLevelKind === "fleet") {
-		return { kind: "fleet", args: rest };
-	}
-
-	if (topLevelKind === "localState") {
-		const normalizedAction = normalizeActionAndArgs("localState", rest);
-		return {
-			kind: "localState",
-			args: normalizedAction.action
-				? [normalizedAction.action, ...normalizedAction.args]
-				: normalizedAction.args,
-		};
-	}
-
-	if (topLevelKind === "catchup") {
-		return { kind: "catchup", args: normalizeScopedFlags("catchup", rest) };
-	}
-
-	if (topLevelKind === "preflight") {
-		return { kind: "preflight", args: rest };
-	}
-
-	if (topLevelKind === "adm") {
-		const { action, args: scopedArgs } = normalizeActionAndArgs("adm", rest);
-		return {
-			kind: "subcommand",
-			group: "adm",
-			action,
-			args: scopedArgs,
-		};
+	const routeInput: RouteInput = {
+		firstArg,
+		topLevel,
+		topLevelKind: topLevelKind ?? "",
+		rest,
+		normalized,
+	};
+	const kindRoute = topLevelKind ? KIND_ROUTES[topLevelKind] : undefined;
+	if (kindRoute) {
+		return kindRoute(routeInput);
 	}
 
 	if (topLevelKind && SUBCOMMAND_GROUPS.has(topLevelKind)) {
-		const { action, args: scopedArgs } = normalizeActionAndArgs(
-			topLevelKind,
-			rest,
-		);
-		return {
-			kind: "subcommand",
-			group: topLevelKind,
-			action,
-			args: maybeCompactCtxAliasArgs(firstArg, action, scopedArgs),
-		};
+		return SUBCOMMAND_ROUTE(routeInput);
 	}
 
 	if (topLevel.startsWith("-")) {
