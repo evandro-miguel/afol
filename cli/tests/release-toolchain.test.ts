@@ -371,90 +371,9 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
-	test("CI keeps frozen install and blocking typecheck before release validation", () => {
-		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
-			"utf8",
-		);
-		type RunDefaults = {
-			shell?: string;
-			"working-directory"?: string;
-		};
-		type WorkflowStep = {
-			name?: string;
-			run?: string;
-			shell?: string;
-			"working-directory"?: string;
-			env?: Record<string, unknown>;
-			if?: unknown;
-			"continue-on-error"?: unknown;
-		};
-		type ValidationJob = {
-			"runs-on"?: string;
-			defaults?: { run?: RunDefaults };
-			steps?: WorkflowStep[];
-			env?: Record<string, unknown>;
-			if?: unknown;
-			"continue-on-error"?: unknown;
-		};
-		const parsedWorkflow = Bun.YAML.parse(workflow) as {
-			defaults?: { run?: RunDefaults };
-			env?: Record<string, unknown>;
-			jobs?: Record<string, ValidationJob>;
-		};
-		const validationJob = parsedWorkflow.jobs?.validate ?? {};
-		const validationSteps = validationJob.steps ?? [];
-		const workflowStep = (name: string): WorkflowStep =>
-			validationSteps.find((step) => step.name === name) ?? {};
-		const stepIndex = (name: string): number =>
-			validationSteps.findIndex((step) => step.name === name);
-		const installStep = workflowStep("Install dependencies");
-		const typecheckStep = workflowStep("Typecheck");
-		const releaseStep = workflowStep("Release validation");
-
-		expect(validationJob["runs-on"]).toBe("ubuntu-24.04");
-		expect(validationJob).not.toHaveProperty("continue-on-error");
-		expect(validationJob).not.toHaveProperty("if");
-		expect(parsedWorkflow).not.toHaveProperty("env");
-		expect(validationJob.env).toEqual({
-			OSV_SCANNER_VERSION: "2.3.8",
-			GITLEAKS_VERSION: "8.24.2",
-		});
-		expect(parsedWorkflow.defaults?.run?.shell).toBeUndefined();
-		expect(parsedWorkflow.defaults?.run?.["working-directory"]).toBeUndefined();
-		expect(validationJob.defaults?.run?.shell).toBeUndefined();
-		expect(validationJob.defaults?.run?.["working-directory"]).toBeUndefined();
-		expect(installStep.run).toBe("bun install --frozen-lockfile");
-		expect(typecheckStep.run).toBe("bun run typecheck");
-		expect(typecheckStep).not.toHaveProperty("continue-on-error");
-		expect(typecheckStep).not.toHaveProperty("if");
-		expect(typecheckStep).not.toHaveProperty("shell");
-		expect(typecheckStep).not.toHaveProperty("working-directory");
-		expect(typecheckStep).not.toHaveProperty("env");
-		expect(releaseStep.run).toBe("bun run validate:release");
-		const runnerStep = workflowStep("Verify Ubuntu Linux x64 runner");
-		expect(runnerStep.run).toContain('test "$(uname -m)" = "x86_64"');
-		expect(runnerStep.run).toContain("grep -qi '^ID=ubuntu' /etc/os-release");
-		expect(stepIndex("Install dependencies")).toBeLessThan(
-			stepIndex("Typecheck"),
-		);
-		expect(stepIndex("Typecheck")).toBeLessThan(
-			stepIndex("Release validation"),
-		);
-	});
-
-	test("CI is manual-dispatch only per ADR-009", () => {
-		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
-			"utf8",
-		);
-
-		expect(workflow).toContain("  workflow_dispatch:\n");
-		expect(workflow).not.toMatch(/\n {2}push:/);
-		expect(workflow).not.toMatch(/\n {2}pull_request:/);
-		expect(workflow).toContain("permissions:\n  contents: read\n");
-		expect(workflow).toContain("cancel-in-progress: true");
-		expect(workflow).toContain("ADR-009");
+	test("no hosted CI workflows are configured (ADR-009)", () => {
+		const dir = join(repoRoot, ".github", "workflows");
+		expect(existsSync(dir)).toBe(false);
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {
@@ -560,55 +479,6 @@ describe("release and toolchain contracts", () => {
 		expect(pkg.version).toMatch(SEMVER_PATTERN);
 		expect(pkg.version).toContain("-");
 		expect(pkg.version).not.toBe("0.0.0");
-	});
-
-	test("CI provisions pinned security scanners before release validation", () => {
-		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
-			"utf8",
-		);
-		const osvInstallCommand =
-			'go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@v$' +
-			'{OSV_SCANNER_VERSION}"';
-		const gitleaksInstallCommand =
-			'go install "github.com/zricethezav/gitleaks/v8@v$' +
-			'{GITLEAKS_VERSION}"';
-
-		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
-		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
-		expect(workflow).toContain(
-			"uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0",
-		);
-		expect(workflow).toContain('go-version: "1.26.x"');
-		expect(workflow).toContain("cache: false");
-		expect(workflow).toContain(
-			"uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
-		);
-		expect(workflow).toContain(
-			"uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
-		);
-		expect(workflow).toContain("retention-days: 3");
-		expect(workflow).toContain("compression-level: 9");
-		expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
-		expect(workflow).toContain("Install pinned security scanners");
-		expect(workflow).toContain("continue-on-error: true");
-		expect(workflow).toContain(osvInstallCommand);
-		expect(workflow).toContain(gitleaksInstallCommand);
-		expect(workflow).toContain('export GOSUMDB="sum.golang.org"');
-		expect(workflow).not.toContain("curl -fsSL");
-		expect(workflow).not.toContain("tar -xzf");
-		const releaseValidationStep =
-			workflow.match(
-				/- name: Release validation[\s\S]*?(?=\n {6}- name:|\n\S|$)/,
-			)?.[0] ?? "";
-		expect(releaseValidationStep).toContain("run: bun run validate:release");
-		expect(releaseValidationStep).not.toContain("continue-on-error: true");
-		expect(workflow.indexOf("Set up Go")).toBeLessThan(
-			workflow.indexOf("Install pinned security scanners"),
-		);
-		expect(workflow.indexOf("Install pinned security scanners")).toBeLessThan(
-			workflow.indexOf("Release validation"),
-		);
 	});
 
 	test("generate-version creates cli/generated recursively", () => {

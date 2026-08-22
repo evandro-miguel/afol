@@ -47,7 +47,7 @@ ADRs document:
 | ADR-006 | F-22 Core Readiness and Selective Mutation Policy | Accepted | 2026-07-12 |
 | ADR-007 | F-31 External Receipts and Fixed Harness Tool Profiles | Accepted | 2026-07-31 |
 | ADR-008 | AFOL Evolution Autonomy and Evidence Boundary | Accepted | 2026-07-16 |
-| ADR-009 | Local-First Validation; Automatic Hosted CI Disabled | Accepted | 2026-08-21 |
+| ADR-009 | Local-First Validation; Hosted CI Removed | Accepted | 2026-08-21 |
 
 ### Creating an ADR
 

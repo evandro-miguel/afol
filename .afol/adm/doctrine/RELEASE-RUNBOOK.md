@@ -48,14 +48,14 @@ confirm that `LICENSE` is present and that package metadata declares `MIT`;
 local tests, security scans, and artifact provenance cannot substitute for
 that license grant.
 
-Release validation is local-first. Per ADR-009, automatic hosted CI runs are
-disabled: the GitHub Actions workflow exists only as an opt-in manual
-dispatch and consumes no runner time in normal development. The local chain
+Release validation is local-first. Per ADR-009 the repository ships no
+GitHub Actions workflows at all: hosted CI is permanently unavailable on
+this account, so a dead pipeline would be unused code. The local chain
 (`validate:release` including Gitleaks, OSV Scanner, deterministic build,
 provenance, and smokes) against the exact candidate SHA is the release
-evidence. A hosted run, when manually dispatched and billing permits, is
-supplementary observation; its absence or administrative unavailability is
-never described as green or treated as a product failure.
+evidence. A missing hosted run is not a failure signal; there is simply no
+hosted run to wait for, and none may be reintroduced without a new
+decision record.
 
 ## Required Tools on PATH
 

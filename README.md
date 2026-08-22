@@ -178,12 +178,12 @@ afol health --release --json
 bun run validate:release
 ```
 
-The release claim is intentionally limited to the observed Linux x64 path.
-The opt-in, manual-dispatch workflow (ADR-009) targets an Ubuntu 24.04 x64
-runner; it does not establish Windows, macOS, or ARM support. For a local
-WSL2 observation, run `bun run smoke:wsl2` from a Linux x64 WSL2 shell.
-Standalone builds disable Bun's `.env` and `bunfig.toml` autoloading so
-repository-local configuration cannot change binary behavior.
+The release claim is intentionally limited to the observed Linux x64 path;
+the repository ships no hosted CI (ADR-009), so platform evidence comes from
+local validation and `bun run smoke:wsl2` in a Linux x64 WSL2 shell. It does
+not establish Windows, macOS, or ARM support. Standalone builds disable Bun's
+`.env` and `bunfig.toml` autoloading so repository-local configuration cannot
+change binary behavior.
 
 ## Bootstrap
 

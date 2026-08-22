@@ -4,7 +4,7 @@ id: ADR-009
 title: Local-First Validation; Automatic Hosted CI Disabled
 status: accepted
 created_at: '2026-08-21T20:45:00-03:00'
-updated_at: '2026-08-21T20:45:00-03:00'
+updated_at: '2026-08-21T21:55:00-03:00'
 decision_type: governance
 owners:
 - orchestrator
@@ -37,13 +37,15 @@ affected_commands:
 
 ## Decision
 
-- Remove `push` and `pull_request` triggers from the `afol-ci` workflow. It
-  remains in the repository as an opt-in `workflow_dispatch` tool for when
-  billing allows manual observation.
+- The repository ships no GitHub Actions workflows. The former `afol-ci`
+  workflow was removed outright after the account situation proved
+  permanent: there is no premium plan, so hosted runners can never start.
 - Local validation against the exact candidate SHA is the canonical release
-  and merge evidence.
+  and merge evidence, with no hosted counterpart to wait for.
 - Documentation must never describe a missing or administratively
   unavailable hosted run as green, red, or failed product code.
+- Reintroducing any hosted automation requires a new decision record; a
+  contract test asserts `.github/workflows` stays absent.
 
 ## Options Considered
 
@@ -53,32 +55,34 @@ affected_commands:
 - Cons: permanent false-failure noise; contradicts the existing lesson.
 - Risks: trains agents to distrust CI entirely.
 
-2) Delete the workflow file
+2) Delete the workflow file (chosen)
 
-- Pros: simplest tree.
-- Cons: discards a validated pipeline definition that costs nothing while
-  idle.
-- Risks: harder to restore hosted observation later.
+- Pros: zero dead code; contract test locks `.github/workflows` absent;
+  doctrine and lesson stay aligned; nothing to maintain.
+- Cons: restoring hosted observation later requires recreating the workflow.
+- Risks: none technical; git history preserves the recipe.
 
-3) Manual-dispatch only (chosen)
+3) Manual-dispatch only (superseded same day)
 
-- Pros: zero runner consumption in normal flow; pipeline preserved as
-  opt-in; contract test locks the trigger surface; aligns doctrine and
-  lesson.
-- Cons: hosted observation requires an explicit action plus billing.
-- Risks: none technical; documented.
+- Pros: pipeline preserved as opt-in.
+- Cons: kept a permanently unrunnable pipeline plus its contract test alive
+  for no signal; the account has no premium plan, so dispatch could never
+  start a runner either.
 
 ## Rationale
 
 Local gates are strictly more comprehensive than the hosted job and are the
 only source that can observe the exact candidate SHA deterministically.
 Paying (or accruing debt) for a runner that cannot start buys no signal.
-Manual dispatch keeps future optionality without cost.
+Local gates are strictly more comprehensive than the hosted job and are the
+only source that can observe the exact candidate SHA deterministically. With
+no premium plan, even manual dispatch could never start a runner, so keeping
+the file bought nothing.
 
 ## Consequences
 
-- `cli/tests/release-toolchain.test.ts` asserts manual-dispatch-only triggers
-  and the ADR-009 marker inside the workflow.
+- `cli/tests/release-toolchain.test.ts` asserts `.github/workflows` stays
+  absent; reintroduction is a decision-record event.
 - `.afol/adm/doctrine/RELEASE-RUNBOOK.md` describes local-first validation as
   the release evidence chain.
 - Contributors need no Actions minutes; PR review relies on local runs of the
