@@ -18,10 +18,6 @@ import {
 import { validateEvolutionConfigExtension } from "../evolution";
 import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
-	collectFreshnessReport,
-	type FreshnessReport,
-} from "../local-state/freshness";
-import {
 	detectSessionHealth,
 	loadWorkBenchIndexSnapshot,
 } from "../local-state/workbench-index";
@@ -32,6 +28,10 @@ import {
 	validLegacyEvidenceBaseline,
 } from "./legacy-evidence-baseline";
 import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
+import {
+	collectFreshnessReportFast,
+	type FreshnessReport,
+} from "./validate-freshness";
 
 export type ProjectValidationCheck = {
 	id:
@@ -468,7 +468,7 @@ export async function validateProjectStructure(
 ): Promise<ProjectValidationReport> {
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const eventLedger = inspectEventLedger(projectRoot);
-	const freshness = collectFreshnessReport(projectRoot, {
+	const freshness = collectFreshnessReportFast(projectRoot, {
 		localState: true,
 		pstr: Boolean(
 			options?.checkDrift &&
