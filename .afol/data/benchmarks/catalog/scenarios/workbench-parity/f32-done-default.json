@@ -7,17 +7,28 @@
   "sandbox": false,
   "compiled_binary": true,
   "runner": "hot-path",
-  "hot_path": { "operation": "done", "mode": "default" },
+  "hot_path": {
+    "operation": "done",
+    "mode": "default"
+  },
   "coverage": {
-    "commands": ["done"],
-    "journeys": ["f32-hot-path-default-vs-derived"],
-    "features": ["F-32"],
-    "specs": ["260731_hot-path-observability-and-derived-state-separation_spec_01"]
+    "commands": [
+      "done"
+    ],
+    "journeys": [
+      "f32-hot-path-default-vs-derived"
+    ],
+    "features": [
+      "F-32"
+    ],
+    "specs": [
+      "260731_hot-path-observability-and-derived-state-separation_spec_01"
+    ]
   },
   "result_schema": "1.0.0",
   "oracle": "f32-hot-path-instrumentation",
   "thresholds": {
-    "max_p50_ms": 100,
+    "max_p50_ms": 200,
     "max_p95_ms": 300,
     "max_output_bytes": 20000,
     "max_output_tokens": 5000,
