@@ -76,6 +76,7 @@ type BootstrapRuntime = {
 	failAfterCleanup?: boolean | undefined;
 	failAfterMutableBaseline?: boolean | undefined;
 	failAfterProviderMigration?: boolean | undefined;
+	failLocalStateIndexBuild?: boolean | undefined;
 };
 
 function canonicalTargetRoot(targetRoot: string): string {
@@ -838,8 +839,14 @@ function resolveBootstrapWritePath(targetRoot: string, path: string): string {
  * pass `afol validate project` without a manual `afol local-state rebuild`.
  * Index failures must not roll back a completed scaffold.
  */
-function buildLocalStateIndexes(targetRoot: string): boolean {
+function buildLocalStateIndexes(
+	targetRoot: string,
+	runtime: BootstrapRuntime,
+): boolean {
 	try {
+		if (runtime.failLocalStateIndexBuild) {
+			throw new Error("Injected bootstrap local-state index build failure");
+		}
 		rebuildWorkBenchIndex(targetRoot);
 		rebuildProjectIndexes(targetRoot);
 		return true;
@@ -1105,7 +1112,7 @@ export async function runBootstrapCommand(
 						}
 					}
 				}
-				const indexOk = buildLocalStateIndexes(parsed.targetRoot);
+				const indexOk = buildLocalStateIndexes(parsed.targetRoot, runtime);
 				console.log(
 					indexOk
 						? "local_state_index: ok"

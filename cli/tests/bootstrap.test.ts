@@ -1260,11 +1260,11 @@ describe("bootstrap local-state index build", () => {
 		const originalLog = console.log;
 		console.log = (...values: unknown[]) => logs.push(values.join(" "));
 		try {
-			mkdirSync(join(target, ".afol", "data", "index"), { recursive: true });
-			mkdirSync(join(target, ".afol", "data", "index", "workbench.json"));
-			expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(
-				0,
-			);
+			expect(
+				await runBootstrapCommand([target, "--provider-compatible"], {
+					failLocalStateIndexBuild: true,
+				}),
+			).toBe(0);
 
 			expect(logs.join("\n")).toContain(
 				"local_state_index: failed; next: run afol local-state rebuild",

@@ -207,6 +207,23 @@ describe("project root loader", () => {
 		}
 	});
 
+	test("binds correctly when start path is inside the .git directory", () => {
+		const root = mkProjectRoot("inside-git-dir");
+		gitInit(root);
+		mkdirSync(join(root, ".git", "refs"), { recursive: true });
+		try {
+			const loaded = loadProjectRoot(join(root, ".git", "refs"));
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(realpathSync(loaded.value.root)).toBe(realpathSync(root));
+			expect(loaded.value.configSource).toBe("canonical");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("treats a .git file entry as a work-tree boundary", () => {
 		const ancestor = mkProjectRoot("git-file-boundary");
 		const nested = join(ancestor, "wt");
