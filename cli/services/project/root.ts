@@ -34,16 +34,35 @@ function pathIsInsideRoot(root: string, target: string): boolean {
 	);
 }
 
+function findEnclosingGitWorkTreeRoot(startPath: string): string | null {
+	let current = resolve(startPath);
+	while (true) {
+		if (existsSync(join(current, ".git"))) {
+			return current;
+		}
+		const parent = dirname(current);
+		if (parent === current) {
+			return null;
+		}
+		current = parent;
+	}
+}
+
 function findProjectRoot(
 	startPath: string,
 ): { root: string; configPath: string } | null {
-	let current = resolve(startPath);
+	const resolvedStart = resolve(startPath);
+	const gitWorkTreeRoot = findEnclosingGitWorkTreeRoot(resolvedStart);
+	let current = resolvedStart;
 	while (true) {
 		for (const candidate of PROJECT_CONFIG_PATHS) {
 			const configPath = join(current, candidate.relativePath);
 			if (existsSync(configPath)) {
 				return { root: current, configPath };
 			}
+		}
+		if (gitWorkTreeRoot !== null && current === gitWorkTreeRoot) {
+			return null;
 		}
 		const parent = dirname(current);
 		if (parent === current) {
