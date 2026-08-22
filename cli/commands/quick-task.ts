@@ -29,6 +29,17 @@ import { runVerification } from "./workbench/verify";
 /** Match batch start / task-selector cap in workbench args. */
 const QUICK_TASK_MAX_TASKS = 100;
 
+/** Failed steps that leave the session open with unfinished tasks. */
+const OPEN_TASK_FAILED_STEPS = new Set(["start", "verification", "evidence"]);
+
+function sessionOpenRecoveryLines(taskId: string): string[] {
+	return [
+		"session left open",
+		`next: afol tr ${taskId} --state problem -r "<reason>"   (mark blocker)`,
+		`  or: afol d ${taskId} -x "<corrected command>"         (retry and close)`,
+	];
+}
+
 export type ParsedQuickTaskArgs = {
 	theme: string;
 	json: boolean;
@@ -312,7 +323,14 @@ export async function runQuickTaskCommand(
 				next_command: hint,
 			});
 		} else {
-			console.error(`${message} ${formatHintLine(hint)}`);
+			console.error(
+				[
+					`${message} ${formatHintLine(hint)}`,
+					...(session && OPEN_TASK_FAILED_STEPS.has(failedStep)
+						? sessionOpenRecoveryLines(taskIds[0] ?? "T-01")
+						: []),
+				].join("\n"),
+			);
 		}
 		return exitCode;
 	}

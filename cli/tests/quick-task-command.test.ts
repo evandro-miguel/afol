@@ -620,4 +620,65 @@ describe("quick-task runQuickTaskCommand", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("verification failure prints session-open recovery with the real task id", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-fail-recovery-"));
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			console.error = (...values: unknown[]) =>
+				errors.push(values.map(String).join(" "));
+			const exitCode = await runQuickTaskCommand(
+				[
+					"fail-recovery",
+					"--task",
+					"broken work",
+					"--command",
+					"false",
+					"--no-spec-required",
+					"--reason",
+					"recovery fixture",
+				],
+				root,
+			);
+			expect(exitCode).toBe(1);
+			const sessions = readdirSync(join(root, ".afol", "wb")).filter(
+				(name) => !name.startsWith("."),
+			);
+			expect(sessions).toHaveLength(1);
+			const output = errors.join("\n");
+			expect(output).toContain(
+				`session=${sessions[0]} failed_step=verification`,
+			);
+			expect(output).toContain("session left open");
+			expect(output).toContain(
+				'next: afol tr T-01 --state problem -r "<reason>"',
+			);
+			expect(output).toContain("(mark blocker)");
+			expect(output).toContain('or: afol d T-01 -x "<corrected command>"');
+			expect(output).toContain("(retry and close)");
+		} finally {
+			console.error = originalError;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("passing quick task prints no session-open recovery lines", async () => {
+		const root = mkdtempSync(join(tmpdir(), "quick-task-pass-clean-"));
+		const logs: string[] = [];
+		const originalLog = console.log;
+		try {
+			console.log = (...values: unknown[]) => logs.push(values.join(" "));
+			const exitCode = await runQuickTaskCommand(
+				["pass-clean", "--command", "test -d .afol"],
+				root,
+			);
+			expect(exitCode).toBe(0);
+			expect(logs.join("\n")).not.toContain("session left open");
+			expect(logs.join("\n")).toContain("quick-task complete:");
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
