@@ -286,7 +286,7 @@ High-frequency commands should use short names through `afol`:
 - `afol e -T T-01 -c "bun test" -r pass`
 - `afol r g frontend`
 - `afol sk u`
-- `afol q s -T T-02 -f research.md -m "Summary"`
+- `afol qt <theme> -t "Summarize research" -c "bun test"`
 - `afol v`
 - `afol c`
 - `afol up ck`

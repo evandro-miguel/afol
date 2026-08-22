@@ -61,7 +61,7 @@ export function loadProjectRoot(
 		return err({
 			code: 3,
 			message:
-				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found.",
+				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found. next: run afol init",
 		});
 	}
 	let projectRoot: string;
@@ -84,7 +84,7 @@ export function loadProjectRoot(
 		return err({
 			code: 3,
 			message:
-				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found.",
+				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found. next: run afol init",
 		});
 	}
 
