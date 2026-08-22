@@ -897,7 +897,7 @@ describe("verifyWorkbenchTasks", () => {
 		}
 	});
 
-	test("strict verification rejects open generic checklist items in task files", () => {
+	test("strict verification treats open generic checklist items as non-blocking", () => {
 		const root = mkRoot("open-checklist");
 		try {
 			const session = "260615_1200_open_checklist";
@@ -926,7 +926,7 @@ describe("verifyWorkbenchTasks", () => {
 
 			const result = verifyWorkbenchTasks(root, true);
 
-			expect(result.allCompleted).toBe(false);
+			expect(result.allCompleted).toBe(true);
 			expect(
 				result.issues.some((issue) => issue.type === "open_checklist_item"),
 			).toBe(true);

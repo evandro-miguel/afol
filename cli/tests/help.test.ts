@@ -315,6 +315,7 @@ describe("help formatter", () => {
 		);
 		expect(validateHelp).toContain("Subcommands:");
 		expect(validateHelp).toContain("project --json [read]");
+		expect(validateHelp).toContain("project --strict --json [read]");
 		expect(validateHelp).toContain("bench --pack <pack-id> --json [read]");
 		expect(validateHelp).toContain(
 			"bench --pack governance-history --timing-mode observe --json [read]",

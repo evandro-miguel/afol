@@ -275,6 +275,9 @@ describe("release and toolchain contracts", () => {
 			"bun run local-state:rebuild",
 		);
 		expect(scripts["validate:release"]).toContain("bun run validate:project");
+		expect(scripts["validate:project"]).toBe(
+			"bun run kernel -- v project --strict --json",
+		);
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["test:full"]).toBe("bun test --only-failures");
 		expect(scripts["validate:release"]).toContain("bun run test:full");

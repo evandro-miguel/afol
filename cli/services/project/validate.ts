@@ -21,7 +21,10 @@ import {
 	detectSessionHealth,
 	loadWorkBenchIndexSnapshot,
 } from "../local-state/workbench-index";
-import { verifyAllSessions } from "../workbench/verify";
+import {
+	isBlockingVerifyIssue,
+	verifyAllSessions,
+} from "../workbench/verify";
 import { admitsEvidenceTransitionIssue } from "./evidence-transition-admission";
 import {
 	admitsLegacyEvidenceIssue,
@@ -65,12 +68,37 @@ export type ProjectValidationCheck = {
 
 export type ProjectValidationOptions = {
 	checkDrift?: boolean;
+	strict?: boolean;
 };
 
 export type ProjectValidationReport = {
 	ok: boolean;
 	checks: ProjectValidationCheck[];
 };
+
+// Checks that block routine validation; every other failed check degrades to a warning.
+const DEFAULT_HARD_CHECK_IDS: ReadonlySet<ProjectValidationCheck["id"]> =
+	new Set([
+		"config",
+		"wb_dir",
+		"event_ledger",
+		"session_evidence",
+		"session_health",
+	]);
+
+function applyDefaultPolicy(
+	checks: readonly ProjectValidationCheck[],
+	options?: ProjectValidationOptions,
+): ProjectValidationCheck[] {
+	if (options?.strict) {
+		return [...checks];
+	}
+	return checks.map((check) =>
+		!check.ok && !DEFAULT_HARD_CHECK_IDS.has(check.id)
+			? { id: check.id, ok: true, message: `warning: ${check.message}` }
+			: check,
+	);
+}
 
 function validateConfig(projectRoot: string): ProjectValidationCheck {
 	try {
@@ -544,28 +572,40 @@ export async function validateProjectStructure(
 			const baseline = validLegacyEvidenceBaseline(projectRoot);
 			let waivedLegacyIssues = 0;
 			let admittedTransitionDebt = 0;
-			const totalIssues = results.reduce((sum, result) => {
-				const unadmitted = result.issues.filter((issue) => {
-					const admitted = admitsLegacyEvidenceIssue(
-						baseline,
-						result.sessionPath,
-						issue,
-						result.openTasks.length > 0,
-					);
-					if (admitted) waivedLegacyIssues += 1;
-					const transitionAdmitted =
-						!admitted &&
-						admitsEvidenceTransitionIssue(
-							projectRoot,
-							result.sessionPath,
-							issue,
-							result.openTasks.length > 0,
-						);
-					if (transitionAdmitted) admittedTransitionDebt += 1;
-					return !admitted && !transitionAdmitted;
-				});
-				return sum + unadmitted.length;
-			}, 0);
+			const { blocking: totalIssues, checklist: checklistIssues } =
+				results.reduce(
+					(acc, result) => {
+						const unadmitted = result.issues.filter((issue) => {
+							const admitted = admitsLegacyEvidenceIssue(
+								baseline,
+								result.sessionPath,
+								issue,
+								result.openTasks.length > 0,
+							);
+							if (admitted) waivedLegacyIssues += 1;
+							const transitionAdmitted =
+								!admitted &&
+								admitsEvidenceTransitionIssue(
+									projectRoot,
+									result.sessionPath,
+									issue,
+									result.openTasks.length > 0,
+								);
+							if (transitionAdmitted) admittedTransitionDebt += 1;
+							return !admitted && !transitionAdmitted;
+						});
+						for (const issue of unadmitted) {
+							if (isBlockingVerifyIssue(issue)) acc.blocking += 1;
+							else acc.checklist += 1;
+						}
+						return acc;
+					},
+					{ blocking: 0, checklist: 0 },
+				);
+			const checklistNote =
+				checklistIssues > 0
+					? `; ${checklistIssues} open checklist item(s)`
+					: "";
 			const openTaskSessions = results.filter((r) => r.openTasks.length > 0);
 			if (results.length === 0) {
 				return {
@@ -578,14 +618,14 @@ export async function validateProjectStructure(
 				return {
 					id: "session_evidence" as const,
 					ok: false,
-					message: `${totalIssues} evidence issues across ${results.length} sessions`,
+					message: `${totalIssues} evidence issues across ${results.length} sessions${checklistNote}`,
 				};
 			}
 			if (openTaskSessions.length > 0) {
 				return {
 					id: "session_evidence" as const,
 					ok: true,
-					message: `ok, ${openTaskSessions.length} session(s) have open tasks (no evidence issues)`,
+					message: `ok, ${openTaskSessions.length} session(s) have open tasks (no evidence issues)${checklistNote}`,
 				};
 			}
 			return {
@@ -593,8 +633,8 @@ export async function validateProjectStructure(
 				ok: true,
 				message:
 					waivedLegacyIssues === 0 && admittedTransitionDebt === 0
-						? `ok ${results.length} sessions verified`
-						: `ok ${results.length} sessions verified; ${waivedLegacyIssues} legacy evidence issue(s) admitted by ${baseline?.baseline_id}; ${admittedTransitionDebt} post-cutoff evidence debt issue(s) admitted by no-op-evidence-v1`,
+						? `ok ${results.length} sessions verified${checklistNote}`
+						: `ok ${results.length} sessions verified; ${waivedLegacyIssues} legacy evidence issue(s) admitted by ${baseline?.baseline_id}; ${admittedTransitionDebt} post-cutoff evidence debt issue(s) admitted by no-op-evidence-v1${checklistNote}`,
 			};
 		})(),
 		(() => {
@@ -661,8 +701,9 @@ export async function validateProjectStructure(
 		});
 	}
 
+	const effectiveChecks = applyDefaultPolicy(checks, options);
 	return {
-		ok: checks.every((check) => check.ok),
-		checks,
+		ok: effectiveChecks.every((check) => check.ok),
+		checks: effectiveChecks,
 	};
 }

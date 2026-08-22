@@ -83,6 +83,27 @@
       "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01",
       "resolved_at": "2026-08-17T23:35:47.485Z",
       "reason": "Regression fix for final F-22 lock integrity; parent cannot be reopened and focused evidence is recorded."
+    },
+    {
+      "session_id": "260822_1523_warn-vs-block-advisory-gates",
+      "created_at": "2026-08-22T20:23:45.522Z",
+      "updated_at": "2026-08-22T20:30:36.014Z",
+      "status": "resolved",
+      "theme": "warn-vs-block-advisory-gates",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
+      "resolution_hint": "linked to roadmap feature and parent spec",
+      "feature_id": "F-11",
+      "parent_spec": "260822_2023_warn-vs-block-advisory-gates_spec-child_01",
+      "resolved_at": "2026-08-22T20:30:36.014Z",
+      "parent_spec_path": ".afol/adm/specs/260822_2023_warn-vs-block-advisory-gates_spec-child_01.md",
+      "parent_spec_sha256": "5268a87ba93e8d29f3423e6e00be208964e55764df7ae495117560215df7f929",
+      "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+      "roadmap_sha256": "b9064144010d403e47ee7f57f27fa54b4d327d16a14f82c7869799dc5f8bc903"
     }
   ]
 }

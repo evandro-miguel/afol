@@ -190,6 +190,15 @@ describe("validate command", () => {
 		}
 	});
 
+	test("resolves strict project validation through the invocation router", () => {
+		expect(resolveValidateInvocation(["project", "--strict", "--json"])).toEqual(
+			{
+				kind: "project",
+				args: ["--strict", "--json"],
+			},
+		);
+	});
+
 	test("renders failing drift validation in JSON and human modes", async () => {
 		const root = createValidationFixture();
 		try {
@@ -444,14 +453,36 @@ describe("validate command", () => {
 			const drifted = captureIo();
 			expect(
 				await runValidateCommand(root, ["--check-drift", "--json"], drifted.io),
-			).toBe(1);
-			const payload = JSON.parse(drifted.stdout[0] ?? "{}") as {
+			).toBe(0);
+			const driftPayload = JSON.parse(drifted.stdout[0] ?? "{}") as {
 				checks?: Array<{ id: string; ok: boolean; message: string }>;
 			};
-			const check = payload.checks?.find((entry) => entry.id === "index_drift");
-			expect(check?.ok).toBe(false);
-			expect(check?.message).toContain("specs_markdown");
-			expect(check?.message).toContain("index/frontmatter mismatch: spec-a");
+			const advisoryCheck = driftPayload.checks?.find(
+				(entry) => entry.id === "index_drift",
+			);
+			expect(advisoryCheck?.ok).toBe(true);
+			expect(advisoryCheck?.message).toContain("warning:");
+			expect(advisoryCheck?.message).toContain("specs_markdown");
+			expect(advisoryCheck?.message).toContain(
+				"index/frontmatter mismatch: spec-a",
+			);
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--strict", "--json"],
+					strict.io,
+				),
+			).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const strictCheck = strictPayload.checks?.find(
+				(entry) => entry.id === "index_drift",
+			);
+			expect(strictCheck?.ok).toBe(false);
+			expect(strictCheck?.message).not.toContain("warning:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -500,15 +531,24 @@ describe("validate command", () => {
 				["--check-drift", "--json"],
 				captured.io,
 			);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				checks?: Array<{ id: string; ok: boolean; message: string }>;
 			};
 			const check = payload.checks?.find((entry) => entry.id === "index_drift");
-			expect(check?.ok).toBe(false);
+			expect(check?.ok).toBe(true);
 			expect(check?.message).toContain(
 				"invalid spec frontmatter: unreadable.md",
 			);
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--strict", "--json"],
+					strict.io,
+				),
+			).toBe(1);
 		} finally {
 			if (existsSync(specPath)) chmodSync(specPath, 0o600);
 			rmSync(root, { recursive: true, force: true });
@@ -517,46 +557,32 @@ describe("validate command", () => {
 
 	test.each([
 		{
-			name: "rejects disabled adapter with .claude",
+			name: "warns on disabled adapter with .claude until strict",
 			enabled: false,
 			artifact: ".claude",
-			expectedCode: 1,
-			expectedOk: false,
-			expectedMessage:
+			message:
 				"claude adapter is disabled but owned artifacts are present: .claude",
 		},
 		{
-			name: "rejects disabled adapter with CLAUDE.md",
+			name: "warns on disabled adapter with CLAUDE.md until strict",
 			enabled: false,
 			artifact: "CLAUDE.md",
-			expectedCode: 1,
-			expectedOk: false,
-			expectedMessage:
+			message:
 				"claude adapter is disabled but owned artifacts are present: CLAUDE.md",
 		},
 		{
 			name: "allows enabled adapter with owned artifacts",
 			enabled: true,
 			artifact: ".claude",
-			expectedCode: 0,
-			expectedOk: true,
-			expectedMessage: "ok claude adapter enabled",
+			message: "ok claude adapter enabled",
 		},
 		{
 			name: "allows disabled adapter without owned artifacts",
 			enabled: false,
 			artifact: null,
-			expectedCode: 0,
-			expectedOk: true,
-			expectedMessage: "ok claude adapter disabled with no owned artifacts",
+			message: "ok claude adapter disabled with no owned artifacts",
 		},
-	])("$name", async ({
-		enabled,
-		artifact,
-		expectedCode,
-		expectedOk,
-		expectedMessage,
-	}) => {
+	])("$name", async ({ enabled, artifact, message }) => {
 		const root = createValidationFixture();
 		try {
 			writeFileSync(
@@ -580,6 +606,7 @@ describe("validate command", () => {
 			}
 			rebuildValidationFixtureIndexes(root);
 
+			const failing = !message.startsWith("ok ");
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
@@ -589,11 +616,34 @@ describe("validate command", () => {
 				(check) => check.id === "adapter_consistency",
 			);
 
-			expect(code).toBe(expectedCode);
+			expect(code).toBe(0);
 			expect(adapterCheck).toEqual({
 				id: "adapter_consistency",
-				ok: expectedOk,
-				message: expectedMessage,
+				ok: true,
+				message: failing ? `warning: ${message}` : message,
+			});
+
+			if (!failing) {
+				return;
+			}
+			const strict = captureIo();
+			const strictCode = await runValidateCommand(
+				root,
+				["--strict", "--json"],
+				strict.io,
+			);
+			expect(strictCode).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				checks?: Array<{ id?: string; ok?: boolean; message?: string }>;
+			};
+			expect(
+				strictPayload.checks?.find(
+					(check) => check.id === "adapter_consistency",
+				),
+			).toEqual({
+				id: "adapter_consistency",
+				ok: false,
+				message,
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -820,7 +870,7 @@ describe("validate command", () => {
 		}
 	});
 
-	test("rejects discontinued skills-sync manifest in .agents", async () => {
+	test("warns on discontinued skills-sync manifest until strict", async () => {
 		const root = createValidationFixture();
 		try {
 			writeFileSync(
@@ -838,15 +888,29 @@ describe("validate command", () => {
 				(entry) => entry.id === "agents_payload_clean",
 			);
 
-			expect(code).toBe(1);
-			expect(check?.ok).toBe(false);
+			expect(code).toBe(0);
+			expect(check?.ok).toBe(true);
+			expect(check?.message).toContain("warning:");
 			expect(check?.message).toContain(".agents/skills-sync.manifest.json");
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(root, ["--strict", "--json"], strict.io),
+			).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const strictCheck = strictPayload.checks?.find(
+				(entry) => entry.id === "agents_payload_clean",
+			);
+			expect(strictCheck?.ok).toBe(false);
+			expect(strictCheck?.message).not.toContain("warning:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("rejects vendored global agentic-folder-sys skill", async () => {
+	test("warns on vendored global agentic-folder-sys skill until strict", async () => {
 		const root = createValidationFixture();
 		try {
 			const staleSkillPath = join(
@@ -867,9 +931,22 @@ describe("validate command", () => {
 				(entry) => entry.id === "agents_payload_clean",
 			);
 
-			expect(code).toBe(1);
-			expect(check?.ok).toBe(false);
+			expect(code).toBe(0);
+			expect(check?.ok).toBe(true);
+			expect(check?.message).toContain("warning:");
 			expect(check?.message).toContain(".agents/skills/agentic-folder-sys");
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(root, ["--strict", "--json"], strict.io),
+			).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const strictCheck = strictPayload.checks?.find(
+				(entry) => entry.id === "agents_payload_clean",
+			);
+			expect(strictCheck?.ok).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -911,19 +988,19 @@ describe("validate command", () => {
 		}
 	});
 
-	test("fails when local-state index snapshots are missing", async () => {
+	test("warns on missing local-state snapshots until strict", async () => {
 		const root = createValidationFixture();
 		try {
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				exit_code: number;
 				ok: boolean;
 				checks: Array<{ id: string; ok: boolean; message?: string }>;
 			};
-			expect(payload.exit_code).toBe(1);
-			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.ok).toBe(true);
 			for (const id of [
 				"wb_local_state_index",
 				"rules_local_state_index",
@@ -933,8 +1010,54 @@ describe("validate command", () => {
 			]) {
 				const check = payload.checks.find((entry) => entry.id === id);
 				expect(check).toBeDefined();
-				expect(check?.ok).toBe(false);
+				expect(check?.ok).toBe(true);
+				expect(check?.message).toContain("warning:");
 				expect(check?.message).toContain("run afol local-state rebuild");
+			}
+
+			const strict = captureIo();
+			const strictCode = await runValidateCommand(
+				root,
+				["--strict", "--json"],
+				strict.io,
+			);
+			expect(strictCode).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
+			};
+			for (const id of [
+				"wb_local_state_index",
+				"rules_local_state_index",
+				"skills_local_state_index",
+				"specs_local_state_index",
+				"files_local_state_index",
+			]) {
+				const check = strictPayload.checks.find((entry) => entry.id === id);
+				expect(check?.ok).toBe(false);
+				expect(check?.message).not.toContain("warning:");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps config checks blocking in every mode", async () => {
+		const root = createValidationFixture();
+		try {
+			writeFileSync(join(root, ".afol", "config.json"), "{");
+
+			for (const args of [["--json"], ["--strict", "--json"]]) {
+				const captured = captureIo();
+				const code = await runValidateCommand(root, args, captured.io);
+				expect(code).toBe(1);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					ok: boolean;
+					checks: Array<{ id: string; ok: boolean; message: string }>;
+				};
+				expect(payload.ok).toBe(false);
+				const check = payload.checks.find((entry) => entry.id === "config");
+				expect(check?.ok).toBe(false);
+				expect(check?.message.startsWith("warning:")).toBe(false);
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -972,8 +1095,8 @@ describe("validate command", () => {
 							? "wb_local_state_index"
 							: `${name}_local_state_index`),
 				);
-				expect(check).toMatchObject({ ok: false });
-				expect(check?.message).toBe(finding.message);
+				expect(check).toMatchObject({ ok: true });
+				expect(check?.message).toBe(`warning: ${finding.message}`);
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1005,16 +1128,26 @@ describe("validate command", () => {
 			const drift = captureIo();
 			expect(
 				await runValidateCommand(root, ["--check-drift", "--json"], drift.io),
-			).toBe(1);
+			).toBe(0);
 			const driftPayload = JSON.parse(drift.stdout[0] ?? "{}") as {
 				checks: Array<{ id: string; ok: boolean; message: string }>;
 			};
 			const indexDrift = driftPayload.checks.find(
 				(check) => check.id === "index_drift",
 			);
-			expect(indexDrift).toMatchObject({ ok: false });
+			expect(indexDrift).toMatchObject({ ok: true });
+			expect(indexDrift?.message).toContain("warning:");
 			expect(indexDrift?.message).toContain("pstr");
 			expect(indexDrift?.message).toContain("run afol pstr rebuild");
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--strict", "--json"],
+					strict.io,
+				),
+			).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1036,17 +1169,27 @@ describe("validate command", () => {
 					["--check-drift", "--json"],
 					captured.io,
 				),
-			).toBe(1);
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				checks: Array<{ id: string; ok: boolean; message: string }>;
 			};
 			const indexDrift = payload.checks.find(
 				(check) => check.id === "index_drift",
 			);
-			expect(indexDrift).toMatchObject({ ok: false });
+			expect(indexDrift).toMatchObject({ ok: true });
+			expect(indexDrift?.message).toContain("warning:");
 			expect(indexDrift?.message).toContain("pstr:index");
 			expect(indexDrift?.message).toContain("invalid pstr index snapshot");
 			expect(indexDrift?.message).not.toContain("pstr:map:");
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(
+					root,
+					["--check-drift", "--strict", "--json"],
+					strict.io,
+				),
+			).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1135,7 +1278,7 @@ describe("validate command", () => {
 		}
 	});
 
-	test("fails when manifest is missing or invalid", async () => {
+	test("warns on invalid manifest until strict", async () => {
 		const root = createValidationFixture();
 		try {
 			writeFileSync(
@@ -1146,7 +1289,7 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 			expect(captured.stderr).toEqual([]);
 			expect(captured.stdout.length).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
@@ -1154,19 +1297,27 @@ describe("validate command", () => {
 				unknown
 			>;
 			expect(payload.schema).toBe("afol.result/v1");
-			expect(payload.exit_code).toBe(1);
-			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.ok).toBe(true);
 			expect(payload.report).toBeDefined();
 			const checks = payload.checks as Array<Record<string, unknown>>;
-			expect(
-				checks.some((entry) => entry.id === "manifest" && entry.ok === false),
-			).toBe(true);
+			const manifestCheck = checks.find((entry) => entry.id === "manifest");
+			expect(manifestCheck?.ok).toBe(true);
+			expect(String(manifestCheck?.message)).toContain("warning:");
+
+			const strict = captureIo();
+			const strictCode = await runValidateCommand(
+				root,
+				["--strict", "--json"],
+				strict.io,
+			);
+			expect(strictCode).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("fails when workbench index snapshot is malformed", async () => {
+	test("warns when workbench index snapshot is malformed until strict", async () => {
 		const root = createValidationFixture();
 		try {
 			const indexPath = join(root, ".afol", "data", "index");
@@ -1179,25 +1330,31 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				schema: string;
 				exit_code: number;
-				checks: Array<{ id: string; ok: boolean }>;
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
 			};
 			expect(payload.schema).toBe("afol.result/v1");
-			expect(payload.exit_code).toBe(1);
+			expect(payload.exit_code).toBe(0);
 			const indexCheck = payload.checks.find(
 				(entry) => entry.id === "wb_local_state_index",
 			);
 			expect(indexCheck).toBeDefined();
-			expect(indexCheck?.ok).toBe(false);
+			expect(indexCheck?.ok).toBe(true);
+			expect(indexCheck?.message).toContain("warning:");
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(root, ["--strict", "--json"], strict.io),
+			).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("fails when rules index snapshot is malformed", async () => {
+	test("warns when rules index snapshot is malformed until strict", async () => {
 		const root = createValidationFixture();
 		try {
 			const indexPath = join(root, ".afol", "data", "index");
@@ -1210,20 +1367,26 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				schema: string;
 				exit_code: number;
-				checks: Array<{ id: string; ok: boolean }>;
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
 			};
 			expect(payload.schema).toBe("afol.result/v1");
-			expect(payload.exit_code).toBe(1);
+			expect(payload.exit_code).toBe(0);
 			const indexCheck = payload.checks.find(
 				(entry) => entry.id === "rules_local_state_index",
 			);
 			expect(indexCheck).toBeDefined();
-			expect(indexCheck?.ok).toBe(false);
+			expect(indexCheck?.ok).toBe(true);
+			expect(indexCheck?.message).toContain("warning:");
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(root, ["--strict", "--json"], strict.io),
+			).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1325,20 +1488,40 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(1);
+			expect(code).toBe(0);
 
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
 				string,
 				unknown
 			>;
 			expect(payload.schema).toBe("afol.result/v1");
-			expect(payload.exit_code).toBe(1);
+			expect(payload.exit_code).toBe(0);
 			const checks = payload.checks as Array<Record<string, unknown>>;
 			const templateCheck = checks.find(
 				(entry) => entry.id === "template_forbidden",
 			);
 			expect(templateCheck).toBeDefined();
-			expect(templateCheck?.ok).toBe(false);
+			expect(templateCheck?.ok).toBe(true);
+			expect(templateCheck?.message).toContain("warning:");
+
+			const strict = captureIo();
+			const strictCode = await runValidateCommand(
+				root,
+				["--strict", "--json"],
+				strict.io,
+			);
+			expect(strictCode).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			const strictChecks = strictPayload.checks as Array<
+				Record<string, unknown>
+			>;
+			const strictTemplateCheck = strictChecks.find(
+				(entry) => entry.id === "template_forbidden",
+			);
+			expect(strictTemplateCheck?.ok).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

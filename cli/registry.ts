@@ -176,6 +176,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Validate project structure and include drift checks",
 			},
 			{
+				usage: "project --strict --json",
+				sideEffect: "read",
+				description:
+					"Strict validation keeps failed hygiene checks blocking (release gate)",
+			},
+			{
 				usage: "drift --json",
 				sideEffect: "read",
 				description: "Run drift validation only",

@@ -260,11 +260,42 @@ describe("health system", () => {
 		try {
 			writeMemory(root, hoursAgo(24 * 45));
 			const report = checkHealth(root, { deep: true });
-			expect(report.ok).toBe(false);
+			expect(report.ok).toBe(true);
 			expect(report.findings.length).toBeGreaterThan(0);
 			expect(
 				report.summary.fail + report.summary.warn + report.summary.info,
 			).toBe(report.findings.length);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("health treats missing administration as advisory unless release scoped", async () => {
+		const root = createFixture();
+		try {
+			rmSync(join(root, ".afol", "adm"), { recursive: true, force: true });
+			const report = checkHealth(root, { area: "adm" });
+			expect(report.ok).toBe(true);
+			expect(report.findings[0]?.severity).toBe("warn");
+			expect(report.findings[0]?.message).toContain("missing");
+
+			const captured = captureIo();
+			expect(
+				await runHealthCommand(["--release", "--json"], root, captured.io),
+			).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				exit_code: number;
+				findings: Array<{ area: string; severity: string; message: string }>;
+			};
+			expect(payload.exit_code).toBe(1);
+			expect(
+				payload.findings.some(
+					(finding) =>
+						finding.area === "adm" &&
+						finding.severity === "fail" &&
+						finding.message.includes("missing"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -339,10 +370,28 @@ describe("health system", () => {
 				report.findings.some(
 					(finding) =>
 						finding.area === "pstr" &&
-						finding.severity === "fail" &&
+						finding.severity === "warn" &&
 						finding.hint === "run afol pstr rebuild",
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkHealth promotes stale PSTR warnings in release scope", () => {
+		const root = createFixture();
+		try {
+			writePstrIndex(root, hoursAgo(24 * 45));
+			const routine = checkHealth(root, { area: "pstr" });
+			expect(routine.ok).toBe(true);
+			expect(
+				routine.findings.every((finding) => finding.severity === "warn"),
+			).toBe(true);
+
+			const release = checkHealth(root, { area: "pstr", release: true });
+			expect(release.ok).toBe(false);
+			expect(release.summary.fail).toBe(release.findings.length);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -556,7 +605,7 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const report = checkHealth(root, { area: "memory" });
-			expect(report.findings[0]?.severity).toBe("fail");
+			expect(report.findings[0]?.severity).toBe("warn");
 			expect(report.findings[0]?.message).toContain(
 				"missing or invalid project memory",
 			);
@@ -618,7 +667,7 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const report = checkHealth(root, { area: "state" });
-			expect(report.findings[0]?.severity).toBe("fail");
+			expect(report.findings[0]?.severity).toBe("warn");
 			expect(report.findings[0]?.message).toContain("missing state db");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -657,7 +706,7 @@ describe("health system", () => {
 				(finding) => finding.severity === "info",
 			).length;
 			expect(report.summary).toEqual({ fail, warn, info });
-			expect(fail).toBeGreaterThan(0);
+			expect(fail).toBe(0);
 			expect(warn).toBeGreaterThan(0);
 			expect(info).toBeGreaterThan(0);
 		} finally {
@@ -712,8 +761,9 @@ describe("health system", () => {
 			writeMemory(root, hoursAgo(24 * 45));
 			const report = runDoctor(root);
 			const severities = report.remediation.map((step) => step.severity);
-			expect(severities[0]).toBe("fail");
+			expect(severities[0]).toBe("warn");
 			expect(severities.some((severity) => severity === "warn")).toBe(true);
+			expect(severities.every((severity) => severity !== "fail")).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1364,9 +1414,9 @@ describe("health system", () => {
 			expect(captured.stdout.join("\n")).not.toContain("FAIL pstr");
 
 			const full = captureIo();
-			expect(await runHealthCommand(["full"], root, full.io)).toBe(1);
-			expect(full.stdout.join("\n")).toContain("health full: issues found");
-			expect(full.stdout.join("\n")).toContain("FAIL pstr: stale pstr map");
+			expect(await runHealthCommand(["full"], root, full.io)).toBe(0);
+			expect(full.stdout.join("\n")).toContain("health full: ok");
+			expect(full.stdout.join("\n")).toContain("WARN pstr: stale pstr map");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1411,7 +1461,7 @@ describe("health system", () => {
 			const captured = captureIo();
 			expect(
 				await runHealthCommand(["--area", "pstr"], root, captured.io),
-			).toBe(1);
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("pstr");
 			expect(captured.stdout.join("\n")).not.toContain("memory");
 		} finally {

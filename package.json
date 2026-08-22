@@ -48,7 +48,7 @@
 		"build": "bun run version:generate && bun run cli/dev/build-release.ts",
 		"build:deterministic": "bun install --frozen-lockfile && bun test cli/tests/reproducible-build.test.ts && bun run build",
 		"local-state:rebuild": "bun run kernel -- local-state rebuild --json",
-		"validate:project": "bun run kernel -- v project --json",
+		"validate:project": "bun run kernel -- v project --strict --json",
 		"validate:security": "bun run security:scan:informative",
 		"security:deps:informative": "bun run cli/dev/security-scan.ts deps",
 		"security:secrets:informative": "bun run cli/dev/security-scan.ts secrets",

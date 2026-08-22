@@ -116,6 +116,10 @@ export type VerifyIssue = {
 	message: string;
 };
 
+export function isBlockingVerifyIssue(issue: VerifyIssue): boolean {
+	return issue.type !== "open_checklist_item";
+}
+
 export type VerifyResult = {
 	sessionPath: string;
 	strict: boolean;
@@ -864,7 +868,8 @@ export function verifyTaskText(content: string, file: string): VerifyResult {
 	const seenTaskIds = new Map<string, VerifyTask>();
 	for (const task of tasks) recordTaskState(result, task, seenTaskIds);
 	result.allCompleted =
-		result.openTasks.length === 0 && result.issues.length === 0;
+		result.openTasks.length === 0 &&
+		!result.issues.some(isBlockingVerifyIssue);
 	return result;
 }
 
@@ -936,7 +941,8 @@ export function verifyWorkbenchTasks(
 	}
 
 	result.allCompleted =
-		result.openTasks.length === 0 && result.issues.length === 0;
+		result.openTasks.length === 0 &&
+		!result.issues.some(isBlockingVerifyIssue);
 	return result;
 }
 

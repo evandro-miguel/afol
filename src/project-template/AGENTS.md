@@ -94,6 +94,19 @@ afol local-state rebuild --json
 - Prefer `afol qt` for micro one-shot work; hygiene warnings (health,
   maintenance, open pending) do not stop mid-delivery lifecycle. Repair corrupt
   context with `afol catchup --fix`.
+- Warning versus hard block: routine hygiene is advisory and must not stop
+  delivery; unsafe or unsuccessful operations always stop.
+
+| Operation | Warning-only | Hard block |
+| --- | --- | --- |
+| `afol health` / `full` / `--area` | Administration, PSTR, stale sessions, rebuildable indexes/DBs, memory/library/ctx health, token budget | Unreadable canonical session directory or invalid event ledger |
+| `afol health --release` | None: routine warnings become failures for the explicit release check | Any warning/failure |
+| `afol validate project` | Administration/provider/template layout, derived local indexes, toolchain claims, optional drift, pending specs | Invalid config, missing workbench root, invalid event ledger, unreadable/corrupt session state, blocking evidence issue |
+| `afol validate project --strict` | Pending specs and generic checklist items remain warnings | Every other raw failed project check |
+| `afol verify-tasks --strict` | Generic unchecked checklist item is reported but exits 0 when it is the only issue and no task is open | Missing/failed/invalid evidence, invalid/duplicate task state, missing session/tasks, or any open lifecycle task |
+| `afol close` | Generic checklist warning returned compactly | Open task unless carry-open; blocking verifier issue |
+| `afol close --admit-legacy-baseline` | Same checklist warning behavior | Any issue outside exact hash/cutoff admission or the warning predicate |
+
 - Resolve with short path: `afol gov rs -S <id> -F <F-id> -P <spec-id>`
   (`-S` optional when active/bound) or waive
   `afol gov rs -S <id> --no-spec-required -r "<reason>"`.

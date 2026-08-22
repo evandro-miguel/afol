@@ -2782,6 +2782,30 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("close treats open checklist items as non-blocking warnings", () => {
+		const root = mkRoot("checklist-close");
+		try {
+			const created = newWorkstream(root, "checklist close");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "sh -n session-task.sh",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			writeFileSync(
+				created.taskPath,
+				`${readFileSync(created.taskPath, "utf8")}\n## Sub-task Checklist (T-01)\n\n- [ ] Run final gate\n`,
+				"utf8",
+			);
+			const result = closeSession(root, created.session);
+			expect(result.join("\n")).toContain("open checklist item(s)");
+			expect(existsSync(created.activeSessionPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("doneTask rejects latest-failed evidence after successful evidence", () => {
 		const root = mkRoot("done-latest-failed");
 		try {
