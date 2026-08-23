@@ -1,1 +1,0 @@
-src/project-template/RTK.md
