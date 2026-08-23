@@ -5,6 +5,7 @@ import {
 	fstatSync,
 	fsyncSync,
 	ftruncateSync,
+	linkSync,
 	lstatSync,
 	mkdirSync,
 	openSync,
@@ -13,6 +14,7 @@ import {
 	realpathSync,
 	unlinkSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
@@ -38,6 +40,19 @@ interface GenerationFence {
 	identity: LockIdentity;
 }
 
+interface GenerationRecord {
+	generation: number;
+	raw: string;
+}
+
+interface CompletionFenceIo {
+	truncate?: (fd: number, size: number) => void;
+	write?: (fd: number, value: string) => void;
+	sync?: (fd: number) => void;
+	link?: (existingPath: string, newPath: string) => void;
+	unlink?: (path: string) => void;
+}
+
 interface CompletionLockMetadata {
 	pid: number;
 	host: string;
@@ -57,6 +72,8 @@ export interface TaskCompletionLease {
 export interface TaskCompletionLockOptions {
 	timeoutMs?: number;
 	heartbeatMs?: number;
+	/** Narrow test-only fault-injection seam for completion fence durability. */
+	fenceIo?: CompletionFenceIo;
 }
 
 export class TaskCompletionBusyError extends Error {
@@ -155,20 +172,25 @@ function readOwnedMetadata(
 	}
 }
 
-function readGenerationFd(fd: number, allowEmpty = false): number | null {
+function readGenerationRecordFd(fd: number): GenerationRecord | null {
 	try {
 		const size = fstatSync(fd).size;
-		if (size === 0) return allowEmpty ? 0 : null;
-		if (size > 32) return null;
+		if (size === 0 || size > 32) return null;
 		const buffer = Buffer.alloc(size);
 		if (readSync(fd, buffer, 0, size, 0) !== size) return null;
 		const raw = buffer.toString("utf8");
 		if (!/^(0|[1-9]\d*)\n$/.test(raw)) return null;
-		const value = Number.parseInt(raw, 10);
-		return Number.isSafeInteger(value) && value >= 0 ? value : null;
+		const generation = Number.parseInt(raw, 10);
+		return Number.isSafeInteger(generation) && generation >= 0
+			? { generation, raw }
+			: null;
 	} catch {
 		return null;
 	}
+}
+
+function readGenerationFd(fd: number): number | null {
+	return readGenerationRecordFd(fd)?.generation ?? null;
 }
 
 function readOwnedGeneration(
@@ -189,48 +211,173 @@ function readOwnedGeneration(
 	}
 }
 
-function incrementGeneration(path: string): GenerationFence {
-	let fd: number;
-	let created = false;
-	try {
-		fd = openSync(
-			path,
-			fsConstants.O_RDWR |
-				fsConstants.O_CREAT |
-				fsConstants.O_EXCL |
-				fsConstants.O_APPEND |
-				NOFOLLOW,
-			0o600,
-		);
-		created = true;
-	} catch (error) {
-		if (!isAlreadyExistsError(error)) throw error;
-		fd = openSync(path, fsConstants.O_RDWR | fsConstants.O_APPEND | NOFOLLOW);
+function writeFence(fd: number, value: string, io?: CompletionFenceIo): void {
+	if (io?.write) {
+		io.write(fd, value);
+		return;
 	}
+	const buffer = Buffer.from(value, "utf8");
+	let offset = 0;
+	while (offset < buffer.length) {
+		const written = writeSync(
+			fd,
+			buffer,
+			offset,
+			buffer.length - offset,
+			offset,
+		);
+		if (written <= 0) {
+			throw new Error("Task completion fence write made no progress.");
+		}
+		offset += written;
+	}
+}
+
+function syncFence(fd: number, io?: CompletionFenceIo): void {
+	(io?.sync ?? fsyncSync)(fd);
+}
+
+function restoreGeneration(
+	path: string,
+	fd: number,
+	expected: LockIdentity,
+	previous: string,
+	io?: CompletionFenceIo,
+): void {
+	if (!pathHasIdentity(path, expected)) {
+		throw new Error(
+			"Task completion fence ownership was lost before recovery.",
+		);
+	}
+	(io?.truncate ?? ftruncateSync)(fd, 0);
+	writeFence(fd, previous, io);
+	syncFence(fd, io);
+	if (
+		!pathHasIdentity(path, expected) ||
+		readGenerationRecordFd(fd)?.raw !== previous
+	) {
+		throw new Error("Task completion fence recovery could not be verified.");
+	}
+}
+
+function incrementExistingGeneration(
+	path: string,
+	fd: number,
+	io?: CompletionFenceIo,
+): GenerationFence {
 	try {
 		const fenceIdentity = identity(fd);
 		if (!pathHasIdentity(path, fenceIdentity)) {
 			throw new Error("Task completion fence is not a regular owned file.");
 		}
-		const current = readGenerationFd(fd, created);
+		const current = readGenerationRecordFd(fd);
 		if (current === null) {
 			throw new Error(
 				"Task completion fence contains invalid generation data.",
 			);
 		}
-		const next = current + 1;
+		const next = current.generation + 1;
 		if (!Number.isSafeInteger(next)) {
 			throw new Error("Task completion fence generation is exhausted.");
 		}
-		ftruncateSync(fd, 0);
-		writeFileSync(fd, `${next}\n`, "utf8");
-		fsyncSync(fd);
-		if (!pathHasIdentity(path, fenceIdentity)) {
+		(io?.truncate ?? ftruncateSync)(fd, 0);
+		try {
+			writeFence(fd, `${next}\n`, io);
+			syncFence(fd, io);
+		} catch (primaryError) {
+			try {
+				restoreGeneration(path, fd, fenceIdentity, current.raw, io);
+			} catch (recoveryError) {
+				throw new AggregateError(
+					[primaryError, recoveryError],
+					"Task completion fence update failed and could not be restored.",
+				);
+			}
+			throw primaryError;
+		}
+		if (
+			!pathHasIdentity(path, fenceIdentity) ||
+			readGenerationRecordFd(fd)?.generation !== next
+		) {
 			throw new Error("Task completion fence ownership was lost.");
 		}
 		return { fd, generation: next, identity: fenceIdentity };
 	} catch (error) {
 		closeSync(fd);
+		throw error;
+	}
+}
+
+// This is atomic for observed synchronous I/O failures, not sudden power loss.
+function createFreshGeneration(
+	path: string,
+	io?: CompletionFenceIo,
+): GenerationFence {
+	const temporaryPath = `${path}.tmp-${randomUUID()}`;
+	let fd: number | null = null;
+	let temporaryIdentity: LockIdentity | null = null;
+	try {
+		fd = openSync(
+			temporaryPath,
+			fsConstants.O_RDWR | fsConstants.O_CREAT | fsConstants.O_EXCL | NOFOLLOW,
+			0o600,
+		);
+		temporaryIdentity = identity(fd);
+		if (!pathHasIdentity(temporaryPath, temporaryIdentity)) {
+			throw new Error("Task completion fence temporary file is not owned.");
+		}
+		writeFence(fd, "1\n", io);
+		syncFence(fd, io);
+		if (readGenerationRecordFd(fd)?.raw !== "1\n") {
+			throw new Error(
+				"Task completion fence temporary data could not be verified.",
+			);
+		}
+		try {
+			(io?.link ?? linkSync)(temporaryPath, path);
+		} catch (error) {
+			if (isAlreadyExistsError(error)) {
+				throw new Error("Task completion fence was concurrently created.");
+			}
+			throw error;
+		}
+		if (!pathHasIdentity(path, temporaryIdentity)) {
+			throw new Error("Task completion fence publication ownership was lost.");
+		}
+		if (!unlinkOwned(temporaryPath, temporaryIdentity, io?.unlink)) {
+			throw new Error(
+				"Task completion fence temporary alias could not be removed.",
+			);
+		}
+		return { fd, generation: 1, identity: temporaryIdentity };
+	} catch (error) {
+		if (temporaryIdentity !== null) {
+			unlinkOwned(temporaryPath, temporaryIdentity, io?.unlink);
+		}
+		if (fd !== null) closeSync(fd);
+		throw error;
+	}
+}
+
+function incrementGeneration(
+	path: string,
+	io?: CompletionFenceIo,
+): GenerationFence {
+	try {
+		return incrementExistingGeneration(
+			path,
+			openSync(path, fsConstants.O_RDWR | NOFOLLOW),
+			io,
+		);
+	} catch (error) {
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			(error as { code?: unknown }).code === "ENOENT"
+		) {
+			return createFreshGeneration(path, io);
+		}
 		throw error;
 	}
 }
@@ -241,12 +388,16 @@ function writeMetadataFd(fd: number, metadata: CompletionLockMetadata): void {
 	fsyncSync(fd);
 }
 
-function unlinkOwned(path: string, expected: LockIdentity): boolean {
+function unlinkOwned(
+	path: string,
+	expected: LockIdentity,
+	unlink: (path: string) => void = unlinkSync,
+): boolean {
 	let fd: number | null = null;
 	try {
 		fd = openSync(path, READ_NOFOLLOW);
 		if (!sameIdentity(identity(fd), expected)) return false;
-		unlinkSync(path);
+		unlink(path);
 		return true;
 	} catch {
 		return false;
@@ -332,7 +483,7 @@ export async function withTaskCompletionLock<T>(
 	let fenceIdentity: LockIdentity;
 	let metadata: CompletionLockMetadata;
 	try {
-		const fence = incrementGeneration(fencePath);
+		const fence = incrementGeneration(fencePath, options.fenceIo);
 		fenceFd = fence.fd;
 		generation = fence.generation;
 		fenceIdentity = fence.identity;

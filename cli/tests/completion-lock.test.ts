@@ -1,12 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import {
+	closeSync,
 	existsSync,
+	fsyncSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
+	readdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
 	symlinkSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { hostname, tmpdir } from "node:os";
@@ -28,6 +34,54 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 	});
 	return { promise, resolve };
 }
+
+function supportsFileSymlinks(): boolean {
+	const projectRoot = root("symlink-capability");
+	try {
+		const targetPath = join(projectRoot, "target.txt");
+		writeFileSync(targetPath, "target\n", "utf8");
+		symlinkSync(targetPath, join(projectRoot, "link.txt"), "file");
+		return true;
+	} catch {
+		return false;
+	} finally {
+		rmSync(projectRoot, { recursive: true, force: true });
+	}
+}
+
+function supportsReplacingOpenFiles(): boolean {
+	const projectRoot = root("replace-open-capability");
+	let fd: number | null = null;
+	try {
+		const targetPath = join(projectRoot, "target.txt");
+		const replacementPath = join(projectRoot, "replacement.txt");
+		writeFileSync(targetPath, "target\n", "utf8");
+		writeFileSync(replacementPath, "replacement\n", "utf8");
+		fd = openSync(targetPath, "r+");
+		renameSync(replacementPath, targetPath);
+		return true;
+	} catch {
+		return false;
+	} finally {
+		if (fd !== null) closeSync(fd);
+		rmSync(projectRoot, { recursive: true, force: true });
+	}
+}
+
+function fenceTempEntries(lockPath: string): string[] {
+	return readdirSync(dirname(lockPath)).filter((entry) =>
+		entry.includes(".fence.tmp-"),
+	);
+}
+
+function existingError(): Error & { code: string } {
+	const error = new Error("injected EEXIST") as Error & { code: string };
+	error.code = "EEXIST";
+	return error;
+}
+
+const CAN_CREATE_FILE_SYMLINK = supportsFileSymlinks();
+const CAN_REPLACE_OPEN_FILE = supportsReplacingOpenFiles();
 
 describe("task completion lock", () => {
 	test("serializes a canonical project/session/task and rejects live-owner takeover", async () => {
@@ -203,33 +257,422 @@ describe("task completion lock", () => {
 		}
 	});
 
-	test("rejects a fence symlink without modifying its target", async () => {
-		const projectRoot = root("fence-symlink");
+	test("creates a fresh fence without truncating it", async () => {
+		const projectRoot = root("fresh-fence-no-truncate");
+		let truncateCalls = 0;
+		let publishedSameIdentity = false;
 		try {
 			const lockPath = resolveTaskCompletionLockPath(
 				projectRoot,
 				"session-a",
 				"T-01",
 			);
-			const targetPath = join(projectRoot, "preserve.txt");
+			const fencePath = `${lockPath}.fence`;
+			let generation = 0;
+			await withTaskCompletionLock(
+				projectRoot,
+				"session-a",
+				"T-01",
+				async (lease) => {
+					generation = lease.generation;
+				},
+				{
+					fenceIo: {
+						truncate: () => {
+							truncateCalls += 1;
+							throw new Error("injected fresh-fence EPERM");
+						},
+						unlink: (temporaryPath) => {
+							const temporary = lstatSync(temporaryPath, { bigint: true });
+							const canonical = lstatSync(fencePath, { bigint: true });
+							publishedSameIdentity =
+								temporary.dev === canonical.dev &&
+								temporary.ino === canonical.ino;
+							unlinkSync(temporaryPath);
+						},
+					},
+				},
+			);
+			expect(generation).toBe(1);
+			expect(truncateCalls).toBe(0);
+			expect(publishedSameIdentity).toBe(true);
+			expect(readFileSync(fencePath, "utf8")).toBe("1\n");
+
+			await withTaskCompletionLock(
+				projectRoot,
+				"session-a",
+				"T-01",
+				async (lease) => {
+					generation = lease.generation;
+				},
+			);
+			expect(generation).toBe(2);
+			expect(readFileSync(fencePath, "utf8")).toBe("2\n");
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("fails before publishing when fresh fence write fails", async () => {
+		const projectRoot = root("fresh-fence-write-failure");
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"session-a",
+					"T-01",
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							write: () => {
+								throw new Error("injected fresh write failure");
+							},
+						},
+					},
+				),
+			).rejects.toThrow("injected fresh write failure");
+			expect(actionRan).toBe(false);
+			expect(existsSync(`${lockPath}.fence`)).toBe(false);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(fenceTempEntries(lockPath)).toEqual([]);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("fails before publishing when fresh fence sync fails", async () => {
+		const projectRoot = root("fresh-fence-sync-failure");
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"session-a",
+					"T-01",
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							sync: () => {
+								throw new Error("injected fresh sync failure");
+							},
+						},
+					},
+				),
+			).rejects.toThrow("injected fresh sync failure");
+			expect(actionRan).toBe(false);
+			expect(existsSync(`${lockPath}.fence`)).toBe(false);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(fenceTempEntries(lockPath)).toEqual([]);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed when fresh fence publication collides", async () => {
+		const projectRoot = root("fresh-fence-link-collision");
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"session-a",
+					"T-01",
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							link: (_temporary, canonical) => {
+								writeFileSync(canonical, "7\n", "utf8");
+								throw existingError();
+							},
+						},
+					},
+				),
+			).rejects.toThrow("concurrently created");
+			expect(actionRan).toBe(false);
+			expect(readFileSync(fencePath, "utf8")).toBe("7\n");
+			expect(existsSync(lockPath)).toBe(false);
+			expect(fenceTempEntries(lockPath)).toEqual([]);
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("fails closed when fresh fence temporary alias cleanup fails", async () => {
+		const projectRoot = root("fresh-fence-temp-cleanup-failure");
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"session-a",
+					"T-01",
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							unlink: () => {
+								throw new Error("injected temporary cleanup failure");
+							},
+						},
+					},
+				),
+			).rejects.toThrow("temporary alias could not be removed");
+			expect(actionRan).toBe(false);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(readFileSync(fencePath, "utf8")).toBe("1\n");
+
+			const temporaryEntries = fenceTempEntries(lockPath);
+			expect(temporaryEntries).toHaveLength(1);
+			const temporaryPath = join(dirname(lockPath), temporaryEntries[0] ?? "");
+			const canonical = lstatSync(fencePath, { bigint: true });
+			const temporary = lstatSync(temporaryPath, { bigint: true });
+			expect(temporary.dev).toBe(canonical.dev);
+			expect(temporary.ino).toBe(canonical.ino);
+			expect(readFileSync(temporaryPath, "utf8")).toBe("1\n");
+
+			let generation = 0;
+			await withTaskCompletionLock(
+				projectRoot,
+				"session-a",
+				"T-01",
+				async (lease) => {
+					generation = lease.generation;
+				},
+			);
+			expect(generation).toBe(2);
+			expect(readFileSync(fencePath, "utf8")).toBe("2\n");
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("cleans up the lock when persisted fence replacement fails", async () => {
+		const projectRoot = root("persisted-fence-truncate-failure");
+		let truncateCalls = 0;
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
 			mkdirSync(dirname(lockPath), { recursive: true });
-			writeFileSync(targetPath, "preserve\n", "utf8");
-			symlinkSync(targetPath, `${lockPath}.fence`, "file");
+			writeFileSync(fencePath, "1\n", "utf8");
 
 			await expect(
 				withTaskCompletionLock(
 					projectRoot,
 					"session-a",
 					"T-01",
-					async () => {},
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							truncate: () => {
+								truncateCalls += 1;
+								throw new Error("injected persisted-fence EPERM");
+							},
+						},
+					},
 				),
-			).rejects.toThrow();
-			expect(readFileSync(targetPath, "utf8")).toBe("preserve\n");
+			).rejects.toThrow("injected persisted-fence EPERM");
+			expect(actionRan).toBe(false);
+			expect(truncateCalls).toBe(1);
 			expect(existsSync(lockPath)).toBe(false);
+			expect(readFileSync(fencePath, "utf8")).toBe("1\n");
 		} finally {
 			rmSync(projectRoot, { recursive: true, force: true });
 		}
 	});
+
+	test("restores a persisted fence after a replacement write failure", async () => {
+		const projectRoot = root("persisted-fence-write-restore");
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(fencePath, "1\n", "utf8");
+
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"session-a",
+					"T-01",
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							write: (fd, value) => {
+								if (value === "2\n") {
+									throw new Error("injected persisted write failure");
+								}
+								writeFileSync(fd, value, "utf8");
+							},
+						},
+					},
+				),
+			).rejects.toThrow("injected persisted write failure");
+			expect(actionRan).toBe(false);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(readFileSync(fencePath, "utf8")).toBe("1\n");
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("restores a persisted fence after a single replacement sync failure", async () => {
+		const projectRoot = root("persisted-fence-sync-restore");
+		let syncCalls = 0;
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(fencePath, "1\n", "utf8");
+
+			await expect(
+				withTaskCompletionLock(
+					projectRoot,
+					"session-a",
+					"T-01",
+					async () => {
+						actionRan = true;
+					},
+					{
+						fenceIo: {
+							sync: (fd) => {
+								syncCalls += 1;
+								if (syncCalls === 1) {
+									throw new Error("injected persisted sync failure");
+								}
+								fsyncSync(fd);
+							},
+						},
+					},
+				),
+			).rejects.toThrow("injected persisted sync failure");
+			expect(syncCalls).toBe(2);
+			expect(actionRan).toBe(false);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(readFileSync(fencePath, "utf8")).toBe("1\n");
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("reports a hard failure when persisted fence recovery also fails", async () => {
+		const projectRoot = root("persisted-fence-recovery-failure");
+		let actionRan = false;
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				projectRoot,
+				"session-a",
+				"T-01",
+			);
+			const fencePath = `${lockPath}.fence`;
+			mkdirSync(dirname(lockPath), { recursive: true });
+			writeFileSync(fencePath, "1\n", "utf8");
+
+			const failure = await withTaskCompletionLock(
+				projectRoot,
+				"session-a",
+				"T-01",
+				async () => {
+					actionRan = true;
+				},
+				{
+					fenceIo: {
+						write: () => {
+							throw new Error("injected unrecoverable write failure");
+						},
+					},
+				},
+			).catch((error: unknown) => error);
+			expect(failure).toBeInstanceOf(AggregateError);
+			expect((failure as AggregateError).message).toContain(
+				"could not be restored",
+			);
+			expect((failure as AggregateError).errors).toHaveLength(2);
+			expect(actionRan).toBe(false);
+			expect(existsSync(lockPath)).toBe(false);
+			expect(readFileSync(fencePath, "utf8")).toBe("");
+		} finally {
+			rmSync(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	test.skipIf(!CAN_CREATE_FILE_SYMLINK)(
+		"rejects a fence symlink without modifying its target",
+		async () => {
+			const projectRoot = root("fence-symlink");
+			try {
+				const lockPath = resolveTaskCompletionLockPath(
+					projectRoot,
+					"session-a",
+					"T-01",
+				);
+				const targetPath = join(projectRoot, "preserve.txt");
+				mkdirSync(dirname(lockPath), { recursive: true });
+				writeFileSync(targetPath, "preserve\n", "utf8");
+				symlinkSync(targetPath, `${lockPath}.fence`, "file");
+
+				await expect(
+					withTaskCompletionLock(
+						projectRoot,
+						"session-a",
+						"T-01",
+						async () => {},
+					),
+				).rejects.toThrow();
+				expect(readFileSync(targetPath, "utf8")).toBe("preserve\n");
+				expect(existsSync(lockPath)).toBe(false);
+			} finally {
+				rmSync(projectRoot, { recursive: true, force: true });
+			}
+		},
+	);
 
 	for (const [name, content] of [
 		["empty", ""],
@@ -263,70 +706,76 @@ describe("task completion lock", () => {
 		});
 	}
 
-	test("assertOwned rejects an atomic same-metadata replacement", async () => {
-		const projectRoot = root("atomic-replacement");
-		let lockPath = "";
-		try {
-			await expect(
-				withTaskCompletionLock(
-					projectRoot,
-					"session-a",
-					"T-01",
-					async (lease) => {
-						lockPath = resolveTaskCompletionLockPath(
-							projectRoot,
-							"session-a",
-							"T-01",
-						);
-						const replacementPath = `${lockPath}.replacement`;
-						writeFileSync(
-							replacementPath,
-							readFileSync(lockPath, "utf8"),
-							"utf8",
-						);
-						renameSync(replacementPath, lockPath);
-						lease.assertOwned();
-					},
-					{ heartbeatMs: 60_000 },
-				),
-			).rejects.toThrow("ownership was lost");
-			expect(existsSync(lockPath)).toBe(true);
-		} finally {
-			rmSync(projectRoot, { recursive: true, force: true });
-		}
-	});
+	test.skipIf(!CAN_REPLACE_OPEN_FILE)(
+		"assertOwned rejects an atomic same-metadata replacement",
+		async () => {
+			const projectRoot = root("atomic-replacement");
+			let lockPath = "";
+			try {
+				await expect(
+					withTaskCompletionLock(
+						projectRoot,
+						"session-a",
+						"T-01",
+						async (lease) => {
+							lockPath = resolveTaskCompletionLockPath(
+								projectRoot,
+								"session-a",
+								"T-01",
+							);
+							const replacementPath = `${lockPath}.replacement`;
+							writeFileSync(
+								replacementPath,
+								readFileSync(lockPath, "utf8"),
+								"utf8",
+							);
+							renameSync(replacementPath, lockPath);
+							lease.assertOwned();
+						},
+						{ heartbeatMs: 60_000 },
+					),
+				).rejects.toThrow("ownership was lost");
+				expect(existsSync(lockPath)).toBe(true);
+			} finally {
+				rmSync(projectRoot, { recursive: true, force: true });
+			}
+		},
+	);
 
-	test("assertOwned rejects an atomic same-generation fence replacement", async () => {
-		const projectRoot = root("atomic-fence-replacement");
-		let fencePath = "";
-		try {
-			await expect(
-				withTaskCompletionLock(
-					projectRoot,
-					"session-a",
-					"T-01",
-					async (lease) => {
-						const lockPath = resolveTaskCompletionLockPath(
-							projectRoot,
-							"session-a",
-							"T-01",
-						);
-						fencePath = `${lockPath}.fence`;
-						const replacementPath = `${fencePath}.replacement`;
-						writeFileSync(
-							replacementPath,
-							readFileSync(fencePath, "utf8"),
-							"utf8",
-						);
-						renameSync(replacementPath, fencePath);
-						lease.assertOwned();
-					},
-					{ heartbeatMs: 60_000 },
-				),
-			).rejects.toThrow("ownership was lost");
-			expect(existsSync(fencePath)).toBe(true);
-		} finally {
-			rmSync(projectRoot, { recursive: true, force: true });
-		}
-	});
+	test.skipIf(!CAN_REPLACE_OPEN_FILE)(
+		"assertOwned rejects an atomic same-generation fence replacement",
+		async () => {
+			const projectRoot = root("atomic-fence-replacement");
+			let fencePath = "";
+			try {
+				await expect(
+					withTaskCompletionLock(
+						projectRoot,
+						"session-a",
+						"T-01",
+						async (lease) => {
+							const lockPath = resolveTaskCompletionLockPath(
+								projectRoot,
+								"session-a",
+								"T-01",
+							);
+							fencePath = `${lockPath}.fence`;
+							const replacementPath = `${fencePath}.replacement`;
+							writeFileSync(
+								replacementPath,
+								readFileSync(fencePath, "utf8"),
+								"utf8",
+							);
+							renameSync(replacementPath, fencePath);
+							lease.assertOwned();
+						},
+						{ heartbeatMs: 60_000 },
+					),
+				).rejects.toThrow("ownership was lost");
+				expect(existsSync(fencePath)).toBe(true);
+			} finally {
+				rmSync(projectRoot, { recursive: true, force: true });
+			}
+		},
+	);
 });
