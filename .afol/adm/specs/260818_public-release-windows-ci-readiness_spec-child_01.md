@@ -5,8 +5,8 @@ theme: public-release-windows-ci-readiness
 status: active
 owners:
 - orchestrator
-workstream_intent: Close native Windows, deterministic-byte, isolation, locking, scanner, and release-CI blockers.
-artifact_purpose: Define exact readiness evidence for the public alpha release pipeline.
+workstream_intent: Close native Windows, deterministic-byte, isolation, locking, scanner, and local-release blockers.
+artifact_purpose: Define exact readiness evidence for the public alpha release candidate.
 created_at: '2026-08-18T00:00:00Z'
 updated_at: '2026-08-19T00:00:00Z'
 roadmap_feature: F-34
@@ -21,12 +21,13 @@ links:
 risk_level: high
 ---
 
-# SPEC CHILD: Public Release, Windows, and CI Readiness
+# SPEC CHILD: Public Release, Windows, and Local Readiness
 
 ## Required Behavior
 
-- Linux x64 and native Windows x64 execute platform-specific tests on native
-  runners; platform branches may not pass solely because they were skipped.
+- Linux x64 is validated through the local release gate. Native Windows x64 is
+  experimental and any native checks are non-gating observations; a skipped
+  check is not evidence of support.
 - Text bytes used by template hashing are canonical LF bytes independent of
   checkout configuration, and managed locks are generated from those bytes.
 - Native Windows sandbox execution does not require WSL or `wslpath`.
@@ -40,16 +41,13 @@ risk_level: high
 
 - [ ] Every unresolved P1/P2 review finding has a focused regression test and
       is resolved or superseded by evidence.
-- [ ] Linux and Windows CI are green on the exact candidate commit.
-- [ ] Template hashes match across Linux, Windows, and `core.autocrlf=true`.
+- [ ] The local Linux x64 release gate passes on the exact candidate commit.
+- [ ] Template hashes match across supported local checkout configurations.
 - [ ] Fault-injection and clean-checkout isolation tests pass.
 - [ ] `validate:release` passes on the exact candidate commit.
 
-## Public-Readiness Reconciliation (2026-08-19)
+## Public-Readiness Reconciliation (2026-08-23)
 
-Hosted Windows jobs on the factory account fail before useful runner
-assignment because of GitHub Actions spending-limit state. The public alpha
-contract is therefore Linux x64 supported and native Windows experimental.
-Hosted Windows green on the exact tag remains required before any
-"Windows supported" claim. The public CI Windows job runs for observation
-and does not gate the Linux alpha.
+ADR-009 disables hosted CI; the local exact-SHA Linux x64 release gate is the
+canonical evidence path. Native Windows remains experimental and no hosted or
+green status is claimed. macOS and ARM remain unsupported for this alpha.

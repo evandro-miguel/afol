@@ -35,7 +35,7 @@ risk_level: high
 
 - Outcome: AFOL is released as an honest alpha from a clean public repository
   that independently contains the complete engine, tests, template, public
-  documentation, and release automation.
+  documentation, and local release tooling.
 - Public identity: **AFOL CLI**, where AFOL means **A Folder**.
 - Product statement: a provider- and harness-independent local CLI that gives
   coding agents consistent tools, governed work, safe mutations, and observed
@@ -48,9 +48,8 @@ risk_level: high
   to npm or another registry.
 - Supported: Linux x64, proven by the Linux release gate. WSL2 is supported
   only with an observed smoke.
-- Experimental: native Windows x64 until a hosted native Windows job is green
-  on the exact release commit. Do not advertise Windows as supported before
-  that evidence exists.
+- Experimental: native Windows x64. Linux-local evidence does not establish
+  native Windows support.
 - Unsupported for this alpha: macOS and ARM.
 - Stable alpha: init/bootstrap, status and health, governed task lifecycle,
   evidence/done/close, project validation, previewed updates, safe local
@@ -62,7 +61,8 @@ risk_level: high
 ## Canonical Boundary
 
 The public repository is the sole canonical source for engine code, product
-template, tests, public documentation, examples, CI, and release artifacts.
+template, tests, public documentation, examples, local release tooling, and
+release artifacts.
 Private repositories may retain raw operations, workbench history, research,
 RAG configuration, and sensitive evidence, but may not contain a divergent
 engine used to produce releases.
@@ -76,7 +76,7 @@ code and may be distributed.
 
 ## Workstreams
 
-1. Release, Windows, and CI readiness.
+1. Release and platform readiness.
 2. Security and governance reconciliation.
 3. Public engine boundary and canonical cutover.
 4. Legal and third-party licensing.
@@ -92,22 +92,22 @@ and do not expand the release candidate.
 ## Acceptance
 
 - [ ] All six child specs are final with exact-commit evidence.
-- [ ] No release-blocking security, governance, Windows, or CI acceptance is
-      pending.
-- [x] A clean public clone builds and tests without private repository state.
-- [x] Public history and current content pass privacy, secret, symlink, large
+- [ ] No release-blocking security, governance, platform, or release
+      acceptance is pending.
+- [ ] A clean public clone builds and tests without private repository state.
+- [ ] Public history and current content pass privacy, secret, symlink, large
       file, dependency vulnerability, and third-party license checks.
 - [ ] Stable, experimental, planned, supported, and unsupported claims match
-      runtime behavior and native CI evidence.
-- [ ] Release assets carry checksums, provenance, SBOM, and verifiable
-      attestations from the exact tagged commit.
-- [ ] Final repository visibility, immutable release publication, remote
-      rename, and global installation occur only after explicit user approval.
+      runtime behavior and local exact-SHA evidence.
+- [ ] Release-candidate assets carry checksums, provenance, and an SPDX SBOM
+      generated from the exact candidate commit.
+- [ ] This spec does not authorize repository visibility changes, release
+      publication, remote renames, attestations, or global installation.
 
-Local readiness evidence is bound to public candidate commit `b0bee752` in
-`/home/ozy/01_projects/dev/afol/afol.public-candidate`. Hosted native CI,
-attestation publication, rulesets, visibility changes, and immutable release
-publication remain open and require external evidence or explicit approval.
+Readiness evidence must be rerun against the exact candidate SHA in the public
+checkout. Prior candidate snapshots are not current release proof. Hosted CI,
+publication, attestations, visibility changes, and global installation are
+outside the local release contract and remain unclaimed.
 
 ## Non-Goals
 

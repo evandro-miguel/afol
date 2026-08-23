@@ -8,4 +8,5 @@
 
 Support is best-effort during the alpha. Linux x64 is the supported release
 target. WSL2 and experimental Windows may receive diagnostic help without a
-compatibility guarantee.
+compatibility guarantee. Support does not establish hosted, macOS, or ARM
+compatibility.

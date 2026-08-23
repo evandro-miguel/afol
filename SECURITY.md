@@ -29,4 +29,6 @@ identity verification.
 
 Release-affecting changes must pass the local Gitleaks and OSV Scanner gates,
 produce checksum-bound provenance, and complete the clean-checkout Linux x64
-smoke. Missing scanners or unresolved findings block the candidate.
+smoke. These are local exact-SHA gates; no hosted workflow or publication
+status is implied. Missing scanners or unresolved findings block the
+candidate.

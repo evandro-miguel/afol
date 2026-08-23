@@ -1251,13 +1251,13 @@ Follow-on slices under this direction:
 - Scope: freeze the stable-alpha surface; close release and Windows blockers;
   reconcile security and lifecycle evidence; extract the complete engine from
   private operational state; audit licenses and third-party content; harden
-  architecture; publish accurate documentation, community policy, provenance,
-  SBOM, and release artifacts.
+  architecture; maintain accurate documentation and community policy; produce
+  local provenance, SBOM, and release-candidate artifacts.
 - Exit criteria: the public repository is the sole canonical engine source;
-  a clean clone builds, tests, and installs the declared platform artifacts;
+  a clean clone builds, tests, and validates the declared local platform path;
   no private operational content or unlicensed vendored material is reachable;
   stable, experimental, planned, and unsupported surfaces are explicit; every
-  public claim is linked to evidence from the exact release commit.
+  public claim is linked to local evidence from the exact candidate commit.
 - Release freeze: until this feature is final, new product features are not
   accepted into the alpha scope. F-30 Evolution and F-33 Fleet remain active
   roadmap work but are outside the stable alpha and cannot delay or expand it.
@@ -1279,7 +1279,8 @@ Follow-on slices under this direction:
    research/log save flows.
 1. Safe mutation: write/move/patch/archive, mutation journal, dry-run, undo.
 1. Update system: manifest, lock, check, preview, apply, conflicts.
-1. Public readiness: install path, minimal docs, examples, CI, release workflow.
+1. Public readiness: install path, minimal docs, examples, local release gate,
+   and release-candidate artifacts.
 
 ## 7) MVP
 

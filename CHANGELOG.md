@@ -8,8 +8,7 @@ Semantic Versioning while in alpha.
 ## [0.1.0-alpha.1]
 
 - Establish the sanitized public repository boundary.
-- Publish command stability metadata.
+- Add command stability metadata.
 - Bind release provenance to `package.json` and the exact build artifact.
-- Keep native Windows validation in CI while support remains experimental
-  pending hosted evidence.
+- Keep native Windows experimental; no hosted runner evidence is claimed.
 - Initial public alpha candidate.

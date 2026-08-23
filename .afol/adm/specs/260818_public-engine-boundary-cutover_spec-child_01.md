@@ -38,19 +38,16 @@ risk_level: high
 
 ## Acceptance
 
-- [x] A clean allowlisted export builds, tests, and validates independently.
-- [x] Removing private repository access does not affect the public build.
-- [x] Public hygiene checks find no private paths, repository names, absolute
+- [ ] A clean allowlisted export builds, tests, and validates independently.
+- [ ] Removing private repository access does not affect the public build.
+- [ ] Public hygiene checks find no private paths, repository names, absolute
       symlinks, unexpected binaries, or large files.
-- [x] Public history begins with reviewed sanitized commits rather than a
+- [ ] Public history begins with reviewed sanitized commits rather than a
       rewrite or mirror of private history.
 
 ## Evidence
 
-- Local public candidate commit: `b0bee752` in
-  `/home/ozy/01_projects/dev/afol/afol.public-candidate`.
-- `bun run validate:release` passed from the clean candidate at that commit,
-  including 456 tests, critical-surface coverage, deterministic build,
-  Gitleaks, OSV, release provenance, artifact smoke, and clean-checkout smoke.
-- `bun run scripts/audit-public-content.ts
-  /home/ozy/01_projects/dev/afol/afol.public-candidate` passed.
+- The public checkout contains the allowlisted engine, template, tests,
+  documentation, and examples without the private operator payload.
+- Fresh `bun run validate:release` and public-content audit evidence must be
+  recorded against the exact candidate SHA before release readiness is claimed.

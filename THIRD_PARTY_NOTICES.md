@@ -16,6 +16,6 @@ remain under their respective licenses:
 
 The distributed project template contains only AFOL-owned skills.
 
-Transitive dependency notices and exact versions are represented by the
-release SBOM. This file is not a substitute for the license texts shipped by
-those dependencies.
+Transitive dependency notices and exact versions must be represented by the
+locally generated release-candidate SBOM. This file is not a substitute for
+the license texts shipped by those dependencies.

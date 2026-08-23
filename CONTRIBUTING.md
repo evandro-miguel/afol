@@ -30,7 +30,8 @@ bun run validate:release
 
 Security checks include Gitleaks and OSV Scanner. Do not commit generated drift.
 Documentation changes should preserve working relative links and valid Markdown
-structure.
+structure. All release evidence is produced locally against the exact
+candidate SHA; this repository has no hosted CI workflow under ADR-009.
 
 ## Security and privacy
 

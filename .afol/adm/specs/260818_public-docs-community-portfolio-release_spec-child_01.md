@@ -25,17 +25,17 @@ risk_level: medium
 
 ## Required Behavior
 
-- README leads with value, a CI-verified quickstart, actual product output,
+- README leads with value, a locally verified quickstart, actual product output,
   support/stability tables, safety limits, architecture, and evidence.
 - Installation, commands, configuration, troubleshooting, upgrades, rollback,
   security model, release process, roadmap, and case study are public docs.
 - Community files define contribution, conduct, support, security reporting,
   issue forms, and PR evidence expectations.
-- CI includes native platform tests, CodeQL, dependency review, Dependabot,
-  public-hygiene checks, docs examples, minimal permissions, and SHA-pinned
-  actions.
-- Release assets include checksums, provenance, SPDX SBOM, attestations, known
-  limitations, and post-download smoke evidence.
+- Local validation includes public-hygiene checks, docs examples, security
+  scans, deterministic build checks, known limitations, and post-build smoke
+  evidence.
+- Release-candidate assets include checksums, provenance, and an SPDX SBOM
+  generated locally from the exact candidate SHA.
 
 ## Acceptance
 
@@ -43,16 +43,17 @@ risk_level: medium
       and troubleshoot from a clean clone without private documentation.
 - [x] Case study states role, constraints, architecture, hard problems,
       trade-offs, reproducible metrics, and unresolved limitations.
-- [ ] Community and security files pass GitHub public-health checks.
-- [ ] The release candidate is ready for explicit authorization to rename the
-      remote, change visibility, configure rulesets, and publish immutably.
+- [ ] Community and security files pass local structure and link checks.
+- [ ] The local release candidate is ready for review; repository visibility,
+      release publication, rulesets, attestations, and global installation are
+      outside this spec.
 
 ## Evidence
 
-- The public candidate at `b0bee752` includes the landing README, getting
-  started, architecture, command reference, security model, troubleshooting,
+- The public docs surface includes the landing README, getting started,
+  architecture, command reference, security model, troubleshooting,
   upgrade/rollback, release process, known limitations, roadmap, and case
   study without references to private operator documentation.
-- The CI-verified release gate exercised the documented binary build and clean
-  checkout flows. Hosted GitHub public-health and publication checks remain
-  pending and are intentionally not checked above.
+- The documented release gate is local and exact-SHA based. Hosted workflows,
+  public-health checks, and publication are outside the contract and are not
+  claimed here.

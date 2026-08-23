@@ -5,6 +5,10 @@
 - WSL2 is supported from observed local smoke, not from a hosted matrix.
 - Native Windows is experimental. Do not depend on it for production work.
 - macOS and ARM release assets are not provided.
+- The repository has no hosted CI workflow; local exact-SHA validation is the
+  release gate.
+- Release publication, attestations, and global installation are outside this
+  documented local contract.
 - AFOL is not a multi-user authentication or sandbox boundary.
 - Bun is required only to build and test from source.
 - Evolution, fleet, memory/library adoption, telemetry, receipts, and provider

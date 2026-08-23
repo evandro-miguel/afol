@@ -25,5 +25,5 @@ before applying.
 ## Release verification fails
 
 Confirm the artifact filename, checksum file, provenance file, and SBOM all
-belong to the same release. Do not rebuild locally and treat that output as the
-published artifact.
+belong to the same candidate. Do not rebuild locally and treat that output as
+a published artifact without matching candidate provenance.

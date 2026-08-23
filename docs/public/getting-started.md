@@ -1,7 +1,8 @@
 # Getting started
 
-Install a verified Linux x64 release, or build `./dist/afol` from this
-repository. Then create a Git repository and run `afol init`.
+Use a verified Linux x64 release asset supplied for the candidate, or build
+`./dist/afol` from this repository. Then create a Git repository and run
+`afol init`.
 
 ```bash
 mkdir afol-demo
@@ -33,3 +34,6 @@ AFOL writes mutable state under `.afol/` and provider metadata under
 Use `afol help` and `afol help <command>` for flags. See
 [Command reference](command-reference.md) and
 [Troubleshooting](troubleshooting.md).
+
+Linux x64 is the supported alpha target. WSL2 has observed local smoke; native
+Windows is experimental, and macOS/ARM are unsupported.

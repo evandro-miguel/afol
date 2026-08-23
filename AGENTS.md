@@ -101,14 +101,11 @@ not a project-local skills root.
 
 ## Project RAG
 
-- This `afol-public` worktree is live state, not a static readiness claim:
-  Postgres id `2423`, slug `afol-afol-public`. Run
-  `ragctl project verify --project afol-afol-public --json` immediately before
-  trusting indexed results from this checkout.
-- Indexed root: `/home/ozy/01_projects/dev/afol/afol.afol-public`.
-- The factory `dev` worktree remains a separate index: Postgres id `1707`,
-  slug `afol-dev`, root `/home/ozy/01_projects/dev/afol/afol.dev`. Do not mix
-  the two when searching.
+- Project RAG identity is live state, not a static readiness claim. Run the
+  configured project's `ragctl project verify --project <slug> --json`
+  immediately before trusting indexed results.
+- Use the current checkout as the indexed root. Do not mix results from another
+  worktree or repository.
 - Include roots (platform rejects leading-dot dirs): `cli`, `src`, `docs`.
   Do not pass `.afol` or `.agents` as include roots; Project RAG forbids them.
 - This scope leaves a deliberate hidden-administration gap: `.afol/adm/**`
@@ -129,11 +126,13 @@ not a project-local skills root.
   not use a watcher or make resident MCP/core startup a dependency:
 
   ```bash
+  : "${PROJECT_ROOT:?set PROJECT_ROOT to this checkout}"
+  : "${PROJECT_SLUG:?set PROJECT_SLUG to its registered RAG slug}"
   cd "${RAG_REPO_ROOT:?set RAG_REPO_ROOT to the rag-v2 checkout}"
   bun run ingest-project \
-    --root /home/ozy/01_projects/dev/afol/afol.afol-public \
+    --root "$PROJECT_ROOT" \
     --include cli,src,docs --max-files 100
-  ragctl project verify --project afol-afol-public --json
+  ragctl project verify --project "$PROJECT_SLUG" --json
   ```
 
   Use `register-project` only when the repository is not registered. Reserve
@@ -141,9 +140,9 @@ not a project-local skills root.
   index repair. Project RAG watchers are removed, so freshness is operator
   checked and manually repaired rather than continuously synchronized.
 - Critical read-only checks:
-  - `ragctl project verify --project afol-dev --json`
-  - `ragctl project search --project afol-dev "<query>" --mode hybrid --json`
-  - `ragctl project file --project afol-dev --file <repo-relative-path> --json`
+  - `ragctl project verify --project "$PROJECT_SLUG" --json`
+  - `ragctl project search --project "$PROJECT_SLUG" "<query>" --mode hybrid --json`
+  - `ragctl project file --project "$PROJECT_SLUG" --file <repo-relative-path> --json`
 - Semantic repository discovery uses Project RAG only. Use the global
   `evandro-rag-system` skill and `ragctl` for semantic navigation; use `rg` and
   focused source reads to confirm exact implementation facts. A stale,

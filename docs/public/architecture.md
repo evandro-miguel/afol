@@ -25,6 +25,7 @@ the build flags and artifact hash, while provenance binds the exact Git commit,
 package metadata, lockfile, template hash, platform, architecture, and scanner
 outcomes.
 
-The first public alpha advertises Linux x64. Native Windows is experimental.
-See [Architecture decision records](adr/README.md) for the public contract
-choices.
+The first public alpha advertises Linux x64 from local exact-SHA validation.
+Native Windows is experimental; macOS and ARM are unsupported. The repository
+ships no hosted CI workflow. See [Architecture decision records](adr/README.md)
+for the public contract choices.

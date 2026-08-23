@@ -15,4 +15,5 @@ files.
 To roll back the executable, reinstall the previously verified release asset.
 To roll back a scaffold mutation, follow the mutation report and journal for
 that operation. Never delete `.afol/` wholesale: it contains task, evidence,
-and recovery state.
+and recovery state. This document does not define hosted updates or a global
+installation path.

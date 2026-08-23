@@ -5,7 +5,7 @@ theme: public-security-governance-reconciliation
 status: active
 owners:
 - orchestrator
-workstream_intent: Reconcile security, lifecycle, release, and no-op evidence claims before publication.
+workstream_intent: Reconcile security, lifecycle, release, and no-op evidence claims before public release review.
 artifact_purpose: Prevent public claims from exceeding exact observed governance evidence.
 created_at: '2026-08-18T00:00:00Z'
 updated_at: '2026-08-19T00:00:00Z'
@@ -25,12 +25,12 @@ risk_level: high
 
 ## Required Behavior
 
-- Every release-blocking acceptance item maps to a test, artifact, workflow,
+- Every release-blocking acceptance item maps to a test, artifact,
   evidence record, and exact commit where applicable.
-- C01 action-policy limits and deployment assumptions are explicit and its red
-  proofs are green before closure.
+- C01 action-policy limits and deployment assumptions are explicit and its
+  focused proofs are recorded before closure.
 - Release-promotion remediation and sequential verification close only with
-  clean-checkout and CI evidence.
+  clean-checkout and local exact-SHA evidence.
 - Historical no-op evidence debt is resolved through the bounded, hash-linked
   transition policy; issue #84 closes only after exact revalidation.
 - Experimental, planned, compatibility, and stable surfaces cannot be confused

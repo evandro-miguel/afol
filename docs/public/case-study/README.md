@@ -39,9 +39,10 @@ objectives.
 
 ## Evidence and limits
 
-A public release should publish tests, selected coverage, scanner outcomes,
-checksum, provenance, and SBOM for the tagged commit. No metric here is a
-hosted-CI guarantee.
+A release candidate should retain local tests, selected coverage, scanner
+outcomes, checksum, provenance, and SBOM evidence for the exact candidate
+commit. No metric here is hosted-CI evidence, and no publication status is
+claimed.
 
 Current limits include macOS/ARM, multi-principal authentication, experimental
 evolution features, and native Windows.
