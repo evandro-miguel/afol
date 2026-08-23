@@ -290,10 +290,9 @@ describe("template forbidden-content policy", () => {
 	test("template governance matrix mirrors the root command contract", async () => {
 		const projectRoot = process.cwd();
 		const readMatrix = (relativePath: string) =>
-			readFile(
-				join(projectRoot, relativePath),
-				"utf8",
-			).then((content) => JSON.parse(content));
+			readFile(join(projectRoot, relativePath), "utf8").then((content) =>
+				JSON.parse(content),
+			);
 		const [rootMatrix, templateMatrix] = await Promise.all([
 			readMatrix(
 				".afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json",
@@ -339,9 +338,9 @@ describe("template forbidden-content policy", () => {
 					sandbox?: boolean;
 				};
 
-				expect(forbiddenReferences.some((value) => content.includes(value))).toBe(
-					false,
-				);
+				expect(
+					forbiddenReferences.some((value) => content.includes(value)),
+				).toBe(false);
 				expect(scenario.coverage?.journeys?.length).toBeGreaterThan(0);
 				if (isPstr) {
 					expect(scenario.sandbox).toBe(true);
