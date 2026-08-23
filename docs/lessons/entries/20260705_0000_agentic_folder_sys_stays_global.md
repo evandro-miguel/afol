@@ -27,3 +27,10 @@ older skill versions.
 
 - Template and manifest validation must fail if a project-local
   `agentic-folder-sys` copy is reintroduced.
+
+## Current Application
+
+This lesson remains a packaging guardrail, not an active routing dependency.
+AFOL work starts with `AGENTS.md`, resolved `.afol/adm/rules/**`, and
+`afol help <command>`; preserve this historical correction without requiring or
+recreating a replacement skill.

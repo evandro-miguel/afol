@@ -104,6 +104,9 @@ const TEMPLATE_FORBIDDEN_TEXT_REFERENCES = [
 	"just wb-touch",
 ] as const;
 
+const TEMPLATE_RETIRED_LEGACY_SEED_REFERENCE =
+	".agents/source/universal-skills/skills/agentic-folder-sys";
+
 const FORBIDDEN_GLOBS = TEMPLATE_FORBIDDEN_PATTERNS.map(
 	(pattern) => new Glob(pattern),
 );
@@ -177,8 +180,12 @@ export function scanProjectTemplateForbiddenTextReferences(
 			continue;
 		}
 		const content = readFileSync(absolutePath, "utf8");
+		const contentWithoutRetiredSeedReference = content.replaceAll(
+			TEMPLATE_RETIRED_LEGACY_SEED_REFERENCE,
+			"",
+		);
 		for (const forbidden of TEMPLATE_FORBIDDEN_TEXT_REFERENCES) {
-			if (content.includes(forbidden)) {
+			if (contentWithoutRetiredSeedReference.includes(forbidden)) {
 				matches.push(`${relativePath}: ${forbidden}`);
 			}
 		}

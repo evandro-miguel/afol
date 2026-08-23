@@ -38,6 +38,7 @@ const UPDATE_TARGETS: UpdateFilePath[] = Object.keys(
 
 const REMOVED_TEMPLATE_PATHS: readonly UpdateFilePath[] = [
 	".agents/skills/agentic-folder-sys",
+	".agents/source/universal-skills/skills/agentic-folder-sys",
 	".afol/adm/source/universal-skills/skills/agentic-folder-sys",
 ];
 

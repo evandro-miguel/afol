@@ -52,6 +52,9 @@ Replace this section after bootstrap with real product purpose and constraints.
   then `afol c -S {session-id}`.
 - Prefer short commands; long forms remain valid for humans/audits.
 - Use `afol` as the only downstream front door.
+- Resolve guidance in this order: target `AGENTS.md`, accepted ADRs and active
+  lessons, applicable `.afol/adm/rules/**`, then `afol help <command>` for live
+  flags and side effects. Do not require or create a replacement skill.
   It is an external command, not a repository-local file.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
@@ -164,6 +167,8 @@ afol local-state rebuild --json
 - `.afol/`: provider-compatible mutable state when configured; not a skills
   root.
 - `.afol/adm/source/universal-skills/`: local seed, not nested git.
+- `.agents/source/universal-skills/skills/agentic-folder-sys`: retired legacy
+  seed; detect and preserve history through migration archives, never reactivate.
 - `.afol/pstr/`: current-state structure maps only.
 - `docs/`: project docs.
 
@@ -283,8 +288,10 @@ afol local-state rebuild --json
   adapter is disabled, do not create or sync its mirror files.
 - Keep enabled adapters thin and traceable.
 - Prefer project-local skills only for project-specific behavior.
-- Use global Codex skills for universal AFOL behavior when available; do not
-  vendor `agentic-folder-sys` under `.agents/skills/`.
+- Machine-global skills are not an AFOL runtime dependency. Use this
+  `AGENTS.md`, resolved `.afol/adm/rules/**`, and `afol help <command>` for
+  universal AFOL behavior; do not vendor `agentic-folder-sys` under
+  `.agents/skills/`.
 - Project-local skills are optional; use a native downstream sync command only
   when this repo provides one.
 - External skill source updates are branch/PR flow; never direct to universal

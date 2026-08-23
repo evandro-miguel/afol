@@ -986,6 +986,53 @@ describe("validate command", () => {
 		}
 	});
 
+	test("warns on legacy universal-skills agentic-folder-sys seed until strict", async () => {
+		const root = createValidationFixture();
+		try {
+			const staleSeedPath = join(
+				root,
+				".agents",
+				"source",
+				"universal-skills",
+				"skills",
+				"agentic-folder-sys",
+			);
+			mkdirSync(staleSeedPath, { recursive: true });
+			writeFileSync(join(staleSeedPath, "SKILL.md"), "# stale\n", "utf8");
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const check = payload.checks?.find(
+				(entry) => entry.id === "agents_payload_clean",
+			);
+
+			expect(code).toBe(0);
+			expect(check?.ok).toBe(true);
+			expect(check?.message).toContain("warning:");
+			expect(check?.message).toContain(
+				".agents/source/universal-skills/skills/agentic-folder-sys",
+			);
+
+			const strict = captureIo();
+			expect(
+				await runValidateCommand(root, ["--strict", "--json"], strict.io),
+			).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				strictPayload.checks?.find(
+					(entry) => entry.id === "agents_payload_clean",
+				)?.ok,
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects skills_dir outside .agents/skills", async () => {
 		const root = createValidationFixture();
 		try {

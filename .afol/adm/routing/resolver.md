@@ -6,8 +6,8 @@ Scope: canonical-layout routing reference; verify path existence before load.
 ## Signals
 | task signal | load |
 | --- | --- |
-| rules or skills | `.afol/adm/rules/README.md`, `.afol/adm/rules/RULE-006-applicable-rule-resolution.md`, `.agents/skills/**` (if present) |
-| tools or commands | `afol schema resolver --json`, `afol schema resolver --write`, `afol validate project` |
+| guidance or rules | `AGENTS.md`, `.afol/adm/rules/README.md`, resolved `.afol/adm/rules/**` |
+| tools or commands | `afol help <command>`, `afol schema resolver --json`, `afol validate project` |
 | adm or routing docs | `.afol/adm/doctrine/ARCHITECTURE.md#9.4-resolver`, `.afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md` |
 | pstr or surface maps | `.afol/pstr/cli.md`, `.afol/pstr/docs.md`, `.afol/pstr/template.md`, `.afol/pstr/config.md` (generated; verify present) |
 | memory or library refs | `.afol/memory/memory.md`, `.afol/library/**` (if present), `.afol/adm/specs/260612_global-project-research-library_spec-child_01.md` |
@@ -19,12 +19,12 @@ Scope: canonical-layout routing reference; verify path existence before load.
 - `.afol/adm/rules/RULE-004-validation-linting.md`
 - `.afol/adm/rules/RULE-005-folder-structure.md`
 
-## Skills
-- global Codex `agentic-folder-sys` skill when available
-- `.agents/skills/afol-integration-test/`
-- `.agents/skills/typescript-expert/`
-- `.agents/skills/javascript-testing-patterns/`
-- `.agents/skills/bun-development/`
+## Guidance
+- read `AGENTS.md` before editing
+- resolve applicable `.afol/adm/rules/**` before choosing a workflow
+- use `afol help <command>` for current flags and side effects
+- `.agents/skills/**` is optional and project-specific only
+- `agentic-folder-sys` is not an active AFOL route or dependency
 
 ## Tools
 - `afol schema resolver --json` -> inspect content

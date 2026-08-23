@@ -99,10 +99,15 @@ events, indexes, mutations, temporary files, benchmark catalog/results, and
 migration archives.
 
 Project-local provider skills may live under `.agents/skills/**` when they are
-specific to this repo. Do not vendor `agentic-folder-sys` there; use the global
-Codex skill when available.
+specific to this repo. Do not vendor `agentic-folder-sys` there. AFOL operation
+is resolved from this `AGENTS.md`, accepted ADRs and lessons, the applicable
+`.afol/adm/rules/**`, and live `afol help <command>` output.
 Do not create or use `.afol/skills/**`; `.afol/**` is mutable runtime state,
 not a project-local skills root.
+
+The legacy seed `.agents/source/universal-skills/skills/agentic-folder-sys` is
+retired payload. Detect it, preserve its history under an AFOL migration
+archive when present, and never reactivate it as an operational route.
 
 ## Project RAG
 
@@ -153,10 +158,11 @@ not a project-local skills root.
   focused source reads to confirm exact implementation facts. A stale,
   missing, or out-of-scope result is orientation only, never proof.
 
-Large AFOL changes should use the global Codex `agentic-folder-sys` skill when
-available. Do not require or restore a project-local
-`.agents/skills/agentic-folder-sys` copy; stale local copies have caused
-version drift.
+Large AFOL changes should begin with this root guidance, then resolve the
+applicable `.afol/adm/rules/**` (especially RULE-006 and RULE-009), and inspect
+`afol help <command>` before relying on flags or side effects. Accepted ADRs,
+active lessons, and migration records remain context; they do not create a
+second command or skill route.
 
 Target governance layout:
 
@@ -176,8 +182,9 @@ Workflow/template routing:
 - Use `docs/templates/**` for workflow artifact shapes such as roadmap, spec,
   spec-child, spec-test, plan, task, log, report, postmortem, retrospective,
   ADR, architecture, pattern, and structure.
-- Global skill guidance may reference this template map, but the repo/template
-  must not carry a project-local `agentic-folder-sys` skill copy.
+- Resolve this template map through `AGENTS.md`, the applicable
+  `.afol/adm/rules/**`, and `afol help <command>`; do not add a replacement
+  skill or carry a project-local `agentic-folder-sys` copy.
 
 Canonical commands (agent **fast path** — prefer when active/bound session
 resolves; see F-03 and
@@ -396,11 +403,10 @@ Use the narrowest tool that answers the question.
 - Portuguese -> only when explicitly requested by user.
 - Skills -> prefer repo-local `.agents/skills/` only for project-specific
   behavior.
-- Machine-global skills -> preferred for universal AFOL/workbench behavior.
-- Project-local skills are optional; do not keep stale local copies of global
-  AFOL skills.
+- Machine-global skills are not an AFOL runtime dependency.
+- Project-local skills are optional and limited to project-specific behavior;
+  AFOL/workbench operations use local guidance, resolved rules, and `afol`.
 - Skill drift -> classify first, then ask explicit confirmation before removal.
-- AFOL/workbench operations -> use global `agentic-folder-sys` when available.
 - External memory -> auxiliary retrieval only.
 - Repo-local canon and workbench artifacts -> authoritative.
 

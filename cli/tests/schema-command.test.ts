@@ -28,6 +28,10 @@ describe("schema command", () => {
 			expect(content).toContain("## Signals");
 			expect(content).toContain("## Rules");
 			expect(content).toContain("## Validation commands");
+			expect(content).toContain("AGENTS.md");
+			expect(content).toContain("afol help <command>");
+			expect(content).toContain("not an active AFOL route");
+			expect(content).not.toContain("global Codex");
 			expect(content).not.toContain("docs/arc/");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

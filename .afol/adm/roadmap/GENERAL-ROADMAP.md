@@ -68,8 +68,9 @@ The active contract is:
    `.agents/wb`, `.agents/z-arq`, `agents.config`, and `legacy:` routing must
    not be restored or extended.
 3. Retained `.agents/**` content is limited to static provider metadata and
-   optional project-local skills. Universal AFOL skills such as
-   `agentic-folder-sys` are global Codex skills, not vendored template payload.
+   optional project-local skills. Universal AFOL guidance is resolved from
+   `AGENTS.md`, applicable `.afol/adm/rules/**`, and `afol help <command>`;
+   no operator skill is an active template dependency.
 4. Python, Bash, uv, and Just references are historical migration context, not
    active runtime surfaces.
 5. `src/project-template` must export the AFOL config/governance/state payload

@@ -305,7 +305,11 @@ describe("template forbidden-content policy", () => {
 	test("src/project-template does not vendor global agentic-folder-sys skill", async () => {
 		const projectRoot = process.cwd();
 		const forbiddenPaths = [
+			".agents/skills/agentic-folder-sys",
+			".agents/source/universal-skills/skills/agentic-folder-sys",
+			".afol/adm/source/universal-skills/skills/agentic-folder-sys",
 			"src/project-template/.agents/skills/agentic-folder-sys",
+			"src/project-template/.agents/source/universal-skills/skills/agentic-folder-sys",
 			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-folder-sys",
 		];
 		const existingForbiddenPaths = forbiddenPaths.filter((path) =>
@@ -313,6 +317,10 @@ describe("template forbidden-content policy", () => {
 		);
 
 		const metadataFiles = [
+			".agents/manifest.json",
+			".agents/lock.json",
+			".afol/adm/source/universal-skills/index.json",
+			".afol/adm/source/universal-skills/profiles/core.json",
 			"src/project-template/.agents/manifest.json",
 			"src/project-template/.agents/lock.json",
 			"src/project-template/.afol/adm/source/universal-skills/index.json",
@@ -354,6 +362,8 @@ describe("template forbidden-content policy", () => {
 	test("template excludes retired agentic-scaffold-mcp seed", async () => {
 		const projectRoot = process.cwd();
 		const forbiddenPaths = [
+			".agents/skills/agentic-scaffold-mcp",
+			".afol/adm/source/universal-skills/skills/agentic-scaffold-mcp",
 			"src/project-template/.agents/skills/agentic-scaffold-mcp",
 			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-scaffold-mcp",
 		];
@@ -362,6 +372,10 @@ describe("template forbidden-content policy", () => {
 		).toEqual([]);
 
 		const metadataFiles = [
+			".agents/manifest.json",
+			".agents/lock.json",
+			".afol/adm/source/universal-skills/index.json",
+			".afol/adm/source/universal-skills/profiles/core.json",
 			"src/project-template/.agents/manifest.json",
 			"src/project-template/.agents/lock.json",
 			"src/project-template/.afol/adm/source/universal-skills/index.json",

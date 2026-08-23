@@ -226,6 +226,10 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Install scaffold; use --dry-run to preview writes",
 		category: "core",
+		guidance: [
+			"Read AGENTS.md and resolve .afol/adm/rules before applying changes.",
+			"Use afol help init for current flags; preserve existing history and migrations.",
+		],
 		subcommands: [
 			{
 				usage: "--dry-run [--json]",
@@ -766,6 +770,10 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Install scaffold into another repo; use --dry-run to preview",
 		category: "workflow",
+		guidance: [
+			"Read the target AGENTS.md and resolve its .afol/adm/rules when present.",
+			"Use afol help bootstrap for current flags; preview first and preserve history and migrations.",
+		],
 		subcommands: [
 			{
 				usage: "<target-path> --dry-run",

@@ -32,6 +32,9 @@ the active repo.
   and must not be restored.
 - Downstream installs receive only the exportable scaffold from
   `src/project-template/`.
+- AFOL guidance is rule-first: read `AGENTS.md`, resolve applicable
+  `.afol/adm/rules/**`, and use `afol help <command>` for live command
+  contracts. A global or historical skill copy is not an active AFOL route.
 
 ## Consequences
 

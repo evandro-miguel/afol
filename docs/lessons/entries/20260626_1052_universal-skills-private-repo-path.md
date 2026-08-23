@@ -30,3 +30,5 @@ Workbench context: `N/A`.
 
 - Before documenting a universal skill source path, verify that
   `skills/agentic-folder-sys/SKILL.md` exists in that checkout.
+- This source-path check is historical provenance only; active AFOL routing is
+  local `AGENTS.md`, resolved rules, and `afol help <command>`.

@@ -302,10 +302,14 @@ describe("help formatter", () => {
 	test("expands per-command help with tool-specific options and guidance", () => {
 		const validateHelp = formatCommandHelp("validate", kernelRegistry);
 		const updateHelp = formatCommandHelp("update", kernelRegistry);
+		const initHelp = formatCommandHelp("init", kernelRegistry);
+		const bootstrapHelp = formatCommandHelp("bootstrap", kernelRegistry);
 
 		expect(validateHelp).not.toBeNull();
 		expect(updateHelp).not.toBeNull();
-		if (!validateHelp || !updateHelp) {
+		expect(initHelp).not.toBeNull();
+		expect(bootstrapHelp).not.toBeNull();
+		if (!validateHelp || !updateHelp || !initHelp || !bootstrapHelp) {
 			throw new Error("expected command help");
 		}
 
@@ -328,6 +332,18 @@ describe("help formatter", () => {
 		expect(updateHelp).toContain("Subcommands:");
 		expect(updateHelp).toContain("check [read]");
 		expect(updateHelp).toContain("apply --dry-run [read]");
+		expect(initHelp).toContain(
+			"Read AGENTS.md and resolve .afol/adm/rules before applying changes.",
+		);
+		expect(initHelp).toContain(
+			"Use afol help init for current flags; preserve existing history and migrations.",
+		);
+		expect(bootstrapHelp).toContain(
+			"Read the target AGENTS.md and resolve its .afol/adm/rules when present.",
+		);
+		expect(bootstrapHelp).toContain(
+			"Use afol help bootstrap for current flags; preview first and preserve history and migrations.",
+		);
 	});
 
 	test("lists session radar in per-command help", () => {

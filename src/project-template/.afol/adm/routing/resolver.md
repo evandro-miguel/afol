@@ -6,30 +6,38 @@ Scope: canonical-layout routing reference; verify path existence before load.
 
 | task signal | load |
 | --- | --- |
-| rules or skills | `.afol/adm/rules/README.md`, configured `paths.skills_dir` |
-| tools or commands | `afol schema resolver --json`, `afol validate project` |
+| guidance or rules | `AGENTS.md`, `.afol/adm/rules/README.md`, resolved `.afol/adm/rules/**` |
+| tools or commands | `afol help <command>`, `afol schema resolver --json`, `afol validate project` |
 | adm or routing docs | `.afol/adm/**` |
 | pstr or surface maps | `.afol/pstr/**` generated maps |
 | memory or library refs | `.afol/memory/memory.md`, `.afol/library/**` |
-| validation or trust | `afol health`, `afol doctor --remediation-plan`, `afol validate project` |
+| validation or trust | `bun run typecheck`, `bun test cli/tests/schema-command.test.ts` |
 
 ## Rules
 
-- Load the smallest rule set that matches the task surface.
-- Prefer AFOL commands over direct edits for governed state.
-- Do not load whole `.afol/library/**`, `.afol/memory/**`, or `.afol/wb/**` trees into context.
+- `.afol/adm/rules/README.md`
+- `.afol/adm/rules/RULE-006-applicable-rule-resolution.md`
+- `.afol/adm/rules/RULE-004-validation-linting.md`
+- `.afol/adm/rules/RULE-005-folder-structure.md`
 
-## Skills
+## Guidance
 
-- Use project-local skills only through configured `paths.skills_dir`.
+- read `AGENTS.md` before editing
+- resolve applicable `.afol/adm/rules/**` before choosing a workflow
+- use `afol help <command>` for current flags and side effects
+- `.agents/skills/**` is optional and project-specific only
+- `agentic-folder-sys` is not an active AFOL route or dependency
 
 ## Tools
 
-- `afol ctx bundle --explain --json`
-- `afol pstr validate`
-- `afol health --deep`
-- `afol validate project --json`
+- `afol schema resolver --json` -> inspect content
+- `afol schema resolver --write` -> write the resolver atomically
+- `afol validate project` -> project contract check
+- `bun run typecheck` -> type safety
+- `bun test cli/tests/schema-command.test.ts` -> command coverage
 
 ## Validation commands
 
-- `afol validate project --json`
+- `bun run typecheck`
+- `bun test cli/tests/schema-command.test.ts`
+- `afol validate project`

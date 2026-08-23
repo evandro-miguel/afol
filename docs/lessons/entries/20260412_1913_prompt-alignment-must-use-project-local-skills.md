@@ -28,6 +28,6 @@ about the scaffold's skill surface.
 ## Guardrail
 
 - For this repository, route governed scaffold/workbench operations through
-  global Codex `agentic-folder-sys` guidance and AFOL CLI commands; do not
+  `AGENTS.md`, resolved `.afol/adm/rules/**`, and AFOL CLI help; do not
   reintroduce the older split between `agentic-system-workflow` and
-  `workbench-agent-teams`.
+  `workbench-agent-teams`, or create a replacement skill.

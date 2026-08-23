@@ -152,8 +152,9 @@ local state.
 - `.afol/adm/source/**`: static source seed content.
 - `.agents/skills/**`: optional project-local provider skills. `paths.skills_dir`
   must stay here or in a child path; `.afol/skills/**` is not an active skills
-  root. Universal AFOL behavior uses global Codex skills such as
-  `agentic-folder-sys`, not a vendored project-local copy.
+  root. Universal AFOL behavior is resolved from `AGENTS.md`, applicable
+  `.afol/adm/rules/**`, and `afol help <command>`; `agentic-folder-sys` is not
+  an active project route.
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
   desired-state administration.
 - `.afol/pstr/**`: generated project-structure maps when present.

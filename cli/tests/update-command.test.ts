@@ -408,11 +408,21 @@ describe("update command", () => {
 			"skills",
 			"agentic-folder-sys",
 		);
+		const staleLegacySeedPath = join(
+			root,
+			".agents",
+			"source",
+			"universal-skills",
+			"skills",
+			"agentic-folder-sys",
+		);
 		try {
 			mkdirSync(staleSkillPath, { recursive: true });
 			writeFileSync(join(staleSkillPath, "SKILL.md"), "# stale\n", "utf8");
 			mkdirSync(staleSourcePath, { recursive: true });
 			writeFileSync(join(staleSourcePath, "SKILL.md"), "# stale\n", "utf8");
+			mkdirSync(staleLegacySeedPath, { recursive: true });
+			writeFileSync(join(staleLegacySeedPath, "SKILL.md"), "# stale\n", "utf8");
 
 			const check = capture();
 			expect(
@@ -450,6 +460,7 @@ describe("update command", () => {
 			});
 			expect(existsSync(staleSkillPath)).toBe(true);
 			expect(existsSync(staleSourcePath)).toBe(true);
+			expect(existsSync(staleLegacySeedPath)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

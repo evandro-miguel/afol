@@ -10,54 +10,53 @@ applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 
 # Applicable Rule Resolution
 
-**Purpose:** load the right local rule/spec/skill before governed edits.
+**Purpose:** resolve local authority before governed edits.
 
-## Pre-Edit Check
+## Resolution Order
 
-Before edits, answer:
+Load the smallest applicable set in this order:
 
-1. What element am I touching?
-2. Which project rule applies?
-3. Which spec, standard, template, or skill applies?
-4. Which validation proves compliance?
+1. `AGENTS.md` and nearer target guidance.
+2. Accepted ADRs and active lessons.
+3. Resolved `.afol/adm/rules/**`, using RULE-006 cumulatively.
+4. `afol help <command>` for live flags and side effects.
+5. Governing roadmap/spec, template, tests, and source.
 
-If no project rule exists, state the gap, use closest local guidance, and record
-follow-up when recurrence is likely.
+Name the element, rule/spec, and validation before editing. If no rule exists,
+state the gap and record follow-up when recurrence is likely.
 
-## Routing
+## Surface Routing
 
 | Element | Guidance |
 | --- | --- |
 | Ambiguous/product request | Decision intake, parent spec, RULE-002 |
 | Feature/workstream | Roadmap, parent spec, RULE-002 |
-| Spec, roadmap, managed doc | RULE-003 and the matching template |
-| Workbench artifact | global Codex `agentic-folder-sys`, RULE-002, RULE-004 |
-| Project-local skill | `writing-skills`, skills-sync docs, RULE-002 |
+| Spec or managed doc | RULE-003 and matching template |
+| Workbench artifact | `AGENTS.md`, RULE-002/RULE-004, `afol help start|done|close` |
+| Project-local skill | `AGENTS.md`, rules, `afol help skill`, RULE-002 |
 | Code | Project config, nearest tests, language skill |
-| Runtime command/tool | Command docs/tests, `.afol/adm/tools.json` |
-| Folder/scaffold layout | RULE-005, template docs, map evidence |
-| Validation/release gate | RULE-004 and affected command docs |
+| Command/tool | `AGENTS.md`, rules, `afol help <command>`, docs/tests |
+| Folder/scaffold | RULE-005, template docs, map evidence |
+| Validation/release | RULE-004 and command docs |
 
-Guidance is cumulative. A code feature also follows feature/workstream rules.
+Guidance is cumulative. `agentic-folder-sys` is not an active AFOL route; do
+not require or create a replacement skill. Historical copies are context only.
 
 ## Similar Systems
 
-Before creating a command, workflow, artifact type, or helper:
+Before creating a command, artifact, or helper:
 
-- Search closest existing code/docs/rules/skills.
-- Reuse local patterns unless they conflict with current requirements.
-- Do not refactor the similar system unless the scope includes it.
-- Record convergence debt when duplication matters.
+- Search closest existing code/docs/rules/skills and reuse local patterns.
+- Do not refactor the similar system unless this scope includes it.
 
 ## Delegation
 
-The orchestrator passes applicable rule context to delegated agents. If context
-is missing, the delegated agent pauses and asks instead of guessing.
+Pass resolved rule context to delegated agents. Missing context means pause and
+ask instead of guessing.
 
 ## Validation
 
-Before completion, name followed rules, run required validation, and record real
-rule gaps in the workstream, roadmap, spec, or report.
+Name followed rules, run required checks, and record real rule gaps.
 
 ## References
 
@@ -65,3 +64,4 @@ rule gaps in the workstream, roadmap, spec, or report.
 - RULE-003 - Documentation Standards
 - RULE-004 - Validation and Linting
 - RULE-005 - Folder Structure
+- RULE-009 - Legacy Surface Retirement

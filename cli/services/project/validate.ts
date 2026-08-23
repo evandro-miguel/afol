@@ -233,6 +233,7 @@ function validateAgentsPayloadClean(
 		".agents/hooks",
 		".agents/rules",
 		".agents/source",
+		".agents/source/universal-skills/skills/agentic-folder-sys",
 		".agents/tools",
 		".agents/tools.json",
 		".agents/skills/agentic-folder-sys",
