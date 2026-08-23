@@ -27,6 +27,9 @@
   "mapped_directories": {
     "docs/public": "docs"
   },
+  "mapped_files": {
+    "docs/public/AGENTS.md": "AGENTS.md"
+  },
   "exclude": [
     "cli/tests/active-canon-migration.test.ts",
     "cli/tests/bench-command.test.ts",

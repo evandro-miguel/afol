@@ -7,16 +7,15 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
-	readlinkSync,
-	symlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 type ExportConfig = {
 	files: string[];
 	directories: string[];
 	mapped_directories: Record<string, string>;
+	mapped_files: Record<string, string>;
 	exclude: string[];
 };
 
@@ -58,30 +57,43 @@ if (existsSync(targetRoot) && readdirSync(targetRoot).length > 0) {
 mkdirSync(targetRoot, { recursive: true });
 
 const excluded = new Set(config.exclude);
+const mappedFileSources = new Set(Object.keys(config.mapped_files));
 function isExcluded(relativePath: string): boolean {
 	return [...excluded].some(
 		(entry) => relativePath === entry || relativePath.startsWith(`${entry}/`),
 	);
 }
 
-function copyEntry(sourcePath: string, destinationPath: string): void {
+function pathExists(path: string): boolean {
+	try {
+		lstatSync(path);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function copyEntry(
+	sourcePath: string,
+	destinationPath: string,
+	includeMappedFiles = false,
+): void {
 	const sourceRelative = relative(repoRoot, sourcePath).split("\\").join("/");
 	if (isExcluded(sourceRelative)) return;
+	if (!includeMappedFiles && mappedFileSources.has(sourceRelative)) return;
 
 	const stats = lstatSync(sourcePath);
 	if (stats.isSymbolicLink()) {
-		const target = readlinkSync(sourcePath);
-		if (isAbsolute(target)) {
-			throw new Error(`absolute symlink is forbidden in public export: ${sourceRelative}`);
-		}
-		mkdirSync(dirname(destinationPath), { recursive: true });
-		symlinkSync(target, destinationPath);
-		return;
+		throw new Error(`symlink is forbidden in public export: ${sourceRelative}`);
 	}
 	if (stats.isDirectory()) {
 		mkdirSync(destinationPath, { recursive: true });
 		for (const entry of readdirSync(sourcePath)) {
-			copyEntry(join(sourcePath, entry), join(destinationPath, entry));
+			copyEntry(
+				join(sourcePath, entry),
+				join(destinationPath, entry),
+				includeMappedFiles,
+			);
 		}
 		return;
 	}
@@ -91,22 +103,31 @@ function copyEntry(sourcePath: string, destinationPath: string): void {
 
 for (const path of config.files) {
 	const source = join(repoRoot, path);
-	if (!existsSync(source)) throw new Error(`missing public file: ${path}`);
+	if (!pathExists(source)) throw new Error(`missing public file: ${path}`);
 	copyEntry(source, join(targetRoot, path));
 }
 for (const path of config.directories) {
 	const source = join(repoRoot, path);
-	if (!existsSync(source)) throw new Error(`missing public directory: ${path}`);
+	if (!pathExists(source)) throw new Error(`missing public directory: ${path}`);
 	copyEntry(source, join(targetRoot, path));
 }
 for (const [sourcePath, destinationPath] of Object.entries(
 	config.mapped_directories,
 )) {
 	const source = join(repoRoot, sourcePath);
-	if (!existsSync(source)) {
+	if (!pathExists(source)) {
 		throw new Error(`missing mapped public directory: ${sourcePath}`);
 	}
 	copyEntry(source, join(targetRoot, destinationPath));
+}
+for (const [sourcePath, destinationPath] of Object.entries(
+	config.mapped_files,
+)) {
+	const source = join(repoRoot, sourcePath);
+	if (!pathExists(source)) {
+		throw new Error(`missing mapped public file: ${sourcePath}`);
+	}
+	copyEntry(source, join(targetRoot, destinationPath), true);
 }
 
 const packagePath = join(targetRoot, "package.json");

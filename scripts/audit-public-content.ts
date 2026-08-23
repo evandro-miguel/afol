@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { lstatSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { lstatSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 const root = resolve(process.argv[2] ?? process.cwd());
 const findings: string[] = [];
@@ -18,8 +18,7 @@ function visit(path: string): void {
 	const stats = lstatSync(path);
 	const name = relative(root, path).split("\\").join("/") || ".";
 	if (stats.isSymbolicLink()) {
-		const target = readlinkSync(path);
-		if (isAbsolute(target)) findings.push(`${name}: absolute-symlink`);
+		findings.push(`${name}: symlink`);
 		return;
 	}
 	if (stats.isDirectory()) {
