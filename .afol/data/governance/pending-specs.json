@@ -104,6 +104,37 @@
       "parent_spec_sha256": "5268a87ba93e8d29f3423e6e00be208964e55764df7ae495117560215df7f929",
       "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
       "roadmap_sha256": "b9064144010d403e47ee7f57f27fa54b4d327d16a14f82c7869799dc5f8bc903"
+    },
+    {
+      "session_id": "260823_1545_windows-completion-fence-integrity",
+      "created_at": "2026-08-23T20:45:25.126Z",
+      "updated_at": "2026-08-23T20:45:25.126Z",
+      "status": "open",
+      "theme": "windows-completion-fence-integrity",
+      "task_ids": [
+        "T-01",
+        "T-02"
+      ],
+      "missing": [],
+      "resolution_hint": "catalog resolution deferred: Parent spec must resolve uniquely: 260710_core-integrity-and-transaction-safety_spec_01; run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "feature_id": "F-22",
+      "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01"
+    },
+    {
+      "session_id": "260823_1551_completion-fence-integrity-recovery",
+      "created_at": "2026-08-23T20:51:53.230Z",
+      "updated_at": "2026-08-23T20:51:53.230Z",
+      "status": "open",
+      "theme": "completion-fence-integrity-recovery",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
+      "resolution_hint": "catalog resolution deferred: Parent spec must resolve uniquely: 260710_core-integrity-and-transaction-safety_spec_01; run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "feature_id": "F-22",
+      "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01"
     }
   ]
 }
