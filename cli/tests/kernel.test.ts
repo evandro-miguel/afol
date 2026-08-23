@@ -460,6 +460,37 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("restricted done test-shell invocations are denied before shell execution", () => {
+		const root = mkProjectRoot("done-test-shell-policy", "");
+		const sentinel = join(root, "test-shell-ran");
+		try {
+			for (const caller of ["--agent", "--remote"] as const) {
+				const proc = runKernel(root, [
+					caller,
+					"done",
+					"--session",
+					"S-RESTRICTED",
+					"--task-id",
+					"T-01",
+					"--test-shell",
+					`touch ${sentinel}`,
+					"--json",
+				]);
+
+				expectRestrictedJsonError(proc);
+				const payload = JSON.parse((proc.stdout as string).trim()) as {
+					action?: string;
+					error?: { code?: string };
+				};
+				expect(payload.action).toBe("workbench.done.test-shell");
+				expect(payload.error?.code).toBe("approval-required");
+				expect(existsSync(sentinel)).toBe(false);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("--help --verbose prints expanded catalog without requiring project files", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-help-verbose-no-project-"));
 		try {

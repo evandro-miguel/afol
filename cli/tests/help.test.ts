@@ -485,6 +485,41 @@ describe("help formatter", () => {
 		expect(help).toContain("rebuild|rb --json --verbose [generated]");
 	});
 
+	test("documents local-operator shell verification without a catalog subcommand", () => {
+		const help = formatCommandHelp("done", kernelRegistry);
+		const done = buildCommandCatalog(kernelRegistry).find(
+			(entry) => entry.command === "done",
+		);
+
+		expect(help).not.toBeNull();
+		expect(help).toContain(
+			'Use --test-shell "<cmd>" for one shell verification (local operator only).',
+		);
+		expect(done?.subcommands?.map((entry) => entry.usage)).not.toContain(
+			'--test-shell "<cmd>"',
+		);
+	});
+
+	test("formats state help with every supported action", () => {
+		const help = formatCommandHelp("state", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected state command help");
+		}
+		expect(help).toContain("Command: state");
+		expect(help).toContain("show|sh [--session <session-id>] [--json] [read]");
+		expect(help).toContain(
+			"validate|v [--session <session-id>] [--json] [read]",
+		);
+		expect(help).toContain(
+			"sync|sy [--session <session-id>] [--json] [generated]",
+		);
+		expect(help).toContain(
+			"export|ex [--session <session-id>] [--json] [read]",
+		);
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{

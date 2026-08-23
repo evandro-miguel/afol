@@ -2,32 +2,32 @@
   "version": 1,
   "areas": {
     "rules": {
-      "reviewed_at": "2026-06-29T23:13:28.997Z",
-      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+      "reviewed_at": "2026-08-23T18:51:22.683Z",
+      "note": "Reviewed 11 rules; fixed body budgets and maintenance aliases; focused rule/context tests passed."
     },
     "skills": {
-      "reviewed_at": "2026-06-29T23:13:28.997Z",
-      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+      "reviewed_at": "2026-08-23T18:51:26.131Z",
+      "note": "Reviewed 20 skills; project-local typescript-expert lacks canonical ownership and remains unchanged pending explicit remove-or-upstream decision."
     },
     "docs": {
-      "reviewed_at": "2026-06-29T23:13:28.997Z",
-      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+      "reviewed_at": "2026-08-23T18:51:31.673Z",
+      "note": "Reviewed public and governance docs; corrected invalid lifecycle, evidence, and state examples; changed-file Markdown checks passed except pre-existing ADR title policy."
     },
     "commands": {
-      "reviewed_at": "2026-06-29T23:13:28.997Z",
-      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+      "reviewed_at": "2026-08-23T18:51:37.012Z",
+      "note": "Reviewed live command help; added state actions and local-operator-only test-shell guidance with agent and remote denial regression coverage."
     },
     "memory": {
-      "reviewed_at": "2026-07-15T12:38:00.821Z",
-      "note": "Reviewed 2026-07-15: 0 memory entries; no content to consolidate, archive, or refresh."
+      "reviewed_at": "2026-08-23T18:51:41.082Z",
+      "note": "Reviewed AFOL Memory health and empty continuity store; no stale, duplicate, conflicting, or retention candidates."
     },
     "library": {
-      "reviewed_at": "2026-06-29T23:13:28.997Z",
-      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+      "reviewed_at": "2026-08-23T18:51:45.690Z",
+      "note": "Reviewed AFOL Library health and empty knowledge store; no sources, claims, aliases, or freshness candidates."
     },
     "organization": {
-      "reviewed_at": "2026-06-29T23:13:28.997Z",
-      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+      "reviewed_at": "2026-08-23T18:51:49.819Z",
+      "note": "Reviewed project organization; PSTR and drift checks current, no root pollution, pending specs, or open sessions."
     }
   }
 }

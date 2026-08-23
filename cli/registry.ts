@@ -281,6 +281,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 			'Prefer -x / batch T-01..T-n: afol d T-01 -x "<cmd>" verifies and completes in one step.',
 			"Separate evidence is diagnostic when you need a receipt without completing.",
 			"Batch selectors run one shared check for execution-policy tasks.",
+			'Use --test-shell "<cmd>" for one shell verification (local operator only).',
 		],
 		subcommands: [
 			{
@@ -980,6 +981,28 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect state snapshot",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "show|sh [--session <session-id>] [--json]",
+				sideEffect: "read",
+				description: "Show the hydrated session state",
+			},
+			{
+				usage: "validate|v [--session <session-id>] [--json]",
+				sideEffect: "read",
+				description: "Validate stored session-state source hashes",
+			},
+			{
+				usage: "sync|sy [--session <session-id>] [--json]",
+				sideEffect: "generated",
+				description: "Refresh the hydrated session state",
+			},
+			{
+				usage: "export|ex [--session <session-id>] [--json]",
+				sideEffect: "read",
+				description: "Export the hydrated session snapshot",
+			},
+		],
 	},
 	{
 		command: "hydrate",

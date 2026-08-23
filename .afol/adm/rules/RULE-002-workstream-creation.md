@@ -15,7 +15,7 @@ decisions.
 
 ## Artifact Economy
 
-- No workbench session for quick answers, read-only checks, planning-only
+- No workbench session for quick asks, read-only checks, planning-only
   replies, or broad context gathering.
 - No sidecar artifacts by habit. Add research, brainstorm, explorer-check,
   report, spec, spec-lite, or postmortem only when requested, required, or

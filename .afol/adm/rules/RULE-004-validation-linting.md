@@ -10,14 +10,14 @@ applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 
 # Validation And Linting
 
-**Purpose:** validate code, scaffold state, and documentation before completion.
+**Purpose:** validate touched code, scaffold state, and docs before completion.
 
 ---
 
 ## Completion Validation
 
 Run the smallest checks that prove the touched surface. For cross-cutting
-scaffold changes, use:
+scaffold changes, run:
 
 ```bash
 afol local-state rebuild --json
@@ -27,30 +27,14 @@ bun test
 bun run validate:release
 ```
 
-When a governed session is active, also run:
+For a governed session, also run:
 
-```bash
-afol verify-tasks --strict
-```
+`afol verify-tasks --strict`.
 
-For a project carrying an approved legacy-evidence baseline, strict output is
-the raw historical audit and may remain nonzero. `afol validate project --json`
-is the release-readiness gate: it verifies exact admissions and reports them as
-waived debt; new, changed, open, invalid, or unlisted evidence remains blocking.
-
----
-
-## Validation Commands
-
-| Scope | Command |
-|-------|---------|
-| Project structure | `afol validate project --json` |
-| Workbench tasks | `afol verify-tasks --strict` |
-| Local state indexes | `afol local-state rebuild --json` |
-| TypeScript | `bun run typecheck` |
-| Tests | `bun test` |
-| Release gate | `bun run validate:release` |
-| Static JSON | `python -m json.tool .afol/adm/tools.json` |
+An approved legacy-evidence baseline may leave strict output nonzero;
+`afol validate project --json` remains the release gate, admitting only exact
+waived historical debt. New, changed, open, invalid, or unlisted evidence
+blocks. For static JSON, run `python -m json.tool .afol/adm/tools.json`.
 
 ---
 

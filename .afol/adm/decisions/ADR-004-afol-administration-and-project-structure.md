@@ -15,7 +15,10 @@ affected_rules: []
 affected_skills: []
 affected_commands:
 - afol hydrate
-- afol db rebuild
+- afol state show
+- afol state validate
+- afol state sync
+- afol state export
 - afol validate drift
 - afol ctx bundle
 archive_reason: ""
@@ -57,6 +60,11 @@ administration surface.
 
 SQLite is derived and rebuildable. It must carry source hashes and must not
 overwrite human-authored Markdown/YAML outside AFOL-managed blocks.
+
+The state inspection surface is explicit: `afol state show` reads a hydrated
+snapshot, `afol state validate` checks source hashes, `afol state sync` refreshes
+the snapshot, and `afol state export` emits the hydrated snapshot. The obsolete
+database-rebuild example is not part of the supported CLI.
 
 IWE is a library provider only. It may operate through AFOL-governed library
 commands, but it never owns core direction, workbench state, evidence, memory,

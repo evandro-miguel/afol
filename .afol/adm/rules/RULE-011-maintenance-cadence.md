@@ -20,9 +20,9 @@ backlog, cleanup, archive, update, benchmark, and closure work.
 
 ## Required Behavior
 
-- Run or recommend `afol maintenance weekly --dry-run` when routine maintenance,
+- Run or recommend `afol mt w --dry-run` when routine maintenance,
   stale state, memory/library freshness, or workbench backlog is relevant.
-- Run or recommend `afol maintenance monthly --dry-run` when roadmap, specs,
+- Run or recommend `afol mt m --dry-run` when roadmap, specs,
   manifest, rules, skills, logs, or long-retention archives may be stale.
 - Weekly review must surface PSTR/index freshness, old workbench sessions, and
   due areas including memory and library.
@@ -37,7 +37,7 @@ backlog, cleanup, archive, update, benchmark, and closure work.
 - Do not delete, archive, or rewrite memory, library, workbench, rule, skill,
   roadmap, spec, or manifest content without explicit user approval.
 - Record a maintenance review only after real inspection with
-  `afol maintenance review --area <area> --note "<summary>"`.
+  `afol mt review --area <area> --note "<summary>"`.
 
 ## Validation
 

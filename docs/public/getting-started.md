@@ -24,7 +24,7 @@ Several tasks:
 afol new feature-name --task "Implement behavior" --task "Add tests"
 afol start T-01
 # edit the project
-afol done T-01 --execute "git diff --check"
+afol d T-01 -x "git diff --check"
 afol close
 ```
 

@@ -74,7 +74,6 @@
           "skill",
           "verify",
           "verify-tasks",
-          "state",
           "adm",
           "health",
           "db",
@@ -96,7 +95,6 @@
           "skill",
           "verify",
           "verify-tasks",
-          "state",
           "adm",
           "health",
           "db",
@@ -156,7 +154,6 @@
           "skill",
           "verify",
           "verify-tasks",
-          "state",
           "adm",
           "health",
           "db",
@@ -1194,9 +1191,30 @@
       "category": "inspect",
       "type": "inspect",
       "side_effect": "read",
-      "execution_mode": "read-only",
+      "execution_mode": "on-demand",
       "description": "Inspect state snapshot",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "show|sh [--session <session-id>] [--json]",
+          "side_effect": "read",
+          "description": "Show the hydrated session state"
+        },
+        {
+          "usage": "validate|v [--session <session-id>] [--json]",
+          "side_effect": "read",
+          "description": "Validate stored session-state source hashes"
+        },
+        {
+          "usage": "sync|sy [--session <session-id>] [--json]",
+          "side_effect": "generated",
+          "description": "Refresh the hydrated session state"
+        },
+        {
+          "usage": "export|ex [--session <session-id>] [--json]",
+          "side_effect": "read",
+          "description": "Export the hydrated session snapshot"
+        }
+      ]
     },
     {
       "id": "hydrate",

@@ -276,20 +276,21 @@ Factory development may invoke root `./afol`, `bun run kernel`, or
 `./dist/afol`; downstream projects receive no local executable or command
 runner.
 
-High-frequency commands should use short names through `afol`:
+High-frequency commands have short aliases through `afol`; these examples use
+explicit forms where argument names matter:
 
 - `afol s`
-- `afol n auth-refactor -F F-02 -S auth-spec`
-- `afol st -T T-01`
-- `afol d -T T-01 -x "bun test"`
-- `afol l -T T-01 -m "Added validation"`
-- `afol e -T T-01 -c "bun test" -r pass`
-- `afol r g frontend`
-- `afol sk u`
+- `afol new auth-refactor --feature-id F-02 --parent-spec auth-spec`
+- `afol start --task-id T-01`
+- `afol done --task-id T-01 --test "bun test"`
+- `afol log --session <session-id> --message "Added validation"`
+- `afol evidence --task-id T-01 --command "bun test" --result passed`
+- `afol rule resolve --surface frontend --work-type delivery`
+- `afol skill list`
 - `afol qt <theme> -t "Summarize research" -c "bun test"`
-- `afol v`
-- `afol c`
-- `afol up ck`
+- `afol validate project`
+- `afol close`
+- `afol update check`
 
 Long aliases may exist for humans. Agents should prefer short commands.
 Retired aliases do not return as command front doors.

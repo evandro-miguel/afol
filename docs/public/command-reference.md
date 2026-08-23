@@ -14,14 +14,35 @@ afol init
 afol status
 afol qt <theme> -t "<task>" -c "<check>"
 afol new <theme> --task <text>
-afol start <task-id>
-afol evidence <task-id> --command <check> --outcome passed
-afol done <task-id> --execute <check>
+afol start --task-id <task-id>
+afol evidence --task-id <task-id> --command "<check>" --result passed
+afol done <task-id> --test "<argv-only-check>"
+afol done <task-id> --test-shell "<shell-check>"
 afol close
 ```
 
-`done --execute` (alias `-x` / `--test`) runs the check and records observed
-evidence. Completion without that evidence is rejected.
+`done --test` (alias `-x`) is the agent-facing default: it runs argv-only
+verification and records observed evidence without shell parsing.
+`done --test-shell` runs one shell command for a local operator only; never use
+it for agent or remote/provider execution. Completion without observed evidence
+is rejected. Use `evidence --result passed` when recording a separate evidence
+receipt.
+
+## Materialized state
+
+Hydrate a session before inspecting or exporting its derived state:
+
+```text
+afol hydrate --session <session-id>
+afol state show --session <session-id>
+afol state validate --session <session-id>
+afol state sync --session <session-id>
+afol state export --session <session-id>
+```
+
+`state show` reads the snapshot, `state validate` checks its source hashes,
+`state sync` refreshes the snapshot, and `state export` prints the hydrated
+snapshot. Omit `--session` only when an active or bound session is available.
 
 ## Project and template
 
@@ -37,7 +58,7 @@ afol catchup --fix
 ## Stability
 
 - **stable**: init, bootstrap, status, health, new/start/done/close, evidence,
-  validate, update, safe file mutations.
+  state, validate, update, safe file mutations.
 - **experimental**: evolve, fleet, memory, library, bench,
   project-benchmark, telemetry, receipt, adapter, hydrate, ux.
 - **compatibility**: `legacy`, `render`. Do not use these for new work.

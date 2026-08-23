@@ -22,25 +22,21 @@ lifecycle changes.
 ## Required Behavior
 
 - Register each non-trivial user or agent flow through roadmap, spec, spec-test,
-  and evidence. Use `docs/templates/ux-journey.md` for complex flows.
+  and evidence; use `docs/templates/ux-journey.md` for complex flows.
 - Every AFOL command change must update or explicitly defer
   `.afol/adm/benchmarks/afol-tool-scenario-coverage-plan.md`.
 - A journey must name actor, goal, trigger, expected AFOL tools, expected
   output, state change, failure/recovery path, and evidence.
-- Live-agent scenarios are required when the flow depends on agent choice,
-  research, memory/library, workbench execution, update safety, maintenance, or
-  governance review.
+- Require live-agent scenarios when a flow depends on agent choice, research,
+  memory/library, workbench execution, update safety, maintenance, or governance
+  review.
 - Deterministic command behavior should use scripted catalog scenarios before
   adding new live-agent prompts.
-- Command strings, skipped scenarios, disabled scenarios, and exemption rows are
-  not production proof by themselves. They are routing metadata or visible
-  backlog until tied to executable scenario evidence.
-- Planned scenarios are explicit non-executing backlog metadata. They do not
-  count as production proof. Command, subcommand, feature, and spec references
-  remain strict regardless of implementation status.
-- Multi-step and live-agent scenarios must carry journey metadata that names the
-  user flow and points to saved evidence before they are accepted as live
-  coverage.
+- Planned, skipped, disabled, or exempt scenarios, command strings, and
+  command/subcommand/feature/spec references are routing or backlog metadata,
+  not production proof; references remain strict regardless of implementation
+  status. Multi-step and live-agent scenarios need journey metadata plus saved
+  evidence before acceptance as live coverage.
 - Do not create a separate UX registry/control surface while roadmap, spec,
   spec-test, and evidence can serve as the source of truth.
 - Do not claim "all tools tested" unless the coverage matrix count matches

@@ -8,8 +8,11 @@ that `.afol/config.json` exists and is valid JSON.
 ## Task cannot complete
 
 Use `afol status --task-id <id> --json`. Completion requires observed evidence;
-run `afol done <id> --execute "<real check>"` or record an evidence command and
-outcome explicitly.
+run the agent-facing default `afol done <id> --test "<argv-only-check>"` (or
+`-x`), or record an evidence command with
+`afol evidence --task-id <id> --command "<check>" --result passed`.
+`--test-shell "<real check>"` is local-operator-only and must never be used by
+an agent or remote/provider execution.
 
 ## Session context is ambiguous
 
