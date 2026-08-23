@@ -470,7 +470,7 @@ export function appendImportJournalEventUnlocked(
 	assertSafeEvolutionTarget(path, "import journal target");
 	const fd = openSync(
 		path,
-		openFlags(fsConstants.O_RDWR | fsConstants.O_APPEND | fsConstants.O_CREAT),
+		openFlags(fsConstants.O_RDWR | fsConstants.O_CREAT),
 		0o600,
 	);
 	try {
@@ -488,7 +488,12 @@ export function appendImportJournalEventUnlocked(
 		if (line.byteLength > MAX_EVENT_BYTES)
 			throw new Error("import journal event exceeds size limit");
 		try {
-			writeBufferFullySync(fd, line, input.io?.write ?? writeSync);
+			writeBufferFullySync(
+				fd,
+				line,
+				input.io?.write ?? writeSync,
+				previousSize,
+			);
 			if (process.platform !== "win32") fchmodSync(fd, 0o600);
 			(input.io?.fsync ?? fsyncSync)(fd);
 			fsyncDirectory(dirname(path));

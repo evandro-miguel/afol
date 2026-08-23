@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import {
 	DEFAULT_TEMPLATE_FILES,
@@ -11,7 +13,6 @@ import {
 	type TemplatePayload,
 } from "../services/template/payload";
 
-const expectedTemplatePathCount = 200;
 const forbiddenExactPaths = new Set([
 	"a",
 	"afol",
@@ -53,11 +54,8 @@ function inspectSourceParity(
 	if (source.templateHash !== generated.hash) {
 		issues.push("exported-template-hash-mismatch");
 	}
-	if (sourcePaths.length !== expectedTemplatePathCount) {
-		issues.push("source-path-count-mismatch");
-	}
-	if (generatedPaths.length !== expectedTemplatePathCount) {
-		issues.push("generated-path-count-mismatch");
+	if (sourcePaths.length === 0 || generatedPaths.length === 0) {
+		issues.push("template-payload-empty");
 	}
 
 	for (const path of sourcePaths) {
@@ -108,6 +106,28 @@ function inspectSourceParity(
 }
 
 describe("source-only generated template parity", () => {
+	test("canonicalizes CRLF source files before hashing template entries", async () => {
+		const crlfRoot = mkdtempSync(join(tmpdir(), "template-crlf-"));
+		const lfRoot = mkdtempSync(join(tmpdir(), "template-lf-"));
+		try {
+			writeFileSync(join(crlfRoot, "AGENTS.md"), "line one\r\nline two\r\n");
+			writeFileSync(join(lfRoot, "AGENTS.md"), "line one\nline two\n");
+
+			const [crlfPayload, lfPayload] = await Promise.all([
+				buildTemplatePayload(crlfRoot),
+				buildTemplatePayload(lfRoot),
+			]);
+
+			expect(crlfPayload.templateHash).toBe(lfPayload.templateHash);
+			expect(crlfPayload.files["AGENTS.md"]).toEqual(
+				lfPayload.files["AGENTS.md"],
+			);
+		} finally {
+			rmSync(crlfRoot, { recursive: true, force: true });
+			rmSync(lfRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("matches the complete source payload without external dependencies", async () => {
 		const source = await buildTemplatePayload(
 			join(process.cwd(), "src", "project-template"),

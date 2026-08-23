@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: bearer-token synthetic redaction fixture
 import { execFileSync, spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -552,6 +553,7 @@ describe("kernel front-door", () => {
 				sideEffect: string;
 				description: string;
 				requires_approval: boolean;
+				stability: string;
 				category?: string;
 				subcommands?: Array<{
 					usage: string;
@@ -567,6 +569,7 @@ describe("kernel front-door", () => {
 				sideEffect: "read",
 				description: "Show current project status",
 				requires_approval: false,
+				stability: "stable",
 				category: "core",
 				subcommands: [
 					{

@@ -234,21 +234,21 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 	try {
 		db.exec("BEGIN");
 		try {
-			db.prepare("DELETE FROM evidence WHERE session_id = ?").run(
+			db.query("DELETE FROM evidence WHERE session_id = ?").run(
 				snapshot.sessionId,
 			);
-			db.prepare("DELETE FROM tasks WHERE session_id = ?").run(
+			db.query("DELETE FROM tasks WHERE session_id = ?").run(
 				snapshot.sessionId,
 			);
-			db.prepare("DELETE FROM source_files WHERE session_id = ?").run(
+			db.query("DELETE FROM source_files WHERE session_id = ?").run(
 				snapshot.sessionId,
 			);
-			db.prepare("DELETE FROM sessions WHERE session_id = ?").run(
+			db.query("DELETE FROM sessions WHERE session_id = ?").run(
 				snapshot.sessionId,
 			);
 
 			const storedHash = sourceHash(snapshot.sourceFiles);
-			db.prepare(
+			db.query(
 				`INSERT INTO sessions (session_id, hydrated_at, source_algorithm, source_hash, session_path) VALUES (?, ?, ?, ?, ?)`,
 			).run(
 				snapshot.sessionId,
@@ -259,7 +259,7 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 			);
 
 			for (const file of snapshot.sourceFiles) {
-				db.prepare(
+				db.query(
 					`INSERT INTO source_files (session_id, path, kind, source_hash) VALUES (?, ?, ?, ?)`,
 				).run(snapshot.sessionId, file.path, file.kind, file.hash.hash);
 			}
@@ -274,7 +274,7 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 					if (!match?.[1] || !match[2] || !match[3]) {
 						continue;
 					}
-					db.prepare(
+					db.query(
 						`INSERT INTO tasks (session_id, task_id, state, owner, notes) VALUES (?, ?, ?, ?, ?)`,
 					).run(
 						snapshot.sessionId,
@@ -325,7 +325,7 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 							`Incomplete evidence at ${evidencePath}:${lineIndex + 1}`,
 						);
 					}
-					db.prepare(
+					db.query(
 						`INSERT INTO evidence (session_id, evidence_id, task_id, created_at, command, result, exit_code, artifact, note, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					).run(
 						snapshot.sessionId,

@@ -41,6 +41,10 @@ function sha256Hex(value: string): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
+function portablePath(value: string): string {
+	return value.replaceAll("\\", "/");
+}
+
 function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "adm-plan-"));
 	mkdirSync(join(root, "docs", "arc", "SPECS", "nested"), { recursive: true });
@@ -98,7 +102,7 @@ describe("adm plan", () => {
 			});
 			const bySource = new Map(
 				(payload.manifest as Array<{ source_path: string }>).map((entry) => [
-					entry.source_path,
+					portablePath(entry.source_path),
 					entry,
 				]),
 			);

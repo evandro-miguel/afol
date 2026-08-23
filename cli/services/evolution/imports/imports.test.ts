@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { link, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+// public-audit-allow: bearer-token synthetic redaction fixture
+import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { symlinkTestSupport } from "../../../tests/symlink-test-support";
 import { codexAdapter, piAdapter } from "./adapters.ts";
 import { type JsonlReaderState, readJsonl } from "./reader.ts";
 import { redactImported } from "./redaction.ts";
@@ -78,6 +80,29 @@ describe("external import core", () => {
 		expect(firstRecords[0]?.recordDigest).toBe(secondRecords[0]?.recordDigest);
 	});
 
+	test.skipIf(process.platform !== "win32")(
+		"accepts local paths whose drive and directories differ only by case",
+		async () => {
+			const root = await tempRoot();
+			const directory = join(root, "CaseDirectory");
+			const path = join(directory, "Session.jsonl");
+			await mkdir(directory);
+			await writeFile(path, `${JSON.stringify({ ok: true })}\n`);
+
+			const alternateCasing = `${path.slice(0, 2).toLowerCase()}${path.slice(2).toLowerCase()}`;
+			const state: JsonlReaderState = {
+				bytes: 0,
+				lines: 0,
+				contentDigest: "",
+			};
+			const records = [];
+			for await (const record of readJsonl(alternateCasing, state))
+				records.push(record);
+
+			expect(records).toEqual([{ line: 1, value: { ok: true } }]);
+		},
+	);
+
 	test("detection requires structural transcript markers, not repeated content", async () => {
 		const root = await tempRoot();
 		const path = join(root, "generic.jsonl");
@@ -126,25 +151,29 @@ describe("external import core", () => {
 		const real = join(root, "real.jsonl");
 		const symlinkPath = join(root, "link.jsonl");
 		await writeFile(real, `${JSON.stringify({ ok: true })}\n`);
-		await symlink(real, symlinkPath);
-		await expect(
-			codexAdapter.preview({ provider: "codex", path: symlinkPath }),
-		).rejects.toThrow(/symbolic links|regular/);
-		const linkedParent = join(root, "linked-parent");
-		await symlink(root, linkedParent);
-		await expect(
-			codexAdapter.preview({
-				provider: "codex",
-				path: join(linkedParent, "real.jsonl"),
-			}),
-		).rejects.toThrow(/symbolic links/);
-		for (const unsupported of [
-			"C:\\sessions\\codex.jsonl",
+		if (symlinkTestSupport.available) {
+			await symlink(real, symlinkPath);
+			await expect(
+				codexAdapter.preview({ provider: "codex", path: symlinkPath }),
+			).rejects.toThrow(/symbolic links|regular/);
+			const linkedParent = join(root, "linked-parent");
+			await symlink(root, linkedParent);
+			await expect(
+				codexAdapter.preview({
+					provider: "codex",
+					path: join(linkedParent, "real.jsonl"),
+				}),
+			).rejects.toThrow(/symbolic links/);
+		}
+		const unsupported = [
 			"\\\\server\\share\\codex.jsonl",
 			join(root, "session.jsonl:stream"),
-		])
+		];
+		if (process.platform !== "win32")
+			unsupported.push("C:\\sessions\\codex.jsonl");
+		for (const path of unsupported)
 			await expect(
-				codexAdapter.preview({ provider: "codex", path: unsupported }),
+				codexAdapter.preview({ provider: "codex", path }),
 			).rejects.toThrow(/supported local path/);
 		const hardlink = join(root, "hard.jsonl");
 		await link(real, hardlink);

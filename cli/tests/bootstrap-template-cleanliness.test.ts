@@ -105,7 +105,7 @@ describe("generated template cleanliness", () => {
 		expect(config.skills_sync.project_dir).toBe(".agents/skills");
 	});
 
-	test("exported project skills keep valid discovery metadata and root parity", () => {
+	test("exported project skills keep valid discovery metadata and source parity", () => {
 		const skillPaths = Object.keys(DEFAULT_TEMPLATE_FILES)
 			.filter((path) => /^\.agents\/skills\/[^/]+\/SKILL\.md$/.test(path))
 			.sort();
@@ -115,7 +115,6 @@ describe("generated template cleanliness", () => {
 			".agents/skills/afol-maintenance/SKILL.md",
 			".agents/skills/afol-memory/SKILL.md",
 			".agents/skills/afol-rules/SKILL.md",
-			".agents/skills/ux-design/SKILL.md",
 		]);
 
 		for (const path of skillPaths) {
@@ -147,7 +146,9 @@ describe("generated template cleanliness", () => {
 			expect(typeof frontmatter.metadata?.updated_at).toBe("string");
 			expect(frontmatter.metadata?.target_provider).toBe("universal");
 
-			expect(content).toBe(readFileSync(join(process.cwd(), path), "utf8"));
+			expect(content).toBe(
+				readFileSync(join(process.cwd(), "src/project-template", path), "utf8"),
+			);
 		}
 	});
 

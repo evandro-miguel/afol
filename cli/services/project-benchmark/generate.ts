@@ -8,6 +8,7 @@ import {
 	readSync,
 } from "node:fs";
 import { join, relative } from "node:path";
+import { toPosixPath } from "../../core/file-paths";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import type { ProjectBenchmarkMatrix } from "./matrix";
@@ -196,25 +197,25 @@ function buildGeneratedFiles(
 	return [
 		{
 			path: indexPath,
-			relativePath: relative(projectRoot, indexPath),
+			relativePath: toPosixPath(relative(projectRoot, indexPath)),
 			kind: "index",
 			content: jsonText(payloads.index),
 		},
 		{
 			path: matrixPath,
-			relativePath: relative(projectRoot, matrixPath),
+			relativePath: toPosixPath(relative(projectRoot, matrixPath)),
 			kind: "matrix",
 			content: jsonText(payloads.generatedMatrix),
 		},
 		{
 			path: summaryPath,
-			relativePath: relative(projectRoot, summaryPath),
+			relativePath: toPosixPath(relative(projectRoot, summaryPath)),
 			kind: "summary",
 			content: payloads.summary,
 		},
 		{
 			path: validationPath,
-			relativePath: relative(projectRoot, validationPath),
+			relativePath: toPosixPath(relative(projectRoot, validationPath)),
 			kind: "validation",
 			content: jsonText(payloads.validationReport),
 		},
@@ -295,7 +296,7 @@ function collectMisplacedOutputs(
 				entry.isDirectory() &&
 				/^project-benchmarks?$/.test(entry.name)
 			) {
-				const rel = relative(projectRoot, entryPath) || entryPath;
+				const rel = toPosixPath(relative(projectRoot, entryPath) || entryPath);
 				misplaced.set(rel, { path: rel, location });
 			}
 			if (entry.isDirectory()) {
@@ -307,7 +308,7 @@ function collectMisplacedOutputs(
 			) {
 				continue;
 			}
-			const rel = relative(projectRoot, entryPath) || entryPath;
+			const rel = toPosixPath(relative(projectRoot, entryPath) || entryPath);
 			misplaced.set(rel, { path: rel, location });
 		}
 	};
@@ -426,7 +427,7 @@ export function generateProjectBenchmarkOutputs(
 				misplacedFiles.length === 0 &&
 				(check ? changedFiles.length === 0 : true),
 			generated_at: generatedAt,
-			data_dir: relative(projectRoot, generatePaths.dataDir),
+			data_dir: toPosixPath(relative(projectRoot, generatePaths.dataDir)),
 			files: files.map(publicFile),
 			changed_files: changedFiles.map(publicFile),
 			misplaced_files: misplacedFiles,

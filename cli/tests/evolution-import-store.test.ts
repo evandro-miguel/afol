@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import {
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-	writeSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evolutionDbPath, openEvolutionDb } from "../services/evolution/db";
@@ -23,6 +17,7 @@ import {
 	rebuildExternalImportProjection,
 	validateExternalImportProjection,
 } from "../services/evolution/import-store";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const EXTERNAL_SESSION_ID = `EXT-${"b".repeat(32)}`;
@@ -97,7 +92,7 @@ describe("external import acceptance store", () => {
 			expect(readImportCheckpoint(db, PROJECT_ID, importId)?.cursor).toBe("1");
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -123,7 +118,7 @@ describe("external import acceptance store", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -160,7 +155,7 @@ describe("external import acceptance store", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -192,7 +187,7 @@ describe("external import acceptance store", () => {
 			).not.toThrow();
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -215,7 +210,7 @@ describe("external import acceptance store", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -267,7 +262,7 @@ describe("external import acceptance store", () => {
 			expect(readFileSync(path)).toEqual(before);
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(1);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -298,7 +293,7 @@ describe("external import acceptance store", () => {
 				"import journal must end with a newline",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -321,7 +316,7 @@ describe("external import acceptance store", () => {
 				}),
 			).toThrow("append and rollback both failed");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -346,7 +341,7 @@ describe("external import acceptance store", () => {
 			);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -372,7 +367,7 @@ describe("external import acceptance store", () => {
 			).not.toThrow();
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -392,7 +387,7 @@ describe("external import acceptance store", () => {
 				"external import schema is stale or incomplete",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -426,7 +421,7 @@ describe("external import acceptance store", () => {
 			expect(readImportJournal(root, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -453,7 +448,7 @@ describe("external import acceptance store", () => {
 			expect(listExternalImports(db, PROJECT_ID)).toHaveLength(0);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

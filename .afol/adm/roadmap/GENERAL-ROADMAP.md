@@ -1241,6 +1241,35 @@ Follow-on slices under this direction:
   deletion or archival, session closure, Git mutation, or forcing managed
   files across a project fleet.
 
+### F-34 Public Product and Portfolio Readiness
+
+- Status: active
+- Governing spec:
+  `.afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md`
+- Why: AFOL needs a clean, independently reproducible public product boundary
+  before repository visibility, portfolio promotion, or an alpha release.
+- Scope: freeze the stable-alpha surface; close release and Windows blockers;
+  reconcile security and lifecycle evidence; extract the complete engine from
+  private operational state; audit licenses and third-party content; harden
+  architecture; maintain accurate documentation and community policy; produce
+  local provenance, SBOM, and release-candidate artifacts.
+- Exit criteria: the public repository is the sole canonical engine source;
+  a clean clone builds, tests, and validates the declared local platform path;
+  no private operational content or unlicensed vendored material is reachable;
+  stable, experimental, planned, and unsupported surfaces are explicit; every
+  public claim is linked to local evidence from the exact candidate commit.
+- Release freeze: until this feature is final, new product features are not
+  accepted into the alpha scope. F-30 Evolution and F-33 Fleet remain active
+  roadmap work but are outside the stable alpha and cannot delay or expand it.
+- Non-goals: npm publication, macOS or ARM support, public visibility changes,
+  global installation, production deployment, provider/model execution, or
+  publishing private workbench, RAG, governance history, and raw evidence.
+- Local cutover checkpoint (2026-08-23): the public engine boundary child is
+  final at exact public SHA `09fd89fda14c40c5a4fd8a3160510e22670ec3bc` after
+  a clean-clone release validation. F-34 remains active for its other child
+  workstreams; no remote, visibility, publication, hosted CI, or installation
+  action is implied.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
@@ -1255,7 +1284,8 @@ Follow-on slices under this direction:
    research/log save flows.
 1. Safe mutation: write/move/patch/archive, mutation journal, dry-run, undo.
 1. Update system: manifest, lock, check, preview, apply, conflicts.
-1. Public readiness: install path, minimal docs, examples, CI, release workflow.
+1. Public readiness: install path, minimal docs, examples, local release gate,
+   and release-candidate artifacts.
 
 ## 7) MVP
 

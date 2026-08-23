@@ -22,6 +22,8 @@ import {
 	openEvolutionDb,
 	productionDayJournalPath,
 } from "../services/evolution";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "67cfb6af-14a2-4d07-a8e2-9e0be1435844";
 
@@ -146,7 +148,7 @@ describe("evolution static path safety", () => {
 				beforeStateEntries,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -163,7 +165,7 @@ describe("evolution static path safety", () => {
 				"must not be hardlinked",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -204,22 +206,25 @@ describe("evolution static path safety", () => {
 				db.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
-	test("rejects a symlinked intermediate state directory", () => {
-		const root = fixture();
-		try {
-			const outside = join(root, "outside");
-			mkdirSync(outside);
-			mkdirSync(join(root, ".afol"), { recursive: true });
-			symlinkSync(outside, join(root, ".afol", "state"), "dir");
-			expect(() =>
-				openEvolutionDb(join(root, ".afol", "state", "evolution.db")),
-			).toThrow(/parent|reparse|symlink/i);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"rejects a symlinked intermediate state directory",
+		() => {
+			const root = fixture();
+			try {
+				const outside = join(root, "outside");
+				mkdirSync(outside);
+				mkdirSync(join(root, ".afol"), { recursive: true });
+				symlinkSync(outside, join(root, ".afol", "state"), "dir");
+				expect(() =>
+					openEvolutionDb(join(root, ".afol", "state", "evolution.db")),
+				).toThrow(/parent|reparse|symlink/i);
+			} finally {
+				removeEvolutionTestRoot(root);
+			}
+		},
+	);
 });

@@ -2,7 +2,7 @@
 doc_type: spec-child
 id: 260711_c01-action-policy-and-protected-resources_spec-child_01
 theme: c01-action-policy-and-protected-resources
-status: active
+status: final
 owners:
 - f22-governance-owner
 - c01-implementation-writer
@@ -10,7 +10,7 @@ owners:
 workstream_intent: Enforce the accepted local-operator and restrictive-mode policy at one pre-dispatch boundary and protect sensitive and AFOL-owned resources before I/O.
 artifact_purpose: Define the separately reviewable S-C01-I production scope after STOP-C01-AUTHORITY.
 created_at: '2026-07-11T00:00:00Z'
-updated_at: '2026-07-11T00:00:00Z'
+updated_at: '2026-08-18T21:15:00Z'
 roadmap_feature: F-22
 spec_role: child
 parent_spec: 260710_core-integrity-and-transaction-safety_spec_01
@@ -220,5 +220,17 @@ Operand rules:
 - [x] Authority decision is accepted by the F-22 governance owner.
 - [x] Independent critic returns `GO` for this scope.
 - [x] Exact production and test boundaries are accepted.
-- [ ] Current red proofs become green for the intended reason.
-- [ ] Claim limits and deployment prerequisite remain explicit.
+- [x] Current red proofs become green for the intended reason.
+- [x] Claim limits and deployment prerequisite remain explicit.
+
+## Closure Evidence
+
+- Implementation commit: `6f4cf616`.
+- Historical release evidence commit: `6c4655f7`.
+- Final F-22 closure review:
+  `.afol/wb/260710_2355_core-integrity-quality-loop/reports/f22-final-closure-review-001.json`
+  with verdict `PASS` and no blocking findings.
+- Revalidated on 2026-08-18: the canonical six-file C01 suite passed 226
+  tests with zero failures. The canonical-position and rollout sections above
+  retain the local-operator, restrictive-mode, deployment-catalog, and
+  same-account-process limitations.

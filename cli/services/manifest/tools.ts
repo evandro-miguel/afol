@@ -27,6 +27,7 @@ export type ToolCatalog = {
 		tool: "afol";
 		wrapper_command: string;
 		aliases: string[];
+		stability: CommandSpec["stability"];
 		category: NonNullable<CommandSpec["category"]>;
 		type: NonNullable<CommandSpec["category"]>;
 		side_effect: CommandSpec["sideEffect"];
@@ -139,6 +140,7 @@ export function buildToolCatalog(
 			tool: "afol",
 			wrapper_command: `afol ${spec.command}`,
 			aliases: [...spec.aliases],
+			stability: spec.stability,
 			category: spec.category ?? "core",
 			type: spec.category ?? "core",
 			side_effect: spec.sideEffect,

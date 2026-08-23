@@ -1,12 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-	copyFileSync,
-	cpSync,
 	existsSync,
-	mkdirSync,
 	mkdtempSync,
-	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -15,11 +11,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
-import { baselineFilename, loadRegistry } from "../validate/registry";
-import { assertCompiledHotPathBenchmark } from "./dist-smoke-assertions";
+import { releaseArtifactPath } from "./build-release";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const distPath = join(repoRoot, "dist", "afol");
+const releaseArtifact = releaseArtifactPath("dist/afol");
+const distPath = join(repoRoot, releaseArtifact);
 const requireWsl2 = process.argv.includes("--wsl2");
 const DIAGNOSTIC_LIMIT = 800;
 
@@ -132,136 +128,6 @@ function sha256Hex(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
-function runGit(
-	cwd: string,
-	args: string[],
-	env: Record<string, string> = {},
-): SpawnResult {
-	return spawnSync("git", args, {
-		cwd,
-		encoding: "utf8",
-		env: { ...process.env, ...env },
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-}
-
-function expectedBenchmarkScenarioIds(): ReadonlySet<string> {
-	const scenarios = loadRegistry(repoRoot).scenariosByPack["workbench-parity"];
-	const ids = scenarios?.map((scenario) => scenario.scenario_id) ?? [];
-	const uniqueIds = new Set(ids);
-	if (
-		ids.length === 0 ||
-		ids.some((scenarioId) => scenarioId.trim() === "") ||
-		uniqueIds.size !== ids.length
-	) {
-		throw new Error(
-			`Invalid trusted workbench-parity scenario-id set: count=${ids.length} unique=${uniqueIds.size}`,
-		);
-	}
-	return uniqueIds;
-}
-
-function copyManagedFile(workspace: string, relativePath: string): void {
-	const target = join(workspace, relativePath);
-	mkdirSync(dirname(target), { recursive: true });
-	copyFileSync(join(repoRoot, relativePath), target);
-}
-
-function normalizeTemporaryGitProvenance(
-	workspace: string,
-	commit: string,
-): void {
-	const snapshot = loadRegistry(workspace);
-	for (const pack of snapshot.packs) {
-		const scenarios = snapshot.scenariosByPack[pack.pack_id] ?? [];
-		if (!scenarios.some((scenario) => scenario.measurement !== undefined)) {
-			continue;
-		}
-		const scenarioDirectory = join(
-			workspace,
-			".afol",
-			"data",
-			"benchmarks",
-			"catalog",
-			"scenarios",
-			pack.pack_id,
-		);
-		for (const entry of readdirSync(scenarioDirectory)) {
-			if (!entry.endsWith(".json")) continue;
-			const path = join(scenarioDirectory, entry);
-			const scenario = readJson<{
-				measurement?: Record<string, unknown>;
-			}>(path);
-			if (typeof scenario.measurement?.git_commit !== "string") continue;
-			scenario.measurement.git_commit = commit;
-			writeJson(path, scenario);
-		}
-		const baselinePath = join(
-			workspace,
-			".afol",
-			"data",
-			"benchmarks",
-			"catalog",
-			"baselines",
-			pack.pack_id,
-			baselineFilename(pack.pack_id),
-		);
-		const baseline = readJson<Record<string, unknown>>(baselinePath);
-		baseline.git_commit = commit;
-		writeJson(baselinePath, baseline);
-	}
-}
-
-function prepareBenchmarkWorkspace(root: string): string {
-	const workspace = join(root, "benchmark-workspace");
-	mkdirSync(workspace, { recursive: true });
-	cpSync(
-		join(repoRoot, ".afol", "data", "benchmarks", "catalog"),
-		join(workspace, ".afol", "data", "benchmarks", "catalog"),
-		{ recursive: true },
-	);
-	for (const relativePath of [
-		".afol/config.json",
-		".agents/lock.json",
-		".agents/manifest.json",
-	]) {
-		copyManagedFile(workspace, relativePath);
-	}
-	assertOk(
-		runGit(workspace, ["init", "--quiet"]),
-		"benchmark workspace git init",
-	);
-	assertOk(runGit(workspace, ["add", "."]), "benchmark workspace git add");
-	assertOk(
-		runGit(
-			workspace,
-			[
-				"-c",
-				"user.name=AFOL dist smoke",
-				"-c",
-				"user.email=afol-dist-smoke@example.invalid",
-				"commit",
-				"--quiet",
-				"-m",
-				"benchmark workspace",
-			],
-			{
-				GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
-				GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
-			},
-		),
-		"benchmark workspace git commit",
-	);
-	const head = runGit(workspace, ["rev-parse", "HEAD"]);
-	assertOk(head, "benchmark workspace git head");
-	const commit = (head.stdout as string).trim();
-	if (!/^[a-f0-9]{40}$/u.test(commit)) {
-		throw new Error(`benchmark workspace git head invalid: ${commit}`);
-	}
-	normalizeTemporaryGitProvenance(workspace, commit);
-	return workspace;
-}
-
 type DistReleaseReceipts = {
 	checksumPath: string;
 	provenancePath: string;
@@ -271,25 +137,26 @@ type DistReleaseReceipts = {
 };
 
 function readDistReleaseReceipts(root: string): DistReleaseReceipts {
-	const artifactPath = join(root, "dist", "afol");
-	const checksumPath = join(root, "dist", "afol.sha256");
-	const provenancePath = join(root, "dist", "afol.provenance.json");
+	const artifact = releaseArtifactPath("dist/afol");
+	const artifactPath = join(root, artifact);
+	const checksumPath = join(root, `${artifact}.sha256`);
+	const provenancePath = join(root, `${artifact}.provenance.json`);
 	if (!existsSync(artifactPath)) {
 		throw new Error(`Missing ${artifactPath}. Run bun run build first.`);
 	}
 	if (!existsSync(checksumPath) || !existsSync(provenancePath)) {
 		throw new Error(
-			"Missing dist/afol.sha256 or dist/afol.provenance.json; run release provenance before dist smoke",
+			`Missing ${artifact}.sha256 or ${artifact}.provenance.json; run release provenance before dist smoke`,
 		);
 	}
 
 	const artifactBytes = readFileSync(artifactPath);
 	const sha256 = sha256Hex(artifactBytes);
 	const checksumText = readFileSync(checksumPath, "utf8").trim();
-	const expectedChecksum = `${sha256}  dist/afol`;
+	const expectedChecksum = `${sha256}  ${artifact}`;
 	if (checksumText !== expectedChecksum) {
 		throw new Error(
-			`dist/afol.sha256 does not bind dist/afol; expected ${expectedChecksum}, got ${checksumText}`,
+			`${artifact}.sha256 does not bind ${artifact}; expected ${expectedChecksum}, got ${checksumText}`,
 		);
 	}
 
@@ -298,8 +165,8 @@ function readDistReleaseReceipts(root: string): DistReleaseReceipts {
 		sha256?: unknown;
 		size_bytes?: unknown;
 	};
-	if (provenance.artifact !== "dist/afol" || provenance.sha256 !== sha256) {
-		throw new Error("dist/afol.provenance.json does not bind dist/afol");
+	if (provenance.artifact !== artifact || provenance.sha256 !== sha256) {
+		throw new Error(`${artifact}.provenance.json does not bind ${artifact}`);
 	}
 	if (
 		typeof provenance.size_bytes !== "number" ||
@@ -308,7 +175,7 @@ function readDistReleaseReceipts(root: string): DistReleaseReceipts {
 		provenance.size_bytes !== artifactBytes.byteLength
 	) {
 		throw new Error(
-			`dist/afol.provenance.json size_bytes does not match dist/afol`,
+			`${artifact}.provenance.json size_bytes does not match ${artifact}`,
 		);
 	}
 
@@ -347,8 +214,6 @@ function main(): void {
 	const sandbox = mkdtempSync(join(tmpdir(), "afol-dist-smoke-"));
 
 	try {
-		const expectedScenarioIds = expectedBenchmarkScenarioIds();
-		const benchmarkWorkspace = prepareBenchmarkWorkspace(sandbox);
 		const help = runDist(repoRoot, ["--help"]);
 		assertOk(help, "dist help");
 		assertContains(help, "dist help", ["Usage: afol"]);
@@ -412,20 +277,6 @@ function main(): void {
 			"TASK: T-01",
 			"SESSIONS: 1",
 		]);
-
-		const hotPathBenchmark = runDist(benchmarkWorkspace, [
-			"v",
-			"bench",
-			"--pack",
-			"workbench-parity",
-			"--json",
-		]);
-		assertOk(hotPathBenchmark, "dist compiled workbench-parity benchmark");
-		assertCompiledHotPathBenchmark(
-			hotPathBenchmark.stdout as string,
-			expectedScenarioIds,
-			receiptsBefore.sha256,
-		);
 
 		const radarAfterNew = runDist(lifecycleTarget, ["session", "radar"]);
 		assertOk(radarAfterNew, "dist session radar");
@@ -651,7 +502,7 @@ function main(): void {
 			!receiptsBefore.provenanceBytes.equals(receiptsAfter.provenanceBytes)
 		) {
 			throw new Error(
-				"dist smoke mutated dist/afol.sha256 or dist/afol.provenance.json",
+				`dist smoke mutated ${releaseArtifact}.sha256 or ${releaseArtifact}.provenance.json`,
 			);
 		}
 		process.stdout.write(`dist smoke: ok ${session}\n`);

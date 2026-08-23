@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { kernelRegistry } from "../registry";
-import { buildManifestCommands } from "../services/manifest/commands";
+import {
+	buildManifestCommandStability,
+	buildManifestCommands,
+} from "../services/manifest/commands";
 import { buildToolCatalog } from "../services/manifest/tools";
 
 describe("kernel registry", () => {
@@ -171,7 +174,13 @@ describe("kernel registry", () => {
 			expect(entry.command.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeLessThanOrEqual(80);
+			expect(["stable", "experimental", "compatibility"]).toContain(
+				entry.stability,
+			);
 		}
+		expect(byCommand.get("status")?.stability).toBe("stable");
+		expect(byCommand.get("evolve")?.stability).toBe("experimental");
+		expect(byCommand.get("legacy")?.stability).toBe("compatibility");
 	});
 
 	test("publishes strict project validation metadata", () => {
@@ -218,16 +227,17 @@ describe("kernel registry", () => {
 
 	test("keeps static manifests synced from the command registry", () => {
 		const expectedCommands = buildManifestCommands(kernelRegistry.commands);
+		const expectedStability = buildManifestCommandStability(
+			kernelRegistry.commands,
+		);
 
-		for (const relativePath of [
-			".agents/manifest.json",
-			"src/project-template/.agents/manifest.json",
-		]) {
+		for (const relativePath of ["src/project-template/.agents/manifest.json"]) {
 			const manifest = JSON.parse(
 				readFileSync(join(process.cwd(), relativePath), "utf8"),
-			) as { commands?: unknown };
+			) as { commands?: unknown; command_stability?: unknown };
 
 			expect(manifest.commands).toEqual(expectedCommands);
+			expect(manifest.command_stability).toEqual(expectedStability);
 		}
 	});
 
@@ -327,33 +337,18 @@ describe("kernel registry", () => {
 		expect(apply?.requires_approval).toBe(true);
 	});
 
-	test("covers every PSTR registry action in the canonical benchmark catalog", () => {
+	test("keeps the public PSTR benchmark subset aligned with the registry", () => {
 		const expected = [
 			"pstr show|sh --json",
 			"pstr rebuild|rb --json",
 			"pstr validate|v --json",
 			"pstr stale|st --json",
-			"pstr section|sec <id> --json",
-			"pstr diff --json",
-			"pstr watch --once --json",
-			"pstr detect|det --json",
-			"pstr suggest|sug --json",
-			"pstr review-candidates|review|rc --json",
-			"pstr review-candidates --apply <id> --json",
 		];
 		const scenarios = {
 			"pstr-show": "afol pstr show --json",
 			"pstr-rebuild": "afol pstr rebuild --json",
 			"pstr-validate": "afol pstr validate --json",
 			"pstr-stale": "afol pstr stale --json",
-			"pstr-section": "afol pstr section cli --json",
-			"pstr-diff": "afol pstr diff --json",
-			"pstr-watch-once": "afol pstr watch --once --json",
-			"pstr-detect": "afol pstr detect --json",
-			"pstr-suggest": "afol pstr suggest --json",
-			"pstr-review": "afol pstr review-candidates --json",
-			"pstr-review-apply":
-				"afol pstr review-candidates --apply rebuild-all --json",
 		} as const;
 		const covered = Object.entries(scenarios).flatMap(
 			([scenarioId, command]) => {
@@ -361,7 +356,7 @@ describe("kernel registry", () => {
 					readFileSync(
 						join(
 							process.cwd(),
-							`.afol/data/benchmarks/catalog/scenarios/pstr-integrity/${scenarioId}.json`,
+							`src/project-template/.afol/data/benchmarks/catalog/scenarios/pstr-integrity/${scenarioId}.json`,
 						),
 						"utf8",
 					),

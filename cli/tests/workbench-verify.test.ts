@@ -409,7 +409,9 @@ describe("verifyWorkbenchTasks", () => {
 			expect(result.allCompleted).toBe(false);
 			expect(result.totalTasks).toBe(1);
 			expect(result.openTasks).toHaveLength(1);
-			expect(result.openTasks[0]?.file).toContain("/.afol/wb/");
+			expect(result.openTasks[0]?.file.replaceAll("\\", "/")).toContain(
+				"/.afol/wb/",
+			);
 			expect(result.openTasks[0]?.id).toBe("T-01");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -518,12 +520,16 @@ describe("verifyWorkbenchTasks", () => {
 			expect(result.totalTasks).toBe(1);
 			expect(result.pending).toBe(1);
 			expect(result.completed).toBe(0);
-			expect(result.sessionPath).toContain("/.afol/wb");
+			expect(result.sessionPath.replaceAll("\\", "/")).toContain("/.afol/wb");
 			expect(
-				result.taskFiles.every((file) => file.includes("/.afol/wb/")),
+				result.taskFiles.every((file) =>
+					file.replaceAll("\\", "/").includes("/.afol/wb/"),
+				),
 			).toBe(true);
 			expect(
-				result.taskFiles.every((file) => !file.includes("/.afol/wb/_archive/")),
+				result.taskFiles.every(
+					(file) => !file.replaceAll("\\", "/").includes("/.afol/wb/_archive/"),
+				),
 			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

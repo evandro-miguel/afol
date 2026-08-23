@@ -21,6 +21,7 @@ import {
 } from "../services/mutations/journal";
 import { checkTemplateUpdate } from "../services/update/check";
 import { newWorkstream, startTask } from "../services/workbench/lifecycle";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
 
@@ -327,6 +328,7 @@ describe("update command", () => {
 
 	test("fails closed for a completion-lock gitignore symlink or non-regular target", () => {
 		for (const kind of ["symlink", "directory"] as const) {
+			if (kind === "symlink" && !symlinkTestSupport.available) continue;
 			const root = mkRoot();
 			try {
 				const gitignore = join(root, ".gitignore");
@@ -704,6 +706,7 @@ describe("update command", () => {
 					changes?: {
 						total?: number;
 						paths?: string[];
+						pathsTruncated?: boolean;
 					};
 					ownershipSource?: Record<string, number>;
 					filePreviews?: unknown[];
@@ -722,7 +725,8 @@ describe("update command", () => {
 				currentRevision: "old",
 				changes: {
 					total: expect.any(Number),
-					paths: expect.arrayContaining([".agents/manifest.json"]),
+					paths: expect.any(Array),
+					pathsTruncated: true,
 				},
 			});
 			expect(parsed.data?.ownershipSource?.managed).toBeGreaterThan(0);
@@ -738,7 +742,11 @@ describe("update command", () => {
 				exit_code: number;
 				data?: {
 					hasSource?: boolean;
-					changes?: { total?: number; paths?: string[] };
+					changes?: {
+						total?: number;
+						paths?: string[];
+						pathsTruncated?: boolean;
+					};
 					filePreviews?: unknown[];
 					operations?: unknown[];
 				};
@@ -751,7 +759,8 @@ describe("update command", () => {
 				hasSource: true,
 				changes: {
 					total: expect.any(Number),
-					paths: expect.arrayContaining([".agents/manifest.json"]),
+					paths: expect.any(Array),
+					pathsTruncated: true,
 				},
 			});
 
@@ -1999,6 +2008,7 @@ describe("update transactional public contract", () => {
 
 	test("rollback rejects backup paths outside the backup jail and through symlinks", async () => {
 		for (const mode of ["outside", "symlink"] as const) {
+			if (mode === "symlink" && !symlinkTestSupport.available) continue;
 			const root = mkRoot();
 			const outside = mkdtempSync(join(tmpdir(), "update-rollback-outside-"));
 			try {
@@ -2077,6 +2087,7 @@ describe("update transactional public contract", () => {
 	});
 
 	test("rollback revalidates targets and backup bytes inside resource locks", async () => {
+		if (!symlinkTestSupport.available) return;
 		const root = mkRoot();
 		const outside = mkdtempSync(join(tmpdir(), "update-rollback-race-"));
 		try {

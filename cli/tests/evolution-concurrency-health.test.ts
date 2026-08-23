@@ -5,7 +5,6 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -24,6 +23,8 @@ import {
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
 import { validateEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
 import { withSessionLock } from "../services/io/session-lock";
+import { removeEvolutionTestRoot } from "./evolution-test-support";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const TIMEZONE = "America/Asuncion";
@@ -109,7 +110,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			});
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -152,7 +153,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			expect(existsSync(readerDone)).toBe(true);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -191,7 +192,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			});
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -237,7 +238,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				rebuilt.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -272,7 +273,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				readonly.close();
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -292,7 +293,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			expect(readFileSync(journalPath, "utf8")).toBe(before);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -314,7 +315,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			).toEqual({ count: 0 });
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -333,7 +334,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				db.exec("ROLLBACK");
 			} catch {}
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -361,31 +362,34 @@ describe("Evolution canonical projection and concurrency", () => {
 				db.exec("ROLLBACK");
 			} catch {}
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
-	test("journal rejects a final symlink without touching its target", () => {
-		const root = mkdtempSync(join(tmpdir(), "evolution-journal-symlink-"));
-		const db = openEvolutionDb(evolutionDbPath(root));
-		seedEvidence(root, "S-01", "E-01");
-		const journalPath = productionDayJournalPath(root);
-		const externalPath = join(root, "outside.jsonl");
-		mkdirSync(join(root, ".afol", "data", "events", "evolution"), {
-			recursive: true,
-		});
-		writeFileSync(externalPath, "external sentinel\n");
-		symlinkSync(externalPath, journalPath);
-		try {
-			expect(() => append(root, db, "S-01", "E-01")).toThrow(
-				"production-day journal target must be a regular file",
-			);
-			expect(readFileSync(externalPath, "utf8")).toBe("external sentinel\n");
-		} finally {
-			db.close();
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+	test.skipIf(!symlinkTestSupport.available)(
+		"journal rejects a final symlink without touching its target",
+		() => {
+			const root = mkdtempSync(join(tmpdir(), "evolution-journal-symlink-"));
+			const db = openEvolutionDb(evolutionDbPath(root));
+			seedEvidence(root, "S-01", "E-01");
+			const journalPath = productionDayJournalPath(root);
+			const externalPath = join(root, "outside.jsonl");
+			mkdirSync(join(root, ".afol", "data", "events", "evolution"), {
+				recursive: true,
+			});
+			writeFileSync(externalPath, "external sentinel\n");
+			symlinkSync(externalPath, journalPath);
+			try {
+				expect(() => append(root, db, "S-01", "E-01")).toThrow(
+					"production-day journal target must be a regular file",
+				);
+				expect(readFileSync(externalPath, "utf8")).toBe("external sentinel\n");
+			} finally {
+				db.close();
+				removeEvolutionTestRoot(root);
+			}
+		},
+	);
 
 	test("health waits for an in-flight append and avoids false projection drift", async () => {
 		const root = mkdtempSync(join(tmpdir(), "evolution-health-inflight-"));
@@ -434,7 +438,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				holdDb.exec("ROLLBACK");
 			} catch {}
 			holdDb.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -459,7 +463,7 @@ describe("Evolution canonical projection and concurrency", () => {
 				]),
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -486,7 +490,7 @@ describe("Evolution canonical projection and concurrency", () => {
 			]);
 		} finally {
 			db.close();
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

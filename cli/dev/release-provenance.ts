@@ -9,14 +9,20 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import {
 	compiledReleaseBuildArgs,
 	DEFAULT_BUILD_COMMAND,
 	readMinifiedCompiledReleaseBuildReceipt,
+	releaseArtifactPath,
 } from "./build-release";
+import {
+	assertReleaseOutputFileStable,
+	assertSafeReleaseArtifact,
+	prepareReleaseOutputFile,
+} from "./release-output";
 import {
 	buildReleaseSecurityScanOutcomes,
 	DEFAULT_RELEASE_ARTIFACT,
@@ -29,7 +35,7 @@ import {
 	writeReleaseSecurityScanReport,
 } from "./security-scan";
 
-const VERSION_REGISTRY_PATH = ".afol/adm/source/release-version.json";
+const VERSION_SOURCE_PATH = "package.json";
 const RELEASE_SECURITY_EVIDENCE_MAX_AGE_MS = 30 * 60 * 1000;
 const RELEASE_SECURITY_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const SEMVER_PATTERN =
@@ -39,8 +45,8 @@ type ReleaseProvenance = {
 	artifact: string;
 	package_name: string;
 	version: string;
-	version_registry_path: string;
-	version_registry_sha256: string;
+	version_source_path: string;
+	version_source_sha256: string;
 	sha256: string;
 	size_bytes: number;
 	bun: string;
@@ -65,6 +71,8 @@ type ReleaseProvenance = {
 		kind: string;
 		status: string;
 		version?: string;
+		executable_path?: string;
+		executable_sha256?: string;
 		reason?: string;
 		waiver_required?: boolean;
 	}>;
@@ -83,16 +91,11 @@ type PackageMetadata = {
 	version: string;
 };
 
-type VersionRegistry = {
-	packageName: string;
-	currentVersion: string;
-};
-
-type ResolvedVersionRegistry = {
+type ResolvedVersionSource = {
 	packageName: string;
 	version: string;
-	registryPath: string;
-	registrySha256: string;
+	sourcePath: string;
+	sourceSha256: string;
 };
 
 type ProvenanceSecurityScanner = ReleaseProvenance["security_scanners"][number];
@@ -131,58 +134,19 @@ function readPackageMetadata(cwd: string): PackageMetadata {
 	return { name: raw.name, version: raw.version };
 }
 
-function resolveVersionRegistry(cwd: string): ResolvedVersionRegistry | null {
-	const registryPath = join(cwd, VERSION_REGISTRY_PATH);
-	if (!existsSync(registryPath)) {
-		return null;
-	}
-
-	const raw = JSON.parse(
-		readFileSync(registryPath, "utf8"),
-	) as Partial<VersionRegistry>;
-	if (typeof raw.packageName !== "string" || raw.packageName.length === 0) {
-		throw new Error(
-			`${VERSION_REGISTRY_PATH} packageName must be a non-empty string`,
-		);
-	}
-	if (
-		typeof raw.currentVersion !== "string" ||
-		raw.currentVersion.length === 0
-	) {
-		throw new Error(
-			`${VERSION_REGISTRY_PATH} currentVersion must be a non-empty string`,
-		);
-	}
-	assertValidVersion(
-		raw.currentVersion,
-		`${VERSION_REGISTRY_PATH} currentVersion`,
-	);
-
+function resolveVersionSource(cwd: string): ResolvedVersionSource {
 	const metadata = readPackageMetadata(cwd);
-	if (raw.packageName !== metadata.name) {
+	if (CLI_PACKAGE_NAME !== metadata.name || CLI_VERSION !== metadata.version) {
 		throw new Error(
-			`${VERSION_REGISTRY_PATH} packageName ${JSON.stringify(raw.packageName)} does not match package.json name ${JSON.stringify(metadata.name)}`,
-		);
-	}
-	if (raw.currentVersion !== metadata.version) {
-		throw new Error(
-			`package.json version ${JSON.stringify(metadata.version)} is not the registered release version ${JSON.stringify(raw.currentVersion)} in ${VERSION_REGISTRY_PATH}`,
-		);
-	}
-	if (
-		CLI_PACKAGE_NAME !== raw.packageName ||
-		CLI_VERSION !== raw.currentVersion
-	) {
-		throw new Error(
-			`generated version metadata ${JSON.stringify(`${CLI_PACKAGE_NAME}@${CLI_VERSION}`)} does not match registered release version ${JSON.stringify(`${raw.packageName}@${raw.currentVersion}`)} in ${VERSION_REGISTRY_PATH}`,
+			`generated version metadata ${JSON.stringify(`${CLI_PACKAGE_NAME}@${CLI_VERSION}`)} does not match package metadata ${JSON.stringify(`${metadata.name}@${metadata.version}`)} in ${VERSION_SOURCE_PATH}`,
 		);
 	}
 
 	return {
-		packageName: raw.packageName,
-		version: raw.currentVersion,
-		registryPath: VERSION_REGISTRY_PATH,
-		registrySha256: sha256Hex(readFileSync(registryPath)),
+		packageName: metadata.name,
+		version: metadata.version,
+		sourcePath: VERSION_SOURCE_PATH,
+		sourceSha256: sha256Hex(readFileSync(join(cwd, VERSION_SOURCE_PATH))),
 	};
 }
 
@@ -320,6 +284,12 @@ function toProvenanceSecurityScanners(
 		kind: scanner.kind,
 		status: scanner.status,
 		...(scanner.version ? { version: scanner.version } : {}),
+		...(scanner.executable_path
+			? { executable_path: scanner.executable_path }
+			: {}),
+		...(scanner.executable_sha256
+			? { executable_sha256: scanner.executable_sha256 }
+			: {}),
 		...(scanner.reason ? { reason: scanner.reason } : {}),
 		...(scanner.waiver_required
 			? { waiver_required: scanner.waiver_required }
@@ -391,11 +361,25 @@ function assertReleaseSecurityScanEvidenceShape(
 		}
 		if (
 			("version" in scan && typeof scan.version !== "string") ||
+			("executable_path" in scan && typeof scan.executable_path !== "string") ||
+			("executable_sha256" in scan &&
+				typeof scan.executable_sha256 !== "string") ||
 			("reason" in scan && typeof scan.reason !== "string") ||
 			("waiver_required" in scan && typeof scan.waiver_required !== "boolean")
 		) {
 			throw new Error(
 				`${RELEASE_SECURITY_EVIDENCE_PATH} scan ${index} has invalid optional fields`,
+			);
+		}
+		if (
+			scan.status === "passed" &&
+			(typeof scan.executable_path !== "string" ||
+				!isAbsolute(scan.executable_path) ||
+				typeof scan.executable_sha256 !== "string" ||
+				!/^[a-f0-9]{64}$/i.test(scan.executable_sha256))
+		) {
+			throw new Error(
+				`${RELEASE_SECURITY_EVIDENCE_PATH} passed scan ${index} must bind an approved absolute scanner path and SHA-256`,
 			);
 		}
 	}
@@ -458,6 +442,7 @@ function readReleaseSecurityScanEvidence(
 			`missing required ${RELEASE_SECURITY_EVIDENCE_PATH}; run bun run validate:security:release before release provenance`,
 		);
 	}
+	assertSafeReleaseArtifact(cwd, evidencePath);
 
 	const raw = JSON.parse(
 		readFileSync(evidencePath, "utf8"),
@@ -508,22 +493,21 @@ export function buildReleaseProvenance(
 	options: WriteReleaseProvenanceOptions = {},
 ): ReleaseProvenance {
 	const cwd = options.cwd ?? process.cwd();
-	const artifact = options.artifact ?? DEFAULT_RELEASE_ARTIFACT;
+	const artifact = releaseArtifactPath(
+		options.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	);
 	const artifactPath = join(cwd, artifact);
+	prepareReleaseOutputFile(cwd, artifactPath);
 	if (!existsSync(artifactPath)) {
 		throw new Error(`missing release artifact: ${artifact}`);
 	}
+	assertSafeReleaseArtifact(cwd, artifactPath);
 
 	const bytes = readFileSync(artifactPath);
 	const stats = statSync(artifactPath);
 	const lockMetadata = readLockMetadata(cwd);
 	const commitSha = runGitCommand(cwd, ["rev-parse", "HEAD"]);
-	const versionRegistry = resolveVersionRegistry(cwd);
-	if (options.releaseMode && !versionRegistry) {
-		throw new Error(
-			`missing required ${VERSION_REGISTRY_PATH} for release provenance`,
-		);
-	}
+	const versionSource = resolveVersionSource(cwd);
 	const compiledReceipt = readMinifiedCompiledReleaseBuildReceipt(
 		artifactPath,
 		compiledReleaseBuildArgs("cli/main.ts", artifact),
@@ -548,10 +532,10 @@ export function buildReleaseProvenance(
 			);
 	const provenance: ReleaseProvenance = {
 		artifact,
-		package_name: CLI_PACKAGE_NAME,
-		version: CLI_VERSION,
-		version_registry_path: versionRegistry?.registryPath ?? "unknown",
-		version_registry_sha256: versionRegistry?.registrySha256 ?? "unknown",
+		package_name: versionSource.packageName,
+		version: versionSource.version,
+		version_source_path: versionSource.sourcePath,
+		version_source_sha256: versionSource.sourceSha256,
 		sha256: sha256Hex(bytes),
 		size_bytes: stats.size,
 		bun: process.versions.bun ?? "unknown",
@@ -597,15 +581,19 @@ export function writeReleaseProvenance(
 	provenancePath: string;
 } {
 	const cwd = options.cwd ?? process.cwd();
-	const artifact = options.artifact ?? DEFAULT_RELEASE_ARTIFACT;
+	const artifact = releaseArtifactPath(
+		options.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	);
 	const checksumPath = join(cwd, `${artifact}.sha256`);
 	const provenancePath = join(cwd, `${artifact}.provenance.json`);
+	const checksumGuard = prepareReleaseOutputFile(cwd, checksumPath);
+	const provenanceGuard = prepareReleaseOutputFile(cwd, provenancePath);
 	const provenance = buildReleaseProvenance(options);
 
 	const checksumContent = `${provenance.sha256}  ${artifact}\n`;
 	const provenanceContent = `${JSON.stringify(provenance, null, 2)}\n`;
-	writeFileAtomically(checksumPath, checksumContent);
-	writeFileAtomically(provenancePath, provenanceContent);
+	writeFileAtomically(cwd, checksumPath, checksumContent, checksumGuard);
+	writeFileAtomically(cwd, provenancePath, provenanceContent, provenanceGuard);
 	assertReleaseProvenanceBindsArtifact(
 		cwd,
 		artifact,
@@ -617,10 +605,18 @@ export function writeReleaseProvenance(
 	return { checksumPath, provenancePath };
 }
 
-function writeFileAtomically(path: string, content: string): void {
+function writeFileAtomically(
+	cwd: string,
+	path: string,
+	content: string,
+	outputGuard = prepareReleaseOutputFile(cwd, path),
+): void {
 	const tempPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+	const tempGuard = prepareReleaseOutputFile(cwd, tempPath);
 	writeFileSync(tempPath, content, "utf8");
+	assertReleaseOutputFileStable(tempGuard, true);
 	renameSync(tempPath, path);
+	assertReleaseOutputFileStable(outputGuard, true);
 }
 
 function assertReleaseProvenanceBindsArtifact(
@@ -630,12 +626,16 @@ function assertReleaseProvenanceBindsArtifact(
 	checksumPath: string,
 	provenancePath: string,
 ): void {
-	const artifactSha256 = sha256Hex(readFileSync(join(cwd, artifact)));
+	const artifactPath = join(cwd, artifact);
+	assertSafeReleaseArtifact(cwd, artifactPath);
+	assertSafeReleaseArtifact(cwd, checksumPath);
+	assertSafeReleaseArtifact(cwd, provenancePath);
+	const artifactSha256 = sha256Hex(readFileSync(artifactPath));
 	const written = JSON.parse(
 		readFileSync(provenancePath, "utf8"),
 	) as ReleaseProvenance;
 	const checksumText = readFileSync(checksumPath, "utf8").trim();
-	const artifactSize = statSync(join(cwd, artifact)).size;
+	const artifactSize = statSync(artifactPath).size;
 	const sizeMatches =
 		Number.isSafeInteger(provenance.size_bytes) &&
 		Number.isSafeInteger(written.size_bytes) &&

@@ -570,8 +570,28 @@ function appendLine(
 					throw new Error(
 						"evolution evaluation journal changed before rollback",
 					);
-				truncateFile(fd, previousSize);
-				syncFile(fd);
+				// Windows rejects ftruncate on an O_APPEND descriptor. Keep the
+				// append descriptor for the write path, then roll back through a
+				// separate non-append descriptor after verifying the same file.
+				const rollbackFd = openSync(
+					path,
+					fsConstants.O_WRONLY |
+						(process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW),
+				);
+				try {
+					const rollbackOpened = fstatSync(rollbackFd);
+					if (
+						String(rollbackOpened.dev) !== String(opened.dev) ||
+						String(rollbackOpened.ino) !== String(opened.ino)
+					)
+						throw new Error(
+							"evolution evaluation journal changed before rollback",
+						);
+					truncateFile(rollbackFd, previousSize);
+					syncFile(rollbackFd);
+				} finally {
+					closeSync(rollbackFd);
+				}
 				syncDirectory(parent);
 			} catch (errorDuringRollback) {
 				rollbackError = errorDuringRollback;

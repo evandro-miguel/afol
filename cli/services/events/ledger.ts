@@ -300,6 +300,32 @@ function syncParentDirectory(path: string): void {
 	}
 }
 
+function rollbackAppendedBytes(
+	path: string,
+	originalSize: number,
+	opened: ReturnType<typeof fstatSync>,
+	truncateFile: NonNullable<DurableJsonlIo["truncateFile"]>,
+	syncFile: NonNullable<DurableJsonlIo["syncFile"]>,
+): void {
+	// Windows does not permit ftruncate on a descriptor opened with O_APPEND.
+	// Open a second descriptor without O_APPEND, then prove it still identifies
+	// the append target before mutating it. If that proof fails, leave the
+	// primary error intact and report rollback failure instead of truncating a
+	// pathname replacement.
+	const rollbackFd = openSync(path, safeOpenFlags(fsConstants.O_RDWR));
+	try {
+		const rollbackOpened = fstatSync(rollbackFd);
+		if (!sameIdentity(opened, rollbackOpened))
+			throw new Error("event ledger target changed during rollback");
+		verifyOpenedTarget(path, rollbackOpened);
+		truncateFile(rollbackFd, originalSize);
+		syncFile(rollbackFd);
+		verifyOpenedTarget(path, fstatSync(rollbackFd));
+	} finally {
+		closeSync(rollbackFd);
+	}
+}
+
 /**
  * Append one or more JSON objects plus LF under the global event-file lock.
  * Success is returned only after every byte and the file have been synced.
@@ -406,9 +432,13 @@ export function appendEventLedgerRecords<T extends Record<string, unknown>>(
 			primaryError = error;
 			if (appendAttempted) {
 				try {
-					verifyOpenedTarget(path, fstatSync(fd));
-					truncateFile(fd, originalSize);
-					syncFile(fd);
+					rollbackAppendedBytes(
+						path,
+						originalSize,
+						fstatSync(fd),
+						truncateFile,
+						syncFile,
+					);
 				} catch (errorDuringRollback) {
 					rollbackError = errorDuringRollback;
 				}

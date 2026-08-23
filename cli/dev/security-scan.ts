@@ -2,8 +2,23 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import {
+	chmodSync,
+	existsSync,
+	lstatSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
+import { releaseArtifactPath } from "./build-release";
+import {
+	assertReleaseOutputFileStable,
+	assertSafeReleaseArtifact,
+	prepareReleaseOutputFile,
+} from "./release-output";
 
 export type ScanMode = "deps" | "secrets";
 type ScanRequirement = "informative" | "required" | "release";
@@ -21,6 +36,8 @@ export type SecurityScanOutcome = {
 	mode: ScanRequirement;
 	status: SecurityScanStatus;
 	version?: string;
+	executable_path?: string;
+	executable_sha256?: string;
 	reason?: string;
 	waiver_required?: boolean;
 };
@@ -49,7 +66,7 @@ type ScanRunResult = {
 };
 
 export const RELEASE_SECURITY_EVIDENCE_PATH = "dist/security-scan.release.json";
-export const DEFAULT_RELEASE_ARTIFACT = "dist/afol";
+export const DEFAULT_RELEASE_ARTIFACT = releaseArtifactPath("dist/afol");
 
 const KIND_LABELS: Record<ScanMode, string> = {
 	deps: "dependency",
@@ -60,6 +77,202 @@ const SCAN_TOOLS: Record<ScanMode, string[]> = {
 	deps: ["osv-scanner"],
 	secrets: ["gitleaks"],
 };
+
+const RELEASE_SCANNER_PATH_ENV: Record<string, string> = {
+	"osv-scanner": "AFOL_OSV_SCANNER_PATH",
+	gitleaks: "AFOL_GITLEAKS_PATH",
+};
+
+type ScannerIdentity = {
+	executable_path: string;
+	executable_sha256: string;
+};
+
+type ScannerFileIdentity = ScannerIdentity & {
+	dev: string;
+	ino: string;
+	size: string;
+};
+
+type ReleaseScannerResolution =
+	| { identity: ScannerFileIdentity; executable: string; bytes: Uint8Array }
+	| { error: string };
+
+type ImmutableScannerCopy =
+	| { executable: string; cleanup: () => void }
+	| { error: string };
+
+function resolveToolExecutable(tool: string, env?: NodeJS.ProcessEnv): string {
+	// Informative and required scans retain PATH discovery for local operator use.
+	// Release scans resolve only the explicit, hash-recorded paths below.
+	if (process.platform !== "win32") return tool;
+	const pathValue =
+		env?.PATH ?? env?.Path ?? process.env.PATH ?? process.env.Path;
+	if (!pathValue) return tool;
+	for (const directory of pathValue.split(delimiter)) {
+		if (!directory) continue;
+		for (const candidate of [
+			`${tool}.exe`,
+			`${tool}.cmd`,
+			`${tool}.bat`,
+			tool,
+		]) {
+			const resolved = join(directory, candidate);
+			if (existsSync(resolved)) return resolved;
+		}
+	}
+	return tool;
+}
+
+function hasReparsePoint(path: string): boolean {
+	let current = path;
+	while (true) {
+		if (lstatSync(current).isSymbolicLink()) {
+			return true;
+		}
+		const parent = dirname(current);
+		if (parent === current) {
+			return false;
+		}
+		current = parent;
+	}
+}
+
+function sameScannerIdentity(
+	left: ScannerFileIdentity,
+	right: ScannerFileIdentity,
+): boolean {
+	return (
+		left.executable_path === right.executable_path &&
+		left.executable_sha256 === right.executable_sha256 &&
+		left.dev === right.dev &&
+		left.ino === right.ino &&
+		left.size === right.size
+	);
+}
+
+function inspectReleaseScannerExecutable(
+	tool: string,
+	variable: string,
+	configuredPath: string,
+): ReleaseScannerResolution {
+	try {
+		const before = lstatSync(configuredPath);
+		if (hasReparsePoint(configuredPath)) {
+			return {
+				error: `release ${tool} scanner ${variable} must not traverse a symlink or reparse point`,
+			};
+		}
+		if (!before.isFile()) {
+			return {
+				error: `release ${tool} scanner ${variable} must name a regular file`,
+			};
+		}
+		const bytes = readFileSync(configuredPath);
+		const after = lstatSync(configuredPath);
+		if (
+			String(before.dev) !== String(after.dev) ||
+			String(before.ino) !== String(after.ino) ||
+			Number(before.size) !== Number(after.size)
+		) {
+			return {
+				error: `release ${tool} scanner ${variable} changed while its identity was read`,
+			};
+		}
+		return {
+			executable: configuredPath,
+			bytes,
+			identity: {
+				executable_path: configuredPath,
+				executable_sha256: sha256Hex(bytes),
+				dev: String(before.dev),
+				ino: String(before.ino),
+				size: String(before.size),
+			},
+		};
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		return {
+			error: `release ${tool} scanner ${variable} is not an approved readable file: ${detail}`,
+		};
+	}
+}
+
+function materializeImmutableScannerCopy(
+	tool: string,
+	resolution: Exclude<ReleaseScannerResolution, { error: string }>,
+): ImmutableScannerCopy {
+	let directory: string | null = null;
+	try {
+		directory = mkdtempSync(join(tmpdir(), "afol-release-scanner-"));
+		chmodSync(directory, 0o700);
+		const executable = join(directory, basename(resolution.executable));
+		writeFileSync(executable, resolution.bytes, {
+			flag: "wx",
+			mode: 0o500,
+		});
+		chmodSync(executable, 0o500);
+		const copied = lstatSync(executable);
+		if (
+			!copied.isFile() ||
+			sha256Hex(readFileSync(executable)) !==
+				resolution.identity.executable_sha256
+		) {
+			throw new Error("immutable copy does not match the verified bytes");
+		}
+		chmodSync(directory, 0o500);
+		return {
+			executable,
+			cleanup: () => {
+				chmodSync(directory as string, 0o700);
+				rmSync(directory as string, { recursive: true, force: true });
+			},
+		};
+	} catch (error) {
+		if (directory !== null) {
+			rmSync(directory, { recursive: true, force: true });
+		}
+		return {
+			error: `release ${tool} scanner could not create an immutable verified copy: ${error instanceof Error ? error.message : String(error)}`,
+		};
+	}
+}
+
+function revalidateReleaseScannerExecutable(
+	tool: string,
+	env: NodeJS.ProcessEnv | undefined,
+	expected: ScannerFileIdentity,
+): string | null {
+	const current = resolveReleaseScannerExecutable(tool, env);
+	if ("error" in current) return current.error;
+	if (!sameScannerIdentity(expected, current.identity)) {
+		return `release ${tool} scanner changed after trust validation`;
+	}
+	return null;
+}
+
+function resolveReleaseScannerExecutable(
+	tool: string,
+	env?: NodeJS.ProcessEnv,
+): ReleaseScannerResolution {
+	const variable = RELEASE_SCANNER_PATH_ENV[tool];
+	if (!variable) {
+		return { error: `release scanner ${tool} has no approved path variable` };
+	}
+	const configuredPath = (env ?? process.env)[variable];
+	if (!configuredPath) {
+		return {
+			error: `release ${tool} scan requires ${variable} to name an approved absolute binary; PATH discovery is not allowed`,
+		};
+	}
+	if (!isAbsolute(configuredPath)) {
+		return {
+			error: `release ${tool} scanner ${variable} must be an absolute path`,
+		};
+	}
+
+	return inspectReleaseScannerExecutable(tool, variable, configuredPath);
+}
 
 const MISSING_LOCKFILE_MESSAGES: Record<ScanRequirement, string> = {
 	informative:
@@ -112,8 +325,10 @@ function buildReleaseSecurityTarget(
 	cwd: string,
 	artifact = DEFAULT_RELEASE_ARTIFACT,
 ): { target: SecurityScanTarget; errors: string[] } {
+	artifact = releaseArtifactPath(artifact);
 	const errors: string[] = [];
 	const artifactPath = join(cwd, artifact);
+	prepareReleaseOutputFile(cwd, artifactPath);
 	const lockfile = supportedDependencyLockfile(cwd);
 	const commitSha = runGitCommand(cwd, ["rev-parse", "HEAD"]);
 	const target: SecurityScanTarget = {
@@ -127,6 +342,7 @@ function buildReleaseSecurityTarget(
 	if (!existsSync(artifactPath)) {
 		errors.push(`missing release artifact: ${artifact}`);
 	} else {
+		assertSafeReleaseArtifact(cwd, artifactPath);
 		target.artifact_sha256 = sha256Hex(readFileSync(artifactPath));
 	}
 
@@ -191,6 +407,7 @@ function buildCommandOutcome(opts: {
 	mode: ScanRequirement;
 	status: number;
 	version?: string;
+	identity?: ScannerIdentity;
 	failureDetail?: string;
 }): SecurityScanOutcome {
 	const status = opts.status === 0 ? "passed" : "failed";
@@ -204,8 +421,9 @@ function buildCommandOutcome(opts: {
 		mode: opts.mode,
 		status,
 		...(opts.version ? { version: opts.version } : {}),
-		...(opts.status === 0 ? {} : { reason: failureReason }),
-		...(waiverRequired ? { waiver_required: true } : {}),
+		...opts.identity,
+		...(opts.status !== 0 && { reason: failureReason }),
+		...(waiverRequired && { waiver_required: true }),
 	};
 }
 
@@ -224,13 +442,18 @@ function summarizeFailureOutput(output: string): string | undefined {
 function probeToolVersion(
 	tool: string,
 	env?: NodeJS.ProcessEnv,
+	executable?: string,
 ): string | undefined {
-	const probe = spawnSync(tool, ["--version"], {
-		encoding: "utf8",
-		...(env ? { env } : {}),
-		shell: false,
-		stdio: "pipe",
-	});
+	const probe = spawnSync(
+		executable ?? resolveToolExecutable(tool, env),
+		["--version"],
+		{
+			encoding: "utf8",
+			...(env ? { env } : {}),
+			shell: false,
+			stdio: "pipe",
+		},
+	);
 	if (probe.error || (probe.status ?? 0) !== 0) {
 		return undefined;
 	}
@@ -243,6 +466,7 @@ function buildProbeErrorOutcome(opts: {
 	kind: ScanMode;
 	mode: ScanRequirement;
 	error: Error & { code?: string };
+	identity?: ScannerIdentity;
 }): SecurityScanOutcome {
 	const status: SecurityScanStatus = "errored";
 	const waiverRequired = shouldRequireWaiver(opts.mode, status);
@@ -252,8 +476,9 @@ function buildProbeErrorOutcome(opts: {
 		kind: opts.kind,
 		mode: opts.mode,
 		status,
+		...opts.identity,
 		reason: `${opts.tool} probe failed with ${code}: ${opts.error.message}`,
-		...(waiverRequired ? { waiver_required: true } : {}),
+		...(waiverRequired && { waiver_required: true }),
 	};
 }
 
@@ -263,22 +488,47 @@ function buildReleaseScannerOutcome(opts: {
 	mode: ScanRequirement;
 	env?: NodeJS.ProcessEnv;
 }): SecurityScanOutcome {
-	const probe = spawnSync(opts.tool, ["--version"], {
+	const resolution = resolveReleaseScannerExecutable(opts.tool, opts.env);
+	if ("error" in resolution) {
+		return buildReleaseScannerTrustErrorOutcome({
+			...opts,
+			reason: resolution.error,
+		});
+	}
+	const beforeProbe = revalidateReleaseScannerExecutable(
+		opts.tool,
+		opts.env,
+		resolution.identity,
+	);
+	if (beforeProbe) {
+		return buildReleaseScannerTrustErrorOutcome({
+			...opts,
+			reason: beforeProbe,
+		});
+	}
+	const probe = spawnSync(resolution.executable, ["--version"], {
 		encoding: "utf8",
 		env: opts.env,
 		shell: false,
 		stdio: "pipe",
 	});
+	const afterProbe = revalidateReleaseScannerExecutable(
+		opts.tool,
+		opts.env,
+		resolution.identity,
+	);
+	if (afterProbe) {
+		return buildReleaseScannerTrustErrorOutcome({
+			...opts,
+			reason: afterProbe,
+		});
+	}
 
 	if (probe.error) {
-		const code = String((probe.error as Error & { code?: string }).code);
-		if (code === "ENOENT") {
-			return buildMissingToolOutcome(opts);
-		}
-
 		return buildProbeErrorOutcome({
 			...opts,
 			error: probe.error as Error & { code?: string },
+			identity: resolution.identity,
 		});
 	}
 
@@ -288,6 +538,7 @@ function buildReleaseScannerOutcome(opts: {
 			kind: opts.kind,
 			mode: opts.mode,
 			status: probe.status ?? 1,
+			identity: resolution.identity,
 		});
 	}
 
@@ -299,6 +550,7 @@ function buildReleaseScannerOutcome(opts: {
 		mode: opts.mode,
 		status,
 		...(version ? { version } : {}),
+		...resolution.identity,
 		reason: `${opts.tool} available; scan not executed during provenance generation.`,
 		...(shouldRequireWaiver(opts.mode, status)
 			? { waiver_required: true }
@@ -339,71 +591,194 @@ function runOptionalScan(opts: {
 
 	for (const binary of opts.binaries) {
 		let binaryMissing = false;
-		const version = probeToolVersion(binary, opts.env);
+		const releaseResolution =
+			opts.mode === "release"
+				? resolveReleaseScannerExecutable(binary, opts.env)
+				: undefined;
+		if (releaseResolution && "error" in releaseResolution) {
+			return {
+				outcome: buildReleaseScannerTrustErrorOutcome({
+					tool: binary,
+					kind: opts.kind,
+					mode: opts.mode,
+					reason: releaseResolution.error,
+				}),
+				exitCode: 1,
+				stderr: releaseResolution.error,
+			};
+		}
+		let immutableCopy: Exclude<ImmutableScannerCopy, { error: string }> | null =
+			null;
+		try {
+			if (releaseResolution) {
+				const snapshot = materializeImmutableScannerCopy(
+					binary,
+					releaseResolution,
+				);
+				if ("error" in snapshot) {
+					return {
+						outcome: buildReleaseScannerTrustErrorOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							reason: snapshot.error,
+						}),
+						exitCode: 1,
+						stderr: snapshot.error,
+					};
+				}
+				immutableCopy = snapshot;
+			}
+			const executable =
+				immutableCopy?.executable ?? resolveToolExecutable(binary, opts.env);
+			const identity = releaseResolution?.identity;
+			if (releaseResolution) {
+				const beforeProbe = revalidateReleaseScannerExecutable(
+					binary,
+					opts.env,
+					releaseResolution.identity,
+				);
+				if (beforeProbe) {
+					return {
+						outcome: buildReleaseScannerTrustErrorOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							reason: beforeProbe,
+						}),
+						exitCode: 1,
+						stderr: beforeProbe,
+					};
+				}
+			}
+			const version = probeToolVersion(binary, opts.env, executable);
+			if (releaseResolution) {
+				const afterProbe = revalidateReleaseScannerExecutable(
+					binary,
+					opts.env,
+					releaseResolution.identity,
+				);
+				if (afterProbe) {
+					return {
+						outcome: buildReleaseScannerTrustErrorOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							reason: afterProbe,
+						}),
+						exitCode: 1,
+						stderr: afterProbe,
+					};
+				}
+			}
 
-		for (const commandArgs of commands) {
-			const result = spawnSync(binary, commandArgs, {
-				encoding: opts.json ? "utf8" : undefined,
-				...(opts.cwd ? { cwd: opts.cwd } : {}),
-				...(opts.env ? { env: opts.env } : {}),
-				shell: false,
-				stdio: opts.json ? "pipe" : "inherit",
-			});
-
-			if (result.error) {
-				const error = result.error as Error & { code?: string };
-				if (String(error.code) === "ENOENT") {
-					binaryMissing = true;
-					break;
+			for (const commandArgs of commands) {
+				if (releaseResolution) {
+					const beforeScan = revalidateReleaseScannerExecutable(
+						binary,
+						opts.env,
+						releaseResolution.identity,
+					);
+					if (beforeScan) {
+						return {
+							outcome: buildReleaseScannerTrustErrorOutcome({
+								tool: binary,
+								kind: opts.kind,
+								mode: opts.mode,
+								reason: beforeScan,
+							}),
+							exitCode: 1,
+							stderr: beforeScan,
+						};
+					}
+				}
+				const result = spawnSync(executable, commandArgs, {
+					encoding: opts.json ? "utf8" : undefined,
+					...(opts.cwd ? { cwd: opts.cwd } : {}),
+					...(opts.env ? { env: opts.env } : {}),
+					shell: false,
+					stdio: opts.json ? "pipe" : "inherit",
+				});
+				if (releaseResolution) {
+					const afterScan = revalidateReleaseScannerExecutable(
+						binary,
+						opts.env,
+						releaseResolution.identity,
+					);
+					if (afterScan) {
+						return {
+							outcome: buildReleaseScannerTrustErrorOutcome({
+								tool: binary,
+								kind: opts.kind,
+								mode: opts.mode,
+								reason: afterScan,
+							}),
+							exitCode: 1,
+							stderr: afterScan,
+						};
+					}
 				}
 
-				const stderr = `${binary} failed to start: ${error.message}`;
-				return {
-					outcome: buildProbeErrorOutcome({
-						tool: binary,
-						kind: opts.kind,
-						mode: opts.mode,
-						error,
-					}),
-					exitCode: 1,
-					stderr,
-				};
+				if (result.error) {
+					const error = result.error as Error & { code?: string };
+					if (String(error.code) === "ENOENT") {
+						binaryMissing = true;
+						break;
+					}
+
+					const stderr = `${binary} failed to start: ${error.message}`;
+					return {
+						outcome: buildProbeErrorOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							error,
+							...(identity ? { identity } : {}),
+						}),
+						exitCode: 1,
+						stderr,
+					};
+				}
+
+				if (result.status !== 0) {
+					const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
+					const stdout = opts.json ? `${result.stdout ?? ""}`.trim() : "";
+					const failureDetail = opts.json
+						? summarizeFailureOutput(stderr || stdout)
+						: undefined;
+					return {
+						outcome: buildCommandOutcome({
+							tool: binary,
+							kind: opts.kind,
+							mode: opts.mode,
+							status: result.status ?? 1,
+							...(version ? { version } : {}),
+							...(identity ? { identity } : {}),
+							...(failureDetail ? { failureDetail } : {}),
+						}),
+						exitCode: result.status ?? 1,
+						...(opts.json && stderr ? { stderr } : {}),
+					};
+				}
 			}
 
-			if (result.status !== 0) {
-				const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
-				const stdout = opts.json ? `${result.stdout ?? ""}`.trim() : "";
-				const failureDetail = opts.json
-					? summarizeFailureOutput(stderr || stdout)
-					: undefined;
-				return {
-					outcome: buildCommandOutcome({
-						tool: binary,
-						kind: opts.kind,
-						mode: opts.mode,
-						status: result.status ?? 1,
-						...(version ? { version } : {}),
-						...(failureDetail ? { failureDetail } : {}),
-					}),
-					exitCode: result.status ?? 1,
-					...(opts.json && stderr ? { stderr } : {}),
-				};
+			if (binaryMissing) {
+				continue;
 			}
+			return {
+				outcome: buildCommandOutcome({
+					tool: binary,
+					kind: opts.kind,
+					mode: opts.mode,
+					status: 0,
+					...(version ? { version } : {}),
+					...(identity ? { identity } : {}),
+				}),
+				exitCode: 0,
+			};
+		} finally {
+			immutableCopy?.cleanup();
 		}
-
-		if (binaryMissing) {
-			continue;
-		}
-		return {
-			outcome: buildCommandOutcome({
-				tool: binary,
-				kind: opts.kind,
-				mode: opts.mode,
-				status: 0,
-				...(version ? { version } : {}),
-			}),
-			exitCode: 0,
-		};
 	}
 
 	if (opts.mode === "required") {
@@ -546,9 +921,28 @@ export function writeReleaseSecurityScanReport(
 	cwd = process.cwd(),
 ): string {
 	const outputPath = join(cwd, RELEASE_SECURITY_EVIDENCE_PATH);
-	mkdirSync(dirname(outputPath), { recursive: true });
+	const outputGuard = prepareReleaseOutputFile(cwd, outputPath);
 	writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+	assertReleaseOutputFileStable(outputGuard, true);
 	return outputPath;
+}
+
+function buildReleaseScannerTrustErrorOutcome(opts: {
+	tool: string;
+	kind: ScanMode;
+	mode: ScanRequirement;
+	reason: string;
+}): SecurityScanOutcome {
+	return {
+		tool: opts.tool,
+		kind: opts.kind,
+		mode: opts.mode,
+		status: "errored",
+		reason: opts.reason,
+		...(shouldRequireWaiver(opts.mode, "errored")
+			? { waiver_required: true }
+			: {}),
+	};
 }
 
 function writeScanResult(result: ScanRunResult, json: boolean): void {

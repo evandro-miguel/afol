@@ -17,6 +17,10 @@ import {
 	openEvolutionDb,
 	productionDayJournalPath,
 } from "../services/evolution";
+import {
+	releaseEvolutionTestHandles,
+	removeEvolutionTestRoot,
+} from "./evolution-test-support";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
 
@@ -130,6 +134,7 @@ function createJournal(root: string, projectId = PROJECT_ID): void {
 }
 
 function removeDb(root: string): void {
+	releaseEvolutionTestHandles();
 	const path = evolutionDbPath(root);
 	for (const candidate of [path, `${path}-wal`, `${path}-shm`])
 		rmSync(candidate, { force: true });
@@ -162,7 +167,7 @@ describe("evolve status canonical journal integrity", () => {
 			expect(existsSync(`${evolutionDbPath(root)}-wal`)).toBe(false);
 			expect(existsSync(`${evolutionDbPath(root)}-shm`)).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -190,7 +195,7 @@ describe("evolve status canonical journal integrity", () => {
 				"recovery_action=afol evolve repair --json",
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -208,7 +213,7 @@ describe("evolve status canonical journal integrity", () => {
 				recovery_action: null,
 			});
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -232,7 +237,7 @@ describe("evolve status canonical journal integrity", () => {
 			expect(payload.data.journal_health.error).toContain("JSON");
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -258,8 +263,8 @@ describe("evolve status canonical journal integrity", () => {
 			expect(payload.data.journal_health.error).toContain("another project");
 			expect(existsSync(evolutionDbPath(target))).toBe(false);
 		} finally {
-			rmSync(source, { recursive: true, force: true });
-			rmSync(target, { recursive: true, force: true });
+			removeEvolutionTestRoot(source);
+			removeEvolutionTestRoot(target);
 		}
 	});
 });

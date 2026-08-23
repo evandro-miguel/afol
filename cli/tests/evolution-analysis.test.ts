@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: bearer-token synthetic redaction fixture
+// public-audit-allow: linux-home-path synthetic path fixture
 import { spawnSync } from "node:child_process";
 import {
 	chmodSync,
@@ -50,6 +52,10 @@ import {
 	suggestionJournalPath,
 } from "../services/evolution";
 import type { SuggestionCandidate } from "../services/evolution/suggestion-model";
+import {
+	releaseEvolutionTestHandles,
+	removeEvolutionTestRoot,
+} from "./evolution-test-support";
 
 const PROJECT_ID = "db97afff-2026-4eb1-a799-5d34fd505267";
 
@@ -408,7 +414,7 @@ describe("evolution analysis previews", () => {
 				);
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -439,7 +445,7 @@ describe("evolution analysis previews", () => {
 			expect(JSON.stringify(data)).not.toContain("/home/operator/private.txt");
 			expect(data.proposals[0]?.impact).toBe("unknown");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -532,7 +538,7 @@ describe("evolution analysis previews", () => {
 				expect(restrictedProposal).not.toHaveProperty(key);
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -667,6 +673,7 @@ describe("evolution analysis previews", () => {
 		const { root } = populatedFixture();
 		try {
 			const dbPath = evolutionDbPath(root);
+			releaseEvolutionTestHandles();
 			rmSync(`${dbPath}-wal`, { force: true });
 			rmSync(`${dbPath}-shm`, { force: true });
 			const before = snapshotReadOnlyState(root);
@@ -675,7 +682,7 @@ describe("evolution analysis previews", () => {
 			);
 			expect(snapshotReadOnlyState(root)).toBe(before);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -684,12 +691,16 @@ describe("evolution analysis previews", () => {
 		try {
 			const dbPath = evolutionDbPath(root);
 			const replacement = `${dbPath}.replacement`;
+			releaseEvolutionTestHandles();
+			for (const suffix of ["-wal", "-shm"])
+				writeFileSync(`${dbPath}${suffix}`, "", "utf8");
 			expect(() =>
 				analyzeEvolutionProject(
 					root,
 					{},
 					{
 						beforeOpen: (path) => {
+							releaseEvolutionTestHandles();
 							renameSync(path, replacement);
 							writeFileSync(path, readFileSync(replacement));
 						},
@@ -697,7 +708,7 @@ describe("evolution analysis previews", () => {
 				),
 			).toThrow("state changed during read-only analysis");
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -712,7 +723,7 @@ describe("evolution analysis previews", () => {
 				"database state exceeds the size limit",
 			);
 		} finally {
-			rmSync(oversizedDb.root, { recursive: true, force: true });
+			removeEvolutionTestRoot(oversizedDb.root);
 		}
 		const oversizedJournal = populatedFixture();
 		try {
@@ -725,7 +736,7 @@ describe("evolution analysis previews", () => {
 				"journals exceed the size limit",
 			);
 		} finally {
-			rmSync(oversizedJournal.root, { recursive: true, force: true });
+			removeEvolutionTestRoot(oversizedJournal.root);
 		}
 		const oversizedLines = populatedFixture();
 		try {
@@ -738,7 +749,7 @@ describe("evolution analysis previews", () => {
 				"journals exceed the size limit",
 			);
 		} finally {
-			rmSync(oversizedLines.root, { recursive: true, force: true });
+			removeEvolutionTestRoot(oversizedLines.root);
 		}
 	});
 
@@ -785,7 +796,7 @@ describe("evolution analysis previews", () => {
 				expect(snapshotReadOnlyState(root), action).toBe(before);
 			}
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -857,7 +868,7 @@ describe("evolution analysis previews", () => {
 			expect(analysis.scorecard.regressions.failed_again?.value).toBe(0);
 			expect(analysis.baseline.scorecard).toEqual(analysis.scorecard);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -956,7 +967,7 @@ describe("evolution analysis previews", () => {
 				if (value === undefined) delete process.env[key];
 				else process.env[key] = value;
 			}
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1077,7 +1088,7 @@ describe("evolution analysis previews", () => {
 				false,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 
@@ -1103,7 +1114,7 @@ describe("evolution analysis previews", () => {
 				false,
 			);
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			removeEvolutionTestRoot(root);
 		}
 	});
 });

@@ -44,8 +44,8 @@ A registered journey must name:
 
 ## Agent Experience Mapping
 
-Use `.agents/skills/ux-design/SKILL.md` for complex user or agent journeys.
-When a flow spans commands, workbench state, warnings, delegated agents,
+Use separately licensed UX guidance for complex user or agent journeys. When a
+flow spans commands, workbench state, warnings, delegated agents,
 governance docs, or maintenance cadences, map it as an experience or service
 blueprint, not only a command checklist.
 

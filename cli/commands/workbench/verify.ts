@@ -93,13 +93,33 @@ export function splitCommandLine(command: string): string[] {
 	let current = "";
 	let quote: '"' | "'" | null = null;
 	let escaping = false;
-	for (const char of command) {
+	const preserveBackslashes = process.platform === "win32";
+	for (let index = 0; index < command.length; index += 1) {
+		const char = command[index] as string;
 		if (escaping) {
 			current += char;
 			escaping = false;
 			continue;
 		}
-		if (char === "\\") {
+		// Windows paths use backslashes as separators, but escaped quotes in
+		// authored argv commands retain the existing quote-escaping behavior.
+		if (
+			char === "\\" &&
+			(!preserveBackslashes ||
+				command[index + 1] === '"' ||
+				command[index + 1] === "'")
+		) {
+			const next = command[index + 1];
+			const afterNext = command[index + 2];
+			if (
+				preserveBackslashes &&
+				quote !== null &&
+				next === quote &&
+				(afterNext === undefined || /\s/.test(afterNext))
+			) {
+				current += "\\";
+				continue;
+			}
 			escaping = true;
 			continue;
 		}
@@ -267,9 +287,13 @@ export function runVerificationAsync(
 		const terminate = (status: ObservedVerificationStatus): void => {
 			if (settled || forcedStatus) return;
 			forcedStatus = status;
-			terminateProcessTree(child, false);
-			forceKill = setTimeout(() => terminateProcessTree(child, true), 100);
-			forceKill.unref();
+			if (process.platform === "win32") {
+				terminateProcessTree(child, true);
+			} else {
+				terminateProcessTree(child, false);
+				forceKill = setTimeout(() => terminateProcessTree(child, true), 100);
+				forceKill.unref();
+			}
 		};
 		const countOutput = (chunk: Buffer | string): void => {
 			outputBytes += Buffer.isBuffer(chunk)

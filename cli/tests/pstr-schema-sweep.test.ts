@@ -38,6 +38,7 @@ import {
 	sweepMonthly,
 	sweepWeekly,
 } from "../services/sweep/runner";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 function initGitRepo(root: string): void {
 	const git = (args: string[]): void => {
@@ -1263,38 +1264,37 @@ describe("pstr service helpers", () => {
 		}
 	});
 
-	test("watch rejects configured roots whose symlink leaves the project", () => {
-		const root = createFixture();
-		const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));
-		try {
-			mkdirSync(join(outside, "secret"), { recursive: true });
+	test.skipIf(!symlinkTestSupport.available)(
+		"watch rejects configured roots whose symlink leaves the project",
+		() => {
+			const root = createFixture();
+			const outside = mkdtempSync(join(tmpdir(), "pstr-outside-"));
 			try {
+				mkdirSync(join(outside, "secret"), { recursive: true });
 				symlinkSync(join(outside, "secret"), join(root, "outside-link"));
-			} catch {
-				return;
+				writeFileSync(
+					join(root, ".agents", "config.json"),
+					JSON.stringify({
+						pstr: {
+							areas: [
+								{
+									id: "outside",
+									scope: "outside",
+									source_roots: ["outside-link"],
+									tags: ["test"],
+								},
+							],
+						},
+					}),
+				);
+				expect(() => resolvePstrAreas(root)).toThrow(/symlink|escapes/);
+				expect(getPstrWatchTargets(root, ["outside-link"])).toEqual([]);
+			} finally {
+				cleanup(root);
+				cleanup(outside);
 			}
-			writeFileSync(
-				join(root, ".agents", "config.json"),
-				JSON.stringify({
-					pstr: {
-						areas: [
-							{
-								id: "outside",
-								scope: "outside",
-								source_roots: ["outside-link"],
-								tags: ["test"],
-							},
-						],
-					},
-				}),
-			);
-			expect(() => resolvePstrAreas(root)).toThrow(/symlink|escapes/);
-			expect(getPstrWatchTargets(root, ["outside-link"])).toEqual([]);
-		} finally {
-			cleanup(root);
-			cleanup(outside);
-		}
-	});
+		},
+	);
 
 	test("registry and affected-area matching stay stable", () => {
 		const root = createFixture();
@@ -1406,7 +1406,7 @@ describe("pstr service helpers", () => {
 		try {
 			mkdirSync(join(root, "cli", "nested", "deep"), { recursive: true });
 			const targets = getPstrWatchTargets(root, ["cli/test.ts"]).map((path) =>
-				relative(root, path),
+				relative(root, path).replaceAll("\\", "/"),
 			);
 			expect(targets).toEqual(["cli", "cli/nested", "cli/nested/deep"]);
 		} finally {
@@ -1419,7 +1419,7 @@ describe("pstr service helpers", () => {
 		try {
 			mkdirSync(join(root, "..hidden_dir", "nested"), { recursive: true });
 			const targets = getPstrWatchTargets(root, ["..hidden_dir/file.ts"]).map(
-				(path) => relative(root, path),
+				(path) => relative(root, path).replaceAll("\\", "/"),
 			);
 			expect(targets).toEqual(["..hidden_dir", "..hidden_dir/nested"]);
 		} finally {

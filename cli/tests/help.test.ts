@@ -561,6 +561,7 @@ describe("help formatter", () => {
 			kind: "status",
 			sideEffect: "read",
 			requires_approval: false,
+			stability: "stable",
 			description: "Show current project status",
 			category: "core",
 			subcommands: [
@@ -681,6 +682,7 @@ describe("help formatter", () => {
 			kind: "ctx",
 			sideEffect: "generated",
 			requires_approval: true,
+			stability: "stable",
 			description: "Inspect context bundles",
 			category: "inspect",
 			subcommands: [
@@ -769,6 +771,7 @@ describe("help formatter", () => {
 			kind: "localState",
 			sideEffect: "generated",
 			requires_approval: true,
+			stability: "stable",
 			description: "Inspect local project indexes",
 			category: "inspect",
 			guidance: [

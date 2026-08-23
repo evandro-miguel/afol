@@ -296,7 +296,7 @@ describe("session context service", () => {
 			expect(spawnSpy).toHaveBeenCalledWith(
 				"git",
 				["rev-parse", "--git-dir", "--show-toplevel"],
-				expect.objectContaining({ timeout: 1_000 }),
+				expect.objectContaining({ timeout: 5_000 }),
 			);
 		} finally {
 			spawnSpy.mockRestore();
@@ -1180,7 +1180,8 @@ describe("afol session command", () => {
 				debugText.io,
 			);
 			expect(debugTextCode).toBe(0);
-			expect(debugText.stdout.join("\n")).toContain(root);
+			const portableRoot = root.replaceAll("\\", "/");
+			expect(debugText.stdout.join("\n")).toContain(portableRoot);
 
 			const debugJson = captureIo();
 			const debugJsonCode = await runSessionCommand(
@@ -1196,8 +1197,8 @@ describe("afol session command", () => {
 					bindings: Array<{ worktree: string }>;
 				};
 			};
-			expect(debugParsed.data.current_worktree).toBe(root);
-			expect(debugParsed.data.bindings[0]?.worktree).toBe(root);
+			expect(debugParsed.data.current_worktree).toBe(portableRoot);
+			expect(debugParsed.data.bindings[0]?.worktree).toBe(portableRoot);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

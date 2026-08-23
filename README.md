@@ -1,232 +1,107 @@
-# AFOL
+# AFOL CLI
 
-Canonical AFOL scaffold factory for terminal-first LLM-assisted development.
+AFOL means **A Folder**. It is a local CLI that gives coding agents a consistent
+project layout, a governed task lifecycle, and completion only after an observed
+check.
 
-`afol` is the only supported public CLI. The old `.agents` command/runtime
-system has been retired and must not be restored.
+No daemon. No cloud account. No model vendor lock-in.
 
-## Release Scope
+AFOL is the only supported public CLI. The old `.agents` command/runtime
+system is retired and must not be restored.
 
-AFOL is currently a prerelease CLI for Linux x64. WSL2 is validated as a
-Linux x64 environment. Windows-native, macOS, Linux ARM, and hosted-service
-support are not claimed.
+> Alpha. The supported release target is Linux x64. WSL2 works from observed
+> local smoke. Native Windows is experimental. macOS and ARM are not supported
+> yet.
 
-The supported distribution artifact is the standalone compiled `afol` binary.
-The package remains private because npm is not a release channel.
+## Why
 
-## Install A Published Release
+Agent sessions lose context, invent project layouts, and call work done without
+a reproducible check. AFOL makes the path explicit and inspectable on disk:
 
-Download these assets from the selected entry on the
-[GitHub Releases page](https://github.com/evandro-miguel/afol/releases):
-
-- `afol`
-- `afol.sha256`
-- `afol.provenance.json`
-
-Verify the downloaded binary before installing it:
-
-```bash
-expected_sha="$(awk '{print $1}' afol.sha256)"
-actual_sha="$(sha256sum afol | awk '{print $1}')"
-test "$actual_sha" = "$expected_sha" && install -Dm755 afol "$HOME/.local/bin/afol"
+```text
+Intent -> Spec -> Task -> Execution -> Evidence -> Close
 ```
 
-Ensure `$HOME/.local/bin` is already on `PATH`, then verify the installed
-command from outside an AFOL source checkout:
+## Local development
 
-```bash
-command -v afol
-test ! -L "$(command -v afol)"
-afol --version
-afol --help >/dev/null
-```
-
-Initialize a project only after reviewing the dry-run:
-
-```bash
-cd /path/to/project
-afol init --dry-run
-afol init
-afol validate project
-```
-
-To uninstall the standalone CLI, remove only the installed binary. Project
-state under `.afol/**` is user data and is not removed automatically.
-
-## License
-
-AFOL is available under the [MIT License](./LICENSE).
-
-## Current Architecture
-
-- `$HOME/.local/bin/afol`: installed public CLI; it must be a real compiled
-  executable, not a wrapper or symlink into this repository.
-- `./afol`, `bun run kernel`, and `dist/afol`: repository-local development
-  entrypoints and build artifact only.
-- `cli/**`: Bun/TypeScript implementation.
-- `src/project-template/**`: exportable downstream scaffold payload.
-- `.afol/config.json`: canonical AFOL project configuration.
-- `.agents/lock.json`, `.agents/manifest.json`: static provider-facing
-  scaffold metadata.
-- `.agents/skills/**`: optional project-local provider skills. Universal AFOL
-  behavior uses global Codex skills such as `agentic-folder-sys`; do not vendor
-  that skill in this repo/template.
-- `.afol/adm/hooks/**`, `.afol/adm/rules/**`,
-  `.afol/adm/source/**`, `.afol/adm/tools.json`: AFOL-owned static governance
-  payloads, hook/rule catalogs, and skill seed content.
-- `.afol/state/afol.db`: SQLite v1 materialization for workbench sessions,
-  task rows, source hashes, and evidence only; broader `adm/pstr/memory/library/ctx`
-  materialization is State DB v2/future.
-- `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
-  events, mutations, temporary files, benchmark catalog/results, and migration
-  archives.
-- Target `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy,
-  and desired-state administration.
-- Optional `.afol/pstr/**`: generated, rebuildable project-structure map
-  snapshots when present; missing or stale maps are not authoritative.
-
-## Documentation Map
-
-- `docs/README.md`: documentation index for repository documentation.
-- `docs/afol-runtime-reference.md`: AFOL command groups, runtime state
-  ownership, and validation gates.
-- `.afol/adm/doctrine/ARCHITECTURE.md`: architecture authority and boundary
-  rules.
-- `.afol/adm/roadmap/GENERAL-ROADMAP.md`: feature inventory and roadmap status.
-- `.afol/adm/specs/**`: governing specs.
-- `.afol/adm/decisions/**`: ADRs and durable decisions.
-- `.afol/pstr/**`: generated project-structure maps when present.
-- `PLANS.md`: ExecPlan requirements for governed workbench sessions.
-- `.afol/adm/doctrine/RELEASE-RUNBOOK.md`: release readiness checklist.
-
-Removed legacy surfaces:
-
-- `.agents/agents`
-- `.agents/agents-mcp`
-- `.agents/scripts/**`
-- `.agents/runtime/**`
-- `.agents/wb/**`
-- `.agents/z-arq/**`
-- `agents.config`
-- `legacy:` delegate routing
-
-`afol new` without `--feature-id`/`--parent-spec` creates a session with
-`pending_spec` plus warnings; open pending specs do not block other new
-sessions. The current session can continue through `start`, `evidence`, `done`,
-and `close` with lifecycle warnings so the user can finish the work and then
-link or waive the missing spec. `afol status` and `afol validate project` warn
-while pending specs are open; close is allowed.
-
-## Commands
-
-```bash
-afol status
-afol validate project
-afol validate bench --pack <pack-id> --json
-afol new <theme> --feature-id <F-id> --parent-spec <spec-id> --task "<task>"
-afol new <theme> --no-spec-required --reason "<reason>"
-afol start --session <session-id> --task-id <task-id>
-afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
-afol close --session <session-id> --summary "<summary>"
-afol governance pending --json
-afol gov rs -S <session-id> -F <F-id> -P <spec-id>
-afol gov rs -S <session-id> --no-spec-required -r "<reason>"
-afol gov bulk-waive -r "<reason>" [--limit 20] [--dry-run]
-afol evolve status --json
-afol update check
-afol update preview
-afol update apply --dry-run
-```
-
-Micro one-shot work should prefer `afol qt <theme> -t "<task>" -c "<cmd>"`
-(repeat `-t` for multi-task with one shared verify). Hygiene signals from
-`afol health`, maintenance, or open `pending_spec` are warnings—not mid-delivery
-stops. Corrupt session context: `afol catchup --fix`.
-
-When one active or bound session is unambiguous, agents should prefer the
-compact path:
-
-```bash
-afol st T-01
-afol d T-01 -x "<cmd>"
-afol c -m "<summary>"
-```
-
-`afol evidence --result passed` is declared evidence; it does not authorize
-task completion. `d -x "<argv command>"` executes without a shell. Use
-`done --test-shell "<shell expression>"` when `&&`, pipes, redirection, or other
-shell syntax is required. Both record observed exit-zero evidence.
-
-Verify a global installation outside this checkout:
-
-```bash
-command -v afol
-test ! -L "$(command -v afol)"
-afol --version
-```
-
-## Development
+Build from source with Bun 1.3.14 or newer:
 
 ```bash
 bun install --frozen-lockfile
-bun run typecheck
-bun test
-bun run manifest:check
-afol local-state rebuild --json
-afol validate project --json
-afol health --release --json
-bun run validate:release
+bun run build
+./dist/afol --version
 ```
 
-The release claim is intentionally limited to the observed Linux x64 path;
-the repository ships no hosted CI (ADR-009), so platform evidence comes from
-local validation and `bun run smoke:wsl2` in a Linux x64 WSL2 shell. It does
-not establish Windows, macOS, or ARM support. Standalone builds disable Bun's
-`.env` and `bunfig.toml` autoloading so repository-local configuration cannot
-change binary behavior.
+AFOL is binary-first. The npm `package.json` is for source builds and is marked
+private; it is not a registry package.
 
-## Bootstrap
+## Platform and validation boundary
 
-Use AFOL only:
+The release claim is intentionally limited to the observed Linux x64 path.
+Platform evidence for this alpha comes from local validation and
+`bun run smoke:wsl2` in a Linux x64 WSL2 shell. It does not establish
+Windows-native, macOS, or ARM support. Per ADR-009, this repository ships no
+hosted CI workflow; local exact-SHA validation is the release evidence. Hosted
+service support is not claimed.
+
+Standalone builds disable Bun's `.env` and `bunfig.toml` autoloading so
+repository-local configuration cannot change binary behavior.
+
+## Quickstart
 
 ```bash
-afol init --dry-run
+mkdir afol-demo && cd afol-demo
+git init
 afol init
-afol bootstrap /path/to/repo --dry-run
-afol bootstrap /path/to/repo --provider-compatible
+afol qt first-proof -t "Create the first verified change" -c "git diff --check"
+afol status
 ```
 
-Provider-compatible installs keep static scaffold metadata in `.agents/` and
-write mutable state under `.afol/`.
-
-## Runtime Adapters
-
-Optional integration surfaces can be toggled off when a downstream project does
-not want them. The Claude adapter owns `CLAUDE.md` and `.claude/`; `AGENTS.md`
-is always canonical and is never removed.
-
-Install without the Claude adapter:
+Multi-step work:
 
 ```bash
-afol init --without-claude
-afol bootstrap /path/to/repo --without-claude
+afol new feature-name --task "Implement behavior" --task "Add tests"
+afol start T-01
+afol done T-01 --execute "git diff --check"
+afol close
 ```
 
-Toggle at runtime (archives `CLAUDE.md` + `.claude/` under
-`.afol/data/migrations/`, reversible):
+`afol` stays outside the project. After `init`, the project owns:
 
-```bash
-afol adapter list
-afol adapter disable claude
-afol adapter enable claude
+```text
+.afol/          local config, governance, tasks, evidence
+.agents/        provider metadata and optional project skills
 ```
 
-Both subcommands accept `--dry-run` and `--json`. The state is persisted in
-`.afol/config.json` under `adapters.claude.enabled` (omitted = enabled);
-`.agents/config.json` is legacy fallback only.
+## What is stable in this alpha
 
-## Legacy Policy
+- `init` / `bootstrap`, status, health, and project validation
+- Governed tasks: `new`, `start`, evidence, `done`, `close`, `qt`
+- Previewed template updates
+- Safe local file mutations
 
-The legacy `.agents` executable/runtime system is discontinued. Do not add docs,
-tests, or code paths that depend on it. Useful historical material should be
-moved under `.afol/data/migrations/` or converted into the TypeScript AFOL CLI.
+Treat `evolve`, `fleet`, `memory`, `library`, benchmarks, telemetry, receipts,
+and provider adapters as experimental. See `afol help --json` for the live
+stability flag on every command.
+
+## Docs
+
+- [Getting started](docs/public/getting-started.md)
+- [Command reference](docs/public/command-reference.md)
+- [Architecture](docs/public/architecture.md)
+- [Security model](docs/public/security-model.md)
+- [Troubleshooting](docs/public/troubleshooting.md)
+- [Upgrade and rollback](docs/public/upgrade-and-rollback.md)
+- [Known limitations](docs/public/known-limitations.md)
+- [Roadmap](ROADMAP.md)
+- [Case study](docs/public/case-study/README.md)
+- [Public documentation index](docs/public/README.md)
+- [Architecture decisions](docs/public/adr/README.md)
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md). Use issues for bugs and features.
+Report vulnerabilities through [SECURITY.md](SECURITY.md), never a public
+issue.
+
+MIT License. See [LICENSE](LICENSE).

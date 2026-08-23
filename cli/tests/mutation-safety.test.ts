@@ -33,6 +33,7 @@ import {
 	mutationJournalPath,
 } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
+import { symlinkTestSupport } from "./symlink-test-support";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
@@ -112,7 +113,7 @@ function mkProjectRoot(): string {
 		"utf8",
 	);
 	cpSync(
-		join(process.cwd(), ".agents", "lock.json"),
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
 		join(agentsDir, "lock.json"),
 	);
 	return root;
@@ -266,71 +267,74 @@ describe("mutation safety command family", () => {
 		);
 	});
 
-	test("SEC-004 symlink operands cannot bypass protected-resource admission", () => {
-		for (const relativeTarget of [
-			".env",
-			".afol/adm/protected-control-plane.txt",
-		]) {
-			for (const restricted of [true, false]) {
-				const root = mkProjectRoot();
-				const target = join(root, relativeTarget);
-				const alias = join(
-					root,
-					"notes",
-					`${restricted ? "agent" : "local"}-${relativeTarget.replaceAll("/", "-")}`,
-				);
-				mkdirSync(dirname(target), { recursive: true });
-				mkdirSync(dirname(alias), { recursive: true });
-				writeFileSync(target, "SYNTHETIC_SYMLINK_TARGET\n", "utf8");
-				symlinkSync(target, alias);
-				const before = readFileSync(target).toString("base64");
-				const journalPath = join(
-					resolveProjectPaths(root).abs.mutationsDir,
-					"mutations.jsonl",
-				);
-				try {
-					if (!restricted) createMutationSession(root, "S-SYMLINK", "T-01");
-					const proc = runKernel(root, [
-						...(restricted ? ["--agent"] : []),
-						"file",
-						"patch",
-						"--path",
-						join("notes", alias.split("/").at(-1) ?? ""),
-						"--append",
-						"synthetic append",
-						...(restricted
-							? ["--dry-run"]
-							: [
-									"--session",
-									"S-SYMLINK",
-									"--task-id",
-									"T-01",
-									"--reason",
-									"synthetic symlink check",
-								]),
-						"--json",
-					]);
+	test.skipIf(!symlinkTestSupport.available)(
+		"SEC-004 symlink operands cannot bypass protected-resource admission",
+		() => {
+			for (const relativeTarget of [
+				".env",
+				".afol/adm/protected-control-plane.txt",
+			]) {
+				for (const restricted of [true, false]) {
+					const root = mkProjectRoot();
+					const target = join(root, relativeTarget);
+					const alias = join(
+						root,
+						"notes",
+						`${restricted ? "agent" : "local"}-${relativeTarget.replaceAll("/", "-")}`,
+					);
+					mkdirSync(dirname(target), { recursive: true });
+					mkdirSync(dirname(alias), { recursive: true });
+					writeFileSync(target, "SYNTHETIC_SYMLINK_TARGET\n", "utf8");
+					symlinkSync(target, alias);
+					const before = readFileSync(target).toString("base64");
+					const journalPath = join(
+						resolveProjectPaths(root).abs.mutationsDir,
+						"mutations.jsonl",
+					);
+					try {
+						if (!restricted) createMutationSession(root, "S-SYMLINK", "T-01");
+						const proc = runKernel(root, [
+							...(restricted ? ["--agent"] : []),
+							"file",
+							"patch",
+							"--path",
+							join("notes", alias.split("/").at(-1) ?? ""),
+							"--append",
+							"synthetic append",
+							...(restricted
+								? ["--dry-run"]
+								: [
+										"--session",
+										"S-SYMLINK",
+										"--task-id",
+										"T-01",
+										"--reason",
+										"synthetic symlink check",
+									]),
+							"--json",
+						]);
 
-					expect(proc.status).toBe(2);
-					expect(readFileSync(target).toString("base64")).toBe(before);
-					expect(existsSync(journalPath)).toBe(false);
-					expect(
-						`${proc.stdout as string}${proc.stderr as string}`,
-					).not.toContain("SYNTHETIC_SYMLINK_TARGET");
-					const payload = parseJsonOutput(proc.stdout as string);
-					expect(payload.error).toBeTruthy();
-					if (restricted) {
-						expect(payload.action).toBe("file.patch.preview");
-						expect((payload.error as { code: string }).code).toBe(
-							"approval-required",
-						);
+						expect(proc.status).toBe(2);
+						expect(readFileSync(target).toString("base64")).toBe(before);
+						expect(existsSync(journalPath)).toBe(false);
+						expect(
+							`${proc.stdout as string}${proc.stderr as string}`,
+						).not.toContain("SYNTHETIC_SYMLINK_TARGET");
+						const payload = parseJsonOutput(proc.stdout as string);
+						expect(payload.error).toBeTruthy();
+						if (restricted) {
+							expect(payload.action).toBe("file.patch.preview");
+							expect((payload.error as { code: string }).code).toBe(
+								"approval-required",
+							);
+						}
+					} finally {
+						rmSync(root, { recursive: true, force: true });
 					}
-				} finally {
-					rmSync(root, { recursive: true, force: true });
 				}
 			}
-		}
-	});
+		},
+	);
 
 	test("pt dry-run shows diff and hashes without mutating", () => {
 		const root = mkProjectRoot();

@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
 import {
 	accessSync,
 	chmodSync,
 	closeSync,
 	copyFileSync,
+	cpSync,
 	existsSync,
 	constants as fsConstants,
 	fstatSync,
@@ -26,12 +27,14 @@ import { dirname, join, relative, resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../core/subprocess";
 import {
 	readMinifiedCompiledReleaseBuildReceipt,
+	releaseArtifactPath,
 	compiledReleaseBuildArgs as releaseBuildArgs,
 	writeCompiledReleaseBuildReceipt,
 } from "../dev/build-release";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
+import { maxSampleOutputBytes } from "./output-metrics";
 import type {
 	BenchmarkExecutionProfile,
 	PreparedCompiledReleaseArtifact,
@@ -40,6 +43,7 @@ import type {
 	ScenarioExecutionResult,
 } from "./types";
 
+export { maxSampleOutputBytes } from "./output-metrics";
 export type {
 	PreparedCompiledReleaseArtifact,
 	ScenarioExecutionMetrics,
@@ -85,13 +89,20 @@ const RUNTIME_STATE_GUARD_PATHS = [
 // Linux exposes O_PATH to open unreadable directories by descriptor; Bun does
 // not currently publish it through fs.constants.
 const LINUX_O_PATH = 0x200000;
+const SANDBOX_IDENTITY_GUARD_PATH = join(
+	".afol",
+	"tmp",
+	".sandbox-root-identity",
+);
 
 type SandboxRootIdentity = {
 	basename: string;
 	rootDev: number;
 	rootIno: number;
+	rootBirthtimeMs: number;
 	parentDev: number;
 	parentIno: number;
+	guardToken: string;
 };
 
 export function resolveScenarioSampleCount(
@@ -130,21 +141,6 @@ export interface ScenarioSampleRun {
 	spawn_error: string | null;
 	stdout: string;
 	stderr: string;
-}
-
-/** Measure only user-visible stdout and stderr from measured samples. */
-export function maxSampleOutputBytes(
-	samples: ReadonlyArray<Pick<ScenarioSampleRun, "stdout" | "stderr">>,
-): number {
-	return samples.reduce(
-		(maximum, sample) =>
-			Math.max(
-				maximum,
-				Buffer.byteLength(sample.stdout, "utf8") +
-					Buffer.byteLength(sample.stderr, "utf8"),
-			),
-		0,
-	);
 }
 
 function argvCharCount(command: string): number {
@@ -207,6 +203,7 @@ interface CompletionLockMetadataSnapshot {
 	pid: number;
 	host: string;
 	owner_token: string;
+	ownership_probe: string;
 	generation: number;
 	acquired_at: string;
 	heartbeat_at: string;
@@ -229,6 +226,17 @@ function tokenizeCommand(command: string): string[] {
 	let quote: '"' | "'" | null = null;
 	let escaping = false;
 	for (const char of command.trim()) {
+		// POSIX-style single quotes are literal. In particular, Windows paths
+		// embedded in a `node -e '...'` scenario must retain their backslashes;
+		// treating them as escapes rewrites `D:\\...` before the child starts.
+		if (quote === "'") {
+			if (char === quote) {
+				quote = null;
+			} else {
+				current += char;
+			}
+			continue;
+		}
 		if (escaping) {
 			current += char;
 			escaping = false;
@@ -311,6 +319,15 @@ function resolveCommandInvocation(
 				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
 			};
 		}
+		// The repository wrapper is a POSIX shell script. Windows cannot spawn an
+		// extensionless shell wrapper, so source benchmarks must invoke Bun
+		// directly. Compiled runs return above through `resolveAfolExecutable`.
+		if (process.platform === "win32") {
+			return {
+				command: "bun",
+				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
+			};
+		}
 		const afolPath = join(projectRoot, "afol");
 		try {
 			accessSync(afolPath, fsConstants.X_OK);
@@ -325,8 +342,13 @@ function resolveCommandInvocation(
 	return { command: program, args };
 }
 
-function shellQuote(value: string): string {
-	return `'${value.replaceAll("'", `'"'"'`)}'`;
+function isSymlinkPrivilegeError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error.code === "EACCES" || error.code === "EPERM")
+	);
 }
 
 export function ensureBenchmarkTempRoot(projectRoot: string): string {
@@ -438,25 +460,72 @@ function createSandboxRoot(projectRoot: string): string {
 		join(ensureBenchmarkTempRoot(projectRoot), "afol-bench-sandbox-"),
 	);
 	const sandboxIdentity = captureSandboxRootIdentity(sandboxRoot);
-	const excludeFlags = SANDBOX_COPY_EXCLUDES.map(
-		(entry) => `--exclude ${shellQuote(entry)}`,
-	).join(" ");
-	const exportCommand = [
-		"set -euo pipefail;",
-		`tar -C ${shellQuote(projectRoot)} ${excludeFlags} -cf - . | tar -C ${shellQuote(sandboxRoot)} -xf -`,
-	].join(" ");
-	const exportResult = boundedSpawn("bash", ["-lc", exportCommand], {
-		timeoutMs: 120_000,
-	});
-	if (!exportResult.ok) {
+	try {
+		const shouldCopy = (sourcePath: string): boolean => {
+			const sourceRelative = relative(projectRoot, sourcePath).replaceAll(
+				"\\",
+				"/",
+			);
+			return !SANDBOX_COPY_EXCLUDES.some((excluded) => {
+				if (excluded.endsWith("*")) {
+					return sourceRelative
+						.split("/")
+						.some((part) => part.startsWith(excluded.slice(0, -1)));
+				}
+				return (
+					sourceRelative === excluded ||
+					sourceRelative.startsWith(`${excluded}/`) ||
+					sourceRelative.includes(`/${excluded}/`)
+				);
+			});
+		};
+		const copyEntry = (sourcePath: string, targetPath: string): void => {
+			if (!shouldCopy(sourcePath)) return;
+			const sourceStat = lstatSync(sourcePath);
+			if (sourceStat.isDirectory()) {
+				mkdirSync(targetPath, { recursive: true, mode: sourceStat.mode });
+				for (const entry of readdirSync(sourcePath)) {
+					copyEntry(join(sourcePath, entry), join(targetPath, entry));
+				}
+				chmodSync(targetPath, sourceStat.mode);
+				return;
+			}
+			if (sourceStat.isSymbolicLink()) {
+				cpSync(sourcePath, targetPath, {
+					force: true,
+					verbatimSymlinks: true,
+				});
+				return;
+			}
+			if (!sourceStat.isFile()) {
+				throw new Error(`Unsupported sandbox source entry: ${sourcePath}`);
+			}
+			copyFileSync(sourcePath, targetPath);
+			chmodSync(targetPath, sourceStat.mode);
+		};
+		for (const entry of readdirSync(projectRoot)) {
+			const sourcePath = join(projectRoot, entry);
+			copyEntry(sourcePath, join(sandboxRoot, entry));
+		}
+	} catch (error) {
 		removeSandboxRoot(sandboxRoot, sandboxIdentity);
 		throw new Error(
-			`Sandbox copy export failed: ${outputTail(spawnFailureDetail(exportResult))}`,
+			`Sandbox copy export failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
 	const projectNodeModules = join(projectRoot, "node_modules");
 	if (existsSync(projectNodeModules)) {
-		symlinkSync(projectNodeModules, join(sandboxRoot, "node_modules"), "dir");
+		const sandboxNodeModules = join(sandboxRoot, "node_modules");
+		try {
+			symlinkSync(
+				projectNodeModules,
+				sandboxNodeModules,
+				process.platform === "win32" ? "junction" : "dir",
+			);
+		} catch (error) {
+			if (!isSymlinkPrivilegeError(error)) throw error;
+			cpSync(projectNodeModules, sandboxNodeModules, { recursive: true });
+		}
 	}
 	return sandboxRoot;
 }
@@ -468,12 +537,24 @@ function captureSandboxRootIdentity(sandboxRoot: string): SandboxRootIdentity {
 	if (!rootStat.isDirectory() || !parentStat.isDirectory()) {
 		throw new Error(`Invalid benchmark sandbox root: ${sandboxRoot}`);
 	}
+	const guardPath = join(sandboxRoot, SANDBOX_IDENTITY_GUARD_PATH);
+	mkdirSync(dirname(guardPath), { recursive: true });
+	let guardToken: string;
+	try {
+		guardToken = readFileSync(guardPath, "utf8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		guardToken = randomUUID();
+		writeFileSync(guardPath, guardToken, { encoding: "utf8", flag: "wx" });
+	}
 	return {
 		basename: sandboxRoot.slice(parentPath.length + 1),
 		rootDev: rootStat.dev,
 		rootIno: rootStat.ino,
+		rootBirthtimeMs: rootStat.birthtimeMs,
 		parentDev: parentStat.dev,
 		parentIno: parentStat.ino,
+		guardToken,
 	};
 }
 
@@ -493,8 +574,11 @@ function sandboxRootIdentityMatches(
 			parentStat.isDirectory() &&
 			rootStat.dev === identity.rootDev &&
 			rootStat.ino === identity.rootIno &&
+			rootStat.birthtimeMs === identity.rootBirthtimeMs &&
 			parentStat.dev === identity.parentDev &&
-			parentStat.ino === identity.parentIno
+			parentStat.ino === identity.parentIno &&
+			readFileSync(join(sandboxRoot, SANDBOX_IDENTITY_GUARD_PATH), "utf8") ===
+				identity.guardToken
 		);
 	} catch {
 		return false;
@@ -692,7 +776,11 @@ function executionProfile(
 }
 
 export function isCompiledBunRuntime(mainPath = Bun.main): boolean {
-	return mainPath.includes("$bunfs");
+	const normalizedPath = mainPath.replaceAll("\\", "/");
+	return (
+		normalizedPath.startsWith("/$bunfs/") ||
+		/^b:\/~bun(?:\/|$)/i.test(normalizedPath)
+	);
 }
 
 export function resolveAfolExecutable(
@@ -704,12 +792,16 @@ export function resolveAfolExecutable(
 	return isCompiledBunRuntime(mainPath) ? execPath : null;
 }
 
+export function compiledBenchmarkArtifactPath(artifactRoot: string): string {
+	return releaseArtifactPath(join(artifactRoot, "afol"));
+}
+
 export function prepareCompiledReleaseArtifact(
 	projectRoot: string,
 ): PreparedCompiledReleaseArtifact {
 	const artifactParent = ensureBenchmarkTempRoot(projectRoot);
 	const artifactRoot = mkdtempSync(join(artifactParent, "afol-bench-release-"));
-	const targetBinary = join(artifactRoot, "afol");
+	const targetBinary = compiledBenchmarkArtifactPath(artifactRoot);
 	try {
 		if (isCompiledBunRuntime()) {
 			const sourceState = benchmarkSourceState(projectRoot);
@@ -908,6 +1000,7 @@ function parseCompletionLockMetadata(
 			"heartbeat_at",
 			"host",
 			"owner_token",
+			"ownership_probe",
 			"pid",
 		];
 		if (keys.length !== expectedKeys.length) return null;
@@ -920,6 +1013,8 @@ function parseCompletionLockMetadata(
 			!value.host ||
 			typeof value.owner_token !== "string" ||
 			!value.owner_token ||
+			typeof value.ownership_probe !== "string" ||
+			!value.ownership_probe ||
 			typeof value.generation !== "number" ||
 			!Number.isSafeInteger(value.generation) ||
 			value.generation < 0 ||
@@ -934,6 +1029,7 @@ function parseCompletionLockMetadata(
 			pid: value.pid,
 			host: value.host,
 			owner_token: value.owner_token,
+			ownership_probe: value.ownership_probe,
 			generation: value.generation,
 			acquired_at: value.acquired_at,
 			heartbeat_at: value.heartbeat_at,
@@ -1027,6 +1123,7 @@ function immutableCompletionMetadataMatches(
 		before.pid === after.pid &&
 		before.host === after.host &&
 		before.owner_token === after.owner_token &&
+		before.ownership_probe === after.ownership_probe &&
 		before.generation === after.generation &&
 		before.acquired_at === after.acquired_at &&
 		Date.parse(after.heartbeat_at) >= Date.parse(before.heartbeat_at)

@@ -45,6 +45,7 @@ import { resolveProjectPath } from "../project/root";
 import { readArchivedSessionState } from "./session-archive-state";
 import {
 	isSessionClosed,
+	parseTaskDocument,
 	readTaskLifecycleState,
 	scalarValue,
 } from "./session-lifecycle-state";
@@ -879,6 +880,42 @@ function markTaskMetadataClosed(
 			: `${newline}${document.content}`;
 	atomicWriteText(
 		taskPath,
+		`---${newline}${lines.join(newline)}${newline}---${suffix}`,
+	);
+	countHotPathOperation("workbench.canonical_write");
+}
+
+function markPlanMetadataClosed(
+	planPath: string,
+	session: string,
+	closedAt: string,
+): void {
+	if (!existsSync(planPath)) return;
+	const content = readFileSync(planPath, "utf8");
+	const document = parseTaskDocument(content, planPath);
+	const lines =
+		document.kind === "frontmatter"
+			? [...document.lines]
+			: [
+					'doc_type: "workbench_plan"',
+					`id: ${JSON.stringify(`${session}_plan_01`)}`,
+					`session_id: ${JSON.stringify(session)}`,
+					`created_at: ${JSON.stringify(closedAt)}`,
+				];
+	setFrontmatterValue(lines, "doc_type", "workbench_plan");
+	setFrontmatterValue(lines, "id", `${session}_plan_01`);
+	setFrontmatterValue(lines, "session_id", session);
+	setFrontmatterValue(lines, "status", "closed");
+	setFrontmatterValue(lines, "updated_at", closedAt);
+	setFrontmatterValue(lines, "closed_at", closedAt);
+
+	const newline = document.kind === "frontmatter" ? document.newline : "\n";
+	const suffix =
+		document.kind === "frontmatter"
+			? document.suffix
+			: `${newline}${document.content}`;
+	atomicWriteText(
+		planPath,
 		`---${newline}${lines.join(newline)}${newline}---${suffix}`,
 	);
 	countHotPathOperation("workbench.canonical_write");
@@ -2792,6 +2829,9 @@ export function closeSession(
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
 		let closeEventRecorded: boolean;
+		if (state.kind === "closed") {
+			markPlanMetadataClosed(paths.planPath, session, state.closedAt);
+		}
 		if (state.kind === "open") {
 			assertValidEventLedger(root);
 			closeEventRecorded = false;
@@ -2807,6 +2847,9 @@ export function closeSession(
 		let summary = options.summary?.trim() ?? "";
 		let taskRows = readTaskRows(paths.taskPath);
 		const originalTask = readFileSync(paths.taskPath, "utf8");
+		const originalPlan = existsSync(paths.planPath)
+			? readFileSync(paths.planPath, "utf8")
+			: undefined;
 		const originalActiveSession = existsSync(paths.activeSessionPath)
 			? readFileSync(paths.activeSessionPath, "utf8")
 			: undefined;
@@ -2978,12 +3021,14 @@ export function closeSession(
 					countHotPathOperation("workbench.canonical_write");
 					logWritten = true;
 				}
-				markTaskMetadataClosed(
-					paths.taskPath,
-					session,
-					new Date().toISOString(),
-				);
+				const closedAt = new Date().toISOString();
+				markTaskMetadataClosed(paths.taskPath, session, closedAt);
+				markPlanMetadataClosed(paths.planPath, session, closedAt);
 			} catch (error) {
+				atomicWriteText(paths.taskPath, originalTask);
+				if (originalPlan !== undefined) {
+					atomicWriteText(paths.planPath, originalPlan);
+				}
 				if (reportCreated) {
 					unlinkSync(reportPath);
 				}

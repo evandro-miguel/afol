@@ -139,7 +139,8 @@
       "260717_agent-submission-and-batch-review_spec_01",
       "260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01",
       "260726_governance-contract-reconciliation_spec-child_01",
-      "260727_release-benchmark-timing-and-baseline-contract_spec-child_01"
+      "260727_release-benchmark-timing-and-baseline-contract_spec-child_01",
+      "260818_public-engine-boundary-cutover_spec-child_01"
     ]
   },
   "feature_scenarios": [

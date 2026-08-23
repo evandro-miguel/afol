@@ -1,0 +1,23 @@
+name: Release problem
+description: Report download, verification, installation, or upgrade failures
+title: "release: "
+labels: [release]
+body:
+  - type: input
+    id: release
+    attributes:
+      label: Release and asset name
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification command and sanitized result
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Platform and environment
+    validations:
+      required: true

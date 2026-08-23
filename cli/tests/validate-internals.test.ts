@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: linux-home-path synthetic path fixture
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -50,6 +51,7 @@ import {
 	collectThresholdNotes,
 } from "../validate/runtime-live";
 import {
+	compiledBenchmarkArtifactPath,
 	compiledReleaseBuildArgs,
 	ensureBenchmarkTempRoot,
 	executeScenarioPackWithArtifact,
@@ -75,6 +77,10 @@ import {
 	loadJsonObject,
 } from "../validate/shared";
 import type { Baseline, RegistrySnapshot, Scenario } from "../validate/types";
+import {
+	directoryReparseTestSupport,
+	symlinkTestSupport,
+} from "./symlink-test-support";
 
 function createRepoLocalTestRoot(prefix: string): string {
 	const testTempRoot = join(process.cwd(), ".afol", "tmp", "tests");
@@ -85,6 +91,9 @@ function createRepoLocalTestRoot(prefix: string): string {
 function createFixtureRoot(): string {
 	const root = createRepoLocalTestRoot("validate-internals-");
 	mkdirSync(join(root, ".agents"), { recursive: true });
+	mkdirSync(join(root, "src", "project-template", ".agents"), {
+		recursive: true,
+	});
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
 	writeFileSync(
 		join(root, ".afol", "config.json"),
@@ -92,9 +101,14 @@ function createFixtureRoot(): string {
 		"utf8",
 	);
 	cpSync(
-		join(process.cwd(), ".agents", "lock.json"),
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
 		join(root, ".agents", "lock.json"),
 	);
+	cpSync(
+		join(process.cwd(), "src", "project-template", ".agents", "lock.json"),
+		join(root, "src", "project-template", ".agents", "lock.json"),
+	);
+	cpSync(join(process.cwd(), "package.json"), join(root, "package.json"));
 	cpSync(
 		join(process.cwd(), ".afol", "data", "benchmarks", "catalog"),
 		join(root, ".afol", "data", "benchmarks", "catalog"),
@@ -176,7 +190,11 @@ function createFixtureRoot(): string {
 			{ recursive: true },
 		);
 	}
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	if (symlinkTestSupport.available) {
+		symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	} else {
+		cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+	}
 	const gitSteps = [
 		["init"],
 		["config", "user.email", "bench@example.com"],
@@ -286,14 +304,31 @@ function createBenchExecutionFixtureRoot(): string {
 		'const { appendFileSync } = require("node:fs");\nappendFileSync("tracked.txt", "changed\\n", "utf8");\n',
 		"utf8",
 	);
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
-	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	if (symlinkTestSupport.available) {
+		symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+		symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	} else {
+		cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+		cpSync(join(process.cwd(), "afol"), join(root, "afol"));
+	}
 	if (existsSync(join(process.cwd(), "node_modules"))) {
-		symlinkSync(
-			join(process.cwd(), "node_modules"),
-			join(root, "node_modules"),
-			"dir",
-		);
+		if (symlinkTestSupport.available) {
+			symlinkSync(
+				join(process.cwd(), "node_modules"),
+				join(root, "node_modules"),
+				"dir",
+			);
+		} else if (directoryReparseTestSupport.available) {
+			symlinkSync(
+				join(process.cwd(), "node_modules"),
+				join(root, "node_modules"),
+				"junction",
+			);
+		} else {
+			cpSync(join(process.cwd(), "node_modules"), join(root, "node_modules"), {
+				recursive: true,
+			});
+		}
 	}
 	const gitSteps = [
 		["init"],
@@ -2013,9 +2048,12 @@ describe("scenario benchmark execution", () => {
 
 	test("detects Bun compiled virtual entrypoints", () => {
 		expect(isCompiledBunRuntime("/$bunfs/root/cli/main.ts")).toBe(true);
+		expect(isCompiledBunRuntime("B:/~BUN/root/print-bun-main.exe")).toBe(true);
 		expect(isCompiledBunRuntime(join(process.cwd(), "cli", "main.ts"))).toBe(
 			false,
 		);
+		expect(isCompiledBunRuntime("B:/projects/~BUN/cli/main.ts")).toBe(false);
+		expect(isCompiledBunRuntime("C:/~BUN/cli/main.ts")).toBe(false);
 	});
 
 	test("uses the running AFOL executable for compiled downstream benchmarks", () => {
@@ -2026,6 +2064,13 @@ describe("scenario benchmark execution", () => {
 				"/home/operator/.local/bin/afol",
 			),
 		).toBe("/home/operator/.local/bin/afol");
+		expect(
+			resolveAfolExecutable(
+				undefined,
+				"B:/~BUN/root/print-bun-main.exe",
+				"D:/tools/bin/afol.exe",
+			),
+		).toBe("D:/tools/bin/afol.exe");
 		expect(
 			resolveAfolExecutable(
 				"/fixture/trusted-afol",
@@ -2042,19 +2087,32 @@ describe("scenario benchmark execution", () => {
 		).toBeNull();
 	});
 
+	test("uses the platform-native extension for temporary compiled artifacts", () => {
+		const artifactRoot = join("fixture", "afol-bench-release");
+		expect(compiledBenchmarkArtifactPath(artifactRoot)).toBe(
+			join(artifactRoot, process.platform === "win32" ? "afol.exe" : "afol"),
+		);
+	});
+
 	test("prepares a registered sidecar and executes a compiled mutation", () => {
 		const fixtureRoot = createBenchExecutionFixtureRoot();
 		let artifact: PreparedCompiledReleaseArtifact | undefined;
 		let artifactRoot: string | undefined;
 		try {
 			cpSync(
-				join(process.cwd(), ".afol", "config.json"),
+				join(process.cwd(), "src", "project-template", ".afol", "config.json"),
 				join(fixtureRoot, ".afol", "config.json"),
 			);
 			mkdirSync(join(fixtureRoot, ".agents"), { recursive: true });
 			for (const metadataFile of ["lock.json", "manifest.json"]) {
 				cpSync(
-					join(process.cwd(), ".agents", metadataFile),
+					join(
+						process.cwd(),
+						"src",
+						"project-template",
+						".agents",
+						metadataFile,
+					),
 					join(fixtureRoot, ".agents", metadataFile),
 				);
 			}
@@ -2286,7 +2344,9 @@ describe("scenario benchmark execution", () => {
 			).toBe(20);
 			expect(cleanedSandboxes).toEqual(createdSandboxes);
 			expect(
-				createdSandboxes.every((path) => path.includes("/.afol/tmp/")),
+				createdSandboxes.every((path) =>
+					path.replaceAll("\\", "/").includes("/.afol/tmp/"),
+				),
 			).toBe(true);
 			expect(
 				invocationCommands.every((command) => command === artifactPath),
@@ -2401,46 +2461,49 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
-	test("does not follow a sandbox symlink swap to an external target", () => {
-		const root = createBenchExecutionFixtureRoot();
-		try {
-			const scenario: Scenario = {
-				schema_version: "1.0.0",
-				scenario_id: "sandbox-symlink-swap",
-				scenario_version: "1.0.0",
-				pack_id: "pstr-integrity",
-				command:
-					"node -e \"const fs=require('node:fs'); fs.rmSync('swap-target',{recursive:true,force:true}); fs.symlinkSync('../external-target','swap-target','dir');\"",
-				sandbox: true,
-				setup: [
-					[
-						"node",
-						"-e",
-						"const fs=require('node:fs'); fs.mkdirSync('../external-target',{recursive:true}); fs.writeFileSync('../external-target/keep','keep'); fs.mkdirSync('swap-target',{recursive:true});",
+	test.skipIf(!symlinkTestSupport.available)(
+		"does not follow a sandbox symlink swap to an external target",
+		() => {
+			const root = createBenchExecutionFixtureRoot();
+			try {
+				const scenario: Scenario = {
+					schema_version: "1.0.0",
+					scenario_id: "sandbox-symlink-swap",
+					scenario_version: "1.0.0",
+					pack_id: "pstr-integrity",
+					command:
+						"node -e \"const fs=require('node:fs'); fs.rmSync('swap-target',{recursive:true,force:true}); fs.symlinkSync('../external-target','swap-target','dir');\"",
+					sandbox: true,
+					setup: [
+						[
+							"node",
+							"-e",
+							"const fs=require('node:fs'); fs.mkdirSync('../external-target',{recursive:true}); fs.writeFileSync('../external-target/keep','keep'); fs.mkdirSync('swap-target',{recursive:true});",
+						],
 					],
-				],
-				result_schema: "1.0.0",
-				oracle: "fixture",
-				thresholds: { max_p95_ms: 10_000 },
-				baseline_id: "bench-v1",
-				deterministic_metrics: {},
-			};
-			expect(runScenarioCommand(root, scenario).passed).toBe(true);
-			expect(
-				readFileSync(
-					join(root, ".afol", "tmp", "external-target", "keep"),
-					"utf8",
-				),
-			).toBe("keep");
-			expect(
-				readdirSync(join(root, ".afol", "tmp")).filter((entry) =>
-					entry.startsWith("afol-bench-sandbox-"),
-				),
-			).toEqual([]);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+					result_schema: "1.0.0",
+					oracle: "fixture",
+					thresholds: { max_p95_ms: 10_000 },
+					baseline_id: "bench-v1",
+					deterministic_metrics: {},
+				};
+				expect(runScenarioCommand(root, scenario).passed).toBe(true);
+				expect(
+					readFileSync(
+						join(root, ".afol", "tmp", "external-target", "keep"),
+						"utf8",
+					),
+				).toBe("keep");
+				expect(
+					readdirSync(join(root, ".afol", "tmp")).filter((entry) =>
+						entry.startsWith("afol-bench-sandbox-"),
+					),
+				).toEqual([]);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("fails closed when a sandbox root is replaced before cleanup", () => {
 		const root = createBenchExecutionFixtureRoot();
@@ -2466,7 +2529,52 @@ describe("scenario benchmark execution", () => {
 				baseline_id: "bench-v1",
 				deterministic_metrics: {},
 			};
-			const result = runScenarioCommand(root, scenario);
+			let replacementSandboxCount = 0;
+			const result = runScenarioCommand(
+				root,
+				scenario,
+				process.platform === "win32"
+					? {
+							seams: {
+								createSandboxRoot: () => {
+									const sandbox = join(
+										root,
+										".afol",
+										"tmp",
+										`afol-bench-sandbox-root-replacement-${replacementSandboxCount++}`,
+									);
+									mkdirSync(sandbox, { recursive: true });
+									return sandbox;
+								},
+								runSample: (sandbox, _invocation, phase) => {
+									if (phase === "setup") {
+										const parent = dirname(sandbox);
+										const external = join(parent, "external-replacement");
+										rmSync(external, { recursive: true, force: true });
+										renameSync(sandbox, external);
+										mkdirSync(sandbox);
+										writeFileSync(
+											join(sandbox, "replacement-sentinel"),
+											"replacement",
+										);
+										writeFileSync(
+											join(external, "external-sentinel"),
+											"external",
+										);
+									}
+									return {
+										duration_ms: 1,
+										exit_code: 0,
+										signal: null,
+										spawn_error: null,
+										stdout: "",
+										stderr: "",
+									};
+								},
+							},
+						}
+					: undefined,
+			);
 			expect(result.passed).toBe(false);
 			expect(
 				result.notes.every((note) => note === "sandbox-root-replaced"),
@@ -2491,11 +2599,15 @@ describe("scenario benchmark execution", () => {
 				return existsSync(candidate) ? [candidate] : [];
 			});
 			expect(readFileSync(externalSentinel, "utf8")).toBe("external");
-			expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			if (process.platform !== "win32") {
+				expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			}
 			expect(replacementSentinels.length).toBeGreaterThan(0);
 			for (const replacementSentinel of replacementSentinels) {
 				expect(readFileSync(replacementSentinel, "utf8")).toBe("replacement");
-				expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+				if (process.platform !== "win32") {
+					expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+				}
 				expect(
 					existsSync(join(dirname(replacementSentinel), "command-ran")),
 				).toBe(false);
@@ -2567,9 +2679,13 @@ describe("scenario benchmark execution", () => {
 				"replacement-sentinel",
 			);
 			expect(readFileSync(externalSentinel, "utf8")).toBe("external");
-			expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			if (process.platform !== "win32") {
+				expect(lstatSync(externalSentinel).mode & 0o777).toBe(0o555);
+			}
 			expect(readFileSync(replacementSentinel, "utf8")).toBe("replacement");
-			expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+			if (process.platform !== "win32") {
+				expect(lstatSync(replacementSentinel).mode & 0o777).toBe(0o444);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2592,10 +2708,45 @@ describe("scenario benchmark execution", () => {
 				baseline_id: "bench-v1",
 				deterministic_metrics: {},
 			};
-			const result = runScenarioCommand(root, scenario, {
-				sampleCount: 1,
-				warmupCount: 0,
-			});
+			const result = runScenarioCommand(
+				root,
+				scenario,
+				process.platform === "win32"
+					? {
+							sampleCount: 1,
+							warmupCount: 0,
+							seams: {
+								createSandboxRoot: () => {
+									const sandbox = join(
+										root,
+										".afol",
+										"tmp",
+										"afol-bench-sandbox-rename-only",
+									);
+									mkdirSync(sandbox, { recursive: true });
+									return sandbox;
+								},
+								runSample: (sandbox) => {
+									const target = join(dirname(sandbox), "rename-only-target");
+									rmSync(target, { recursive: true, force: true });
+									renameSync(sandbox, target);
+									writeFileSync(join(target, "rename-sentinel"), "renamed");
+									return {
+										duration_ms: 1,
+										exit_code: 0,
+										signal: null,
+										spawn_error: null,
+										stdout: "",
+										stderr: "",
+									};
+								},
+							},
+						}
+					: {
+							sampleCount: 1,
+							warmupCount: 0,
+						},
+			);
 			expect(result.passed).toBe(false);
 			expect(result.notes).toContain("sandbox-root-replaced");
 			const sentinel = join(
@@ -2606,7 +2757,9 @@ describe("scenario benchmark execution", () => {
 				"rename-sentinel",
 			);
 			expect(readFileSync(sentinel, "utf8")).toBe("renamed");
-			expect(lstatSync(sentinel).mode & 0o777).toBe(0o555);
+			if (process.platform !== "win32") {
+				expect(lstatSync(sentinel).mode & 0o777).toBe(0o555);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2776,13 +2929,19 @@ describe("scenario benchmark execution", () => {
 				`${JSON.stringify(baseline, null, 2)}\n`,
 				"utf8",
 			);
+			const successCommand =
+				process.platform === "win32" ? "node --version" : "afol --version";
+			const expectedExitCommand =
+				process.platform === "win32"
+					? "node -e 'process.exit(2)'"
+					: "afol __nonexistent__";
 
 			const successScenario: Scenario = {
 				schema_version: "1.0.0",
 				scenario_id: "bench-success",
 				scenario_version: "1.0.0",
 				pack_id: "pstr-integrity",
-				command: "afol --version",
+				command: successCommand,
 				result_schema: "1.0.0",
 				oracle: "normalized-envelope-and-threshold-check",
 				thresholds: {
@@ -2807,6 +2966,14 @@ describe("scenario benchmark execution", () => {
 					tool_success_rate: 1,
 				},
 			};
+			if (process.platform === "win32") {
+				const sourceAfol = runScenarioCommand(
+					root,
+					{ ...successScenario, command: "afol --version" },
+					{ sampleCount: 1, warmupCount: 0 },
+				);
+				expect(sourceAfol.passed).toBe(true);
+			}
 			const success = withCapturedConsoleError(() =>
 				buildResult(root, successScenario, baselinePath, baseline),
 			);
@@ -2871,7 +3038,7 @@ describe("scenario benchmark execution", () => {
 			const expectedExitScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-expected-exit",
-				command: "afol __nonexistent__",
+				command: expectedExitCommand,
 				expected_exit: 2,
 			};
 			const expectedExit = withCapturedConsoleError(() =>
@@ -2884,7 +3051,7 @@ describe("scenario benchmark execution", () => {
 			const failureScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-failure",
-				command: "afol __nonexistent__",
+				command: expectedExitCommand,
 			};
 			const failure = withCapturedConsoleError(() =>
 				buildResult(root, failureScenario, baselinePath, baseline),
@@ -3110,7 +3277,11 @@ describe("scenario benchmark execution", () => {
 					const safe = withCapturedConsoleError(() =>
 						buildResult(root, scenario, baselinePath, baseline),
 					);
-					expect(safe.result.status).toBe("passed");
+					if (safe.result.status !== "passed") {
+						throw new Error(
+							`active-lock scenario failed: ${JSON.stringify(safe.result.notes)}`,
+						);
+					}
 					expect(
 						safe.result.notes.some((note) =>
 							note.startsWith("side-effect-leak:"),
@@ -3146,36 +3317,38 @@ describe("scenario benchmark execution", () => {
 					expect(existsSync(arbitraryLockFile)).toBe(false);
 					expect(existsSync(ownerLockPath)).toBe(true);
 
-					const symlinkTarget = join(root, "lock-symlink-target.txt");
-					writeFileSync(symlinkTarget, "preserve\n", "utf8");
-					const symlinkEntry = join(
-						root,
-						".afol",
-						"wb",
-						".locks",
-						"unexpected-link",
-					);
-					const symlink = withCapturedConsoleError(() =>
-						buildResult(
+					if (symlinkTestSupport.available) {
+						const symlinkTarget = join(root, "lock-symlink-target.txt");
+						writeFileSync(symlinkTarget, "preserve\n", "utf8");
+						const symlinkEntry = join(
 							root,
-							{
-								...scenario,
-								scenario_id: "bench-held-lock-symlink-entry",
-								command: `node -e 'require("node:fs").symlinkSync(${JSON.stringify(symlinkTarget)}, ".afol/wb/.locks/unexpected-link")'`,
-							},
-							baselinePath,
-							baseline,
-						),
-					);
-					expect(symlink.result.status).toBe("failed");
-					expect(
-						symlink.result.notes.find((note) =>
-							note.startsWith("side-effect-leak:"),
-						),
-					).toBe("side-effect-leak:.afol/wb/.locks/unexpected-link");
-					expect(existsSync(symlinkEntry)).toBe(false);
-					expect(readFileSync(symlinkTarget, "utf8")).toBe("preserve\n");
-					expect(existsSync(ownerLockPath)).toBe(true);
+							".afol",
+							"wb",
+							".locks",
+							"unexpected-link",
+						);
+						const symlink = withCapturedConsoleError(() =>
+							buildResult(
+								root,
+								{
+									...scenario,
+									scenario_id: "bench-held-lock-symlink-entry",
+									command: `node -e 'require("node:fs").symlinkSync(${JSON.stringify(symlinkTarget)}, ".afol/wb/.locks/unexpected-link")'`,
+								},
+								baselinePath,
+								baseline,
+							),
+						);
+						expect(symlink.result.status).toBe("failed");
+						expect(
+							symlink.result.notes.find((note) =>
+								note.startsWith("side-effect-leak:"),
+							),
+						).toBe("side-effect-leak:.afol/wb/.locks/unexpected-link");
+						expect(existsSync(symlinkEntry)).toBe(false);
+						expect(readFileSync(symlinkTarget, "utf8")).toBe("preserve\n");
+						expect(existsSync(ownerLockPath)).toBe(true);
+					}
 
 					const leaked = withCapturedConsoleError(() =>
 						buildResult(
@@ -3203,54 +3376,158 @@ describe("scenario benchmark execution", () => {
 		}
 	}, 30_000);
 
-	test("reports hostile completion-lock metadata and fence mutations without unsafe cleanup", async () => {
-		const mutations = [
-			{
-				id: "owner-token",
-				command(lockPath: string): string {
-					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.owner_token="hostile-owner"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+	test(
+		"reports hostile completion-lock metadata and fence mutations without unsafe cleanup",
+		async () => {
+			const mutations = [
+				{
+					id: "owner-token",
+					command(lockPath: string): string {
+						return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.owner_token="hostile-owner"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+					},
+					target: "lock" as const,
 				},
-				target: "lock" as const,
-			},
-			{
-				id: "generation",
-				command(lockPath: string): string {
-					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.generation+=1000; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				{
+					id: "generation",
+					command(lockPath: string): string {
+						return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.generation+=1000; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+					},
+					target: "lock" as const,
 				},
-				target: "lock" as const,
-			},
-			{
-				id: "extra-field",
-				command(lockPath: string): string {
-					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.untrusted="extra"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				{
+					id: "extra-field",
+					command(lockPath: string): string {
+						return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.untrusted="extra"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+					},
+					target: "lock" as const,
 				},
-				target: "lock" as const,
-			},
-			{
-				id: "malformed",
-				command(lockPath: string): string {
-					return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(lockPath)},"malformed"+String.fromCharCode(10),"utf8")'`;
+				{
+					id: "malformed",
+					command(lockPath: string): string {
+						return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(lockPath)},"malformed"+String.fromCharCode(10),"utf8")'`;
+					},
+					target: "lock" as const,
 				},
-				target: "lock" as const,
-			},
-			{
-				id: "heartbeat-regression",
-				command(lockPath: string): string {
-					return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.heartbeat_at="1970-01-01T00:00:00.000Z"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+				{
+					id: "heartbeat-regression",
+					command(lockPath: string): string {
+						return `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(lockPath)}; const value=JSON.parse(fs.readFileSync(p,"utf8")); value.heartbeat_at="1970-01-01T00:00:00.000Z"; fs.writeFileSync(p,JSON.stringify(value)+String.fromCharCode(10),"utf8")'`;
+					},
+					target: "lock" as const,
 				},
-				target: "lock" as const,
-			},
-			{
-				id: "fence",
-				command(lockPath: string): string {
-					return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(`${lockPath}.fence`)},"999999"+String.fromCharCode(10),"utf8")'`;
+				{
+					id: "fence",
+					command(lockPath: string): string {
+						return `node -e 'require("node:fs").writeFileSync(${JSON.stringify(`${lockPath}.fence`)},"999999"+String.fromCharCode(10),"utf8")'`;
+					},
+					target: "fence" as const,
 				},
-				target: "fence" as const,
-			},
-		];
+			];
 
-		for (const mutation of mutations) {
+			for (const mutation of mutations) {
+				const root = createBenchExecutionFixtureRoot();
+				try {
+					const baselinePath = join(root, "baseline-v1.json");
+					const baseline: Baseline = {
+						baseline_id: "bench-v1",
+						pack_id: "pstr-integrity",
+						schema_version: "1.0.0",
+						timing_p50_ms: 10_000,
+						timing_p95_ms: 10_000,
+					};
+					await withTaskCompletionLock(
+						root,
+						"bench-session",
+						"T-01",
+						async () => {
+							const ownerLockPath = resolveTaskCompletionLockPath(
+								root,
+								"bench-session",
+								"T-01",
+							);
+							const fencePath = `${ownerLockPath}.fence`;
+							const originalLock = readFileSync(ownerLockPath, "utf8");
+							const originalFence = readFileSync(fencePath, "utf8");
+							const relativeLockPath = ownerLockPath
+								.slice(root.length + 1)
+								.replaceAll("\\", "/");
+							const expectedLeakPath =
+								mutation.target === "fence"
+									? `${relativeLockPath}.fence`
+									: relativeLockPath;
+							try {
+								const result = withCapturedConsoleError(() =>
+									buildResult(
+										root,
+										{
+											schema_version: "1.0.0",
+											scenario_id: `bench-hostile-lock-${mutation.id}`,
+											scenario_version: "1.0.0",
+											pack_id: "pstr-integrity",
+											command: mutation.command(ownerLockPath),
+											result_schema: "1.0.0",
+											oracle: "normalized-envelope-and-threshold-check",
+											thresholds: {
+												max_duration_ms: 10_000,
+												max_p95_ms: 10_000,
+												max_output_tokens: 100,
+												min_tool_success_rate: 1,
+											},
+											baseline_id: "bench-v1",
+											deterministic_metrics: {},
+										},
+										baselinePath,
+										baseline,
+									),
+								);
+								expect(result.result.status).toBe("failed");
+								const leakReported = result.result.notes.some(
+									(note) =>
+										note.startsWith("side-effect-leak:") &&
+										note.includes(expectedLeakPath),
+								);
+								if (!leakReported) {
+									throw new Error(
+										`missing side-effect leak for ${mutation.id}: ${JSON.stringify(result.result.notes)}`,
+									);
+								}
+								if (mutation.target === "fence") {
+									expect(readFileSync(fencePath, "utf8")).toBe("999999\n");
+									expect(readFileSync(ownerLockPath, "utf8")).toBe(
+										originalLock,
+									);
+								} else {
+									expect(readFileSync(ownerLockPath, "utf8")).not.toBe(
+										originalLock,
+									);
+									expect(readFileSync(fencePath, "utf8")).toBe(originalFence);
+								}
+							} finally {
+								writeFileSync(ownerLockPath, originalLock, "utf8");
+								writeFileSync(fencePath, originalFence, "utf8");
+							}
+						},
+						{ heartbeatMs: 60_000 },
+					);
+					const ownerLockPath = resolveTaskCompletionLockPath(
+						root,
+						"bench-session",
+						"T-01",
+					);
+					expect(existsSync(ownerLockPath)).toBe(false);
+				} finally {
+					rmSync(root, { recursive: true, force: true });
+				}
+			}
+		},
+		process.platform === "win32" ? 120_000 : 30_000,
+	);
+
+	test(
+		"reports atomic replacement of an owner lock and leaves the replacement for explicit recovery",
+		async () => {
 			const root = createBenchExecutionFixtureRoot();
+			let ownerLockPath = "";
 			try {
 				const baselinePath = join(root, "baseline-v1.json");
 				const baseline: Baseline = {
@@ -3265,223 +3542,141 @@ describe("scenario benchmark execution", () => {
 					"bench-session",
 					"T-01",
 					async () => {
-						const ownerLockPath = resolveTaskCompletionLockPath(
+						ownerLockPath = resolveTaskCompletionLockPath(
 							root,
 							"bench-session",
 							"T-01",
 						);
-						const fencePath = `${ownerLockPath}.fence`;
-						const originalLock = readFileSync(ownerLockPath, "utf8");
-						const originalFence = readFileSync(fencePath, "utf8");
+						const original = readFileSync(ownerLockPath, "utf8");
+						const replacementPath = `${ownerLockPath}.hostile-replacement`;
+						const replaceOwner =
+							process.platform === "win32"
+								? "try { fs.renameSync(replacement,p); } catch (error) { if (error.code !== 'EPERM') throw error; fs.unlinkSync(p); fs.renameSync(replacement,p); }"
+								: "fs.renameSync(replacement,p)";
+						const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); ${replaceOwner}'`;
+						const result = withCapturedConsoleError(() =>
+							buildResult(
+								root,
+								{
+									schema_version: "1.0.0",
+									scenario_id: "bench-hostile-lock-atomic-replacement",
+									scenario_version: "1.0.0",
+									pack_id: "pstr-integrity",
+									command,
+									result_schema: "1.0.0",
+									oracle: "normalized-envelope-and-threshold-check",
+									thresholds: {
+										max_duration_ms: 10_000,
+										max_p95_ms: 10_000,
+										max_output_tokens: 100,
+										min_tool_success_rate: 1,
+									},
+									baseline_id: "bench-v1",
+									deterministic_metrics: {},
+								},
+								baselinePath,
+								baseline,
+							),
+						);
 						const relativeLockPath = ownerLockPath
 							.slice(root.length + 1)
 							.replaceAll("\\", "/");
-						const expectedLeakPath =
-							mutation.target === "fence"
-								? `${relativeLockPath}.fence`
-								: relativeLockPath;
-						try {
-							const result = withCapturedConsoleError(() =>
-								buildResult(
-									root,
-									{
-										schema_version: "1.0.0",
-										scenario_id: `bench-hostile-lock-${mutation.id}`,
-										scenario_version: "1.0.0",
-										pack_id: "pstr-integrity",
-										command: mutation.command(ownerLockPath),
-										result_schema: "1.0.0",
-										oracle: "normalized-envelope-and-threshold-check",
-										thresholds: {
-											max_duration_ms: 10_000,
-											max_p95_ms: 10_000,
-											max_output_tokens: 100,
-											min_tool_success_rate: 1,
-										},
-										baseline_id: "bench-v1",
-										deterministic_metrics: {},
-									},
-									baselinePath,
-									baseline,
-								),
-							);
-							expect(result.result.status).toBe("failed");
-							expect(
-								result.result.notes.some((note) =>
-									note.includes(`side-effect-leak:${expectedLeakPath}`),
-								),
-							).toBe(true);
-							if (mutation.target === "fence") {
-								expect(readFileSync(fencePath, "utf8")).toBe("999999\n");
-								expect(readFileSync(ownerLockPath, "utf8")).toBe(originalLock);
-							} else {
-								expect(readFileSync(ownerLockPath, "utf8")).not.toBe(
-									originalLock,
-								);
-								expect(readFileSync(fencePath, "utf8")).toBe(originalFence);
-							}
-						} finally {
-							writeFileSync(ownerLockPath, originalLock, "utf8");
-							writeFileSync(fencePath, originalFence, "utf8");
-						}
+						expect(result.result.status).toBe("failed");
+						expect(
+							result.result.notes.some((note) =>
+								note.includes(`side-effect-leak:${relativeLockPath}`),
+							),
+						).toBe(true);
+						expect(readFileSync(ownerLockPath, "utf8")).toBe(original);
 					},
 					{ heartbeatMs: 60_000 },
 				);
-				const ownerLockPath = resolveTaskCompletionLockPath(
+				// POSIX rename replaces the inode, so cleanup must preserve the foreign
+				// file. Windows may replace contents while retaining the owned open file;
+				// the final descriptor probe proves that cleanup is safe in that case.
+				expect(existsSync(ownerLockPath)).toBe(process.platform !== "win32");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+		process.platform === "win32" ? 120_000 : 30_000,
+	);
+
+	test.skipIf(!symlinkTestSupport.available)(
+		"reports an owner lock root replaced by a symlink without touching its target",
+		async () => {
+			const root = createBenchExecutionFixtureRoot();
+			try {
+				const target = join(root, "lock-root-target");
+				mkdirSync(target);
+				writeFileSync(join(target, "preserve.txt"), "preserve\n", "utf8");
+				const baselinePath = join(root, "baseline-v1.json");
+				const baseline: Baseline = {
+					baseline_id: "bench-v1",
+					pack_id: "pstr-integrity",
+					schema_version: "1.0.0",
+					timing_p50_ms: 10_000,
+					timing_p95_ms: 10_000,
+				};
+				let ownerLockPath = "";
+				await withTaskCompletionLock(
 					root,
 					"bench-session",
 					"T-01",
+					async () => {
+						ownerLockPath = resolveTaskCompletionLockPath(
+							root,
+							"bench-session",
+							"T-01",
+						);
+						const command = `node -e 'const fs=require("node:fs"); const p=".afol/wb/.locks"; try { const stat=fs.lstatSync(p); if (stat.isSymbolicLink()) fs.unlinkSync(p); else fs.rmSync(p,{recursive:true,force:true}); } catch {} fs.symlinkSync(${JSON.stringify(target)},p,"dir")'`;
+						const result = withCapturedConsoleError(() =>
+							buildResult(
+								root,
+								{
+									schema_version: "1.0.0",
+									scenario_id: "bench-lock-root-symlink",
+									scenario_version: "1.0.0",
+									pack_id: "pstr-integrity",
+									command,
+									result_schema: "1.0.0",
+									oracle: "normalized-envelope-and-threshold-check",
+									thresholds: {
+										max_duration_ms: 10_000,
+										max_p95_ms: 10_000,
+										max_output_tokens: 100,
+										min_tool_success_rate: 1,
+									},
+									baseline_id: "bench-v1",
+									deterministic_metrics: {},
+								},
+								baselinePath,
+								baseline,
+							),
+						);
+						expect(result.result.status).toBe("failed");
+						expect(
+							result.result.notes.some((note) =>
+								note.startsWith("side-effect-leak:.afol/wb/.locks"),
+							),
+						).toBe(true);
+						expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(false);
+						expect(readFileSync(join(target, "preserve.txt"), "utf8")).toBe(
+							"preserve\n",
+						);
+						expect(existsSync(ownerLockPath)).toBe(false);
+					},
+					{ heartbeatMs: 60_000 },
 				);
+				// Replacing the root destroyed the owner's inode. Cleanup removes only
+				// the hostile symlink and does not claim that the owner survived.
 				expect(existsSync(ownerLockPath)).toBe(false);
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 			}
-		}
-	}, 30_000);
-
-	test("reports atomic replacement of an owner lock and leaves the replacement for explicit recovery", async () => {
-		const root = createBenchExecutionFixtureRoot();
-		let ownerLockPath = "";
-		try {
-			const baselinePath = join(root, "baseline-v1.json");
-			const baseline: Baseline = {
-				baseline_id: "bench-v1",
-				pack_id: "pstr-integrity",
-				schema_version: "1.0.0",
-				timing_p50_ms: 10_000,
-				timing_p95_ms: 10_000,
-			};
-			await withTaskCompletionLock(
-				root,
-				"bench-session",
-				"T-01",
-				async () => {
-					ownerLockPath = resolveTaskCompletionLockPath(
-						root,
-						"bench-session",
-						"T-01",
-					);
-					const original = readFileSync(ownerLockPath, "utf8");
-					const originalInode = lstatSync(ownerLockPath).ino;
-					const replacementPath = `${ownerLockPath}.hostile-replacement`;
-					const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); fs.renameSync(replacement,p)'`;
-					const result = withCapturedConsoleError(() =>
-						buildResult(
-							root,
-							{
-								schema_version: "1.0.0",
-								scenario_id: "bench-hostile-lock-atomic-replacement",
-								scenario_version: "1.0.0",
-								pack_id: "pstr-integrity",
-								command,
-								result_schema: "1.0.0",
-								oracle: "normalized-envelope-and-threshold-check",
-								thresholds: {
-									max_duration_ms: 10_000,
-									max_p95_ms: 10_000,
-									max_output_tokens: 100,
-									min_tool_success_rate: 1,
-								},
-								baseline_id: "bench-v1",
-								deterministic_metrics: {},
-							},
-							baselinePath,
-							baseline,
-						),
-					);
-					const relativeLockPath = ownerLockPath
-						.slice(root.length + 1)
-						.replaceAll("\\", "/");
-					expect(result.result.status).toBe("failed");
-					expect(
-						result.result.notes.some((note) =>
-							note.includes(`side-effect-leak:${relativeLockPath}`),
-						),
-					).toBe(true);
-					expect(readFileSync(ownerLockPath, "utf8")).toBe(original);
-					expect(lstatSync(ownerLockPath).ino).not.toBe(originalInode);
-				},
-				{ heartbeatMs: 60_000 },
-			);
-			// The owner identity was destroyed. Neither the benchmark nor the lease
-			// may unlink a same-content replacement that it does not own.
-			expect(existsSync(ownerLockPath)).toBe(true);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	}, 30_000);
-
-	test("reports an owner lock root replaced by a symlink without touching its target", async () => {
-		const root = createBenchExecutionFixtureRoot();
-		try {
-			const target = join(root, "lock-root-target");
-			mkdirSync(target);
-			writeFileSync(join(target, "preserve.txt"), "preserve\n", "utf8");
-			const baselinePath = join(root, "baseline-v1.json");
-			const baseline: Baseline = {
-				baseline_id: "bench-v1",
-				pack_id: "pstr-integrity",
-				schema_version: "1.0.0",
-				timing_p50_ms: 10_000,
-				timing_p95_ms: 10_000,
-			};
-			let ownerLockPath = "";
-			await withTaskCompletionLock(
-				root,
-				"bench-session",
-				"T-01",
-				async () => {
-					ownerLockPath = resolveTaskCompletionLockPath(
-						root,
-						"bench-session",
-						"T-01",
-					);
-					const command = `node -e 'const fs=require("node:fs"); const p=".afol/wb/.locks"; try { const stat=fs.lstatSync(p); if (stat.isSymbolicLink()) fs.unlinkSync(p); else fs.rmSync(p,{recursive:true,force:true}); } catch {} fs.symlinkSync(${JSON.stringify(target)},p,"dir")'`;
-					const result = withCapturedConsoleError(() =>
-						buildResult(
-							root,
-							{
-								schema_version: "1.0.0",
-								scenario_id: "bench-lock-root-symlink",
-								scenario_version: "1.0.0",
-								pack_id: "pstr-integrity",
-								command,
-								result_schema: "1.0.0",
-								oracle: "normalized-envelope-and-threshold-check",
-								thresholds: {
-									max_duration_ms: 10_000,
-									max_p95_ms: 10_000,
-									max_output_tokens: 100,
-									min_tool_success_rate: 1,
-								},
-								baseline_id: "bench-v1",
-								deterministic_metrics: {},
-							},
-							baselinePath,
-							baseline,
-						),
-					);
-					expect(result.result.status).toBe("failed");
-					expect(
-						result.result.notes.some((note) =>
-							note.startsWith("side-effect-leak:.afol/wb/.locks"),
-						),
-					).toBe(true);
-					expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(false);
-					expect(readFileSync(join(target, "preserve.txt"), "utf8")).toBe(
-						"preserve\n",
-					);
-					expect(existsSync(ownerLockPath)).toBe(false);
-				},
-				{ heartbeatMs: 60_000 },
-			);
-			// Replacing the root destroyed the owner's inode. Cleanup removes only
-			// the hostile symlink and does not claim that the owner survived.
-			expect(existsSync(ownerLockPath)).toBe(false);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	}, 30_000);
+		},
+		process.platform === "win32" ? 120_000 : 30_000,
+	);
 
 	test("applies the documented timing tolerance to baseline comparisons", () => {
 		const root = createBenchExecutionFixtureRoot();
@@ -3769,146 +3964,153 @@ describe("scenario benchmark execution", () => {
 		).toThrow("--scenario-id requires bench mode");
 	});
 
-	test("fails mutation timing closed when the execution profile is incompatible", () => {
-		const root = createBenchExecutionFixtureRoot();
-		try {
-			const scenario: Scenario = {
-				schema_version: "1.0.0",
-				scenario_id: "mutation-profile-contract",
-				scenario_version: "1.0.0",
-				pack_id: "mutation-safety",
-				command: "node -e 'process.stdout.write(\"ok\")'",
-				result_schema: "1.0.0",
-				oracle: "normalized-envelope-and-threshold-check",
-				thresholds: {
-					max_duration_ms: 10_000,
-					max_p95_ms: 10_000,
-					max_output_tokens: 100,
-					min_tool_success_rate: 1,
-				},
-				baseline_id: "mutation-safety-v1",
-				implementation_status: "implemented",
-				deterministic_metrics: {},
-				compiled_binary: true,
-			};
-			const artifact: PreparedCompiledReleaseArtifact = {
-				binaryPath: join(root, ".afol", "tmp", "release", "afol"),
-				profile: {
-					host_profile_id: "actual-host",
+	test(
+		"fails mutation timing closed when the execution profile is incompatible",
+		() => {
+			const root = createBenchExecutionFixtureRoot();
+			try {
+				const scenario: Scenario = {
+					schema_version: "1.0.0",
+					scenario_id: "mutation-profile-contract",
+					scenario_version: "1.0.0",
+					pack_id: "mutation-safety",
+					command: "node -e 'process.stdout.write(\"ok\")'",
+					result_schema: "1.0.0",
+					oracle: "normalized-envelope-and-threshold-check",
+					thresholds: {
+						max_duration_ms: 10_000,
+						max_p95_ms: 10_000,
+						max_output_tokens: 100,
+						min_tool_success_rate: 1,
+					},
+					baseline_id: "mutation-safety-v1",
+					implementation_status: "implemented",
+					deterministic_metrics: {},
+					compiled_binary: true,
+				};
+				const artifact: PreparedCompiledReleaseArtifact = {
+					binaryPath: join(root, ".afol", "tmp", "release", "afol"),
+					profile: {
+						host_profile_id: "actual-host",
+						os: process.platform,
+						arch: process.arch,
+						cpu_class: "actual-cpu",
+						bun_version: Bun.version,
+						runtime_version: Bun.version,
+						execution_mode: "compiled-release",
+						artifact_mode: "bun-compile",
+						artifact_sha256: "d".repeat(64),
+					},
+					timestamp: "2026-07-28T00:00:00.000Z",
+					git_commit: "e".repeat(40),
+					source_state_sha256: "f".repeat(64),
+					source_dirty: true,
+					cleanup: () => {},
+				};
+				const baseline: Baseline = {
+					baseline_id: "mutation-safety-v1",
+					pack_id: "mutation-safety",
+					schema_version: "1.0.0",
+					host_profile_id: "different-host",
 					os: process.platform,
 					arch: process.arch,
-					cpu_class: "actual-cpu",
+					cpu_class: "different-cpu",
 					bun_version: Bun.version,
 					runtime_version: Bun.version,
-					execution_mode: "compiled-release",
-					artifact_mode: "bun-compile",
-					artifact_sha256: "d".repeat(64),
-				},
-				timestamp: "2026-07-28T00:00:00.000Z",
-				git_commit: "e".repeat(40),
-				source_state_sha256: "f".repeat(64),
-				source_dirty: true,
-				cleanup: () => {},
-			};
-			const baseline: Baseline = {
-				baseline_id: "mutation-safety-v1",
-				pack_id: "mutation-safety",
-				schema_version: "1.0.0",
-				host_profile_id: "different-host",
-				os: process.platform,
-				arch: process.arch,
-				cpu_class: "different-cpu",
-				bun_version: Bun.version,
-				runtime_version: Bun.version,
-				execution_mode: "source",
-				artifact_mode: "source",
-				artifact_sha256: "source",
-				scenarios: {
-					[scenario.scenario_id]: {
-						scenario_id: scenario.scenario_id,
-						scenario_version: scenario.scenario_version,
-						timing_p50_ms: 100,
-						timing_p95_ms: 100,
-						sample_count: 20,
-						warmup_count: 1,
+					execution_mode: "source",
+					artifact_mode: "source",
+					artifact_sha256: "source",
+					scenarios: {
+						[scenario.scenario_id]: {
+							scenario_id: scenario.scenario_id,
+							scenario_version: scenario.scenario_version,
+							timing_p50_ms: 100,
+							timing_p95_ms: 100,
+							sample_count: 20,
+							warmup_count: 1,
+						},
 					},
-				},
-			};
-			const result = withCapturedConsoleError(() =>
-				buildResult(
-					root,
-					scenario,
-					join(root, "baseline.json"),
-					baseline,
-					"enforce",
-					artifact,
-				),
-			).result;
-			expect(result.status).toBe("incompatible");
-			expect(result.pass).toBe(false);
-			expect(result.sample_count).toBe(20);
-			expect(result.warmup_count).toBe(1);
-			expect(result.artifact_sha256).toBe("d".repeat(64));
-			expect(
-				result.notes.some((note) =>
-					note.startsWith("profile-incompatible:host_profile_id:"),
-				),
-			).toBe(true);
-			expect(
-				result.notes.some((note) => note.startsWith("baseline-regression:")),
-			).toBe(false);
+				};
+				const result = withCapturedConsoleError(() =>
+					buildResult(
+						root,
+						scenario,
+						join(root, "baseline.json"),
+						baseline,
+						"enforce",
+						artifact,
+					),
+				).result;
+				expect(result.status).toBe("incompatible");
+				expect(result.pass).toBe(false);
+				expect(result.sample_count).toBe(20);
+				expect(result.warmup_count).toBe(1);
+				expect(result.artifact_sha256).toBe("d".repeat(64));
+				expect(
+					result.notes.some((note) =>
+						note.startsWith("profile-incompatible:host_profile_id:"),
+					),
+				).toBe(true);
+				expect(
+					result.notes.some((note) => note.startsWith("baseline-regression:")),
+				).toBe(false);
 
-			const pendingBaseline: Baseline = {
-				baseline_id: "mutation-safety-v1",
-				pack_id: "mutation-safety",
-				schema_version: "1.0.0",
-				calibration_status: "pending",
-				calibration_reason: "controlled-release-host-required",
-			};
-			const pendingResult = withCapturedConsoleError(() =>
-				buildResult(
-					root,
-					scenario,
-					join(root, "baseline.json"),
-					pendingBaseline,
-					"enforce",
-					artifact,
-				),
-			).result;
-			expect(pendingResult.status).toBe("incompatible");
-			expect(pendingResult.pass).toBe(false);
-			expect(pendingResult.tool_success_rate).toBe(1);
-			expect(pendingResult.error_count).toBe(0);
-			expect(pendingResult.sample_count).toBe(20);
-			expect(pendingResult.warmup_count).toBe(1);
-			expect(
-				pendingResult.notes.filter((note) =>
-					note.startsWith("baseline-incompatible:calibration-pending:"),
-				),
-			).toEqual([
-				"baseline-incompatible:calibration-pending:controlled-release-host-required",
-			]);
+				const pendingBaseline: Baseline = {
+					baseline_id: "mutation-safety-v1",
+					pack_id: "mutation-safety",
+					schema_version: "1.0.0",
+					calibration_status: "pending",
+					calibration_reason: "controlled-release-host-required",
+				};
+				const pendingResult = withCapturedConsoleError(() =>
+					buildResult(
+						root,
+						scenario,
+						join(root, "baseline.json"),
+						pendingBaseline,
+						"enforce",
+						artifact,
+					),
+				).result;
+				expect(pendingResult.status).toBe("incompatible");
+				expect(pendingResult.pass).toBe(false);
+				expect(pendingResult.tool_success_rate).toBe(1);
+				expect(pendingResult.error_count).toBe(0);
+				expect(pendingResult.sample_count).toBe(20);
+				expect(pendingResult.warmup_count).toBe(1);
+				expect(
+					pendingResult.notes.filter((note) =>
+						note.startsWith("baseline-incompatible:calibration-pending:"),
+					),
+				).toEqual([
+					"baseline-incompatible:calibration-pending:controlled-release-host-required",
+				]);
 
-			const failedResult = withCapturedConsoleError(() =>
-				buildResult(
-					root,
-					{ ...scenario, command: "false" },
-					join(root, "baseline.json"),
-					pendingBaseline,
-					"enforce",
-					artifact,
-				),
-			).result;
-			expect(failedResult.status).toBe("failed");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	}, 30_000);
+				const failedResult = withCapturedConsoleError(() =>
+					buildResult(
+						root,
+						{ ...scenario, command: "false" },
+						join(root, "baseline.json"),
+						pendingBaseline,
+						"enforce",
+						artifact,
+					),
+				).result;
+				expect(failedResult.status).toBe("failed");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+		process.platform === "win32" ? 120_000 : 30_000,
+	);
 
 	test("runs sandbox benchmarks with one warmup and three measured samples", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
-			const counterPath = join(root, "sandbox-sample-count.txt");
+			const counterPath = join(root, "sandbox-sample-count.txt").replaceAll(
+				"\\",
+				"/",
+			);
 			const baseline: Baseline = {
 				baseline_id: "bench-v1",
 				pack_id: "pstr-integrity",
@@ -4569,25 +4771,29 @@ describe("runtime live validation helpers", () => {
 });
 
 describe("validation command entrypoint", () => {
-	test("reports governance-history timing observation at the public entrypoint", () => {
-		const observed = withCapturedStdout(() =>
-			runValidationCommand(process.cwd(), [
-				"bench",
-				"--pack",
-				"governance-history",
-				"--timing-mode",
-				"observe",
-				"--json",
-			]),
-		);
-		expect(observed.result).toBe(0);
-		expect(JSON.parse(observed.stdout[0] ?? "{}")).toMatchObject({
-			mode: "benchmark",
-			timing_mode: "observe",
-			status: "passed",
-			pass: true,
-		});
-	}, 120_000);
+	test(
+		"reports governance-history timing observation at the public entrypoint",
+		() => {
+			const observed = withCapturedStdout(() =>
+				runValidationCommand(process.cwd(), [
+					"bench",
+					"--pack",
+					"governance-history",
+					"--timing-mode",
+					"observe",
+					"--json",
+				]),
+			);
+			expect(observed.result).toBe(0);
+			expect(JSON.parse(observed.stdout[0] ?? "{}")).toMatchObject({
+				mode: "benchmark",
+				timing_mode: "observe",
+				status: "passed",
+				pass: true,
+			});
+		},
+		process.platform === "win32" ? 360_000 : 120_000,
+	);
 
 	test("reruns one scored scenario in its explicit pack", () => {
 		const root = createFixtureRoot();
@@ -4726,7 +4932,11 @@ describe("validation command entrypoint", () => {
 			const runText = withCapturedStdout(() =>
 				runValidationCommand(root, ["run", "--pack", "mutation-safety"]),
 			);
-			expect(runText.result).toBe(0);
+			if (runText.result !== 0) {
+				throw new Error(
+					`mutation-safety text run failed: ${JSON.stringify(runText.stdout)}`,
+				);
+			}
 			const runTextPayload = JSON.parse(runText.stdout[0] ?? "{}") as {
 				command_results: Array<{ reported_status?: string }>;
 			};
@@ -4854,7 +5064,7 @@ describe("validation command entrypoint", () => {
 	test("fails JSON-reporting packs when the child emits malformed JSON", () => {
 		const root = createFixtureRoot();
 		try {
-			unlinkSync(join(root, "cli"));
+			rmSync(join(root, "cli"), { recursive: true, force: true });
 			mkdirSync(join(root, "cli"), { recursive: true });
 			writeFileSync(
 				join(root, "cli", "main.ts"),
@@ -4901,7 +5111,7 @@ describe("validation command entrypoint", () => {
 		] as const) {
 			const root = createFixtureRoot();
 			try {
-				unlinkSync(join(root, "cli"));
+				rmSync(join(root, "cli"), { recursive: true, force: true });
 				mkdirSync(join(root, "cli"), { recursive: true });
 				writeFileSync(join(root, "cli", "main.ts"), script, "utf8");
 
@@ -4931,7 +5141,7 @@ describe("validation command entrypoint", () => {
 	test("fails JSON-reporting packs when the child reports failure", () => {
 		const root = createFixtureRoot();
 		try {
-			unlinkSync(join(root, "cli"));
+			rmSync(join(root, "cli"), { recursive: true, force: true });
 			mkdirSync(join(root, "cli"), { recursive: true });
 			writeFileSync(
 				join(root, "cli", "main.ts"),

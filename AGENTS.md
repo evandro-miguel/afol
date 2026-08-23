@@ -5,6 +5,11 @@
 - This repository is already AFOL-only for active workflows. Use `afol` and
   keep mutable state in `.afol/**`, especially `.afol/wb/**`; do not reopen a
   general migration track.
+- The canonical engine checkout is
+  `/home/ozy/01_projects/dev/afol/afol.public`. New engine code, product tests,
+  public documentation, and release tooling start there. This private
+  repository retains governance, workbench history, and the export factory;
+  do not create a divergent private engine or release from it.
 - Do not use as active flow: `.agents/agents`, `.agents/scripts`,
   `.agents/runtime`, `.agents/wb`, `.agents/z-arq`, `agents.config`, or
   `legacy:` routes.
@@ -101,10 +106,11 @@ not a project-local skills root.
 
 ## Project RAG
 
-- Identity is live state, not a static readiness claim: Postgres id `1707`,
-  slug `afol-dev`. Run `ragctl project verify --project afol-dev --json`
+- Project RAG identity is live state, not a static readiness claim. Run the
+  configured project's `ragctl project verify --project <slug> --json`
   immediately before trusting indexed results.
-- Indexed root: `/home/ozy/01_projects/dev/afol/afol.dev`.
+- Use the current checkout as the indexed root. Do not mix results from another
+  worktree or repository.
 - Include roots (platform rejects leading-dot dirs): `cli`, `src`, `docs`.
   Do not pass `.afol` or `.agents` as include roots; Project RAG forbids them.
 - This scope leaves a deliberate hidden-administration gap: `.afol/adm/**`
@@ -125,11 +131,13 @@ not a project-local skills root.
   not use a watcher or make resident MCP/core startup a dependency:
 
   ```bash
+  : "${PROJECT_ROOT:?set PROJECT_ROOT to this checkout}"
+  : "${PROJECT_SLUG:?set PROJECT_SLUG to its registered RAG slug}"
   cd "${RAG_REPO_ROOT:?set RAG_REPO_ROOT to the rag-v2 checkout}"
   bun run ingest-project \
-    --root /home/ozy/01_projects/dev/afol/afol.dev \
+    --root "$PROJECT_ROOT" \
     --include cli,src,docs --max-files 100
-  ragctl project verify --project afol-dev --json
+  ragctl project verify --project "$PROJECT_SLUG" --json
   ```
 
   Use `register-project` only when the repository is not registered. Reserve
@@ -137,9 +145,9 @@ not a project-local skills root.
   index repair. Project RAG watchers are removed, so freshness is operator
   checked and manually repaired rather than continuously synchronized.
 - Critical read-only checks:
-  - `ragctl project verify --project afol-dev --json`
-  - `ragctl project search --project afol-dev "<query>" --mode hybrid --json`
-  - `ragctl project file --project afol-dev --file <repo-relative-path> --json`
+  - `ragctl project verify --project "$PROJECT_SLUG" --json`
+  - `ragctl project search --project "$PROJECT_SLUG" "<query>" --mode hybrid --json`
+  - `ragctl project file --project "$PROJECT_SLUG" --file <repo-relative-path> --json`
 - Semantic repository discovery uses Project RAG only. Use the global
   `evandro-rag-system` skill and `ragctl` for semantic navigation; use `rg` and
   focused source reads to confirm exact implementation facts. A stale,

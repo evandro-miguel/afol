@@ -64,7 +64,9 @@ type UpdateChangeSummary = {
 	conflict: number;
 	preserve: number;
 	paths: string[];
+	pathsTruncated: boolean;
 	conflictPaths: string[];
+	conflictPathsTruncated: boolean;
 };
 
 type UpdateCheckJsonSummary = {
@@ -78,6 +80,8 @@ type UpdateCheckJsonSummary = {
 };
 
 type UpdateJsonData = UpdateCheckResult | UpdateCheckJsonSummary;
+
+const MAX_COMPACT_UPDATE_PATHS = 16;
 
 type ParsedUpdateArgs = {
 	dryRun: boolean;
@@ -276,7 +280,9 @@ function summarizeUpdateChanges(
 		conflict: 0,
 		preserve: 0,
 		paths: [],
+		pathsTruncated: false,
 		conflictPaths: [],
+		conflictPathsTruncated: false,
 	};
 
 	for (const operation of result.operations) {
@@ -284,7 +290,11 @@ function summarizeUpdateChanges(
 			continue;
 		}
 		counts.total += 1;
-		counts.paths.push(operation.path);
+		if (counts.paths.length < MAX_COMPACT_UPDATE_PATHS) {
+			counts.paths.push(operation.path);
+		} else {
+			counts.pathsTruncated = true;
+		}
 		if (operation.kind === "create") {
 			counts.create += 1;
 			continue;
@@ -303,7 +313,11 @@ function summarizeUpdateChanges(
 		}
 		if (operation.kind === "conflict") {
 			counts.conflict += 1;
-			counts.conflictPaths.push(operation.path);
+			if (counts.conflictPaths.length < MAX_COMPACT_UPDATE_PATHS) {
+				counts.conflictPaths.push(operation.path);
+			} else {
+				counts.conflictPathsTruncated = true;
+			}
 		}
 	}
 

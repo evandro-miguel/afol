@@ -3,7 +3,9 @@
   "scenario_id": "pstr-validate",
   "scenario_version": "1.0.0",
   "pack_id": "pstr-integrity",
-  "command": "afol ps validate",
+  "command": "afol pstr validate --json",
+  "sandbox": true,
+  "coverage": { "subcommands": ["pstr validate|v --json"] },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

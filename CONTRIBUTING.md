@@ -1,9 +1,10 @@
-# Contributing To AFOL
+# Contributing to AFOL
 
-AFOL accepts focused changes that preserve the external `afol` command,
-AFOL-only state ownership, and the Linux x64 release boundary.
+AFOL is alpha software. Keep changes focused, preserve existing behavior unless
+the proposal explicitly changes it, and add evidence for every completion
+claim.
 
-## Development Flow
+## Development flow
 
 1. Create a short-lived branch from `dev`.
 2. Install the pinned dependencies with `bun install --frozen-lockfile`.
@@ -11,16 +12,15 @@ AFOL-only state ownership, and the Linux x64 release boundary.
 4. Add focused tests for behavior changes.
 5. Open a pull request into `dev`.
 
-`main` is the official release feed and accepts changes only through the
-governed promotion path from `dev`. Do not force-push shared branches.
+## Required checks
 
-## Required Checks
-
-Run the narrowest relevant test while developing. Before requesting release
-review, run:
+Run the narrowest relevant test while developing. Before requesting review for
+release-affecting changes, run:
 
 ```bash
+bun run version:check
 bun run manifest:check
+bun run template:check
 bun run typecheck
 bun test --only-failures
 bun run local-state:rebuild
@@ -28,20 +28,25 @@ bun run kernel -- health --release --json
 bun run validate:release
 ```
 
-Documentation changes should preserve working relative links and valid
-Markdown structure.
+Security checks include Gitleaks and OSV Scanner. Do not commit generated drift.
+Documentation changes should preserve working relative links and valid Markdown
+structure. All release evidence is produced locally against the exact
+candidate SHA; this repository has no hosted CI workflow under ADR-009.
 
-## Security And Privacy
+## Security and privacy
 
 Never commit credentials, private keys, `.env` files, cookies, tokens, private
 repository content, production configuration, or user data. Use the private
 security-advisory channel for vulnerabilities instead of a public issue.
 
-## Scope Boundaries
+## Scope boundaries
 
 - Do not restore the discontinued `.agents` executable/runtime system.
 - Do not add a project-local AFOL executable to downstream scaffolds.
 - Do not claim support for platforms without observed native or VM-backed
   evidence.
-- Do not publish, deploy, install globally, or change repository visibility as
-  part of an ordinary contribution.
+- Do not deploy, install globally, or change repository visibility as part of an
+  ordinary contribution.
+
+Relevant design changes should include or update a public ADR. See
+[docs/public/adr/README.md](docs/public/adr/README.md) for the public records.
