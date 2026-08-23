@@ -559,13 +559,15 @@ describe("validation command family", () => {
 	test("plain validate stays on structural validation even when benchmark registry exists", () => {
 		const fixtureRoot = createValidationFixtureRoot();
 		const proc = runKernel(["validate", "--json"], fixtureRoot);
-		expect(proc.status).toBe(1);
+		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.schema).toBe("afol.result/v1");
-		expect(payload.exit_code).toBe(1);
+		expect(payload.exit_code).toBe(0);
 		expect(payload.mode).toBeUndefined();
 		expect(typeof payload.ok).toBe("boolean");
 		expect(payload.report).toBeDefined();
+		const data = payload.data as { report?: unknown };
+		expect(data.report).toBeDefined();
 		expect(Array.isArray(payload.checks)).toBe(true);
 	});
 

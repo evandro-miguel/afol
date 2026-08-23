@@ -191,12 +191,12 @@ describe("validate command", () => {
 	});
 
 	test("resolves strict project validation through the invocation router", () => {
-		expect(resolveValidateInvocation(["project", "--strict", "--json"])).toEqual(
-			{
-				kind: "project",
-				args: ["--strict", "--json"],
-			},
-		);
+		expect(
+			resolveValidateInvocation(["project", "--strict", "--json"]),
+		).toEqual({
+			kind: "project",
+			args: ["--strict", "--json"],
+		});
 	});
 
 	test("renders failing drift validation in JSON and human modes", async () => {
@@ -1300,6 +1300,7 @@ describe("validate command", () => {
 			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
 			expect(payload.report).toBeDefined();
+			expect(payload.data).toHaveProperty("report");
 			const checks = payload.checks as Array<Record<string, unknown>>;
 			const manifestCheck = checks.find((entry) => entry.id === "manifest");
 			expect(manifestCheck?.ok).toBe(true);

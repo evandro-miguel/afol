@@ -3002,10 +3002,7 @@ export function closeSession(
 			// write, but only if the durable close is strictly terminally coherent.
 			if (!closeEventRecorded) {
 				const verification = verifyWorkbenchTasks(paths.sessionDir, true);
-				pushChecklistCloseWarnings(
-					checklistCloseWarnings,
-					verification,
-				);
+				pushChecklistCloseWarnings(checklistCloseWarnings, verification);
 				if (!verification.allCompleted) {
 					const message =
 						verification.issues.map((issue) => issue.message).join("; ") ||

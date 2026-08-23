@@ -868,8 +868,7 @@ export function verifyTaskText(content: string, file: string): VerifyResult {
 	const seenTaskIds = new Map<string, VerifyTask>();
 	for (const task of tasks) recordTaskState(result, task, seenTaskIds);
 	result.allCompleted =
-		result.openTasks.length === 0 &&
-		!result.issues.some(isBlockingVerifyIssue);
+		result.openTasks.length === 0 && !result.issues.some(isBlockingVerifyIssue);
 	return result;
 }
 
@@ -941,8 +940,7 @@ export function verifyWorkbenchTasks(
 	}
 
 	result.allCompleted =
-		result.openTasks.length === 0 &&
-		!result.issues.some(isBlockingVerifyIssue);
+		result.openTasks.length === 0 && !result.issues.some(isBlockingVerifyIssue);
 	return result;
 }
 

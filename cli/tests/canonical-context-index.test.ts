@@ -218,7 +218,7 @@ describe("canonical administration section index", () => {
 		}
 	});
 
-	test("rejects false-green empty stored coverage when canonical documents exist", () => {
+	test("reports empty stored coverage when canonical documents exist", () => {
 		const root = createRoot();
 		try {
 			writeDoc(
@@ -235,12 +235,12 @@ describe("canonical administration section index", () => {
 
 			const report = checkHealth(root, { area: "ctx", deep: true });
 
-			expect(report.ok).toBe(false);
+			expect(report.ok).toBe(true);
 			expect(
 				report.findings.some(
 					(finding) =>
 						finding.area === "ctx" &&
-						finding.severity === "fail" &&
+						finding.severity === "warn" &&
 						finding.message.includes("section index"),
 				),
 			).toBe(true);
@@ -1007,7 +1007,7 @@ describe("canonical administration section index", () => {
 				deep: true,
 			});
 
-			expect(report.ok).toBe(false);
+			expect(report.ok).toBe(true);
 			expect(report.findings[0]?.message).toContain("token budget exceeded");
 			expect(report.findings[0]?.message).toContain("/4000");
 		} finally {

@@ -21,10 +21,7 @@ import {
 	detectSessionHealth,
 	loadWorkBenchIndexSnapshot,
 } from "../local-state/workbench-index";
-import {
-	isBlockingVerifyIssue,
-	verifyAllSessions,
-} from "../workbench/verify";
+import { isBlockingVerifyIssue, verifyAllSessions } from "../workbench/verify";
 import { admitsEvidenceTransitionIssue } from "./evidence-transition-admission";
 import {
 	admitsLegacyEvidenceIssue,
