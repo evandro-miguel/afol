@@ -8,7 +8,7 @@ owners:
 workstream_intent: Close native Windows, deterministic-byte, isolation, locking, scanner, and release-CI blockers.
 artifact_purpose: Define exact readiness evidence for the public alpha release pipeline.
 created_at: '2026-08-18T00:00:00Z'
-updated_at: '2026-08-18T00:00:00Z'
+updated_at: '2026-08-19T00:00:00Z'
 roadmap_feature: F-34
 spec_role: child
 parent_spec: 260818_public-product-and-portfolio-readiness_spec_01
@@ -44,3 +44,12 @@ risk_level: high
 - [ ] Template hashes match across Linux, Windows, and `core.autocrlf=true`.
 - [ ] Fault-injection and clean-checkout isolation tests pass.
 - [ ] `validate:release` passes on the exact candidate commit.
+
+## Public-Readiness Reconciliation (2026-08-19)
+
+Hosted Windows jobs on the factory account fail before useful runner
+assignment because of GitHub Actions spending-limit state. The public alpha
+contract is therefore Linux x64 supported and native Windows experimental.
+Hosted Windows green on the exact tag remains required before any
+"Windows supported" claim. The public CI Windows job runs for observation
+and does not gate the Linux alpha.

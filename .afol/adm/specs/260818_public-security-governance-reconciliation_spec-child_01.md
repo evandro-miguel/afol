@@ -8,7 +8,7 @@ owners:
 workstream_intent: Reconcile security, lifecycle, release, and no-op evidence claims before publication.
 artifact_purpose: Prevent public claims from exceeding exact observed governance evidence.
 created_at: '2026-08-18T00:00:00Z'
-updated_at: '2026-08-18T00:00:00Z'
+updated_at: '2026-08-19T00:00:00Z'
 roadmap_feature: F-34
 spec_role: child
 parent_spec: 260818_public-product-and-portfolio-readiness_spec_01
@@ -40,5 +40,7 @@ risk_level: high
 
 - [ ] Zero release-blocking spec acceptance item remains pending.
 - [x] Issue #84 is closed with exact validation evidence.
-- [ ] README, roadmap, specs, command metadata, and implementation agree.
-- [ ] Threat-model claims state deployment boundaries and non-boundaries.
+- [x] README, roadmap, specs, command metadata, and implementation agree on
+      Linux x64 supported, WSL2 observed, Windows experimental, and
+      macOS/ARM unsupported.
+- [x] Threat-model claims state deployment boundaries and non-boundaries.

@@ -97,10 +97,14 @@ not a project-local skills root.
 
 ## Project RAG
 
-- Identity is live state, not a static readiness claim: Postgres id `1707`,
-  slug `afol-dev`. Run `ragctl project verify --project afol-dev --json`
-  immediately before trusting indexed results.
-- Indexed root: `/home/ozy/01_projects/dev/afol/afol.dev`.
+- This `afol-public` worktree is live state, not a static readiness claim:
+  Postgres id `2423`, slug `afol-afol-public`. Run
+  `ragctl project verify --project afol-afol-public --json` immediately before
+  trusting indexed results from this checkout.
+- Indexed root: `/home/ozy/01_projects/dev/afol/afol.afol-public`.
+- The factory `dev` worktree remains a separate index: Postgres id `1707`,
+  slug `afol-dev`, root `/home/ozy/01_projects/dev/afol/afol.dev`. Do not mix
+  the two when searching.
 - Include roots (platform rejects leading-dot dirs): `cli`, `src`, `docs`.
   Do not pass `.afol` or `.agents` as include roots; Project RAG forbids them.
 - This scope leaves a deliberate hidden-administration gap: `.afol/adm/**`
@@ -123,9 +127,9 @@ not a project-local skills root.
   ```bash
   cd "${RAG_REPO_ROOT:?set RAG_REPO_ROOT to the rag-v2 checkout}"
   bun run ingest-project \
-    --root /home/ozy/01_projects/dev/afol/afol.dev \
+    --root /home/ozy/01_projects/dev/afol/afol.afol-public \
     --include cli,src,docs --max-files 100
-  ragctl project verify --project afol-dev --json
+  ragctl project verify --project afol-afol-public --json
   ```
 
   Use `register-project` only when the repository is not registered. Reserve

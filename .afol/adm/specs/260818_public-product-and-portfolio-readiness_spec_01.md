@@ -8,7 +8,7 @@ owners:
 workstream_intent: Establish a clean, reproducible, evidence-backed public AFOL product and portfolio boundary.
 artifact_purpose: Govern the public source cutover, alpha scope, release readiness, legal review, engineering hardening, and public presentation.
 created_at: '2026-08-18T00:00:00Z'
-updated_at: '2026-08-18T00:00:00Z'
+updated_at: '2026-08-19T00:00:00Z'
 roadmap_feature: F-34
 spec_role: parent
 parent_spec: ''
@@ -46,8 +46,11 @@ risk_level: high
 - Version: `0.1.0-alpha.1`.
 - Distribution: binary-first; the package remains private and is not published
   to npm or another registry.
-- Supported: Linux x64 and native Windows x64, each proven on its native CI
-  runner. WSL2 is supported only with an observed smoke.
+- Supported: Linux x64, proven by the Linux release gate. WSL2 is supported
+  only with an observed smoke.
+- Experimental: native Windows x64 until a hosted native Windows job is green
+  on the exact release commit. Do not advertise Windows as supported before
+  that evidence exists.
 - Unsupported for this alpha: macOS and ARM.
 - Stable alpha: init/bootstrap, status and health, governed task lifecycle,
   evidence/done/close, project validation, previewed updates, safe local
