@@ -140,7 +140,6 @@ const FILE_INDEX_SENSITIVE_FILE_PATTERNS = [
 	/(?:^|[-_\s.])keys?(?:[-_\s.]|$)/,
 	/^secrets?(?:\.|$)/,
 	/(?:^|[-_\s.])senhas?(?:[-_\s.]|$)/,
-	/xurupita/,
 ];
 
 function isSensitiveFileIndexSegment(segment: string): boolean {

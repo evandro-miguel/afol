@@ -33,6 +33,7 @@ const factoryOnlyScripts = [
 	"benchmark:multitask:json",
 	"validate:project-benchmarks",
 	"validate:ux-governance",
+	"public:export",
 ] as const;
 
 const factoryOnlyDevDependencies = ["ajv", "ajv-formats"] as const;

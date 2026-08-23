@@ -54,8 +54,6 @@ Replace this section after bootstrap with real product context.
 - `main` -> never direct-push.
 - Production deploy -> forbidden unless the user explicitly asks in the current
   turn.
-- Forbidden without explicit deploy request -> `bun run deploy`,
-  `wrangler deploy`, and any Cloudflare publish command.
 
 ## Stack
 
@@ -89,25 +87,20 @@ Replace this section after bootstrap with real product context.
 
 ## Context And Tokens
 
-- Use Caveman-style updates by default: concise, no filler, no repeated setup.
-  Keep full precise prose when compression could hide risk, order, or evidence.
-- Start narrow with `rg`, `fd`, focused reads, Project RAG through `ragctl`,
-  and existing `.afol/pstr/` maps before broad scans.
-- Use RTK only for noisy output. Use `RTK.md` when present for detailed policy.
+- Keep updates concise. Use full precise prose when compression could hide
+  risk, order, or evidence.
+- Start narrow with `rg`, `fd`, focused reads, and existing `.afol/pstr/` maps
+  before broad scans.
+- Use `RTK.md` only when the project has that optional policy file.
 - Stop discovery when more context will not change decisions.
 
 ## Tool Routing
 
 - Exact search/config: `rg`, `fd`, `jq`.
 - Current structure: `.afol/pstr/` when present.
-- Semantic repository navigation: Project RAG only. Use the global
-  `evandro-rag-system` skill when available, verify with
-  `ragctl project verify --project <project-slug-or-id> --json`, then search
-  with `ragctl project search --project <project-slug-or-id> "<query>" --json`.
-  Confirm findings with focused local reads. If the project is unregistered or
-  stale, use that skill's bounded registration or ingestion flow before relying
-  on semantic results.
-- Syntax: `sg`/`ast-grep`.
+- Semantic search is optional and project-specific. Confirm indexed hits with
+  a focused local read.
+- Syntax: `sg`/`ast-grep` when available.
 - Validation/docs/tasks: `afol` and project-local package commands.
 
 ## Telemetry And Indexes

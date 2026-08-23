@@ -24,15 +24,14 @@ Replace this section after bootstrap with real product purpose and constraints.
   durable governed plan state. It defaults to `.afol/wb/`. Active-session
   pointers and local runtime state live under the configured mutable directory,
   which defaults to `.afol/`. The plan directory must start from the template baseline
-  and must not include factory repo history, root workbench sessions,
-  active-session pointers, caches, telemetry events, benchmark results, or
-  development-only evidence.
+  and must not include upstream AFOL source history, caches, telemetry
+  events, benchmark results, or development-only evidence.
 - `.afol/state/afol.db` is SQLite v1 and materializes workbench sessions, task
   rows, source hashes, and evidence only. Broader `adm/pstr/memory/library/ctx`
   materialization belongs to State DB v2/future.
-- If a future update proposes broad docs, source seeds, factory tests, caches,
-  or root `.agents/wb/` legacy history, treat that as export drift and reject it until
-  the scaffold manifest and docs explicitly justify the payload.
+- If a future update proposes broad docs, source seeds, caches, or retired
+  `.agents/wb/` history, treat that as template drift and reject it until the
+  scaffold manifest and docs explicitly justify the payload.
 
 ## Governed Execution
 
@@ -125,9 +124,7 @@ afol local-state rebuild --json
 - Updating `main` -> merge from `dev` through normal Git merge or PR path.
 - Production deploy -> forbidden unless the user explicitly asks in the current
   turn.
-- Forbidden without explicit deploy request -> `bun run deploy`,
-  `wrangler deploy`, and any Cloudflare publish command.
-- Deploy readiness requested -> report exact deploy command and required
+- Deploy readiness requested -> report the exact command and required
   environment. Leave execution to the user.
 
 ## Stack
@@ -171,15 +168,13 @@ afol local-state rebuild --json
 
 ## Context And Tokens
 
-- Use Caveman-style updates by default: concise, no filler, no repeated setup.
-  Keep full precise prose when compression could hide risk, order, or evidence.
-- Start narrow: `rg`, `fd`, focused reads, Project RAG through `ragctl`, and
-  existing `.afol/pstr/` maps before broad scans.
+- Keep updates concise. Use full precise prose when compression could hide
+  risk, order, or evidence.
+- Start narrow: `rg`, `fd`, focused reads, and existing `.afol/pstr/` maps
+  before broad scans.
 - Prefer repo-local configured plan state and `.afol/memory/` records
   before broad historical reads.
-- Use RTK only for noisy shell output:
-  `rtk git status`, `rtk find`, `rtk summary`, bounded `rtk grep`.
-  Use `RTK.md` when present for detailed command policy.
+- Use `RTK.md` only when the project has that optional policy file.
 - Keep raw output when exact lines or failure evidence matters.
 - Stop context collection when it will not change decisions.
 
@@ -187,41 +182,12 @@ afol local-state rebuild --json
 
 - Exact search/config: `rg`, `fd`, `jq`.
 - Current structure: `.afol/pstr/` when present.
-- Semantic repository navigation: Project RAG only. Use the global
-  `evandro-rag-system` skill when available, verify with
-  `ragctl project verify --project <project-slug-or-id> --json`, then search
-  with `ragctl project search --project <project-slug-or-id> "<query>" --json`.
-  Confirm findings with focused local reads. If the project is unregistered or
-  stale, use that skill's bounded registration or ingestion flow before relying
-  on semantic results.
-- Verify the live Project RAG index immediately before trusting a result. A
-  stale, failed, missing, or out-of-scope result is orientation only, never
-  proof of current code or governance.
-- Project RAG scopes may exclude leading-dot directories. Treat `.afol/adm/**`
-  and `.agents/**` as a deliberate hidden-administration gap when they are not
-  registered: read those paths directly from the checkout instead of inferring
-  their contents or absence from search.
-- For an existing registered project with stale indexed files, use a bounded
-  manual delta reingest from the selected `rag-v2` checkout, then verify again:
-
-  ```bash
-  bun run ingest-project \
-    --root <absolute-project-root> \
-    --include <include-roots> --max-files 100
-  ragctl project verify --project <project-slug-or-id> --json
-  ```
-
-  Repeat only as needed, and reserve `--force` for an explicitly owned full
-  rebuild. Project RAG watchers are removed; no watcher or resident MCP/core
-  startup is required for retrieval or freshness repair.
-- Syntax search: `sg`/`ast-grep`.
-- Repo history/context: `git`/`gh`.
-- Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
-  `lightpanda`.
-- Runtime/tasks: `bun`/`node`/`npm`, `afol`, and project-specific toolchains
-  when present.
-- Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md`, `markitdown`,
-  `yt-dlp`, `docker compose`, `tmux`.
+- Semantic search is optional and project-specific. Confirm any indexed hit
+  with a focused local read. Read `.afol/adm/**` and `.agents/**` from disk
+  when those trees are not in an index.
+- Syntax search: `sg`/`ast-grep` when available.
+- Repo history: `git`.
+- Runtime/tasks: `afol` and the project's own toolchain.
 
 ## Planning And Evidence
 
@@ -272,10 +238,9 @@ afol local-state rebuild --json
 - Temp files -> configured `paths.tmp_dir` (default `.afol/tmp/`).
 - Build artifacts -> `dist/`.
 - Workbench artifacts -> `.afol/wb/<session>/`.
-- Local auxiliary worktrees -> use the repository owner's configured external
-  worktree root; do not create new nested worktrees inside this project.
-- Legacy nested `.worktree/` directories may stay ignored during migration; do
-  not create new nested worktrees.
+- Local auxiliary worktrees -> keep them outside this project when the
+  repository owner uses one; do not create nested worktrees inside this
+  project.
 - Script incidental output -> never root. If it happens, treat as script bug and
   fix script.
 - User data -> never delete or move vault content, backups, keys, secrets,

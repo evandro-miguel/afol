@@ -1652,14 +1652,12 @@ describe("local-state project indexer", () => {
 		const root = buildFixture();
 		try {
 			const excludedPaths = [
-				"anotacoes_ozy_d_v2/20_areas/21-Evandro-Miguel/private/Chave Caixa.md",
-				"anotacoes_ozy_d_v2/20_areas/21-Evandro-Miguel/private/Endereco Casa.md",
-				"anotacoes_ozy_d_v2/90_archive/93-Legacy/Xurupita - Archive.md",
+				"notes/private/bank-key.md",
+				"notes/private/home-address.md",
 				"docs/Private/client.md",
 				"docs/PRIVATE/upper.md",
 				"docs/Chave/client.md",
 				"docs/Endereco/data.md",
-				"archive/Xurupita/note.md",
 				"docs/credentials.prod.md",
 				"src/agent_memory_system.egg-info/PKG-INFO",
 			];

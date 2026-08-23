@@ -63,6 +63,7 @@
 		"smoke:dist": "bun run cli/dev/dist-smoke.ts",
 		"smoke:wsl2": "bun run cli/dev/dist-smoke.ts --wsl2",
 		"smoke:clean": "bun run cli/dev/clean-smoke.ts",
+		"smoke:example": "bun run cli/dev/public-example-smoke.ts",
 		"public:export": "bun run scripts/export-public.ts",
 		"public:audit": "bun run scripts/audit-public-content.ts"
 	},

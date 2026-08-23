@@ -1,16 +1,3 @@
-# Canonical template text is hashed byte-for-byte; keep these payloads stable on Windows.
+# Canonical template and CLI text is hashed byte-for-byte.
 /cli/** text eol=lf
 /src/project-template/** text eol=lf
-/.afol/data/migrations/** -text
-/.afol/adm/doctrine/PROJECT-MANIFESTO.md text eol=lf
-/.afol/data/migrations/260726_f29-afol-only-active-canon/originals/.agents/config.json text eol=lf
-/.afol/adm/source/universal-skills/skills/afol-rules/SKILL.md text eol=lf
-/.afol/adm/tools.json text eol=lf
-/.agents/lock.json text eol=lf
-/.agents/manifest.json text eol=lf
-/.agents/skills/** text eol=lf
-/src/project-template/.afol/adm/source/universal-skills/skills/afol-rules/SKILL.md text eol=lf
-/src/project-template/.afol/adm/tools.json text eol=lf
-/src/project-template/.agents/lock.json text eol=lf
-/src/project-template/.agents/manifest.json text eol=lf
-/src/project-template/.agents/skills/** text eol=lf

@@ -25,9 +25,7 @@
     "src"
   ],
   "mapped_directories": {
-    "docs/public": "docs",
-    "src/project-template/.afol": ".afol",
-    "src/project-template/.agents": ".agents"
+    "docs/public": "docs"
   },
   "exclude": [
     "cli/tests/active-canon-migration.test.ts",
@@ -40,6 +38,8 @@
     "cli/tests/skill-command.test.ts",
     "cli/tests/validate-internals.test.ts",
     "cli/tests/validation.test.ts",
+    "scripts/export-public.ts",
+    "scripts/public-files.json",
     "src/project-template/.agents/skills/ux-design"
   ]
 }
