@@ -11,7 +11,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildReleaseSecurityScanOutcomes } from "../dev/security-scan";
+import {
+	buildReleaseSecurityScanOutcomes,
+	runReleaseSecurityScans,
+} from "../dev/security-scan";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 
@@ -326,6 +329,53 @@ describe("security scan CLI", () => {
 					}),
 				]),
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("binds an explicit Windows candidate artifact into the release target", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "security-scan-explicit-artifact-"),
+		);
+		mkdirSync(join(root, "dist"), { recursive: true });
+		writeFileSync(join(root, "dist", "afol.exe"), "windows artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+
+		try {
+			const { report } = runReleaseSecurityScans({
+				cwd: root,
+				artifact: "dist\\afol.exe",
+			});
+			expect(report.target).toMatchObject({
+				artifact: "dist/afol.exe",
+				artifact_sha256: createHash("sha256")
+					.update(readFileSync(join(root, "dist", "afol.exe")))
+					.digest("hex"),
+			});
+			expect(report.target_errors).not.toContain(
+				"missing release artifact: dist/afol.exe",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects hostile raw artifact targets before a release scan", () => {
+		const root = mkdtempSync(join(tmpdir(), "security-scan-hostile-artifact-"));
+		try {
+			for (const artifact of [
+				"../dist/afol.exe",
+				"dist\\..\\afol.exe",
+				"C:dist\\afol.exe",
+				"\\\\server\\share\\afol.exe",
+				"dist/CON.exe",
+				"dist/afol.exe ",
+			]) {
+				expect(() => runReleaseSecurityScans({ cwd: root, artifact })).toThrow(
+					/invalid release artifact/,
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

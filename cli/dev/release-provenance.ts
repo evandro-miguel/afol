@@ -17,6 +17,7 @@ import {
 	DEFAULT_BUILD_COMMAND,
 	readMinifiedCompiledReleaseBuildReceipt,
 } from "./build-release";
+import { resolveExistingReleaseArtifact } from "./release-artifact";
 import {
 	buildReleaseSecurityScanOutcomes,
 	DEFAULT_RELEASE_ARTIFACT,
@@ -471,10 +472,12 @@ function readReleaseSecurityScanEvidence(
 
 function refreshReleaseSecurityScanEvidence(
 	cwd: string,
+	artifact: string,
 	env?: NodeJS.ProcessEnv,
 ): void {
 	const { report } = runReleaseSecurityScans({
 		cwd,
+		artifact,
 		...(env ? { env } : {}),
 	});
 	writeReleaseSecurityScanReport(report, cwd);
@@ -508,8 +511,10 @@ export function buildReleaseProvenance(
 	options: WriteReleaseProvenanceOptions = {},
 ): ReleaseProvenance {
 	const cwd = options.cwd ?? process.cwd();
-	const artifact = options.artifact ?? DEFAULT_RELEASE_ARTIFACT;
-	const artifactPath = join(cwd, artifact);
+	const { artifact, artifactPath } = resolveExistingReleaseArtifact(
+		cwd,
+		options.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	);
 	if (!existsSync(artifactPath)) {
 		throw new Error(`missing release artifact: ${artifact}`);
 	}
@@ -533,7 +538,7 @@ export function buildReleaseProvenance(
 	}
 	if (options.releaseMode) {
 		assertCleanReleaseSource(cwd);
-		refreshReleaseSecurityScanEvidence(cwd, options.env);
+		refreshReleaseSecurityScanEvidence(cwd, artifact, options.env);
 	}
 	const securityScanners = options.releaseMode
 		? readReleaseSecurityScanEvidence(cwd, {
@@ -597,13 +602,25 @@ export function writeReleaseProvenance(
 	provenancePath: string;
 } {
 	const cwd = options.cwd ?? process.cwd();
-	const artifact = options.artifact ?? DEFAULT_RELEASE_ARTIFACT;
+	const { artifact } = resolveExistingReleaseArtifact(
+		cwd,
+		options.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	);
 	const checksumPath = join(cwd, `${artifact}.sha256`);
 	const provenancePath = join(cwd, `${artifact}.provenance.json`);
-	const provenance = buildReleaseProvenance(options);
+	const provenance = buildReleaseProvenance({ ...options, artifact });
 
 	const checksumContent = `${provenance.sha256}  ${artifact}\n`;
 	const provenanceContent = `${JSON.stringify(provenance, null, 2)}\n`;
+	const revalidated = resolveExistingReleaseArtifact(cwd, artifact);
+	if (
+		sha256Hex(readFileSync(revalidated.artifactPath)) !== provenance.sha256 ||
+		statSync(revalidated.artifactPath).size !== provenance.size_bytes
+	) {
+		throw new Error(
+			`release artifact changed before sidecar write: ${artifact}`,
+		);
+	}
 	writeFileAtomically(checksumPath, checksumContent);
 	writeFileAtomically(provenancePath, provenanceContent);
 	assertReleaseProvenanceBindsArtifact(
