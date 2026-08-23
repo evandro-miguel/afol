@@ -4,6 +4,8 @@
   "scenario_version": "1.0.0",
   "pack_id": "context-bundles",
   "command": "afol cx bundle",
+  "sandbox": true,
+  "setup": [["afol", "cx", "build"]],
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
