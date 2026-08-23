@@ -24,3 +24,7 @@ Release artifacts are compiled from this public source. Their receipt binds
 the build flags and artifact hash, while provenance binds the exact Git commit,
 package metadata, lockfile, template hash, platform, architecture, and scanner
 outcomes.
+
+The first public alpha advertises Linux x64. Native Windows is experimental.
+See [Architecture decision records](adr/README.md) for the public contract
+choices.

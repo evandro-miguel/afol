@@ -16,6 +16,13 @@ Security invariants include:
 - keep release scanners, receipts, checksums, and provenance tied to the exact
   artifact.
 
-Agent and remote operating modes restrict capabilities but are not
-authentication mechanisms. A malicious same-user process can still modify
-files AFOL can access.
+## Boundaries and non-boundaries
+
+In scope: the resolved project root, path and symlink checks, subprocess
+timeouts and output limits, lock identity, mutation journals, and release
+artifact binding.
+
+Out of scope: authentication of principals, isolation from another process
+with the same OS permissions, multi-user authorization, and sandboxing a
+hostile same-user agent. Agent and remote modes restrict capabilities; they
+are not identity verification.

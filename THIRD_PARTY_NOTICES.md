@@ -14,9 +14,7 @@ remain under their respective licenses:
 | Biome | MIT OR Apache-2.0 |
 | Bun type definitions | MIT |
 
-The exported AFOL template contains only AFOL-owned project skills. The
-third-party `ux-design` skill used in the private development environment is
-explicitly excluded from the generated template and public export.
+The distributed project template contains only AFOL-owned skills.
 
 Transitive dependency notices and exact versions are represented by the
 release SBOM. This file is not a substitute for the license texts shipped by

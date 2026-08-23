@@ -35,9 +35,12 @@ jobs:
         run: bun run test:full
       - name: Build and smoke
         run: bun run build && bun run release:provenance && bun run smoke:dist
+      - name: Public example smoke
+        run: bun run smoke:example
 
   windows:
     runs-on: windows-2025
+    continue-on-error: true
     steps:
       - name: Checkout with Windows line-ending policy
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

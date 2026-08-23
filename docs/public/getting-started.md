@@ -1,7 +1,7 @@
 # Getting started
 
-AFOL is a standalone local CLI. Install a verified release asset, create or
-enter a Git repository, and run `afol init`.
+Install a verified Linux x64 release, or build `./dist/afol` from this
+repository. Then create a Git repository and run `afol init`.
 
 ```bash
 mkdir afol-demo
@@ -11,15 +11,25 @@ afol init
 afol status
 ```
 
-Create a governed one-task workflow with an observed check:
+One evidenced task:
 
 ```bash
 afol qt first-proof -t "Create the first verified change" -c "git diff --check"
 ```
 
-For work that needs multiple tasks, use `afol new`, `afol start`, `afol done
---execute`, and `afol close`. AFOL writes mutable state under `.afol/` and
-provider-facing metadata under `.agents/`.
+Several tasks:
 
-See [Troubleshooting](troubleshooting.md) if the project cannot be resolved or
-a task cannot close.
+```bash
+afol new feature-name --task "Implement behavior" --task "Add tests"
+afol start T-01
+# edit the project
+afol done T-01 --execute "git diff --check"
+afol close
+```
+
+AFOL writes mutable state under `.afol/` and provider metadata under
+`.agents/`. The `afol` executable must stay outside the project.
+
+Use `afol help` and `afol help <command>` for flags. See
+[Command reference](command-reference.md) and
+[Troubleshooting](troubleshooting.md).

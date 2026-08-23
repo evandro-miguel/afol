@@ -13,5 +13,5 @@ afol qt verified-change -t "Make one verified change" -c "git diff --check"
 afol status
 ```
 
-The CI smoke test exercises the same bootstrap and lifecycle through the
-compiled release artifact in an empty temporary directory.
+`bun run smoke:example` repeats this bootstrap through the compiled
+`dist/afol` artifact in an empty temporary directory.

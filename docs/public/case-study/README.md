@@ -34,15 +34,14 @@ execution.
 Human-readable state improves auditability but requires drift validation.
 Binary-first distribution narrows installation risk but delays package-manager
 convenience. Strong governance increases up-front discipline but produces
-reviewable evidence. Hosted timing is useful observation, not deterministic
-performance proof.
+reviewable evidence. Local timings are observations, not service-level
+objectives.
 
 ## Evidence and limits
 
-The release workflow publishes the exact tests, critical-surface coverage,
-scanner outcomes, artifact checksum, provenance, SBOM, and supported platform
-evidence for each tag. No metric is claimed here without a release artifact.
+A public release should publish tests, selected coverage, scanner outcomes,
+checksum, provenance, and SBOM for the tagged commit. No metric here is a
+hosted-CI guarantee.
 
 Current limits include macOS/ARM, multi-principal authentication, experimental
-evolution features, and hosted Windows evidence that remains blocked until the
-CI account can start runners.
+evolution features, and native Windows.

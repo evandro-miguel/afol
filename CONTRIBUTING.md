@@ -25,9 +25,10 @@ identities.
   and rollback.
 - Do not commit generated drift. Run `bun run version:check`,
   `bun run manifest:check`, and `bun run template:check`.
-- Do not add absolute paths, private repository names, credentials, raw agent
-  sessions, or machine-specific state.
+- Do not add absolute home paths, credentials, raw agent sessions, or
+  machine-specific state.
 - Keep runtime dependencies in `dependencies`, not `devDependencies`.
 - Mark new commands `stable`, `experimental`, or `compatibility`.
 
 Relevant design changes should include or update an ADR under `docs/adr/`.
+See [docs/adr/README.md](docs/adr/README.md) for the public records.

@@ -7,5 +7,5 @@
 - Vulnerabilities: use private vulnerability reporting, never a public issue.
 
 Support is best-effort during the alpha. Linux x64 is the supported release
-target; other platforms may receive diagnostic help without a compatibility
-guarantee.
+target. WSL2 and experimental Windows may receive diagnostic help without a
+compatibility guarantee.
