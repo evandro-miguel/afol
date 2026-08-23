@@ -26,4 +26,4 @@ spec_waiver_reason: "Narrow repo-local Windows candidate provenance recovery; no
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
 | T-01 | done | worker | Implement canonical receipt, scanner, and provenance artifact handling. attempt=1 |
-| T-02 | pending | worker | Build and validate the local Windows candidate after the source change. |
+| T-02 | in_progress | worker | Build and validate the local Windows candidate after the source change. attempt=1 |
