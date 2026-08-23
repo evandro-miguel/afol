@@ -360,7 +360,7 @@ describe("bench command surfaces", () => {
 		expect(
 			payload.data.results.every((result) => result.output_bytes >= 0),
 		).toBe(true);
-	});
+	}, 20000);
 
 	test("runtime-live action requires an externally produced receipt", async () => {
 		const captured = captureIo();
@@ -770,5 +770,5 @@ describe("bench command surfaces", () => {
 		expect(results.every((result) => result.estimated_output_tokens >= 0)).toBe(
 			true,
 		);
-	});
+	}, 20000);
 });

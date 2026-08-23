@@ -137,7 +137,7 @@ function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 		return [
 			makeFinding(
 				"adm",
-				"fail",
+				"warn",
 				`missing ${admLabel} directory`,
 				"restore AFOL administration files or run the project bootstrap/update flow",
 			),
@@ -186,7 +186,7 @@ function checkPstrHealth(root: string, deep: boolean): HealthFinding[] {
 	const findingsToReport = staleMaps.length > 0 ? staleMaps : pstrFindings;
 	for (const finding of findingsToReport) {
 		findings.push(
-			makeFinding("pstr", "fail", finding.message, finding.remediation),
+			makeFinding("pstr", "warn", finding.message, finding.remediation),
 		);
 	}
 	if (deep && findings.length === 0) {
@@ -205,7 +205,7 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 	const index = validateWorkBenchIndex(root);
 	if (!index.ok) {
 		findings.push(
-			makeFinding("wb", "fail", index.message, "rebuild the workbench index"),
+			makeFinding("wb", "warn", index.message, "rebuild the workbench index"),
 		);
 	} else if (deep) {
 		findings.push(makeFinding("wb", "info", index.message));
@@ -216,7 +216,7 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 			findings.push(
 				makeFinding(
 					"wb",
-					"fail",
+					"warn",
 					warning.message,
 					"archive or close stale sessions",
 				),
@@ -275,7 +275,7 @@ function checkMemoryHealth(root: string, deep: boolean): HealthFinding[] {
 		return [
 			makeFinding(
 				"memory",
-				"fail",
+				"warn",
 				"missing or invalid project memory",
 				"restore .afol/memory/memory.md",
 			),
@@ -293,7 +293,7 @@ function checkMemoryHealth(root: string, deep: boolean): HealthFinding[] {
 		findings.push(
 			makeFinding(
 				"memory",
-				"fail",
+				"warn",
 				`invalid memory updated_at: ${memory.updated_at}`,
 				"fix the project memory frontmatter",
 			),
@@ -335,7 +335,7 @@ function checkLibraryHealth(root: string, deep: boolean): HealthFinding[] {
 			findings.push(
 				makeFinding(
 					"library",
-					"fail",
+					"warn",
 					`invalid library topic: ${slug}`,
 					"check source metadata and claim references",
 				),
@@ -351,7 +351,7 @@ function checkLibraryHealth(root: string, deep: boolean): HealthFinding[] {
 				findings.push(
 					makeFinding(
 						"library",
-						"fail",
+						"warn",
 						`orphaned claim ${claim.id} in ${topic.slug}: ${missing.join(", ")}`,
 						"repair the claim source_ids",
 					),
@@ -374,7 +374,7 @@ function checkStateHealth(root: string, deep: boolean): HealthFinding[] {
 		return [
 			makeFinding(
 				"state",
-				"fail",
+				"warn",
 				`missing state db: ${projectPaths.abs.stateDb}`,
 				"run afol hydrate for the affected session",
 			),
@@ -389,11 +389,7 @@ function checkStateHealth(root: string, deep: boolean): HealthFinding[] {
 	}).findings.map((finding) =>
 		makeFinding(
 			"state",
-			finding.severity === "fail"
-				? "fail"
-				: finding.severity === "warn"
-					? "warn"
-					: "info",
+			finding.severity === "info" ? "info" : "warn",
 			finding.message,
 			finding.hint,
 		),
@@ -421,7 +417,7 @@ function checkCtxHealth(
 		return [
 			makeFinding(
 				"ctx",
-				"fail",
+				"warn",
 				`${inspected.status} section index: ${sectionIndexPath(root)} (${inspected.detail})`,
 				"rebuild the section index",
 			),
@@ -449,7 +445,7 @@ function checkTokenHealth(
 		return [
 			makeFinding(
 				"token_budget",
-				"fail",
+				"warn",
 				`${inspected.status} section index: ${sectionIndexPath(root)} (${inspected.detail})`,
 				"rebuild the section index",
 			),
@@ -462,7 +458,7 @@ function checkTokenHealth(
 		return [
 			makeFinding(
 				"token_budget",
-				"fail",
+				"warn",
 				`section index token budget exceeded (${usedTokens}/${TOKEN_FAIL_AT})`,
 				"split or prune section sources",
 			),
@@ -541,7 +537,7 @@ function checkEvolutionHealth(root: string, deep: boolean): HealthFinding[] {
 		const findings = health.findings.map((finding) =>
 			makeFinding(
 				"evolution",
-				finding.severity,
+				finding.severity === "fail" ? "warn" : finding.severity,
 				finding.message,
 				finding.severity === "fail"
 					? "rebuild the derived evolution database from canonical journal events"
@@ -562,7 +558,7 @@ function checkEvolutionHealth(root: string, deep: boolean): HealthFinding[] {
 		return [
 			makeFinding(
 				"evolution",
-				"fail",
+				"warn",
 				`invalid evolution configuration: ${(error as Error).message}`,
 				"run afol validate project --json and correct the approved project config",
 			),
@@ -641,17 +637,25 @@ export function checkHealth(
 			findings.push(
 				makeFinding(
 					"wb",
-					opts?.release ? "fail" : "warn",
+					"warn",
 					`open pending_spec entries: ${openPendingSpecs.length}`,
 					"run afol governance pending and resolve or waive each entry",
 				),
 			);
 		}
 	}
+	// Release scope promotes routine warnings so explicit release checks stay strict.
+	const effectiveFindings: HealthFinding[] = opts?.release
+		? findings.map((finding) =>
+				finding.severity === "warn"
+					? { ...finding, severity: "fail" }
+					: finding,
+			)
+		: findings;
 	return {
-		ok: findings.every((finding) => finding.severity !== "fail"),
+		ok: effectiveFindings.every((finding) => finding.severity !== "fail"),
 		checked_at: nowIso(),
-		findings,
-		summary: summarize(findings),
+		findings: effectiveFindings,
+		summary: summarize(effectiveFindings),
 	};
 }

@@ -184,7 +184,7 @@ describe("fleet core service", () => {
 		expect(project?.decision.action).toBe("manual-review");
 		expect(project?.decision.blockers).toContain("dirty-git-worktree");
 		expect(project?.decision.blockers).not.toContain("history-failed");
-		expect(project?.classification).toBe("validation-blocked");
+		expect(project?.classification).toBe("mixed");
 	});
 
 	test("ignores only AFOL-owned dirty paths and keeps other temporary paths advisory", async () => {
@@ -331,13 +331,10 @@ describe("fleet core service", () => {
 		expect(["validation-blocked", "update-conflicted"]).toContain(
 			canonicalEntry.classification,
 		);
-		expect(["validation-blocked", "update-conflicted"]).toContain(
-			legacyEntry.classification,
-		);
-		expect(canonicalEntry.health_summary.ok).toBe(false);
-		expect(canonicalEntry.validation.failed_check_ids.length).toBeGreaterThan(
-			0,
-		);
+		expect(legacyEntry.classification).toBe("mixed");
+		expect(canonicalEntry.health_summary.ok).toBe(true);
+		expect(canonicalEntry.validation.ok).toBe(true);
+		expect(canonicalEntry.validation.failed_check_ids).toEqual([]);
 		expect(
 			canonicalEntry.template_update.operation_summary.total,
 		).toBeGreaterThan(0);

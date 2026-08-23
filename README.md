@@ -6,6 +6,9 @@ check.
 
 No daemon. No cloud account. No model vendor lock-in.
 
+AFOL is the only supported public CLI. The old `.agents` command/runtime
+system is retired and must not be restored.
+
 > Alpha. The supported release target is Linux x64. WSL2 works from observed
 > local smoke. Native Windows is experimental. macOS and ARM are not supported
 > yet.
@@ -19,15 +22,7 @@ a reproducible check. AFOL makes the path explicit and inspectable on disk:
 Intent -> Spec -> Task -> Execution -> Evidence -> Close
 ```
 
-## Install
-
-Download the Linux x64 asset from the latest GitHub Release, then:
-
-```bash
-sha256sum --check afol-linux-x64.sha256
-install -m 755 afol-linux-x64 "$HOME/.local/bin/afol"
-afol --version
-```
+## Local development
 
 Build from source with Bun 1.3.14 or newer:
 
@@ -39,6 +34,16 @@ bun run build
 
 AFOL is binary-first. The npm `package.json` is for source builds and is marked
 private; it is not a registry package.
+
+## Platform and validation boundary
+
+The release claim is intentionally limited to the observed Linux x64 path.
+Platform evidence for this alpha comes from local validation and
+`bun run smoke:wsl2` in a Linux x64 WSL2 shell. It does not establish
+Windows-native, macOS, or ARM support. Hosted-service support is not claimed.
+
+Standalone builds disable Bun's `.env` and `bunfig.toml` autoloading so
+repository-local configuration cannot change binary behavior.
 
 ## Quickstart
 
@@ -79,16 +84,17 @@ stability flag on every command.
 
 ## Docs
 
-- [Getting started](docs/getting-started.md)
-- [Command reference](docs/command-reference.md)
-- [Architecture](docs/architecture.md)
-- [Security model](docs/security-model.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Upgrade and rollback](docs/upgrade-and-rollback.md)
-- [Known limitations](docs/known-limitations.md)
+- [Getting started](docs/public/getting-started.md)
+- [Command reference](docs/public/command-reference.md)
+- [Architecture](docs/public/architecture.md)
+- [Security model](docs/public/security-model.md)
+- [Troubleshooting](docs/public/troubleshooting.md)
+- [Upgrade and rollback](docs/public/upgrade-and-rollback.md)
+- [Known limitations](docs/public/known-limitations.md)
 - [Roadmap](ROADMAP.md)
-- [Case study](docs/case-study/README.md)
-- [Documentation index](docs/README.md)
+- [Case study](docs/public/case-study/README.md)
+- [Public documentation index](docs/public/README.md)
+- [Architecture decisions](docs/public/adr/README.md)
 
 ## Contributing
 

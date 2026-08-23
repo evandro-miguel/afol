@@ -29,8 +29,7 @@ function isLegacyExactFile(path: string): boolean {
 }
 
 function isLegacyFileName(path: string): boolean {
-	const separatorIndex = path.lastIndexOf("/");
-	const base = separatorIndex === -1 ? path : path.slice(separatorIndex + 1);
+	const base = path.split(/[/\\]/).pop() ?? "";
 	if (!base) {
 		return false;
 	}

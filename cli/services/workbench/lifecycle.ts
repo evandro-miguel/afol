@@ -79,7 +79,9 @@ import {
 	evidenceCompletionAuthorization,
 	evidenceCompletionStatus,
 	evidenceResultIsFailure,
+	isBlockingVerifyIssue,
 	isNoopExecutionCommand,
+	type VerifyIssue,
 	verifyWorkbenchTasks,
 } from "./verify";
 
@@ -491,6 +493,22 @@ function uniqueSessionId(wbRoot: string, base: string): string {
 			return candidate;
 		}
 		counter += 1;
+	}
+}
+
+function pushChecklistCloseWarnings(
+	target: string[],
+	verification: { issues: VerifyIssue[] },
+): void {
+	const open = verification.issues.filter(
+		(issue) => !isBlockingVerifyIssue(issue),
+	);
+	if (open.length > 0) {
+		target.push(
+			`${open.length} open checklist item(s): ${open
+				.map((issue) => issue.message)
+				.join("; ")}`,
+		);
 	}
 }
 
@@ -2864,6 +2882,7 @@ export function closeSession(
 			}
 			continuation = undefined;
 		};
+		const checklistCloseWarnings: string[] = [];
 		if (state.kind === "open") {
 			const blockingRows = taskRows.filter((row) =>
 				BLOCKING_STATES.has(row.state),
@@ -2930,8 +2949,9 @@ export function closeSession(
 				);
 				verification.allCompleted =
 					verification.openTasks.length === 0 &&
-					verification.issues.length === 0;
+					!verification.issues.some(isBlockingVerifyIssue);
 			}
+			pushChecklistCloseWarnings(checklistCloseWarnings, verification);
 			if (!verification.allCompleted) {
 				const message =
 					verification.issues.map((issue) => issue.message).join("; ") ||
@@ -3027,6 +3047,7 @@ export function closeSession(
 			// write, but only if the durable close is strictly terminally coherent.
 			if (!closeEventRecorded) {
 				const verification = verifyWorkbenchTasks(paths.sessionDir, true);
+				pushChecklistCloseWarnings(checklistCloseWarnings, verification);
 				if (!verification.allCompleted) {
 					const message =
 						verification.issues.map((issue) => issue.message).join("; ") ||
@@ -3054,6 +3075,7 @@ export function closeSession(
 			reportStatus === "waived" || reportStatus === "missing"
 				? evaluateCloseWarnings(session, paths.sessionDir)
 				: [];
+		warnings.push(...checklistCloseWarnings);
 		if (continuation) {
 			const continuationSession = continuation.session;
 			auxiliaryWarning(

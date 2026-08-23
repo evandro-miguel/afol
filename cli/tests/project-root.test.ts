@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -40,6 +41,10 @@ function mkProjectRoot(name: string): string {
 	writeFileSync(join(afolDir, "config.json"), templateConfig, "utf8");
 	writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 	return root;
+}
+
+function gitInit(dir: string): void {
+	execFileSync("git", ["init", "-q"], { cwd: dir });
 }
 
 describe("project root loader", () => {
@@ -145,6 +150,121 @@ describe("project root loader", () => {
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("returns not-found inside nested git repo when only ancestors have AFOL config", () => {
+		const ancestor = mkProjectRoot("nested-git-unconfigured");
+		const nestedRepo = join(ancestor, "vendor", "nested");
+		mkdirSync(nestedRepo, { recursive: true });
+		gitInit(nestedRepo);
+		try {
+			const loaded = loadProjectRoot(join(nestedRepo, "src"));
+			expect(loaded.ok).toBe(false);
+			if (!loaded.ok) {
+				expect(loaded.error.code).toBe(3);
+				expect(loaded.error.message).toContain("Could not detect project root");
+			}
+		} finally {
+			rmSync(ancestor, { recursive: true, force: true });
+		}
+	});
+
+	test("binds to nested git repo that has its own AFOL config", () => {
+		const ancestor = mkProjectRoot("nested-git-configured");
+		const nestedRepo = join(ancestor, "nested");
+		mkdirSync(join(nestedRepo, ".afol"), { recursive: true });
+		mkdirSync(join(nestedRepo, ".agents"), { recursive: true });
+		gitInit(nestedRepo);
+		writeFileSync(
+			join(nestedRepo, ".afol", "config.json"),
+			templateConfig,
+			"utf8",
+		);
+		writeFileSync(
+			join(nestedRepo, ".agents", "lock.json"),
+			templateLock,
+			"utf8",
+		);
+		try {
+			const loaded = loadProjectRoot(join(nestedRepo, "src"));
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(realpathSync(loaded.value.root)).toBe(realpathSync(nestedRepo));
+		} finally {
+			rmSync(ancestor, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps binding upward inside one git repo rooted at the AFOL project", () => {
+		const root = mkProjectRoot("single-git-project");
+		gitInit(root);
+		const nested = join(root, "a", "b", "c");
+		mkdirSync(nested, { recursive: true });
+		try {
+			const loaded = loadProjectRoot(nested);
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(realpathSync(loaded.value.root)).toBe(realpathSync(root));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("binds correctly when start path is inside the .git directory", () => {
+		const root = mkProjectRoot("inside-git-dir");
+		gitInit(root);
+		mkdirSync(join(root, ".git", "refs"), { recursive: true });
+		try {
+			const loaded = loadProjectRoot(join(root, ".git", "refs"));
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(realpathSync(loaded.value.root)).toBe(realpathSync(root));
+			expect(loaded.value.configSource).toBe("canonical");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("treats a .git file entry as a work-tree boundary", () => {
+		const ancestor = mkProjectRoot("git-file-boundary");
+		const nested = join(ancestor, "wt");
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(
+			join(nested, ".git"),
+			"gitdir: ../elsewhere.git/worktrees/wt\n",
+			"utf8",
+		);
+		try {
+			const loaded = loadProjectRoot(nested);
+			expect(loaded.ok).toBe(false);
+			if (!loaded.ok) {
+				expect(loaded.error.code).toBe(3);
+			}
+		} finally {
+			rmSync(ancestor, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves unbounded upward search outside any git work-tree", () => {
+		const ancestor = mkProjectRoot("no-git-unbounded");
+		const child = join(ancestor, "x", "y", "z");
+		mkdirSync(child, { recursive: true });
+		try {
+			const loaded = loadProjectRoot(child);
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(realpathSync(loaded.value.root)).toBe(realpathSync(ancestor));
+		} finally {
+			rmSync(ancestor, { recursive: true, force: true });
 		}
 	});
 

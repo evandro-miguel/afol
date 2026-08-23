@@ -1400,6 +1400,138 @@ describe("update command", () => {
 		}
 	});
 
+	test("apply surfaces integrity error when rollback journal append also fails", async () => {
+		const root = mkRoot();
+		const originalLock = readFileSync(
+			join(root, ".agents", "lock.json"),
+			"utf8",
+		);
+		const originalManifest = readFileSync(
+			join(root, ".agents", "manifest.json"),
+			"utf8",
+		);
+		try {
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-02",
+							"--task-id",
+							"T-03",
+							"--reason",
+							"rollback on journal failure",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+						{
+							failBeforeJournalAppend: true,
+							failBeforeRollbackJournalAppend: true,
+						},
+					),
+				).toBe(2);
+			});
+			expect(output.stderr.join("\n")).toContain("INTEGRITY_ERROR");
+			expect(output.stderr.join("\n")).toContain(
+				"Injected update apply failure before journal append",
+			);
+			expect(output.stderr.join("\n")).toContain(
+				"rollback journal write failed",
+			);
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+				originalLock,
+			);
+			expect(readFileSync(join(root, ".agents", "manifest.json"), "utf8")).toBe(
+				originalManifest,
+			);
+			expect(existsSync(join(root, ".afol", "adm", "rules", "README.md"))).toBe(
+				false,
+			);
+			const journalPath = join(
+				root,
+				".afol",
+				"data",
+				"mutations",
+				"mutations.jsonl",
+			);
+			expect(existsSync(journalPath)).toBe(true);
+			const journal = loadMutationJournalStrict(root);
+			expect(journal.issues.length).toBeGreaterThan(0);
+			for (const issue of journal.issues)
+				expect(issue.startsWith("unmatched-prepared:")).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rollback surfaces integrity error when its journal append also fails", async () => {
+		const root = mkRoot();
+		try {
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"prepare rollback batch",
+							"--allow-unbound-context",
+							"--json",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(0);
+			});
+			const batchId =
+				(
+					JSON.parse(apply.stdout[0] ?? "{}") as {
+						data?: { batch_id?: string };
+					}
+				).data?.batch_id ?? "";
+			expect(batchId.length).toBeGreaterThan(0);
+			const postApplyLock = readFileSync(
+				join(root, ".agents", "lock.json"),
+				"utf8",
+			);
+			const rollback = capture();
+			expect(
+				await runUpdateCommand(
+					["rollback", "--batch-id", batchId, "--reason", "double failure"],
+					root,
+					rollback.io,
+					{
+						failBeforeJournalAppend: true,
+						failBeforeRollbackJournalAppend: true,
+					},
+				),
+			).toBe(2);
+			expect(rollback.stderr.join("\n")).toContain("INTEGRITY_ERROR");
+			expect(rollback.stderr.join("\n")).toContain(
+				"Injected update rollback failure before journal append",
+			);
+			expect(rollback.stderr.join("\n")).toContain(
+				"rollback journal write failed",
+			);
+			expect(rollback.stderr.join("\n")).toContain(`(batch ${batchId})`);
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+				postApplyLock,
+			);
+			const journal = loadMutationJournalStrict(root);
+			expect(journal.issues.length).toBeGreaterThan(0);
+			for (const issue of journal.issues)
+				expect(
+					issue.startsWith("unmatched-prepared:") ||
+						issue.startsWith("unrecoverable-prepared-undo:"),
+				).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("apply rolls back files written before an injected mid-batch failure", async () => {
 		const root = mkRoot();
 		const originalLock = readFileSync(

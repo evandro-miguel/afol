@@ -234,6 +234,7 @@ type UpdateApplyRuntime = {
 	failAfterWriteCount?: number | undefined;
 	failAfterPrepared?: boolean | undefined;
 	failBeforeJournalAppend?: boolean | undefined;
+	failBeforeRollbackJournalAppend?: boolean | undefined;
 	cliRoot?: string | undefined;
 	invocationPath?: string | undefined;
 	beforeLockedReplan?: (() => void) | undefined;
@@ -555,6 +556,11 @@ function applyUpdateOperations(
 					} catch (error) {
 						restoreAppliedOperations(applied);
 						try {
+							if (runtime.failBeforeRollbackJournalAppend) {
+								throw new Error(
+									"Injected update rollback journal append failure",
+								);
+							}
 							appendMutationRecords(
 								projectRoot,
 								staged.map((entry) => ({
@@ -562,7 +568,11 @@ function applyUpdateOperations(
 									status: "rolled_back" as const,
 								})),
 							);
-						} catch {}
+						} catch (journalError) {
+							throw new Error(
+								`INTEGRITY_ERROR: update apply (batch ${staged[0]?.record.batchId ?? "unknown"}) rolled back on disk but rollback journal write failed: ${(journalError as Error).message}. Original error: ${(error as Error).message}`,
+							);
+						}
 						throw error;
 					}
 					return { batchId: staged[0]?.record.batchId ?? null, result };
@@ -727,6 +737,11 @@ function rollbackUpdateBatch(
 								});
 						}
 						try {
+							if (runtime.failBeforeRollbackJournalAppend) {
+								throw new Error(
+									"Injected update rollback journal append failure",
+								);
+							}
 							appendMutationRecords(
 								projectRoot,
 								undoRecords.map((record) => ({
@@ -734,7 +749,11 @@ function rollbackUpdateBatch(
 									status: "rolled_back" as const,
 								})),
 							);
-						} catch {}
+						} catch (journalError) {
+							throw new Error(
+								`INTEGRITY_ERROR: update rollback (batch ${batchId}) restored files on disk but rollback journal write failed: ${(journalError as Error).message}. Original error: ${(error as Error).message}`,
+							);
+						}
 						throw error;
 					}
 					return { status: "rolled-back", batchId };

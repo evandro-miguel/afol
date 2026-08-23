@@ -287,6 +287,11 @@
           "description": "Validate project structure and include drift checks"
         },
         {
+          "usage": "project --strict --json",
+          "side_effect": "read",
+          "description": "Strict validation keeps failed hygiene checks blocking (release gate)"
+        },
+        {
           "usage": "drift --json",
           "side_effect": "read",
           "description": "Run drift validation only"

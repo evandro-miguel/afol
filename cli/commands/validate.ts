@@ -31,16 +31,18 @@ type DriftJsonData = {
 
 type ValidateRunner = (
 	projectRoot: string,
-	options: { checkDrift: boolean },
+	options: { checkDrift: boolean; strict: boolean },
 ) => Promise<ValidationReport>;
 
 function parseValidateArgs(args: string[]): {
 	json: boolean;
 	checkDrift: boolean;
+	strict: boolean;
 	mode: "project" | "drift";
 } {
 	let json = false;
 	let checkDrift = false;
+	let strict = false;
 	let mode: "project" | "drift" = "project";
 	const values = [...args];
 	if (values[0] === "validate") {
@@ -60,13 +62,17 @@ function parseValidateArgs(args: string[]): {
 			checkDrift = true;
 			continue;
 		}
+		if (value === "--strict") {
+			strict = true;
+			continue;
+		}
 		if (value.startsWith("-")) {
 			throw new Error(`Unknown validate argument: ${value}`);
 		}
 		throw new Error(`Unexpected validate argument: ${value}`);
 	}
 
-	return { json, checkDrift, mode };
+	return { json, checkDrift, strict, mode };
 }
 
 function formatReport(report: ValidationReport): string {
@@ -147,7 +153,12 @@ export async function runValidateCommand(
 	io: CommandIo = DEFAULT_IO,
 	validate: ValidateRunner = validateProjectStructure,
 ): Promise<number> {
-	let parsed: { json: boolean; checkDrift: boolean; mode: "project" | "drift" };
+	let parsed: {
+		json: boolean;
+		checkDrift: boolean;
+		strict: boolean;
+		mode: "project" | "drift";
+	};
 	try {
 		parsed = parseValidateArgs(args);
 	} catch (error) {
@@ -167,7 +178,10 @@ export async function runValidateCommand(
 
 	let report: ValidationReport;
 	try {
-		report = await validate(projectRoot, { checkDrift: parsed.checkDrift });
+		report = await validate(projectRoot, {
+			checkDrift: parsed.checkDrift,
+			strict: parsed.strict,
+		});
 	} catch (error) {
 		report = failureReport(error);
 	}

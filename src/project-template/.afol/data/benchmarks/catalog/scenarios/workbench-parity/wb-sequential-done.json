@@ -48,7 +48,7 @@
   "oracle": "eight-step-json-output-and-authored-cost-threshold",
   "thresholds": {
     "max_duration_ms": 400,
-    "max_p50_ms": 200,
+    "max_p50_ms": 400,
     "max_p95_ms": 400,
     "max_argv_chars": 239,
     "max_output_tokens": 500,

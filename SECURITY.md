@@ -1,15 +1,19 @@
 # Security Policy
 
-## Supported versions
+## Supported alpha
 
-Only the latest published alpha receives security fixes.
+Security fixes target the current AFOL alpha for Linux x64. Older alpha
+snapshots and unverified platform builds are not supported.
 
-## Reporting
+## Report a vulnerability
 
-Do not open a public issue for a suspected vulnerability. Use GitHub private
-vulnerability reporting for this repository. Include the affected version,
-reproduction steps, impact, and any proposed mitigation. Do not include real
-credentials or user data.
+Use the repository's private security-advisory channel. Do not open a public
+issue for a suspected vulnerability and do not include credentials, tokens,
+private keys, cookies, environment files, or private repository content in a
+report.
+
+Include the affected AFOL version, platform, minimal reproduction, expected
+behavior, observed behavior, and impact. Redact all sensitive values.
 
 ## Scope
 
@@ -20,3 +24,9 @@ template ownership as security-relevant surfaces.
 AFOL is not an authentication boundary between processes running as the same
 OS user. Agent and remote modes are restrictive operating profiles, not
 identity verification.
+
+## Local release security baseline
+
+Release-affecting changes must pass the local Gitleaks and OSV Scanner gates,
+produce checksum-bound provenance, and complete the clean-checkout Linux x64
+smoke. Missing scanners or unresolved findings block the candidate.

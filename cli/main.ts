@@ -273,6 +273,29 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "unknown") {
+		const jsonRequested = args.some((arg) => kernelRegistry.isJsonAlias(arg));
+		if (jsonRequested && resolution.message.startsWith("err unknown-command")) {
+			const fields =
+				/^err unknown-command command=(\S+) hint="([^"]*)"(?: did_you_mean=(\S+))?$/.exec(
+					resolution.message,
+				);
+			if (fields) {
+				const [command, hint, didYouMean] = fields.slice(1);
+				console.log(
+					stringifyEnvelope({
+						schema: "afol.result/v1",
+						ok: false,
+						exit_code: 2,
+						action: "route",
+						data:
+							didYouMean === undefined
+								? { command, hint }
+								: { command, hint, did_you_mean: didYouMean },
+					}),
+				);
+				return 2;
+			}
+		}
 		console.error(resolution.message);
 		return resolution.exitCode;
 	}

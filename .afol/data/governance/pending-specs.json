@@ -45,51 +45,6 @@
       "reason": "Narrow release-gate flake fix preserving existing absolute SLOs"
     },
     {
-      "session_id": "260817_1521_windows-support",
-      "created_at": "2026-08-17T20:21:49.677Z",
-      "updated_at": "2026-08-18T00:40:26.529Z",
-      "status": "waived",
-      "theme": "windows-support",
-      "task_ids": [
-        "T-01",
-        "T-02",
-        "T-03"
-      ],
-      "missing": [],
-      "resolution_hint": "spec requirement waived with explicit reason",
-      "resolved_at": "2026-08-18T00:40:26.529Z",
-      "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
-    },
-    {
-      "session_id": "260817_1535_windows-release-gates",
-      "created_at": "2026-08-17T20:35:04.944Z",
-      "updated_at": "2026-08-18T00:40:26.689Z",
-      "status": "waived",
-      "theme": "windows-release-gates",
-      "task_ids": [
-        "T-01",
-        "T-02"
-      ],
-      "missing": [],
-      "resolution_hint": "spec requirement waived with explicit reason",
-      "resolved_at": "2026-08-18T00:40:26.689Z",
-      "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
-    },
-    {
-      "session_id": "260817_1553_windows-clean-smoke-symlink",
-      "created_at": "2026-08-17T20:53:36.582Z",
-      "updated_at": "2026-08-18T00:40:26.859Z",
-      "status": "waived",
-      "theme": "windows-clean-smoke-symlink",
-      "task_ids": [
-        "T-01"
-      ],
-      "missing": [],
-      "resolution_hint": "spec requirement waived with explicit reason",
-      "resolved_at": "2026-08-18T00:40:26.859Z",
-      "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
-    },
-    {
       "session_id": "260816_2020_simplicity-preserving-integrity-remediation",
       "created_at": "2026-08-17T01:20:45.380Z",
       "updated_at": "2026-08-17T01:20:52.916Z",
@@ -114,23 +69,41 @@
       "roadmap_sha256": "c6ab558334d31eb8e83ad8ee37d1e699acb4b94c8b4ba188a38cc8712d570f96"
     },
     {
-      "session_id": "260818_1731_architecture-cycle",
-      "created_at": "2026-08-18T22:31:41.148Z",
-      "updated_at": "2026-08-18T22:31:48.854Z",
-      "status": "resolved",
-      "theme": "architecture-cycle",
+      "session_id": "260817_1830_lock-pid-identity-recovery",
+      "created_at": "2026-08-17T23:30:22.376Z",
+      "updated_at": "2026-08-17T23:35:47.485Z",
+      "status": "waived",
+      "theme": "lock-pid-identity-recovery",
       "task_ids": [
         "T-01"
       ],
       "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "feature_id": "F-22",
+      "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01",
+      "resolved_at": "2026-08-17T23:35:47.485Z",
+      "reason": "Regression fix for final F-22 lock integrity; parent cannot be reopened and focused evidence is recorded."
+    },
+    {
+      "session_id": "260822_1523_warn-vs-block-advisory-gates",
+      "created_at": "2026-08-22T20:23:45.522Z",
+      "updated_at": "2026-08-22T20:30:36.014Z",
+      "status": "resolved",
+      "theme": "warn-vs-block-advisory-gates",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
       "resolution_hint": "linked to roadmap feature and parent spec",
-      "feature_id": "F-34",
-      "parent_spec": "260818_public-product-and-portfolio-readiness_spec_01",
-      "resolved_at": "2026-08-18T22:31:48.854Z",
-      "parent_spec_path": ".afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md",
-      "parent_spec_sha256": "816ddb5b91fe0e4598435dc75728257c08e0473c5ddecbf76817dc3386c97312",
+      "feature_id": "F-11",
+      "parent_spec": "260822_2023_warn-vs-block-advisory-gates_spec-child_01",
+      "resolved_at": "2026-08-22T20:30:36.014Z",
+      "parent_spec_path": ".afol/adm/specs/260822_2023_warn-vs-block-advisory-gates_spec-child_01.md",
+      "parent_spec_sha256": "5268a87ba93e8d29f3423e6e00be208964e55764df7ae495117560215df7f929",
       "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
-      "roadmap_sha256": "8531cd5efdb55dc888334c5cd9cdbf94abdd1910b071fff12ecfe4cc9ed768b0"
+      "roadmap_sha256": "b9064144010d403e47ee7f57f27fa54b4d327d16a14f82c7869799dc5f8bc903"
     }
   ]
 }

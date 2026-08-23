@@ -36,6 +36,27 @@ the release-scoped AFOL health check or the observed WSL2 smoke, so this
 runbook keeps those as separate local checks. The manifest check is also part
 of `validate:toolchain` and may be run early to catch registry drift sooner.
 
+## Public Distribution Contract
+
+The initial public channel is a GitHub prerelease containing the standalone
+Linux x64 `afol` binary, `afol.sha256`, and `afol.provenance.json`. The npm
+package remains private and is not a distribution channel. WSL2 is evidence
+for the Linux x64 artifact; it does not establish Windows-native support.
+
+The source is distributed under the MIT License. Public release review must
+confirm that `LICENSE` is present and that package metadata declares `MIT`;
+local tests, security scans, and artifact provenance cannot substitute for
+that license grant.
+
+Release validation is local-first. Per ADR-009 the repository ships no
+GitHub Actions workflows at all: hosted CI is permanently unavailable on
+this account, so a dead pipeline would be unused code. The local chain
+(`validate:release` including Gitleaks, OSV Scanner, deterministic build,
+provenance, and smokes) against the exact candidate SHA is the release
+evidence. A missing hosted run is not a failure signal; there is simply no
+hosted run to wait for, and none may be reintroduced without a new
+decision record.
+
 ## Required Tools on PATH
 
 | Tool | Purpose | Required for Real Release |

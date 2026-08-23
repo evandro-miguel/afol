@@ -386,10 +386,30 @@ export function applyCatchupRepair(root: string): CatchupRepairReport {
 	};
 }
 
-export function computeCatchup(
+type CatchupInputs = {
+	explicitSession: string | null;
+	activeSession: string | null;
+	pendingSpecOpen: number;
+	session: string | null;
+	gitAvailable: boolean;
+	branch: string | null;
+	git: ReturnType<typeof readGitChangedFiles>;
+};
+
+type CatchupStaleness = {
+	findingsStale: boolean;
+	logBehindDiff: boolean;
+};
+
+type CatchupSteps = {
+	sessionIsActive: boolean;
+	nextStep: string;
+};
+
+function gatherCatchupInputs(
 	root: string,
-	opts: { session?: string; repair?: CatchupRepairReport } = {},
-): CatchupReport {
+	opts: { session?: string },
+): CatchupInputs {
 	const explicitSession = opts.session?.trim() || null;
 	const activeSession = readActiveSession(root);
 	const pendingSpecOpen = readOpenPendingSpecCount(root);
@@ -400,50 +420,24 @@ export function computeCatchup(
 	const gitAvailable = gitProbeOk(root);
 	const branch = gitAvailable ? readGitBranch(root) : null;
 	const git = readGitChangedFiles(root);
-	const session = effectiveSession?.session ?? null;
-	if (!session) {
-		const recent = recentSessionsHint(root);
-		const notes = [`recent sessions: ${recent}`];
-		if (!gitAvailable) {
-			notes.unshift("degraded: git unavailable, state unknown");
-		} else if (git.gitQueryFailed) {
-			notes.unshift("degraded: git status query failed, state uncertain");
-		}
-		const pending = appendPendingSpecDiagnostics(
-			notes,
-			"no active session — run afol n",
-			pendingSpecOpen,
-			{ preferPendingNextStep: false },
-		);
-		const report: CatchupReport = {
-			session: null,
-			session_status: "no-session",
-			git_changed_files: git.files,
-			git_changed_files_overflow: git.overflow,
-			git_changed_files_degraded: !gitAvailable || git.gitQueryFailed,
-			git_branch: branch,
-			artifacts: {
-				plan: { present: false, mtime: null, lines: 0 },
-				task: { present: false, mtime: null, lines: 0 },
-				log: { present: false, mtime: null, lines: 0 },
-				report: { present: false, mtime: null, lines: 0 },
-			},
-			freshness: {
-				findings_stale: false,
-				log_behind_diff: false,
-				notes: pending.notes,
-			},
-			next_step: pending.next_step,
-			pending_spec_open: pendingSpecOpen,
-		};
-		if (opts.repair) {
-			report.repair = opts.repair;
-		}
-		return report;
-	}
 
-	const sessionState = buildArtifactStates(root, session);
-	const latestChanged = latestChangedFileMtime(root, git.files);
+	return {
+		explicitSession,
+		activeSession,
+		pendingSpecOpen,
+		session: effectiveSession?.session ?? null,
+		gitAvailable,
+		branch,
+		git,
+	};
+}
+
+function evaluateStalenessPolicy(
+	root: string,
+	sessionState: ReturnType<typeof buildArtifactStates>,
+	gitFiles: string[],
+): CatchupStaleness {
+	const latestChanged = latestChangedFileMtime(root, gitFiles);
 	const planTaskMtime = Math.max(
 		sessionState.artifacts.plan.present && sessionState.artifacts.plan.mtime
 			? Date.parse(sessionState.artifacts.plan.mtime)
@@ -455,20 +449,38 @@ export function computeCatchup(
 	const staleResearch =
 		sessionState.researchMtime > 0 ? sessionState.researchMtime : 0;
 	const findingsStale =
-		git.files.length > 0 && planTaskMtime > 0 && planTaskMtime > staleResearch;
+		gitFiles.length > 0 && planTaskMtime > 0 && planTaskMtime > staleResearch;
 	const logMtime =
 		sessionState.artifacts.log.present && sessionState.artifacts.log.mtime
 			? Date.parse(sessionState.artifacts.log.mtime)
 			: 0;
-	const logBehindDiff =
-		git.files.length > 0 && latestChanged > 0 && logMtime < latestChanged;
 
-	const notes: string[] = [];
+	return {
+		findingsStale,
+		logBehindDiff:
+			gitFiles.length > 0 && latestChanged > 0 && logMtime < latestChanged,
+	};
+}
+
+function pushDegradedGitNote(
+	notes: string[],
+	gitAvailable: boolean,
+	gitQueryFailed: boolean,
+): void {
 	if (!gitAvailable) {
 		notes.push("degraded: git unavailable, state unknown");
-	} else if (git.gitQueryFailed) {
+	} else if (gitQueryFailed) {
 		notes.push("degraded: git status query failed, state uncertain");
 	}
+}
+
+function buildFreshnessNotes(
+	inputs: CatchupInputs,
+	sessionState: ReturnType<typeof buildArtifactStates>,
+	staleness: CatchupStaleness,
+): string[] {
+	const notes: string[] = [];
+	pushDegradedGitNote(notes, inputs.gitAvailable, inputs.git.gitQueryFailed);
 	if (!sessionState.artifacts.plan.present) {
 		notes.push("plan missing");
 	}
@@ -481,63 +493,158 @@ export function computeCatchup(
 	if (sessionState.researchMtime === 0) {
 		notes.push("no research/findings artifact found");
 	}
-	if (git.overflow) {
+	if (inputs.git.overflow) {
 		notes.push(`git changes truncated at ${CATCHUP_GIT_FILE_LIMIT} files`);
 	}
-	if (findingsStale) {
+	if (staleness.findingsStale) {
 		notes.push("plan/task moved ahead of research");
 	}
-	if (logBehindDiff) {
+	if (staleness.logBehindDiff) {
 		notes.push("log mtime trails changed files");
 	}
 	if (notes.length === 0) {
 		notes.push("artifacts look fresh");
 	}
+	return notes;
+}
 
+function selectNextSteps(
+	inputs: CatchupInputs,
+	staleness: CatchupStaleness,
+): CatchupSteps {
 	let nextStep = "artifacts look fresh";
-	if (!gitAvailable) {
+	if (!inputs.gitAvailable) {
 		nextStep = "degraded: git unavailable, state unknown";
-	} else if (git.gitQueryFailed) {
+	} else if (inputs.git.gitQueryFailed) {
 		nextStep = "degraded: git status query failed, state uncertain";
 	}
-	const sessionIsActive = session !== null && session === activeSession;
-	if (explicitSession && !sessionIsActive) {
+	const sessionIsActive =
+		inputs.session !== null && inputs.session === inputs.activeSession;
+	if (inputs.explicitSession && !sessionIsActive) {
 		nextStep =
 			"session is closed — switch to the active session or start a new one";
-	} else if (logBehindDiff) {
+	} else if (staleness.logBehindDiff) {
 		nextStep = "log unsynced changes before continuing";
-	} else if (findingsStale) {
+	} else if (staleness.findingsStale) {
 		nextStep = "sync findings into research before continuing";
 	}
 
+	return { sessionIsActive, nextStep };
+}
+
+function attachRepair(
+	report: CatchupReport,
+	repair?: CatchupRepairReport,
+): CatchupReport {
+	if (repair) {
+		report.repair = repair;
+	}
+	return report;
+}
+
+function buildNoSessionReport(
+	root: string,
+	inputs: CatchupInputs,
+	repair?: CatchupRepairReport,
+): CatchupReport {
+	const recent = recentSessionsHint(root);
+	const notes: string[] = [];
+	pushDegradedGitNote(notes, inputs.gitAvailable, inputs.git.gitQueryFailed);
+	notes.push(`recent sessions: ${recent}`);
+	const pending = appendPendingSpecDiagnostics(
+		notes,
+		"no active session — run afol n",
+		inputs.pendingSpecOpen,
+		{ preferPendingNextStep: false },
+	);
+
+	return attachRepair(
+		{
+			session: null,
+			session_status: "no-session",
+			git_changed_files: inputs.git.files,
+			git_changed_files_overflow: inputs.git.overflow,
+			git_changed_files_degraded:
+				!inputs.gitAvailable || inputs.git.gitQueryFailed,
+			git_branch: inputs.branch,
+			artifacts: {
+				plan: { present: false, mtime: null, lines: 0 },
+				task: { present: false, mtime: null, lines: 0 },
+				log: { present: false, mtime: null, lines: 0 },
+				report: { present: false, mtime: null, lines: 0 },
+			},
+			freshness: {
+				findings_stale: false,
+				log_behind_diff: false,
+				notes: pending.notes,
+			},
+			next_step: pending.next_step,
+			pending_spec_open: inputs.pendingSpecOpen,
+		},
+		repair,
+	);
+}
+
+function buildSessionReport(
+	inputs: CatchupInputs,
+	sessionState: ReturnType<typeof buildArtifactStates>,
+	staleness: CatchupStaleness,
+	notes: string[],
+	steps: CatchupSteps,
+	repair?: CatchupRepairReport,
+): CatchupReport {
 	// Prefer pending_spec hint only when the session is otherwise healthy.
 	const pending = appendPendingSpecDiagnostics(
 		notes,
-		nextStep,
-		pendingSpecOpen,
-		{
-			preferPendingNextStep: nextStep === "artifacts look fresh",
-		},
+		steps.nextStep,
+		inputs.pendingSpecOpen,
+		{ preferPendingNextStep: steps.nextStep === "artifacts look fresh" },
 	);
 
-	const report: CatchupReport = {
-		session,
-		session_status: sessionIsActive ? "active" : "closed",
-		git_changed_files: git.files,
-		git_changed_files_overflow: git.overflow,
-		git_changed_files_degraded: !gitAvailable || git.gitQueryFailed,
-		git_branch: branch,
-		artifacts: sessionState.artifacts,
-		freshness: {
-			findings_stale: findingsStale,
-			log_behind_diff: logBehindDiff,
-			notes: pending.notes,
+	return attachRepair(
+		{
+			session: inputs.session,
+			session_status: steps.sessionIsActive ? "active" : "closed",
+			git_changed_files: inputs.git.files,
+			git_changed_files_overflow: inputs.git.overflow,
+			git_changed_files_degraded:
+				!inputs.gitAvailable || inputs.git.gitQueryFailed,
+			git_branch: inputs.branch,
+			artifacts: sessionState.artifacts,
+			freshness: {
+				findings_stale: staleness.findingsStale,
+				log_behind_diff: staleness.logBehindDiff,
+				notes: pending.notes,
+			},
+			next_step: pending.next_step,
+			pending_spec_open: inputs.pendingSpecOpen,
 		},
-		next_step: pending.next_step,
-		pending_spec_open: pendingSpecOpen,
-	};
-	if (opts.repair) {
-		report.repair = opts.repair;
+		repair,
+	);
+}
+
+export function computeCatchup(
+	root: string,
+	opts: { session?: string; repair?: CatchupRepairReport } = {},
+): CatchupReport {
+	const inputs = gatherCatchupInputs(root, opts);
+	if (!inputs.session) {
+		return buildNoSessionReport(root, inputs, opts.repair);
 	}
-	return report;
+	const sessionState = buildArtifactStates(root, inputs.session);
+	const staleness = evaluateStalenessPolicy(
+		root,
+		sessionState,
+		inputs.git.files,
+	);
+	const notes = buildFreshnessNotes(inputs, sessionState, staleness);
+	const steps = selectNextSteps(inputs, staleness);
+	return buildSessionReport(
+		inputs,
+		sessionState,
+		staleness,
+		notes,
+		steps,
+		opts.repair,
+	);
 }

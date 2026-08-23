@@ -1365,6 +1365,50 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("unknown command emits result envelope with --json and keeps human stderr", () => {
+		const root = mkProjectRoot(
+			"unknown-json",
+			"#!/usr/bin/env bash\necho LEGACY:$*\n",
+		);
+		try {
+			const human = runKernel(root, ["sttaus"]);
+			expect(human.status).toBe(2);
+			expect(human.stdout as string).toBe("");
+			expect(human.stderr as string).toContain(
+				'err unknown-command command=sttaus hint="run afol -h" did_you_mean=status',
+			);
+
+			const json = runKernel(root, ["sttaus", "--json"]);
+			expect(json.status).toBe(2);
+			expect(json.stderr as string).toBe("");
+			expect(JSON.parse(json.stdout as string)).toEqual({
+				schema: "afol.result/v1",
+				ok: false,
+				exit_code: 2,
+				action: "route",
+				data: {
+					command: "sttaus",
+					hint: "run afol -h",
+					did_you_mean: "status",
+				},
+			});
+
+			const jsonWithoutSuggestion = runKernel(root, ["zzqq", "--json"]);
+			expect(jsonWithoutSuggestion.status).toBe(2);
+			expect(jsonWithoutSuggestion.stderr as string).toBe("");
+			expect(JSON.parse(jsonWithoutSuggestion.stdout as string)).toEqual({
+				schema: "afol.result/v1",
+				ok: false,
+				exit_code: 2,
+				action: "route",
+				data: { command: "zzqq", hint: "run afol -h" },
+			});
+			expect(json.stdout as string).not.toContain("LEGACY:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("unknown command fails before project-root detection", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-unknown-no-project-"));
 		try {

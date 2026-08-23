@@ -9,5 +9,15 @@
   "timing_p95_ms": 300,
   "tokenizer_id": "tiktoken-o200k-base",
   "tokenizer_version": "recorded",
-  "git_commit": "baseline-fixture"
+  "git_commit": "baseline-fixture",
+  "scenarios": {
+    "wb-sequential-done": {
+      "scenario_id": "wb-sequential-done",
+      "scenario_version": "1.1.0",
+      "timing_p50_ms": 300,
+      "timing_p95_ms": 330,
+      "sample_count": 20,
+      "warmup_count": 1
+    }
+  }
 }

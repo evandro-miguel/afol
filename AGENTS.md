@@ -13,6 +13,10 @@
   models; the external harness owns model execution.
 - Before implementing product, inventory any legacy references and replace
   active docs, scripts, and runbooks with the current AFOL flow.
+- Avoid creating complexity on the project. The project should be simple, easy to use.
+- Avoid by all means creating systems that can block development; afol needs to be a system with almost no friction.
+- Focus on building systems that consume low tokens and need few commands to execute any tasks.
+- Avoid overengineering.
 
 This repository is AFOL-only.
 

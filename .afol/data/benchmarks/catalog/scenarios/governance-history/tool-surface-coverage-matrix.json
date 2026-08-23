@@ -55,6 +55,7 @@
 			"status --task-id <task-id>",
 			"validate project --json",
 			"validate project --check-drift --json",
+			"validate project --strict --json",
 			"validate drift --json",
 			"validate bench --pack <pack-id> --json",
 			"validate bench --pack <pack-id> --scenario-id <scenario-id> --json",

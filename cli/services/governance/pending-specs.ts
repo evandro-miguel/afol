@@ -80,7 +80,7 @@ const INDEX_FILE = "pending-specs.json";
 const GOVERNANCE_LOCK = "__governance-pending-specs__";
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
 const DEFAULT_PENDING_SPEC_RESOLUTION_HINT =
-	'run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason "<reason>"';
+	'run afol gov rs --session <session> -F <F-id> -P <spec-id> or waive with afol gov rs --session <session> --no-spec-required -r "<reason>"';
 
 function pendingSpecQuestion(
 	missing: readonly GovernanceMissingField[],
@@ -510,7 +510,7 @@ export function formatPendingSpecBlocker(
 		)
 		.join("; ");
 	const suffix = open.length > limit ? `; +${open.length - limit} more` : "";
-	return `open pending_spec: ${open.length}; resolve with afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason "<reason>"; open: ${shown}${suffix}`;
+	return `open pending_spec: ${open.length}; resolve with afol gov rs --session <id> -F <F-id> -P <spec-id> or waive with afol gov rs --session <id> --no-spec-required -r "<reason>"; open: ${shown}${suffix}`;
 }
 
 function sessionDir(root: string, session: string): string {

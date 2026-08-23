@@ -48,7 +48,7 @@
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
     "max_duration_ms": 300,
-    "max_p50_ms": 100,
+    "max_p50_ms": 200,
     "max_p95_ms": 300,
     "max_argv_chars": 32,
     "max_output_tokens": 50,

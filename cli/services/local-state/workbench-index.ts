@@ -1129,7 +1129,9 @@ function sessionSourceLatestTime(root: string, session: string): number {
 	for (const file of sessionTaskFiles(sessionDir)) {
 		try {
 			latest = Math.max(latest, statSync(file).mtimeMs);
-		} catch {}
+		} catch {
+			// best-effort freshness stat; skip
+		}
 	}
 	return latest;
 }

@@ -1018,7 +1018,7 @@ describe("workbench lifecycle service", () => {
 			expect(quickTaskData.pending_spec_question).toBe(
 				"Which roadmap feature and parent spec govern this closed session?",
 			);
-			expect(quickTaskData.next_command).toContain("governance resolve-spec");
+			expect(quickTaskData.next_command).toContain("afol gov rs");
 
 			const human = runKernel(root, [
 				"quick-task",
@@ -1030,9 +1030,7 @@ describe("workbench lifecycle service", () => {
 			expect(human.stdout as string).toContain(
 				"question: Which roadmap feature and parent spec govern this closed session?",
 			);
-			expect(human.stdout as string).toContain(
-				"next: run afol governance resolve-spec",
-			);
+			expect(human.stdout as string).toContain("next: run afol gov rs");
 			expect(human.stdout as string).not.toContain('hint="');
 
 			const next = runKernel(root, [
@@ -2783,6 +2781,30 @@ describe("workbench lifecycle service", () => {
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
 			expect(() => closeSession(root, created.session)).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close treats open checklist items as non-blocking warnings", () => {
+		const root = mkRoot("checklist-close");
+		try {
+			const created = newWorkstream(root, "checklist close");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "sh -n session-task.sh",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			writeFileSync(
+				created.taskPath,
+				`${readFileSync(created.taskPath, "utf8")}\n## Sub-task Checklist (T-01)\n\n- [ ] Run final gate\n`,
+				"utf8",
+			);
+			const result = closeSession(root, created.session);
+			expect(result.join("\n")).toContain("open checklist item(s)");
+			expect(existsSync(created.activeSessionPath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

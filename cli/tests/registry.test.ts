@@ -183,6 +183,15 @@ describe("kernel registry", () => {
 		expect(byCommand.get("legacy")?.stability).toBe("compatibility");
 	});
 
+	test("publishes strict project validation metadata", () => {
+		const validate = kernelRegistry.commands.find(
+			(entry) => entry.command === "validate",
+		);
+		expect(validate?.subcommands?.map((entry) => entry.usage)).toContain(
+			"project --strict --json",
+		);
+	});
+
 	test("publishes verify report flags while preserving aliases and JSON usage", () => {
 		for (const command of ["verify", "verify-tasks"] as const) {
 			const spec = kernelRegistry.commands.find(

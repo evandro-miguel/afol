@@ -382,6 +382,9 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:project",
 		);
+		expect(scripts["validate:project"]).toBe(
+			"bun run kernel -- v project --strict --json",
+		);
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["test:full"]).toBe("bun run cli/dev/full-test.ts");
 		expect(scripts["validate:release"]).toContain("bun run test:full");
@@ -468,60 +471,9 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
-	test("public CI keeps audit, typecheck, tests, and smoke blocking", () => {
-		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "ci.yml"),
-			"utf8",
-		).replace(/\r\n/g, "\n");
-		type WorkflowStep = { name?: string; run?: string };
-		type ValidationJob = {
-			"runs-on"?: string;
-			steps?: WorkflowStep[];
-			env?: Record<string, unknown>;
-		};
-		const parsedWorkflow = Bun.YAML.parse(workflow) as {
-			jobs?: Record<string, ValidationJob>;
-		};
-		const validationJob = parsedWorkflow.jobs?.linux ?? {};
-		const validationSteps = validationJob.steps ?? [];
-		const workflowStep = (name: string): WorkflowStep =>
-			validationSteps.find((step) => step.name === name) ?? {};
-		const stepIndex = (name: string): number =>
-			validationSteps.findIndex((step) => step.name === name);
-
-		expect(validationJob["runs-on"]).toBe("ubuntu-24.04");
-		expect(validationJob.env).toBeUndefined();
-		expect(workflowStep("Install dependencies").run).toBe(
-			"bun install --frozen-lockfile",
-		);
-		expect(workflowStep("Audit public boundary").run).toBe(
-			"bun run public:audit -- .",
-		);
-		expect(workflowStep("Lint and typecheck").run).toContain(
-			"bun run typecheck",
-		);
-		expect(workflowStep("Test").run).toBe("bun run test:full");
-		expect(workflowStep("Build and smoke").run).toContain("bun run smoke:dist");
-		expect(workflowStep("Verify Linux x64").run).toContain(
-			'test "$(uname -m)" = x86_64',
-		);
-		expect(stepIndex("Install dependencies")).toBeLessThan(
-			stepIndex("Audit public boundary"),
-		);
-		expect(stepIndex("Lint and typecheck")).toBeLessThan(stepIndex("Test"));
-	});
-
-	test("CI runs release validation for pull requests and main while retaining manual dispatch", () => {
-		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "ci.yml"),
-			"utf8",
-		).replace(/\r\n/g, "\n");
-
-		expect(workflow).toContain("  workflow_dispatch:\n");
-		expect(workflow).toContain("  pull_request:\n");
-		expect(workflow).toContain("  push:\n    branches: [main]\n");
-		expect(workflow).toContain("permissions:\n  contents: read\n");
-		expect(workflow).toContain("with:\n          fetch-depth: 0\n");
+	test("no hosted CI workflows are configured (ADR-009)", () => {
+		const dir = join(repoRoot, ".github", "workflows");
+		expect(existsSync(dir)).toBe(false);
 	});
 
 	test("validate:release executes strict gates in order with stubbed steps", () => {
@@ -614,67 +566,14 @@ describe("release and toolchain contracts", () => {
 		) as {
 			private?: boolean;
 			version?: string;
+			license?: string;
 		};
 
 		expect(pkg.private).toBe(true);
+		expect(pkg.license).toBe("MIT");
 		expect(pkg.version).toMatch(SEMVER_PATTERN);
 		expect(pkg.version).toContain("-");
 		expect(pkg.version).not.toBe("0.0.0");
-	});
-
-	test("release workflow provisions pinned scanners and attested assets", () => {
-		const workflow = readFileSync(
-			join(repoRoot, ".github", "workflows", "release.yml"),
-			"utf8",
-		);
-		const osvInstallCommand =
-			'go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@v$' +
-			'{OSV_SCANNER_VERSION}"';
-		const gitleaksInstallCommand =
-			'go install "github.com/zricethezav/gitleaks/v8@v$' +
-			'{GITLEAKS_VERSION}"';
-
-		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
-		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
-		expect(workflow).toContain(
-			"uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0",
-		);
-		expect(workflow).toContain('go-version: "1.26.x"');
-		expect(workflow).toContain("cache: false");
-		expect(workflow).toContain(
-			"uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
-		);
-		expect(workflow).toContain("Install pinned security scanners");
-		expect(workflow).toContain(osvInstallCommand);
-		expect(workflow).toContain(gitleaksInstallCommand);
-		expect(workflow).toContain(
-			'echo "AFOL_OSV_SCANNER_PATH=$tool_dir/osv-scanner" >> "$GITHUB_ENV"',
-		);
-		expect(workflow).toContain(
-			'echo "AFOL_GITLEAKS_PATH=$tool_dir/gitleaks" >> "$GITHUB_ENV"',
-		);
-		expect(workflow).not.toContain('echo "$tool_dir" >> "$GITHUB_PATH"');
-		expect(workflow).not.toContain("curl -fsSL");
-		expect(workflow).not.toContain("tar -xzf");
-		const releaseValidationStep =
-			workflow.match(
-				/- name: Validate exact source and artifact[\s\S]*?(?=\n {6}- name:|\n\S|$)/,
-			)?.[0] ?? "";
-		expect(releaseValidationStep).toContain("bun run validate:release");
-		expect(releaseValidationStep).not.toContain("continue-on-error: true");
-		expect(workflow).toContain(
-			"uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.23.1",
-		);
-		expect(workflow).toContain(
-			"uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1",
-		);
-		expect(workflow).toContain("gh release create");
-		expect(workflow.indexOf("Set up Go")).toBeLessThan(
-			workflow.indexOf("Install pinned security scanners"),
-		);
-		expect(workflow.indexOf("Install pinned security scanners")).toBeLessThan(
-			workflow.indexOf("Validate exact source and artifact"),
-		);
 	});
 
 	test("generate-version creates cli/generated recursively", () => {
