@@ -68,8 +68,12 @@ function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
-function managedHashRoot(repoRoot: string, manifestPath: string): string {
-	return manifestPath.startsWith("src/project-template/")
+export function isTemplateManifestPath(manifestPath: string): boolean {
+	return manifestPath.split("\\").join("/").startsWith("src/project-template/");
+}
+
+export function managedHashRoot(repoRoot: string, manifestPath: string): string {
+	return isTemplateManifestPath(manifestPath)
 		? join(repoRoot, "src/project-template")
 		: repoRoot;
 }
@@ -113,7 +117,7 @@ function collectTemplateManagedHashPaths(root: string): string[] {
 	return [...paths].sort();
 }
 
-function refreshManagedHashes(
+export function refreshManagedHashes(
 	repoRoot: string,
 	manifestPath: string,
 	managedHashes: unknown,
@@ -128,7 +132,7 @@ function refreshManagedHashes(
 
 	const root = managedHashRoot(repoRoot, manifestPath);
 	const refreshed: Record<string, string> = {};
-	const paths = manifestPath.startsWith("src/project-template/")
+	const paths = isTemplateManifestPath(manifestPath)
 		? collectTemplateManagedHashPaths(root)
 		: Object.keys(managedHashes).sort();
 	for (const path of paths) {
