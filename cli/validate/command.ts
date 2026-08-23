@@ -8,6 +8,7 @@ import {
 	baselineFilename,
 	formatMutationCalibrationReason,
 	loadRegistry,
+	readGitRepositoryId,
 	validateRegistryContract,
 } from "./registry";
 import {
@@ -448,6 +449,7 @@ export function buildResult(
 		notes.push(...thresholdNotes, ...regressionNotes, ...compatibilityNotes);
 	}
 	const resolvedStatus = resolveBenchmarkStatus(status);
+	const sourceRepository = readGitRepositoryId(projectRoot);
 	return applyProjectTokenRule({
 		schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
 		run_id: `${execution ? "bench" : "legacy"}-${scenario.pack_id}-${scenario.scenario_id}-${scenario.scenario_version}`,
@@ -502,6 +504,7 @@ export function buildResult(
 		tool_call_count: metrics.tool_call_count ?? 1,
 		tool_success_rate: metrics.tool_success_rate ?? 1,
 		git_commit: execution?.git_commit ?? getGitCommit(projectRoot),
+		...(sourceRepository ? { source_repository: sourceRepository } : {}),
 		timestamp: execution?.timestamp ?? new Date().toISOString(),
 		sample_count: execution?.metrics.sample_count ?? 0,
 		warmup_count: execution?.metrics.warmup_count ?? 0,

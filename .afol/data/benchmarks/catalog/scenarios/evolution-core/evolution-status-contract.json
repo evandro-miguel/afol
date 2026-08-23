@@ -63,6 +63,7 @@
 		"sample_count": 3,
 		"warmup_count": 1,
 		"git_commit": "ffbf031e6e68",
+		"source_repository": "github.com/evandro-miguel/afol",
 		"timestamp": "2026-07-26T02:54:28.057Z"
 	},
 	"implementation_status": "implemented"

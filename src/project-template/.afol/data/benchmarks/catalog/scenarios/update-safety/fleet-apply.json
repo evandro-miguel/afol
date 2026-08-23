@@ -1,17 +1,16 @@
 {
   "schema_version": "1.0.0",
-  "scenario_id": "up-conflict",
+  "scenario_id": "fleet-apply",
   "scenario_version": "1.0.0",
   "pack_id": "update-safety",
-  "command": "afol up apply --json --session S-01 --task-id T-01 --reason \"conflict check\"",
+  "command": "afol fleet repair --derived --root /__afol_public_fleet_fixture_v1__ --reason \"missing-config guard\" --json",
   "sandbox": true,
-  "setup": [
-    [
-      "node",
-      "-e",
-      "require('node:fs').appendFileSync('.afol/adm/hooks/README.md','\\npublic synthetic local edit\\n')"
-    ]
-  ],
+  "coverage": {
+    "subcommands": [
+      "fleet repair --derived --root <path> --reason <text> [--json]"
+    ],
+    "journeys": ["fleet-apply"]
+  },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
@@ -22,7 +21,7 @@
   },
   "baseline_id": "update-safety-v1",
   "implementation_status": "implemented",
-  "expected_exit": 4,
+  "expected_exit": 1,
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

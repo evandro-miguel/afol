@@ -19,6 +19,7 @@ import {
 	scanTemplateToolchainClaims,
 	toolProbeSucceeded,
 } from "../schemas/template-policy";
+import { loadRegistry, validateRegistryContract } from "../validate/registry";
 
 function toPosixPath(path: string): string {
 	return path.split(sep).join("/");
@@ -278,6 +279,77 @@ describe("template forbidden-content policy", () => {
 
 		expect(templateRegistry.coverage?.exemptions).toEqual([]);
 		expect(templateRegistry.coverage?.subcommand_exemptions).toEqual([]);
+	});
+
+	test("template benchmark contract has no coverage issues", () => {
+		const snapshot = loadRegistry(join(process.cwd(), "src/project-template"));
+
+		expect(validateRegistryContract(snapshot)).toEqual([]);
+	});
+
+	test("template governance matrix mirrors the root command contract", async () => {
+		const projectRoot = process.cwd();
+		const readMatrix = (relativePath: string) =>
+			readFile(
+				join(projectRoot, relativePath),
+				"utf8",
+			).then((content) => JSON.parse(content));
+		const [rootMatrix, templateMatrix] = await Promise.all([
+			readMatrix(
+				".afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json",
+			),
+			readMatrix(
+				"src/project-template/.afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json",
+			),
+		]);
+
+		expect(templateMatrix.coverage.commands).toEqual(
+			rootMatrix.coverage.commands,
+		);
+		expect(templateMatrix.coverage.subcommands).toEqual(
+			rootMatrix.coverage.subcommands,
+		);
+	});
+
+	test("template PSTR and fleet scenarios use public synthetic fixtures", async () => {
+		const projectRoot = process.cwd();
+		const scenarioRoots = [
+			"src/project-template/.afol/data/benchmarks/catalog/scenarios/pstr-integrity",
+			"src/project-template/.afol/data/benchmarks/catalog/scenarios/update-safety",
+		];
+		const forbiddenReferences = [
+			"/home/ozy/",
+			"/tmp/",
+			"src/project-template",
+			".agents",
+		];
+		for (const scenarioRoot of scenarioRoots) {
+			for (const name of (await readdir(join(projectRoot, scenarioRoot)))
+				.filter((entry) => entry.endsWith(".json"))
+				.sort()) {
+				const isPstr = scenarioRoot.endsWith("pstr-integrity");
+				const isFleet = name.startsWith("fleet-");
+				if (!isPstr && !isFleet) {
+					continue;
+				}
+				const relativePath = join(scenarioRoot, name);
+				const content = await readFile(join(projectRoot, relativePath), "utf8");
+				const scenario = JSON.parse(content) as {
+					coverage?: { journeys?: string[] };
+					sandbox?: boolean;
+				};
+
+				expect(forbiddenReferences.some((value) => content.includes(value))).toBe(
+					false,
+				);
+				expect(scenario.coverage?.journeys?.length).toBeGreaterThan(0);
+				if (isPstr) {
+					expect(scenario.sandbox).toBe(true);
+					expect(content).toContain("['cli'");
+					expect(content).toContain("'docs'");
+				}
+			}
+		}
 	});
 
 	test("workbench benchmark scenarios are valid public template fixtures", async () => {

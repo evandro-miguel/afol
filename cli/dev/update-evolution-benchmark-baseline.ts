@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 
 import { atomicWriteText } from "../services/io/atomic";
 import { runValidationCommand } from "../validate/command";
+import { normalizeGitRepositoryId } from "../validate/registry";
 
 const PACK_ID = "evolution-core";
 const SCENARIO_ID = "evolution-status-contract";
@@ -167,6 +168,22 @@ function requiredNumber(value: unknown, label: string): number {
 		throw new Error(`${label} must be a non-negative number`);
 	}
 	return value;
+}
+
+function requiredSourceRepository(value: unknown, label: string): string {
+	const raw = requiredString(value, label);
+	const normalized = normalizeGitRepositoryId(raw);
+	if (normalized === undefined) {
+		throw new Error(`${label} must be a valid source repository`);
+	}
+	return normalized;
+}
+
+function commitMatchesHead(commit: string, head: string): boolean {
+	return (
+		/^[a-f0-9]{7,40}$/iu.test(commit) &&
+		(head.startsWith(commit) || commit.startsWith(head))
+	);
 }
 
 function controlledGitExecutable(): string {
@@ -382,7 +399,7 @@ function validateInput(
 		throw new Error("Benchmark input scenario does not match evolution-core");
 	}
 	const commit = requiredString(result.git_commit, "results[0].git_commit");
-	if (commit !== head) {
+	if (!commitMatchesHead(commit, head)) {
 		throw new Error(
 			`Benchmark scenario git_commit ${JSON.stringify(commit)} does not match current HEAD ${JSON.stringify(head)}`,
 		);
@@ -424,6 +441,10 @@ function validateInput(
 			`Benchmark result lacks runner evidence ${RUNNER_EVIDENCE}`,
 		);
 	}
+	requiredSourceRepository(
+		result.source_repository,
+		"results[0].source_repository",
+	);
 	if (result.status === "baseline-missing" && result.pass === false) {
 		if (baselinePresent) {
 			throw new Error("Cannot bootstrap an existing baseline");
@@ -457,6 +478,7 @@ function baselineFromResult(
 	result: JsonObject,
 	timestamp: string,
 	provenance: string,
+	sourceRepository: string,
 ): JsonObject {
 	return {
 		schema_version: "1.0.0",
@@ -476,6 +498,7 @@ function baselineFromResult(
 		tokenizer_id: TOKENIZER_ID,
 		tokenizer_version: TOKENIZER_VERSION,
 		git_commit: requiredString(result.git_commit, "results[0].git_commit"),
+		source_repository: sourceRepository,
 		run_id: requiredString(result.run_id, "results[0].run_id"),
 		timestamp,
 		results_count: 1,
@@ -488,6 +511,7 @@ function scenarioFromResult(
 	result: JsonObject,
 	timestamp: string,
 	provenance: string,
+	sourceRepository: string,
 ): JsonObject {
 	const scenario = readObject(path);
 	const metrics = isObject(scenario.deterministic_metrics)
@@ -518,6 +542,7 @@ function scenarioFromResult(
 		sample_count: SAMPLE_COUNT,
 		warmup_count: WARMUP_COUNT,
 		git_commit: requiredString(result.git_commit, "results[0].git_commit"),
+		source_repository: sourceRepository,
 		timestamp,
 	};
 	return scenario;
@@ -541,20 +566,31 @@ function writeEvolutionBenchmarkBaseline(
 	if (!Number.isFinite(now.getTime()))
 		throw new Error("Writer timestamp is invalid");
 	const timestamp = now.toISOString();
+	const sourceRepository = requiredSourceRepository(
+		result.source_repository,
+		"results[0].source_repository",
+	);
 	const rootScenarioPath = join(repoRoot, RELATIVE_PATHS[1]);
 	const templateScenarioPath = join(repoRoot, RELATIVE_PATHS[3]);
-	const baseline = baselineFromResult(result, timestamp, provenance);
+	const baseline = baselineFromResult(
+		result,
+		timestamp,
+		provenance,
+		sourceRepository,
+	);
 	const rootScenario = scenarioFromResult(
 		rootScenarioPath,
 		result,
 		timestamp,
 		provenance,
+		sourceRepository,
 	);
 	const templateScenario = scenarioFromResult(
 		templateScenarioPath,
 		result,
 		timestamp,
 		provenance,
+		sourceRepository,
 	);
 	const baselineText = `${JSON.stringify(baseline, null, 2)}\n`;
 	const rootScenarioText = `${JSON.stringify(rootScenario, null, 2)}\n`;

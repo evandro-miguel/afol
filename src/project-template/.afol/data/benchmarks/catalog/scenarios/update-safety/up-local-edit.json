@@ -4,6 +4,14 @@
   "scenario_version": "1.0.0",
   "pack_id": "update-safety",
   "command": "afol up apply --dry-run --json --session S-01 --task-id T-01 --reason \"dry run local edit\"",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "require('node:fs').appendFileSync('.afol/adm/hooks/README.md','\\npublic synthetic local edit\\n')"
+    ]
+  ],
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

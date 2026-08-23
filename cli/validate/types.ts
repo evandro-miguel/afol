@@ -38,6 +38,7 @@ export interface ScenarioMeasurement {
 	sample_count?: number;
 	warmup_count?: number;
 	git_commit?: string;
+	source_repository?: string;
 	timestamp?: string;
 }
 
@@ -260,6 +261,7 @@ export interface BenchmarkResult {
 	tool_call_count: number;
 	tool_success_rate: number;
 	git_commit: string;
+	source_repository?: string;
 	timestamp?: string;
 	sample_count?: number;
 	warmup_count?: number;

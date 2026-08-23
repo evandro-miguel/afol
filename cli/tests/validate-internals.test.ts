@@ -223,60 +223,58 @@ function createFixtureRoot(): string {
 		"--format=%cI",
 		fixtureCommit,
 	]);
-	const evolutionScenarioPath = join(
-		root,
-		".afol",
-		"data",
-		"benchmarks",
-		"catalog",
-		"scenarios",
-		"evolution-core",
-		"evolution-status-contract.json",
-	);
-	const historicalEvolutionBaselinePath = join(
-		root,
-		".afol",
-		"data",
-		"benchmarks",
-		"catalog",
-		"baselines",
-		"evolution-core",
-		"baseline-v1.json",
-	);
-	const evolutionBaselinePath = historicalEvolutionBaselinePath.replace(
-		"baseline-v1.json",
-		"baseline-v2.json",
-	);
-	if (
-		existsSync(evolutionScenarioPath) &&
-		existsSync(historicalEvolutionBaselinePath)
-	) {
-		const evolutionScenario = readJson(evolutionScenarioPath);
-		const measurement = evolutionScenario.measurement;
-		if (isObject(measurement)) {
-			evolutionScenario.measurement = {
-				...measurement,
-				git_commit: fixtureCommit,
-				timestamp: fixtureTimestamp,
-			};
-			writeFileSync(
-				evolutionScenarioPath,
-				`${JSON.stringify(evolutionScenario, null, 2)}\n`,
-				"utf8",
-			);
-			const evolutionBaseline = readJson(historicalEvolutionBaselinePath);
-			evolutionBaseline.baseline_id = "evolution-core-v2";
-			evolutionBaseline.run_id =
-				"bench-evolution-core-evolution-status-contract-1.1.0";
-			evolutionBaseline.git_commit = fixtureCommit;
-			evolutionBaseline.timestamp = fixtureTimestamp;
-			writeFileSync(
-				evolutionBaselinePath,
-				`${JSON.stringify(evolutionBaseline, null, 2)}\n`,
-				"utf8",
-			);
+	const rebindMeasuredProvenance = (
+		scenarioRelativePath: string,
+		historicalBaselineRelativePath: string,
+		outputBaselineRelativePath = historicalBaselineRelativePath,
+		updateBaseline: (baseline: Record<string, unknown>) => void = () => {},
+	): void => {
+		const scenarioPath = join(root, scenarioRelativePath);
+		const historicalBaselinePath = join(root, historicalBaselineRelativePath);
+		if (!existsSync(scenarioPath) || !existsSync(historicalBaselinePath)) {
+			return;
 		}
-	}
+		const scenario = readJson(scenarioPath);
+		const measurement = scenario.measurement;
+		if (!isObject(measurement)) {
+			return;
+		}
+		scenario.measurement = {
+			...measurement,
+			git_commit: fixtureCommit,
+			timestamp: fixtureTimestamp,
+		};
+		writeFileSync(
+			scenarioPath,
+			`${JSON.stringify(scenario, null, 2)}\n`,
+			"utf8",
+		);
+		const baseline = readJson(historicalBaselinePath);
+		baseline.git_commit = fixtureCommit;
+		baseline.timestamp = fixtureTimestamp;
+		if (typeof measurement.source_repository === "string") {
+			baseline.source_repository = measurement.source_repository;
+		}
+		updateBaseline(baseline);
+		writeFileSync(
+			join(root, outputBaselineRelativePath),
+			`${JSON.stringify(baseline, null, 2)}\n`,
+			"utf8",
+		);
+	};
+	rebindMeasuredProvenance(
+		".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+		".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v1.json",
+		".afol/data/benchmarks/catalog/baselines/evolution-core/baseline-v2.json",
+		(baseline) => {
+			baseline.baseline_id = "evolution-core-v2";
+			baseline.run_id = "bench-evolution-core-evolution-status-contract-1.1.0";
+		},
+	);
+	rebindMeasuredProvenance(
+		".afol/data/benchmarks/catalog/scenarios/state-projection/state-export.json",
+		".afol/data/benchmarks/catalog/baselines/state-projection/baseline-v1.json",
+	);
 	return root;
 }
 
@@ -456,6 +454,16 @@ function createProvenanceFixtures(root: string): {
 	commitTime: Date;
 	commit: string;
 } {
+	const remote = spawnSync(
+		"git",
+		["remote", "add", "origin", "https://github.com/evandro-miguel/afol.git"],
+		{ cwd: root, encoding: "utf8" },
+	);
+	if (remote.status !== 0) {
+		throw new Error(
+			remote.stderr || "Unable to configure provenance fixture remote",
+		);
+	}
 	const commit = gitFixtureValue(root, ["rev-parse", "HEAD"]);
 	const commitTime = new Date(
 		gitFixtureValue(root, ["show", "-s", "--format=%cI", commit]),
@@ -478,6 +486,7 @@ function createProvenanceFixtures(root: string): {
 				sample_count: 3,
 				warmup_count: 1,
 				git_commit: commit,
+				source_repository: "git@github.com:evandro-miguel/afol.git",
 				timestamp,
 			},
 		},
@@ -488,6 +497,7 @@ function createProvenanceFixtures(root: string): {
 			sample_count: 3,
 			warmup_count: 1,
 			git_commit: commit,
+			source_repository: "https://github.com/evandro-miguel/afol",
 			timestamp,
 			provenance: "fixture",
 		},
@@ -730,6 +740,111 @@ describe("validate registry", () => {
 		}
 	});
 
+	test("requires matching normalized source repositories for observed data", () => {
+		const root = createFixtureRoot();
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const missing = {
+				...fixture.scenario,
+				measurement: {
+					...fixture.scenario.measurement,
+					source_repository: undefined,
+				},
+			} as unknown as Scenario;
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					missing,
+					fixture.baseline,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-missing:evolution-core:provenance-fixture:measurement.source_repository",
+			);
+
+			const invalid = {
+				...fixture.scenario,
+				measurement: {
+					...fixture.scenario.measurement,
+					source_repository: "placeholder",
+				},
+			} as unknown as Scenario;
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					invalid,
+					{ ...fixture.baseline, source_repository: "placeholder" },
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toEqual(
+				expect.arrayContaining([
+					"benchmark-provenance-source-repository-invalid:evolution-core:provenance-fixture:measurement",
+					"benchmark-provenance-source-repository-invalid:evolution-core:provenance-fixture:baseline",
+				]),
+			);
+
+			const mismatch = {
+				...fixture.baseline,
+				source_repository: "https://github.com/evandro-miguel/other.git",
+			};
+			expect(
+				validateBenchmarkProvenance(
+					root,
+					fixture.scenario,
+					mismatch,
+					new Date(fixture.commitTime.getTime() + 1_000),
+				),
+			).toContain(
+				"benchmark-provenance-mismatch:evolution-core:provenance-fixture:source_repository",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("accepts foreign and Git-less observed provenance as external anchors", () => {
+		const root = createFixtureRoot();
+		const gitlessRoot = mkdtempSync(join(tmpdir(), "validate-gitless-"));
+		try {
+			const fixture = createProvenanceFixtures(root);
+			const now = new Date();
+			const foreignSource = "https://git.example.invalid/team/afol.git";
+			const foreign = {
+				...fixture.scenario,
+				measurement: {
+					...fixture.scenario.measurement,
+					git_commit: "f".repeat(40),
+					source_repository: foreignSource,
+					timestamp: now.toISOString(),
+				},
+			} as unknown as Scenario;
+			const baseline = {
+				...fixture.baseline,
+				git_commit: "f".repeat(40),
+				source_repository: "git@git.example.invalid:team/afol.git",
+				timestamp: now.toISOString(),
+			};
+			for (const projectRoot of [root, gitlessRoot]) {
+				const issues = validateBenchmarkProvenance(
+					projectRoot,
+					foreign,
+					baseline,
+					now,
+				);
+				expect(issues).not.toContain(
+					`benchmark-provenance-commit-not-found:evolution-core:provenance-fixture:${"f".repeat(40)}`,
+				);
+				expect(issues).not.toContain(
+					`benchmark-provenance-commit-not-ancestor:evolution-core:provenance-fixture:${"f".repeat(40)}`,
+				);
+				expect(issues).toEqual([]);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(gitlessRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects unknown and non-ancestor commits", () => {
 		const root = createFixtureRoot();
 		try {
@@ -861,7 +976,7 @@ describe("validate registry", () => {
 				"pstr-watch-once",
 			]);
 			expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);
-			expect(snapshot.scenariosByPack["state-projection"]).toHaveLength(4);
+			expect(snapshot.scenariosByPack["state-projection"]).toHaveLength(5);
 			expect(snapshot.scenariosByPack["memory-governance"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["library-knowledge"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["governance-history"]).toHaveLength(7);

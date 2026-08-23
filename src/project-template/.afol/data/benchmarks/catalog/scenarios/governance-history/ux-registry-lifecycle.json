@@ -7,6 +7,11 @@
   "sandbox": true,
   "setup": [
     [
+      "node",
+      "-e",
+      "const{mkdirSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd();const journey='public-template-ux-fixture_ux-journey_01';const spec='public-template-ux-fixture_spec-child_01';mkdirSync(join(root,'.afol','adm','ux'),{recursive:true});mkdirSync(join(root,'.afol','adm','specs'),{recursive:true});writeFileSync(join(root,'.afol','adm','ux',journey+'.md'),`---\ndoc_type: ux-journey\nid: ${journey}\ntheme: public-template-ux-fixture\nstatus: draft\nroadmap_feature: unassigned\nparent_spec: ${spec}\n---\n\n# UX Journey: Public Template Fixture\n\n## Purpose\n\n- Goal: validate a public synthetic journey.\n\n## Entry And Exit\n\n- Entry point: benchmark setup.\n- Success exit: registry validation passes.\n\n## Flow\n\n- AFOL command/tool: \\`afol maintenance\\`.\n\n## Expected Result\n\n- Output: compact registry status.\n\n## Evidence\n\n- Scripted scenario: governance-history.\n\n## Metrics\n\n- Completion criterion: \\`afol ux validate\\` exits 0.\n\n## Acceptance\n\n- [ ] Synthetic fixture is discoverable\n`);writeFileSync(join(root,'.afol','adm','specs',spec+'.md'),`---\ndoc_type: spec-child\nid: ${spec}\ntheme: public-template-ux-fixture\nstatus: draft\nroadmap_feature: unassigned\nparent_spec: ${spec}\n---\n\n# Public Template Fixture Spec\n\nThis synthetic fixture covers \\`afol ux validate\\` and \\`afol maintenance\\`.\n`);"
+    ],
+    [
       "afol",
       "ux",
       "list",
@@ -16,7 +21,7 @@
       "afol",
       "ux",
       "show",
-      "260627_1122_afol-tool-scenario-coverage-and-ux-registry_ux-journey_01",
+      "public-template-ux-fixture_ux-journey_01",
       "--json"
     ],
     [
@@ -32,7 +37,7 @@
       "ux",
       "register",
       "--from-spec",
-      "260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01",
+      "public-template-ux-fixture_spec-child_01",
       "--dry-run",
       "--json"
     ]

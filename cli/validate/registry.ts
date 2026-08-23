@@ -337,6 +337,10 @@ function parseScenario(
 			measurementRaw.git_commit,
 			`${sourcePath}.measurement.git_commit`,
 		);
+		const sourceRepository = asOptionalString(
+			measurementRaw.source_repository,
+			`${sourcePath}.measurement.source_repository`,
+		);
 		const timestamp = asOptionalString(
 			measurementRaw.timestamp,
 			`${sourcePath}.measurement.timestamp`,
@@ -346,6 +350,9 @@ function parseScenario(
 		if (sampleCount !== undefined) measurement.sample_count = sampleCount;
 		if (warmupCount !== undefined) measurement.warmup_count = warmupCount;
 		if (gitCommit !== undefined) measurement.git_commit = gitCommit;
+		if (sourceRepository !== undefined) {
+			measurement.source_repository = sourceRepository;
+		}
 		if (timestamp !== undefined) measurement.timestamp = timestamp;
 		scenario.measurement = measurement;
 	}
@@ -1249,21 +1256,25 @@ function readGitProvenance(projectRoot: string, commit: string): GitProvenance {
 	return result;
 }
 
-function normalizeGitRepositoryId(value: string): string | undefined {
-	const normalized = value
-		.trim()
-		.replace(/^git@([^:]+):/u, "$1/")
-		.replace(/^ssh:\/\/git@/u, "")
-		.replace(/^https?:\/\//u, "")
-		.replace(/\.git$/u, "")
-		.replace(/\/+$/u, "")
-		.toLowerCase();
-	return /^[a-z0-9.-]+\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/u.test(normalized)
-		? normalized
+export function normalizeGitRepositoryId(value: string): string | undefined {
+	let normalized = value.trim();
+	if (!normalized || /[?#\s]/u.test(normalized)) return undefined;
+	if (/^[^/@\s]+@[^/:\s]+:.+$/u.test(normalized)) {
+		const separator = normalized.indexOf(":");
+		normalized = `${normalized.slice(0, separator).replace(/^[^@]+@/u, "")}/${normalized.slice(separator + 1)}`;
+	} else {
+		normalized = normalized.replace(
+			/^(?:git\+ssh|ssh|git|https?):\/\/(?:[^@/\s]+@)?/iu,
+			"",
+		);
+	}
+	normalized = normalized.replace(/\/+$/u, "").replace(/\.git$/iu, "");
+	return /^[a-z0-9.-]+\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/iu.test(normalized)
+		? normalized.toLowerCase()
 		: undefined;
 }
 
-function readGitRepositoryId(projectRoot: string): string | undefined {
+export function readGitRepositoryId(projectRoot: string): string | undefined {
 	const remote = runBoundedGit(projectRoot, [
 		"config",
 		"--get",
@@ -1359,6 +1370,40 @@ export function validateBenchmarkProvenance(
 	if (measurement.source === undefined) {
 		issues.push(`benchmark-provenance-missing:${prefix}:measurement.source`);
 	}
+	const measurementSourceRepository = measurement.source_repository;
+	const normalizedMeasurementRepository =
+		typeof measurementSourceRepository === "string"
+			? normalizeGitRepositoryId(measurementSourceRepository)
+			: undefined;
+	if (measurementSourceRepository === undefined) {
+		issues.push(
+			`benchmark-provenance-missing:${prefix}:measurement.source_repository`,
+		);
+	} else if (normalizedMeasurementRepository === undefined) {
+		issues.push(
+			`benchmark-provenance-source-repository-invalid:${prefix}:measurement`,
+		);
+	}
+	const normalizedBaselineRepository =
+		typeof baseline.source_repository === "string"
+			? normalizeGitRepositoryId(baseline.source_repository)
+			: undefined;
+	if (baseline.source_repository === undefined) {
+		issues.push(
+			`benchmark-provenance-missing:${prefix}:baseline.source_repository`,
+		);
+	} else if (normalizedBaselineRepository === undefined) {
+		issues.push(
+			`benchmark-provenance-source-repository-invalid:${prefix}:baseline`,
+		);
+	}
+	if (
+		normalizedMeasurementRepository !== undefined &&
+		normalizedBaselineRepository !== undefined &&
+		normalizedMeasurementRepository !== normalizedBaselineRepository
+	) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:source_repository`);
+	}
 	if (baseline.provenance === undefined) {
 		issues.push(`benchmark-provenance-missing:${prefix}:baseline.provenance`);
 	} else if (
@@ -1427,9 +1472,13 @@ export function validateBenchmarkProvenance(
 	if (commit !== undefined) {
 		if (!/^[0-9a-f]{7,40}$/i.test(commit)) {
 			issues.push(`benchmark-provenance-commit-invalid:${prefix}:${commit}`);
-		} else if (projectRoot === undefined) {
-			issues.push(`benchmark-provenance-project-root-missing:${prefix}`);
-		} else {
+		} else if (
+			projectRoot !== undefined &&
+			normalizedMeasurementRepository !== undefined &&
+			normalizedBaselineRepository !== undefined &&
+			normalizedMeasurementRepository === normalizedBaselineRepository &&
+			readGitRepositoryId(projectRoot) === normalizedMeasurementRepository
+		) {
 			git = readGitProvenance(projectRoot, commit);
 			if (!git.exists) {
 				issues.push(

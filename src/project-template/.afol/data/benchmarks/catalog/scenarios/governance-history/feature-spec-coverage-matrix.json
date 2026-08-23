@@ -23,7 +23,8 @@
       "validate bench --pack <pack-id> --json",
       "spec list [--json] [--verbose]",
       "ux validate",
-      "bench list"
+      "bench list",
+      "evolve evaluate <id> [--record] [--superseded-by <id>] [-j]"
     ],
     "journeys": [
       "feature-spec-scenario-coverage",

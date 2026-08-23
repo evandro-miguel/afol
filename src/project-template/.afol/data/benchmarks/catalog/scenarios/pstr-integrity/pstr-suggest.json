@@ -1,27 +1,27 @@
 {
   "schema_version": "1.0.0",
-  "scenario_id": "pstr-rebuild",
+  "scenario_id": "pstr-suggest",
   "scenario_version": "1.0.0",
   "pack_id": "pstr-integrity",
-  "command": "afol pstr rebuild --json",
+  "command": "afol pstr suggest --json",
   "sandbox": true,
   "setup": [
     [
       "node",
       "-e",
-      "const{mkdirSync,rmSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd();for(const [dir,file] of [['cli','fixture.ts'],['docs','fixture.md']]){const path=join(root,dir);rmSync(path,{recursive:true,force:true});mkdirSync(path,{recursive:true});writeFileSync(join(path,file),'public fixture\\n');}"
+      "const{mkdirSync,rmSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd();for(const [dir,file] of [['cli','fixture.ts'],['docs','fixture.md']]){const path=join(root,dir);rmSync(path,{recursive:true,force:true});mkdirSync(path,{recursive:true});writeFileSync(join(path,file),'public fixture\\n');}rmSync(join(root,'.afol','pstr'),{recursive:true,force:true});"
     ]
   ],
   "coverage": {
-    "subcommands": ["pstr rebuild|rb --json"],
-    "journeys": ["pstr-structure-refresh"]
+    "subcommands": ["pstr suggest|sug --json"],
+    "journeys": ["pstr-freshness-review"]
   },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
-    "max_duration_ms": 300,
-    "max_p95_ms": 300,
-    "max_output_tokens": 220,
+    "max_duration_ms": 500,
+    "max_p95_ms": 500,
+    "max_output_tokens": 700,
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "pstr-integrity-v1",

@@ -174,14 +174,17 @@ function rebindEvolutionProvenance(root: string): void {
 		".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
 	);
 	const baseline = readJson(historicalBaselinePath);
+	const scenario = readJson(scenarioPath);
+	const measurement = scenario.measurement as Record<string, unknown>;
 	baseline.baseline_id = "evolution-core-v2";
 	baseline.run_id = "bench-evolution-core-evolution-status-contract-1.1.0";
 	baseline.git_commit = commit;
 	baseline.timestamp = timestamp;
 	baseline.provenance = "test-fixture-rebind";
+	if (typeof measurement.source_repository === "string") {
+		baseline.source_repository = measurement.source_repository;
+	}
 	writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
-	const scenario = readJson(scenarioPath);
-	const measurement = scenario.measurement as Record<string, unknown>;
 	measurement.git_commit = commit;
 	measurement.timestamp = timestamp;
 	measurement.source = "test-fixture-rebind";

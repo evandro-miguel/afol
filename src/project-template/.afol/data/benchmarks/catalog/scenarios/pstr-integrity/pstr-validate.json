@@ -5,7 +5,18 @@
   "pack_id": "pstr-integrity",
   "command": "afol pstr validate --json",
   "sandbox": true,
-  "coverage": { "subcommands": ["pstr validate|v --json"] },
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const{mkdirSync,rmSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd();for(const [dir,file] of [['cli','fixture.ts'],['docs','fixture.md']]){const path=join(root,dir);rmSync(path,{recursive:true,force:true});mkdirSync(path,{recursive:true});writeFileSync(join(path,file),'public fixture\\n');}"
+    ],
+    ["afol", "pstr", "rebuild", "--json"]
+  ],
+  "coverage": {
+    "subcommands": ["pstr validate|v --json"],
+    "journeys": ["pstr-structure-validation"]
+  },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

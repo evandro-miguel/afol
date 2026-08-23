@@ -3,7 +3,22 @@
   "scenario_id": "state-sync",
   "scenario_version": "1.0.0",
   "pack_id": "state-projection",
-  "command": "afol state sync -S 260613_1811_public-readiness-release-validation",
+  "command": "afol state sync -S sb-state-projection",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const{mkdirSync,rmSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd(),session='sb-state-projection',dir=join(root,'.afol','wb',session);rmSync(dir,{recursive:true,force:true});mkdirSync(dir,{recursive:true});writeFileSync(join(dir,'plan.md'),'# State projection fixture\\n','utf8');writeFileSync(join(dir,'task.md'),'# Tasks\\n\\n| Task | State | Owner | Notes |\\n|------|-------|-------|-------|\\n| T-01 | pending | worker | fixture |\\n','utf8');"
+    ],
+    ["afol", "hydrate", "-S", "sb-state-projection"]
+  ],
+  "coverage": {
+    "subcommands": [
+      "state sync|sy [--session <session-id>] [--json]"
+    ],
+    "journeys": ["workbench-state-projection-sync"]
+  },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

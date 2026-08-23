@@ -120,6 +120,7 @@ function input(
 		tool_call_count: 1,
 		tool_success_rate: 1,
 		git_commit: currentCommit,
+		source_repository: "https://github.com/evandro-miguel/afol.git",
 		notes: ["expected-exit-honored:0"],
 		...resultOverrides,
 	};
@@ -170,6 +171,7 @@ describe("evolution benchmark baseline writer", () => {
 			expect(baseline.timestamp).toBe("2026-07-20T12:00:00.000Z");
 			expect(baseline.tokenizer_id).toBe("output-bytes-divided-by-4");
 			expect(baseline.tokenizer_version).toBe("1");
+			expect(baseline.source_repository).toBe("github.com/evandro-miguel/afol");
 			expect(baseline.provenance).toBe("untrusted-test-fixture");
 			expect(baseline.provenance).not.toBe("fresh-local-runnable-smoke");
 			const scenario = JSON.parse(
@@ -177,6 +179,9 @@ describe("evolution benchmark baseline writer", () => {
 			) as Record<string, unknown>;
 			expect(scenario.scenario_version).toBe("1.1.0");
 			expect(scenario.baseline_id).toBe("evolution-core-v2");
+			expect(
+				(scenario.measurement as Record<string, unknown>).source_repository,
+			).toBe("github.com/evandro-miguel/afol");
 			expect(
 				(scenario.deterministic_metrics as Record<string, unknown>).duration_ms,
 			).toBe(311);
@@ -221,7 +226,9 @@ describe("evolution benchmark baseline writer", () => {
 		const root = fixtureRoot();
 		try {
 			seedV2Baseline(root);
-			const output = input(root);
+			const output = input(root, {
+				git_commit: `${currentCommit}${"0".repeat(40 - currentCommit.length)}`,
+			});
 			evolutionBaselineWriterTestApi.writeFixture(root, output, {
 				currentCommit,
 				now: new Date("2026-07-20T12:00:00.000Z"),
@@ -282,6 +289,11 @@ describe("evolution benchmark baseline writer", () => {
 			name: "wrong commit",
 			result: { git_commit: "deadbeefdead" },
 			error: "does not match current HEAD",
+		},
+		{
+			name: "invalid source repository",
+			result: { source_repository: "placeholder" },
+			error: "valid source repository",
 		},
 		{
 			name: "wrong payload schema",
