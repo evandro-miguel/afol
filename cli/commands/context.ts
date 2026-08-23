@@ -17,7 +17,7 @@ import {
 	SectionIndexTrustError,
 } from "../services/context/section-index";
 import type { ContextRetrievalMode } from "../services/context/types";
-import { checkHealth } from "../services/health/checker";
+import { checkAreaHealth } from "../services/health/checker";
 import { listTopics } from "../services/library/crud";
 import { readMemory } from "../services/memory/crud";
 import { resolveProjectPaths } from "../services/project/paths";
@@ -283,16 +283,11 @@ function formatExplanation(
 	bundle: ReturnType<typeof buildContextBundle>,
 	options: { full?: boolean } = {},
 ) {
-	const healthFindings = checkHealth(root, {
-		deep: false,
-		includeAuxiliary: true,
-	}).findings.filter(
-		(finding) => finding.severity === "fail" || finding.severity === "warn",
-	);
-	const relevantAreas = new Set(["pstr", "memory", "library", "state"]);
-	const relevantHealth = healthFindings.filter((finding) =>
-		relevantAreas.has(finding.area),
-	);
+	const relevantHealth = (["pstr", "memory", "library", "state"] as const)
+		.flatMap((area) => checkAreaHealth(root, area))
+		.filter(
+			(finding) => finding.severity === "fail" || finding.severity === "warn",
+		);
 	const evidenceTags = Array.from(
 		new Set([
 			...bundle.refs.map((ref) => ref.domain),

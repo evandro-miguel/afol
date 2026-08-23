@@ -9,7 +9,7 @@
     [
       "node",
       "-e",
-      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const dir=join(root,'docs','arc','SPECS'); mkdirSync(dir,{recursive:true}); writeFileSync(join(dir,'alpha.md'), ['---','id: alpha','roadmap_feature: alpha','---','','# Alpha','','## Overview','','Alpha overview.',''].join('\\n'),'utf8');"
+      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const dir=join(root,'.afol','adm','specs'); mkdirSync(dir,{recursive:true}); writeFileSync(join(dir,'alpha-spec.md'), ['---','doc_type: spec','id: alpha','roadmap_feature: alpha','status: active','---','','# Alpha','','## Overview','','Alpha overview.',''].join('\\n'),'utf8');"
     ],
     [
       "afol",

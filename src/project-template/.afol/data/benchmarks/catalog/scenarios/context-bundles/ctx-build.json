@@ -4,6 +4,7 @@
 	"scenario_version": "1.0.0",
 	"pack_id": "context-bundles",
 	"command": "afol cx build",
+	"sandbox": true,
 	"coverage": {
 		"features": ["F-29"],
 		"specs": ["260726_canonical-adm-context-index-migration_spec-child_01"]
