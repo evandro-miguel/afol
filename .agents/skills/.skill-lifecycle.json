@@ -1,7 +1,7 @@
 {
   "$schema": "schema/skill-lifecycle.schema.json",
   "version": 1,
-  "updated_at": "2026-07-18T14:12:00Z",
+  "updated_at": "2026-08-23T17:58:40Z",
   "entries": [
     {
       "skill": "analysis-tools-guide",
@@ -146,6 +146,19 @@
       "archive_path": "archives/skills/20260412_merged-agentic-folder-sys/workbench-agent-teams",
       "references": [
         "CHANGELOG.md"
+      ]
+    },
+    {
+      "skill": "agentic-folder-sys",
+      "event": "removed",
+      "date": "2026-08-23",
+      "replacements": [],
+      "reason": "The retired agentic-folder-sys payload was removed from the active catalog; AFOL routing now follows repository-owned governance.",
+      "agent_action": "Do not use or restore agentic-folder-sys; follow AGENTS.md, applicable .afol/adm/rules, and afol help for current AFOL operations.",
+      "references": [
+        "AGENTS.md",
+        ".afol/adm/rules/RULE-009-legacy-surface-retirement.md",
+        "docs/lessons/entries/20260705_0000_agentic_folder_sys_stays_global.md"
       ]
     },
     {
