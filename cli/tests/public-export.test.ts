@@ -32,11 +32,15 @@ describe("public export boundary", () => {
 	test("maps the public governance instructions to the export root", () => {
 		const config = JSON.parse(
 			readFileSync(join(repoRoot, "scripts", "public-files.json"), "utf8"),
-		) as { mapped_files?: Record<string, string> };
+		) as {
+			mapped_files?: Record<string, string>;
+			exclude?: string[];
+		};
 
 		expect(config.mapped_files).toEqual({
 			"docs/public/AGENTS.md": "AGENTS.md",
 		});
+		expect(config.exclude).toContain("cli/tests/public-export.test.ts");
 	});
 
 	test("keeps smoke:example while exporting mapped files", () => {

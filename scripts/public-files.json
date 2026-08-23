@@ -38,6 +38,7 @@
     "cli/tests/evolution-governance-schema.test.ts",
     "cli/tests/governance-contract-reconciliation.test.ts",
     "cli/tests/multitask-throughput-contract.test.ts",
+    "cli/tests/public-export.test.ts",
     "cli/tests/skill-command.test.ts",
     "cli/tests/validate-internals.test.ts",
     "cli/tests/validation.test.ts",
