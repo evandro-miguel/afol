@@ -1264,6 +1264,11 @@ Follow-on slices under this direction:
 - Non-goals: npm publication, macOS or ARM support, public visibility changes,
   global installation, production deployment, provider/model execution, or
   publishing private workbench, RAG, governance history, and raw evidence.
+- Local cutover checkpoint (2026-08-23): the public engine boundary child is
+  final at exact public SHA `09fd89fda14c40c5a4fd8a3160510e22670ec3bc` after
+  a clean-clone release validation. F-34 remains active for its other child
+  workstreams; no remote, visibility, publication, hosted CI, or installation
+  action is implied.
 
 ## 6) Recommended Delivery Phases
 

@@ -5,6 +5,11 @@
 - This repository is already AFOL-only for active workflows. Use `afol` and
   keep mutable state in `.afol/**`, especially `.afol/wb/**`; do not reopen a
   general migration track.
+- The canonical engine checkout is
+  `/home/ozy/01_projects/dev/afol/afol.public`. New engine code, product tests,
+  public documentation, and release tooling start there. This private
+  repository retains governance, workbench history, and the export factory;
+  do not create a divergent private engine or release from it.
 - Do not use as active flow: `.agents/agents`, `.agents/scripts`,
   `.agents/runtime`, `.agents/wb`, `.agents/z-arq`, `agents.config`, or
   `legacy:` routes.
