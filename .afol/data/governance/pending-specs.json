@@ -2,6 +2,21 @@
   "schema_version": 1,
   "entries": [
     {
+      "session_id": "260709_1643_provider-neutral-gitnexus-cleanup",
+      "created_at": "2026-07-09T20:43:42.284Z",
+      "updated_at": "2026-07-09T20:43:42.284Z",
+      "status": "waived",
+      "theme": "provider-neutral-gitnexus-cleanup",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Maintenance follow-up to final F-19: align repository context with the disabled Claude adapter; no new product behavior or governing spec is required."
+    },
+    {
       "session_id": "260716_0945_project-lifecycle-task-graph",
       "created_at": "2026-07-16T13:45:40.555Z",
       "updated_at": "2026-07-16T13:45:47.143Z",
@@ -11,14 +26,13 @@
         "T-01"
       ],
       "missing": [],
-      "resolution_hint": "spec requirement waived with explicit reason",
-      "resolved_at": "2026-07-16T13:45:47.143Z",
+      "resolution_hint": "run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
       "reason": "Architecture handoff for AFOL-native evaluation before roadmap feature and parent spec acceptance; recipient must promote accepted scope into canonical governance before broad implementation."
     },
     {
-      "session_id": "260718_1557_capability-marker_d942",
-      "created_at": "2026-07-18T19:57:38.372Z",
-      "updated_at": "2026-07-18T19:57:56.283Z",
+      "session_id": "260718_1557_capability-marker",
+      "created_at": "2026-07-18T19:57:30.984Z",
+      "updated_at": "2026-07-30T16:59:28.468Z",
       "status": "waived",
       "theme": "capability-marker",
       "task_ids": [
@@ -26,9 +40,153 @@
       ],
       "missing": [],
       "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Capability marker follow-up for AFOL Evolution request; spec to be resolved via governance."
+    },
+    {
+      "session_id": "260718_1557_capability-marker_d942",
+      "created_at": "2026-07-18T19:57:38.372Z",
+      "updated_at": "2026-07-18T20:00:20.372Z",
+      "status": "waived",
+      "theme": "capability-marker",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
       "feature_id": "F-30",
-      "resolved_at": "2026-07-18T19:57:56.283Z",
       "reason": "Spec is currently non-resolvable in branch index (260717 parent missing); proceeding with documented residual."
+    },
+    {
+      "session_id": "260726_2133_branch-consolidation",
+      "created_at": "2026-07-27T00:33:46.415Z",
+      "updated_at": "2026-07-27T00:44:03.982Z",
+      "status": "waived",
+      "theme": "branch-consolidation",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Operational Git branch consolidation; no product intent or implementation change"
+    },
+    {
+      "session_id": "260728_2323_ux-live-check",
+      "created_at": "2026-07-29T04:23:49.013Z",
+      "updated_at": "2026-07-29T04:23:49.692Z",
+      "status": "waived",
+      "theme": "ux-live-check",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "ux-audit-smoke"
+    },
+    {
+      "session_id": "260728_2327_write-close-test",
+      "created_at": "2026-07-29T04:27:26.759Z",
+      "updated_at": "2026-08-01T22:23:11.930Z",
+      "status": "waived",
+      "theme": "write-close-test",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "close-resolve-test"
+    },
+    {
+      "session_id": "260728_2327_write-path-audit",
+      "created_at": "2026-07-29T04:27:10.761Z",
+      "updated_at": "2026-08-01T22:23:16.453Z",
+      "status": "waived",
+      "theme": "write-path-audit",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "write-path-audit"
+    },
+    {
+      "session_id": "260728_2327_write-path-audit2",
+      "created_at": "2026-07-29T04:27:11.312Z",
+      "updated_at": "2026-07-29T04:27:11.312Z",
+      "status": "waived",
+      "theme": "write-path-audit2",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "write-path-audit-2"
+    },
+    {
+      "session_id": "260728_2327_write-path-audit3",
+      "created_at": "2026-07-29T04:27:12.093Z",
+      "updated_at": "2026-07-29T04:27:12.093Z",
+      "status": "waived",
+      "theme": "write-path-audit3",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "write-path-audit-3"
+    },
+    {
+      "session_id": "260728_2352_real-use-gate",
+      "created_at": "2026-07-29T04:52:58.367Z",
+      "updated_at": "2026-07-29T04:52:59.070Z",
+      "status": "waived",
+      "theme": "real-use-gate",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "real-use-gate"
+    },
+    {
+      "session_id": "260728_2353_shortpath2",
+      "created_at": "2026-07-29T04:53:13.122Z",
+      "updated_at": "2026-07-29T04:53:13.122Z",
+      "status": "waived",
+      "theme": "shortpath2",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "s"
+    },
+    {
+      "session_id": "260729_0929_postcommit-critic-fixes",
+      "created_at": "2026-07-29T14:29:55.798Z",
+      "updated_at": "2026-07-29T14:29:55.798Z",
+      "status": "waived",
+      "theme": "postcommit-critic-fixes",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Post-close verification fixes requested by independent critics"
+    },
+    {
+      "session_id": "260729_1312_branch-centralization",
+      "created_at": "2026-07-29T18:12:40.185Z",
+      "updated_at": "2026-07-29T18:12:40.185Z",
+      "status": "waived",
+      "theme": "branch-centralization",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Repository hygiene: integrate verified exclusive branch work before deleting obsolete branches"
     },
     {
       "session_id": "260810_0100_mutation-timing-flake",
@@ -40,9 +198,22 @@
         "T-01"
       ],
       "missing": [],
-      "resolution_hint": "spec requirement waived with explicit reason",
-      "resolved_at": "2026-08-10T06:01:44.763Z",
+      "resolution_hint": "run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
       "reason": "Narrow release-gate flake fix preserving existing absolute SLOs"
+    },
+    {
+      "session_id": "260815_2221_afol-nonblocking-governance",
+      "created_at": "2026-08-16T03:21:24.235Z",
+      "updated_at": "2026-08-16T03:55:52.219Z",
+      "status": "waived",
+      "theme": "afol-nonblocking-governance",
+      "task_ids": [
+        "T-01",
+        "T-02"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Self-hosting fix: current CLI cannot activate planned features or bind active residual children; user explicitly requested implementation"
     },
     {
       "session_id": "260816_2020_simplicity-preserving-integrity-remediation",
@@ -61,12 +232,62 @@
       "missing": [],
       "resolution_hint": "linked to roadmap feature and parent spec",
       "feature_id": "F-29",
-      "parent_spec": "260715_afol-1-0-linux-wsl-finalization_spec_01",
-      "resolved_at": "2026-08-17T01:20:52.916Z",
-      "parent_spec_path": ".afol/adm/specs/260715_afol-1-0-linux-wsl-finalization_spec_01.md",
-      "parent_spec_sha256": "3dd78382bcebd119551ffa68a0e8047811bc32abed320d0d786eb17b1f7d668e",
-      "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
-      "roadmap_sha256": "c6ab558334d31eb8e83ad8ee37d1e699acb4b94c8b4ba188a38cc8712d570f96"
+      "parent_spec": "260715_afol-1-0-linux-wsl-finalization_spec_01"
+    },
+    {
+      "session_id": "260817_1521_windows-support",
+      "created_at": "2026-08-17T20:21:49.677Z",
+      "updated_at": "2026-08-18T00:40:26.529Z",
+      "status": "waived",
+      "theme": "windows-support",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
+      "resolution_hint": "run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
+    },
+    {
+      "session_id": "260817_1535_windows-release-gates",
+      "created_at": "2026-08-17T20:35:04.944Z",
+      "updated_at": "2026-08-18T00:40:26.689Z",
+      "status": "waived",
+      "theme": "windows-release-gates",
+      "task_ids": [
+        "T-01",
+        "T-02"
+      ],
+      "missing": [],
+      "resolution_hint": "run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
+    },
+    {
+      "session_id": "260817_1553_windows-clean-smoke-symlink",
+      "created_at": "2026-08-17T20:53:36.582Z",
+      "updated_at": "2026-08-18T00:40:26.859Z",
+      "status": "waived",
+      "theme": "windows-clean-smoke-symlink",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "reason": "User-authorized Windows AFOL enablement and release-gate repair; this maintenance does not create new roadmap product intent and the governing historical release features are final."
+    },
+    {
+      "session_id": "260817_1603_windows-absolute-verification",
+      "created_at": "2026-08-17T21:03:12.407Z",
+      "updated_at": "2026-08-17T21:27:23.562Z",
+      "status": "waived",
+      "theme": "windows-absolute-verification",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Windows compatibility regression discovered during native end-to-end validation"
     },
     {
       "session_id": "260817_1830_lock-pid-identity-recovery",
@@ -78,16 +299,71 @@
         "T-01"
       ],
       "missing": [],
-      "resolution_hint": "spec requirement waived with explicit reason",
+      "resolution_hint": "catalog resolution deferred: Parent spec is final without one active residual child: 260710_core-integrity-and-transaction-safety_spec_01; run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
       "feature_id": "F-22",
       "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01",
-      "resolved_at": "2026-08-17T23:35:47.485Z",
       "reason": "Regression fix for final F-22 lock integrity; parent cannot be reopened and focused evidence is recorded."
+    },
+    {
+      "session_id": "260817_1910_bun-probe-windows-false-negative",
+      "created_at": "2026-08-18T00:10:54.138Z",
+      "updated_at": "2026-08-18T00:13:13.735Z",
+      "status": "waived",
+      "theme": "bun-probe-windows-false-negative",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "User-requested Windows validator regression fix discovered while verifying the corrected AFOL build; existing validation feature is final."
+    },
+    {
+      "session_id": "260817_1933_closed-plan-consistency",
+      "created_at": "2026-08-18T00:33:44.948Z",
+      "updated_at": "2026-08-18T00:39:59.874Z",
+      "status": "waived",
+      "theme": "closed-plan-consistency",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Release-blocking lifecycle consistency bug discovered during Windows support finalization; governing historical feature is final."
+    },
+    {
+      "session_id": "260817_1952_windows-suite-portability",
+      "created_at": "2026-08-18T00:52:32.407Z",
+      "updated_at": "2026-08-23T18:17:54.431Z",
+      "status": "waived",
+      "theme": "windows-suite-portability",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Release-blocking Windows test portability discovered during user-authorized AFOL finalization; historical validation feature is final."
+    },
+    {
+      "session_id": "260818_1731_architecture-cycle",
+      "created_at": "2026-08-18T22:31:41.148Z",
+      "updated_at": "2026-08-18T22:31:48.854Z",
+      "status": "resolved",
+      "theme": "architecture-cycle",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "linked to roadmap feature and parent spec",
+      "feature_id": "F-34",
+      "parent_spec": "260818_public-product-and-portfolio-readiness_spec_01"
     },
     {
       "session_id": "260822_1523_warn-vs-block-advisory-gates",
       "created_at": "2026-08-22T20:23:45.522Z",
-      "updated_at": "2026-08-22T20:30:36.014Z",
+      "updated_at": "2026-08-22T21:17:40.496Z",
       "status": "resolved",
       "theme": "warn-vs-block-advisory-gates",
       "task_ids": [
@@ -98,12 +374,39 @@
       "missing": [],
       "resolution_hint": "linked to roadmap feature and parent spec",
       "feature_id": "F-11",
-      "parent_spec": "260822_2023_warn-vs-block-advisory-gates_spec-child_01",
-      "resolved_at": "2026-08-22T20:30:36.014Z",
-      "parent_spec_path": ".afol/adm/specs/260822_2023_warn-vs-block-advisory-gates_spec-child_01.md",
-      "parent_spec_sha256": "5268a87ba93e8d29f3423e6e00be208964e55764df7ae495117560215df7f929",
-      "roadmap_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
-      "roadmap_sha256": "b9064144010d403e47ee7f57f27fa54b4d327d16a14f82c7869799dc5f8bc903"
+      "parent_spec": "260822_2023_warn-vs-block-advisory-gates_spec-child_01"
+    },
+    {
+      "session_id": "260823_2001_pending-stash-review",
+      "created_at": "2026-08-24T01:01:48.972Z",
+      "updated_at": "2026-08-24T01:35:24.146Z",
+      "status": "waived",
+      "theme": "pending-stash-review",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04"
+      ],
+      "missing": [],
+      "resolution_hint": "catalog resolution deferred: Parent spec is final without one active residual child: 260717_agent-submission-and-batch-review_spec_01; run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "feature_id": "F-31",
+      "parent_spec": "260717_agent-submission-and-batch-review_spec_01",
+      "reason": "Review-only reconciliation of a stale conflicted stash; no new product scope implemented"
+    },
+    {
+      "session_id": "260823_2054_governance-verification",
+      "created_at": "2026-08-24T01:54:46.535Z",
+      "updated_at": "2026-08-24T01:54:46.535Z",
+      "status": "waived",
+      "theme": "governance-verification",
+      "task_ids": [
+        "T-01",
+        "T-02"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Close evidence coverage for the pending-stash review delivery"
     }
   ]
 }
