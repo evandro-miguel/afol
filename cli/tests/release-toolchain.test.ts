@@ -74,6 +74,35 @@ function writeReleasePackageMetadata(
 	);
 }
 
+function writeReleaseVersionRegistry(
+	root: string,
+	options: {
+		packageJsonName?: string;
+		packageJsonVersion?: string;
+		registryPackageName?: string;
+		registryVersion?: string;
+	} = {},
+): void {
+	const packageJsonName = options.packageJsonName ?? CLI_PACKAGE_NAME;
+	const packageJsonVersion = options.packageJsonVersion ?? CLI_VERSION;
+	const registryPackageName = options.registryPackageName ?? packageJsonName;
+	const registryVersion = options.registryVersion ?? packageJsonVersion;
+	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "source", "release-version.json"),
+		JSON.stringify(
+			{
+				packageName: registryPackageName,
+				currentVersion: registryVersion,
+			},
+			null,
+			2,
+		),
+		"utf8",
+	);
+	writeReleasePackageMetadata(root, { packageJsonName, packageJsonVersion });
+}
+
 type MockScannerOptions = {
 	version?: string;
 	exitCode?: number;
@@ -169,6 +198,43 @@ function writeFakeReleaseScanners(binDir: string): void {
 		writeMockScanner(binDir, name, { version });
 	}
 }
+
+function writePortableReleaseScanners(binDir: string): void {
+	mkdirSync(binDir, { recursive: true });
+	for (const name of ["osv-scanner", "gitleaks"]) {
+		const suffix = process.platform === "win32" ? ".cmd" : "";
+		const content =
+			process.platform === "win32"
+				? "@echo off\r\nexit /b 0\r\n"
+				: "#!/bin/sh\nexit 0\n";
+		const path = join(binDir, `${name}${suffix}`);
+		writeFileSync(path, content, "utf8");
+		if (process.platform !== "win32") chmodSync(path, 0o755);
+	}
+}
+
+function supportsDirectoryLink(): boolean {
+	const root = mkdtempSync(
+		join(tmpdir(), "release-provenance-link-capability-"),
+	);
+	const target = join(root, "target");
+	const link = join(root, "link");
+	try {
+		mkdirSync(target);
+		symlinkSync(
+			target,
+			link,
+			process.platform === "win32" ? "junction" : "dir",
+		);
+		return true;
+	} catch {
+		return false;
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+}
+
+const hasDirectoryLinkCapability = supportsDirectoryLink();
 
 function fileSha256(path: string): string {
 	return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -1424,6 +1490,151 @@ describe("release and toolchain contracts", () => {
 		try {
 			expect(() => buildReleaseProvenance({ cwd: root })).toThrow(
 				/package\.json/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("canonicalizes a Windows candidate artifact before writing sidecars", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-windows-artifact-"),
+		);
+		const artifact = join(root, "dist", "afol.exe");
+		mkdirSync(join(root, "dist"), { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(artifact, "artifact", "utf8");
+
+		try {
+			const written = writeReleaseProvenance({
+				cwd: root,
+				artifact: "dist\\afol.exe",
+			});
+			expect(written.provenancePath).toBe(
+				join(root, "dist", "afol.exe.provenance.json"),
+			);
+			expect(
+				JSON.parse(readFileSync(written.provenancePath, "utf8")),
+			).toMatchObject({ artifact: "dist/afol.exe" });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects unsafe release artifact paths before writing sidecars", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-unsafe-artifact-"),
+		);
+		mkdirSync(join(root, "dist"), { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(root, "dist", "afol.exe"), "artifact", "utf8");
+
+		try {
+			for (const artifact of [
+				"../dist/afol.exe",
+				"dist\\..\\afol.exe",
+				"/dist/afol.exe",
+				"C:\\dist\\afol.exe",
+				"C:dist\\afol.exe",
+				"\\\\server\\share\\afol.exe",
+				"dist/afol.exe/",
+				"dist//afol.exe",
+				"dist/afol:stream.exe",
+				"dist/afol.exe\r\n",
+				"dist/afol.exe ",
+				"dist/afol.exe.",
+				"dist/CON.exe",
+				"dist/LPT9.txt",
+			]) {
+				expect(() => writeReleaseProvenance({ cwd: root, artifact })).toThrow(
+					/invalid release artifact/,
+				);
+			}
+			expect(existsSync(join(root, "dist", "afol.exe.sha256"))).toBe(false);
+			expect(existsSync(join(root, "dist", "afol.exe.provenance.json"))).toBe(
+				false,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test.skipIf(!hasDirectoryLinkCapability)(
+		"rejects a directory link that escapes the physical dist root",
+		() => {
+			const root = mkdtempSync(
+				join(tmpdir(), "release-provenance-reparse-artifact-"),
+			);
+			const outside = mkdtempSync(
+				join(tmpdir(), "release-provenance-reparse-outside-"),
+			);
+			try {
+				writeReleaseVersionRegistry(root);
+				writeFileSync(join(outside, "afol.exe"), "artifact", "utf8");
+				symlinkSync(
+					outside,
+					join(root, "dist"),
+					process.platform === "win32" ? "junction" : "dir",
+				);
+				expect(() =>
+					writeReleaseProvenance({ cwd: root, artifact: "dist/afol.exe" }),
+				).toThrow(/release output directory|reparse path|physical containment/);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+				rmSync(outside, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test("release mode binds an explicit Windows candidate to fresh security evidence and sidecars", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-windows-release-mode-"),
+		);
+		const binDir = join(root, "bin");
+		const artifact = join(root, "dist", "afol.exe");
+		mkdirSync(join(root, "dist"), { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		writeFileSync(artifact, "windows artifact", "utf8");
+		writeCompiledReleaseBuildReceipt(
+			artifact,
+			compiledReleaseBuildArgs("cli/main.ts", "dist/afol.exe"),
+		);
+		writePortableReleaseScanners(binDir);
+		const gitEnv = {
+			...process.env,
+			PATH: `${binDir}${delimiter}${process.env.PATH ?? ""}`,
+			Path: `${binDir}${delimiter}${process.env.Path ?? process.env.PATH ?? ""}`,
+			...pinnedReleaseScannerEnvironment(binDir),
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+
+		try {
+			commitReleaseFixture(root, gitEnv);
+			const written = writeReleaseProvenance({
+				cwd: root,
+				artifact: "dist\\afol.exe",
+				releaseMode: true,
+				env: gitEnv,
+			});
+			const report = JSON.parse(
+				readFileSync(join(root, "dist", "security-scan.release.json"), "utf8"),
+			);
+			expect(report.target).toMatchObject({
+				artifact: "dist/afol.exe",
+				artifact_sha256: fileSha256(artifact),
+			});
+			expect(
+				JSON.parse(readFileSync(written.provenancePath, "utf8")),
+			).toMatchObject({
+				artifact: "dist/afol.exe",
+				sha256: fileSha256(artifact),
+			});
+			expect(readFileSync(written.checksumPath, "utf8")).toBe(
+				`${fileSha256(artifact)}  dist/afol.exe\n`,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

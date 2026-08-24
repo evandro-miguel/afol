@@ -207,6 +207,81 @@ describe("workbench parseSessionTaskArgs", () => {
 });
 
 describe("parseDoneArgs", () => {
+	test("preserves Windows paths and quoted argv in --test", () => {
+		const parsed = parseDoneArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"T-01",
+				"--test",
+				String.raw`bun "C:\Program Files\tool.ts"`,
+			],
+			process.cwd(),
+		);
+
+		expect(parsed.verifications).toEqual([
+			{
+				mode: "argv",
+				executable: "bun",
+				args: ["C:\\Program Files\\tool.ts"],
+			},
+		]);
+	});
+
+	test("tokenizes --test argv without collapsing Windows backslashes", () => {
+		const slash = "\\";
+		expect(
+			splitCommandLine(String.raw`bun "C:\Program Files\tool.ts"`),
+		).toEqual(["bun", "C:\\Program Files\\tool.ts"]);
+		expect(splitCommandLine(String.raw`bun C:\new\test`)).toEqual([
+			"bun",
+			"C:\\new\\test",
+		]);
+		expect(splitCommandLine(String.raw`bun \\server\share\tool.ts`)).toEqual([
+			"bun",
+			"\\\\server\\share\\tool.ts",
+		]);
+		expect(splitCommandLine(String.raw`bun C:\\cache\\tool.ts`)).toEqual([
+			"bun",
+			"C:\\\\cache\\\\tool.ts",
+		]);
+		expect(splitCommandLine(String.raw`bun C:\Program\ Files\tool.ts`)).toEqual(
+			["bun", "C:\\Program Files\\tool.ts"],
+		);
+		expect(splitCommandLine(String.raw`bun "say \"hello\""`)).toEqual([
+			"bun",
+			'say "hello"',
+		]);
+		expect(splitCommandLine(String.raw`bun "say \"hello"`)).toEqual([
+			"bun",
+			'say "hello',
+		]);
+		expect(splitCommandLine(`bun "say ${slash.repeat(3)}"hello"`)).toEqual([
+			"bun",
+			'say \\"hello',
+		]);
+		expect(
+			splitCommandLine(String.raw`bun "C:\temp${slash.repeat(2)}"`),
+		).toEqual(["bun", `${String.raw`C:\temp`}${slash}`]);
+		expect(
+			splitCommandLine(String.raw`bun "C:\temp${slash.repeat(4)}"`),
+		).toEqual(["bun", `${String.raw`C:\temp`}${slash.repeat(2)}`]);
+		expect(
+			splitCommandLine(String.raw`bun "\\server\share${slash.repeat(2)}"`),
+		).toEqual(["bun", `${String.raw`\\server\share`}${slash}`]);
+		expect(
+			splitCommandLine(String.raw`bun 'C:\Program\ Files\tool.ts'`),
+		).toEqual(["bun", "C:\\Program\\ Files\\tool.ts"]);
+		expect(splitCommandLine("bun C:\\temp\\")).toEqual(["bun", "C:\\temp\\"]);
+		expect(splitCommandLine(`bun "" ''`)).toEqual(["bun", "", ""]);
+		expect(() => splitCommandLine(String.raw`bun "C:\temp${slash}`)).toThrow(
+			"Unclosed quote in --test command.",
+		);
+		expect(() => splitCommandLine(`bun "unclosed`)).toThrow(
+			"Unclosed quote in --test command.",
+		);
+	});
+
 	test("expands a compact batch selector", () => {
 		const parsed = parseDoneArgs(
 			[

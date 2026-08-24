@@ -17,7 +17,7 @@ function stringValue(value: unknown): string {
 }
 
 function parseFrontmatter(content: string): Record<string, unknown> | null {
-	const match = /^---\n([\s\S]*?)\n---\n?/.exec(content);
+	const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(content);
 	if (!match?.[1]) return null;
 	try {
 		const parsed = Bun.YAML.parse(match[1]);

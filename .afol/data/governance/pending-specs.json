@@ -377,6 +377,77 @@
       "parent_spec": "260822_2023_warn-vs-block-advisory-gates_spec-child_01"
     },
     {
+      "session_id": "260823_1545_windows-completion-fence-integrity",
+      "created_at": "2026-08-23T20:45:25.126Z",
+      "updated_at": "2026-08-23T20:45:25.126Z",
+      "status": "open",
+      "theme": "windows-completion-fence-integrity",
+      "task_ids": [
+        "T-01",
+        "T-02"
+      ],
+      "missing": [],
+      "resolution_hint": "catalog resolution deferred: Parent spec must resolve uniquely: 260710_core-integrity-and-transaction-safety_spec_01; run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "feature_id": "F-22",
+      "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01"
+    },
+    {
+      "session_id": "260823_1551_completion-fence-integrity-recovery",
+      "created_at": "2026-08-23T20:51:53.230Z",
+      "updated_at": "2026-08-23T20:51:53.230Z",
+      "status": "open",
+      "theme": "completion-fence-integrity-recovery",
+      "task_ids": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "missing": [],
+      "resolution_hint": "catalog resolution deferred: Parent spec must resolve uniquely: 260710_core-integrity-and-transaction-safety_spec_01; run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason \"<reason>\"",
+      "feature_id": "F-22",
+      "parent_spec": "260710_core-integrity-and-transaction-safety_spec_01"
+    },
+    {
+      "session_id": "260823_1657_windows-test-parser",
+      "created_at": "2026-08-23T21:57:09.044Z",
+      "updated_at": "2026-08-23T22:07:34.599Z",
+      "status": "waived",
+      "theme": "windows-test-parser",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "F-22 governance has no parent spec for this narrow Windows parser recovery; scope is limited to the shell:false --test tokenizer and its regression tests."
+    },
+    {
+      "session_id": "260823_1716_windows-candidate-provenance-separator",
+      "created_at": "2026-08-23T22:16:37.099Z",
+      "updated_at": "2026-08-23T22:16:37.099Z",
+      "status": "waived",
+      "theme": "windows-candidate-provenance-separator",
+      "task_ids": [
+        "T-01",
+        "T-02"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Narrow repo-local Windows candidate provenance recovery; no public Windows support, F26, global install, deployment, or release-gate claim."
+    },
+    {
+      "session_id": "260823_1745_windows-template-manifest-classifier",
+      "created_at": "2026-08-23T22:45:54.412Z",
+      "updated_at": "2026-08-23T22:45:54.412Z",
+      "status": "waived",
+      "theme": "windows-template-manifest-classifier",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Narrow repo-local Windows candidate preflight recovery; no core.autocrlf, general Windows, or public release claim."
+    },
+    {
       "session_id": "260823_2001_pending-stash-review",
       "created_at": "2026-08-24T01:01:48.972Z",
       "updated_at": "2026-08-24T01:35:24.146Z",
@@ -393,6 +464,19 @@
       "feature_id": "F-31",
       "parent_spec": "260717_agent-submission-and-batch-review_spec_01",
       "reason": "Review-only reconciliation of a stale conflicted stash; no new product scope implemented"
+    },
+    {
+      "session_id": "260823_2019_windows-governance-containment",
+      "created_at": "2026-08-24T01:19:37.614Z",
+      "updated_at": "2026-08-24T01:22:45.630Z",
+      "status": "waived",
+      "theme": "windows-governance-containment",
+      "task_ids": [
+        "T-01"
+      ],
+      "missing": [],
+      "resolution_hint": "spec requirement waived with explicit reason",
+      "reason": "Narrow repo-local Windows governance resolver recovery; no public Windows release or global install."
     },
     {
       "session_id": "260823_2054_governance-verification",

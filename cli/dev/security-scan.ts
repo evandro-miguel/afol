@@ -15,6 +15,10 @@ import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
 import { releaseArtifactPath } from "./build-release";
 import {
+	resolveExistingReleaseArtifact,
+	resolveReleaseArtifact,
+} from "./release-artifact";
+import {
 	assertReleaseOutputFileStable,
 	assertSafeReleaseArtifact,
 	prepareReleaseOutputFile,
@@ -323,11 +327,12 @@ function runGitCommand(cwd: string, args: string[]): string {
 
 function buildReleaseSecurityTarget(
 	cwd: string,
-	artifact = DEFAULT_RELEASE_ARTIFACT,
+	artifact: string,
 ): { target: SecurityScanTarget; errors: string[] } {
-	artifact = releaseArtifactPath(artifact);
+	const resolved = resolveReleaseArtifact(cwd, releaseArtifactPath(artifact));
+	artifact = resolved.artifact;
 	const errors: string[] = [];
-	const artifactPath = join(cwd, artifact);
+	const artifactPath = resolved.artifactPath;
 	prepareReleaseOutputFile(cwd, artifactPath);
 	const lockfile = supportedDependencyLockfile(cwd);
 	const commitSha = runGitCommand(cwd, ["rev-parse", "HEAD"]);
@@ -342,8 +347,9 @@ function buildReleaseSecurityTarget(
 	if (!existsSync(artifactPath)) {
 		errors.push(`missing release artifact: ${artifact}`);
 	} else {
-		assertSafeReleaseArtifact(cwd, artifactPath);
-		target.artifact_sha256 = sha256Hex(readFileSync(artifactPath));
+		const existing = resolveExistingReleaseArtifact(cwd, artifact);
+		assertSafeReleaseArtifact(cwd, existing.artifactPath);
+		target.artifact_sha256 = sha256Hex(readFileSync(existing.artifactPath));
 	}
 
 	if (commitSha === "unknown") {
@@ -882,10 +888,14 @@ function runSecretsScan(opts: {
 }
 
 export function runReleaseSecurityScans(
-	opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+	opts: { cwd?: string; env?: NodeJS.ProcessEnv; artifact?: string } = {},
 ): { report: SecurityScanReport; exitCode: number } {
 	const cwd = opts.cwd ?? process.cwd();
-	const target = buildReleaseSecurityTarget(cwd);
+	const artifact = resolveReleaseArtifact(
+		cwd,
+		opts.artifact ?? DEFAULT_RELEASE_ARTIFACT,
+	).artifact;
+	const target = buildReleaseSecurityTarget(cwd, artifact);
 	const scans = [
 		runDependencyScan({
 			mode: "release",
@@ -920,6 +930,23 @@ export function writeReleaseSecurityScanReport(
 	report: SecurityScanReport,
 	cwd = process.cwd(),
 ): string {
+	const artifact = resolveReleaseArtifact(cwd, report.target.artifact).artifact;
+	if (artifact !== report.target.artifact) {
+		throw new Error(
+			`release security scan artifact is not canonical: ${report.target.artifact}`,
+		);
+	}
+	if (report.target.artifact_sha256 !== "unknown") {
+		const resolved = resolveExistingReleaseArtifact(cwd, artifact);
+		if (
+			sha256Hex(readFileSync(resolved.artifactPath)) !==
+			report.target.artifact_sha256
+		) {
+			throw new Error(
+				`release artifact changed before security report write: ${artifact}`,
+			);
+		}
+	}
 	const outputPath = join(cwd, RELEASE_SECURITY_EVIDENCE_PATH);
 	const outputGuard = prepareReleaseOutputFile(cwd, outputPath);
 	writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");

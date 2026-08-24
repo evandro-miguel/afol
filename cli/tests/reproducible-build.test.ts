@@ -17,6 +17,7 @@ import {
 	compiledReleaseBuildArgs,
 	readMinifiedCompiledReleaseBuildReceipt,
 	releaseArtifactPath,
+	writeCompiledReleaseBuildReceipt,
 } from "../dev/build-release";
 import {
 	directoryReparseTestSupport,
@@ -67,6 +68,67 @@ describe("deterministic release build", () => {
 			"--outfile",
 			"dist/afol",
 		]);
+	});
+
+	test("accepts Windows receipt path separators without weakening compiler flags", () => {
+		const root = projectScratch("reproducible-build-windows-receipt-");
+		const artifact = join(root, "dist", "afol.exe");
+		try {
+			mkdirSync(join(root, "dist"), { recursive: true });
+			writeFileSync(artifact, "artifact", "utf8");
+			writeCompiledReleaseBuildReceipt(artifact, [
+				"build",
+				"--compile",
+				"--minify",
+				"--format=esm",
+				"--no-compile-autoload-dotenv",
+				"--no-compile-autoload-bunfig",
+				"cli\\main.ts",
+				"--outfile",
+				"dist\\afol.exe",
+			]);
+
+			expect(
+				readMinifiedCompiledReleaseBuildReceipt(
+					artifact,
+					compiledReleaseBuildArgs("cli/main.ts", "dist/afol.exe"),
+				),
+			).not.toBeNull();
+
+			writeCompiledReleaseBuildReceipt(
+				artifact,
+				compiledReleaseBuildArgs("cli/main.ts", "dist/afol.exe"),
+			);
+			expect(
+				readMinifiedCompiledReleaseBuildReceipt(
+					artifact,
+					compiledReleaseBuildArgs("cli/main.ts", "dist/afol.exe"),
+				),
+			).toEqual({
+				artifact_sha256: fileSha256(artifact),
+				build_args: compiledReleaseBuildArgs("cli/main.ts", "dist/afol.exe"),
+			});
+
+			writeCompiledReleaseBuildReceipt(artifact, [
+				"build",
+				"--compile",
+				"--minify",
+				"--format=cjs",
+				"--no-compile-autoload-dotenv",
+				"--no-compile-autoload-bunfig",
+				"cli/main.ts",
+				"--outfile",
+				"dist/afol.exe",
+			]);
+			expect(() =>
+				readMinifiedCompiledReleaseBuildReceipt(
+					artifact,
+					compiledReleaseBuildArgs("cli/main.ts", "dist/afol.exe"),
+				),
+			).toThrow(/noncanonical flags/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test(

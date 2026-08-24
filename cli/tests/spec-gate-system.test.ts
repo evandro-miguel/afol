@@ -248,6 +248,52 @@ describe("spec-gate system", () => {
 		}
 	});
 
+	test("governance catalog canonicalizes internal governing spec paths and rejects outside paths", () => {
+		const root = createFixture();
+		try {
+			writePendingGovernanceFixture(root);
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const acceptedPaths = [
+				".afol/adm/specs/spec-22.md",
+				join(".afol", "adm", "specs", "spec-22.md"),
+				join(root, ".afol", "adm", "specs", "spec-22.md"),
+			];
+			for (const governingSpecPath of acceptedPaths) {
+				writeFileSync(
+					roadmapPath,
+					`# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: ${governingSpecPath}\n`,
+					"utf8",
+				);
+				expect(resolveGovernanceCatalog(root, "F-22", "spec-22")).toMatchObject(
+					{
+						specPath: ".afol/adm/specs/spec-22.md",
+					},
+				);
+			}
+			for (const governingSpecPath of [
+				join(`${root}-sibling`, ".afol", "adm", "specs", "spec-22.md"),
+				join(tmpdir(), "outside-governance-root", "spec-22.md"),
+			]) {
+				writeFileSync(
+					roadmapPath,
+					`# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: ${governingSpecPath}\n`,
+					"utf8",
+				);
+				expect(() => resolveGovernanceCatalog(root, "F-22", "spec-22")).toThrow(
+					"Roadmap feature governing spec mismatch",
+				);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("governance catalog accepts an active residual child under a final parent", () => {
 		const root = createFixture();
 		try {

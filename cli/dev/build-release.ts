@@ -72,6 +72,19 @@ export function compiledReleaseBuildReceiptPath(outfile: string): string {
 	return `${outfile}.build.json`;
 }
 
+function canonicalizeCompilerPathArgument(value: string): string {
+	return value.replaceAll("\\", "/");
+}
+
+function canonicalizeCompiledReleaseBuildArgs(args: string[]): string[] {
+	const outfileIndex = args.indexOf("--outfile");
+	return args.map((argument, index) =>
+		index === outfileIndex - 1 || index === outfileIndex + 1
+			? canonicalizeCompilerPathArgument(argument)
+			: argument,
+	);
+}
+
 export function writeCompiledReleaseBuildReceipt(
 	outfile: string,
 	buildArgs: string[],
@@ -118,7 +131,8 @@ export function readMinifiedCompiledReleaseBuildReceipt(
 		);
 	}
 	if (
-		JSON.stringify(receipt.build_args) !== JSON.stringify(expectedBuildArgs)
+		JSON.stringify(canonicalizeCompiledReleaseBuildArgs(receipt.build_args)) !==
+		JSON.stringify(canonicalizeCompiledReleaseBuildArgs(expectedBuildArgs))
 	) {
 		throw new Error(
 			`compiled release build receipt has noncanonical flags: ${receiptPath}`,
