@@ -284,6 +284,16 @@ function requireString(
 	return value;
 }
 
+function requireNonemptyString(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): string {
+	const parsed = requireString(value, path, fieldPath);
+	if (!parsed.trim()) invalidSavedRun(path, fieldPath, "must not be empty.");
+	return parsed;
+}
+
 function requireBoolean(
 	value: unknown,
 	path: string,
@@ -304,6 +314,28 @@ function requireFiniteNumber(
 		invalidSavedRun(path, fieldPath, "must be a finite number.");
 	}
 	return value;
+}
+
+function requireNonnegativeNumber(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): number {
+	const parsed = requireFiniteNumber(value, path, fieldPath);
+	if (parsed < 0) invalidSavedRun(path, fieldPath, "must be nonnegative.");
+	return parsed;
+}
+
+function requireNonnegativeInteger(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): number {
+	const parsed = requireNonnegativeNumber(value, path, fieldPath);
+	if (!Number.isInteger(parsed)) {
+		invalidSavedRun(path, fieldPath, "must be an integer.");
+	}
+	return parsed;
 }
 
 function requireEnum<T extends string>(
@@ -330,6 +362,43 @@ function requireStringArray(
 		invalidSavedRun(path, fieldPath, "must be an array of strings.");
 	}
 	return value;
+}
+
+function parseTokens(
+	value: Record<string, unknown>,
+	path: string,
+	fieldPath: string,
+): BenchResult["tokens"] {
+	const tokens = {
+		input: requireNonnegativeInteger(value.input, path, `${fieldPath}.input`),
+		output: requireNonnegativeInteger(
+			value.output,
+			path,
+			`${fieldPath}.output`,
+		),
+		cached_input: requireNonnegativeInteger(
+			value.cached_input,
+			path,
+			`${fieldPath}.cached_input`,
+		),
+		reasoning_output: requireNonnegativeInteger(
+			value.reasoning_output,
+			path,
+			`${fieldPath}.reasoning_output`,
+		),
+		total: requireNonnegativeInteger(value.total, path, `${fieldPath}.total`),
+	};
+	if (
+		tokens.total !==
+		tokens.input + tokens.output + tokens.cached_input + tokens.reasoning_output
+	) {
+		invalidSavedRun(
+			path,
+			`${fieldPath}.total`,
+			"must equal the sum of token fields.",
+		);
+	}
+	return tokens;
 }
 
 function parseBenchResult(
@@ -380,99 +449,158 @@ function parseBenchResult(
 						),
 					};
 				})();
+	const parsedTokens = parseTokens(tokens, path, `${rowPath}.tokens`);
+	const wallClockMs = requireNonnegativeNumber(
+		timing.wall_clock_ms,
+		path,
+		`${rowPath}.timing.wall_clock_ms`,
+	);
+
+	const parsedThresholds: BenchResult["thresholds"] = {
+		max_output_tokens: requireFiniteNumber(
+			thresholds.max_output_tokens,
+			path,
+			`${rowPath}.thresholds.max_output_tokens`,
+		),
+		max_duration_ms: requireFiniteNumber(
+			thresholds.max_duration_ms,
+			path,
+			`${rowPath}.thresholds.max_duration_ms`,
+		),
+		min_tool_success_rate: requireFiniteNumber(
+			thresholds.min_tool_success_rate,
+			path,
+			`${rowPath}.thresholds.min_tool_success_rate`,
+		),
+	};
+	const status = requireEnum(
+		record.status,
+		["passed", "failed", "blocked"],
+		path,
+		`${rowPath}.status`,
+	);
+	const pass = requireBoolean(record.pass, path, `${rowPath}.pass`);
+	if (pass !== (status === "passed")) {
+		invalidSavedRun(
+			path,
+			`${rowPath}.pass`,
+			"must be true exactly when status is passed.",
+		);
+	}
+	for (const key of [
+		"max_total_tokens",
+		"max_afol_commands",
+		"max_round_trips",
+	] as const) {
+		if (Object.hasOwn(thresholds, key)) {
+			parsedThresholds[key] = requireFiniteNumber(
+				thresholds[key],
+				path,
+				`${rowPath}.thresholds.${key}`,
+			);
+		}
+	}
+	const totalCalls = requireNonnegativeInteger(
+		tools.total_calls,
+		path,
+		`${rowPath}.tools.total_calls`,
+	);
+	const successRate = requireNonnegativeNumber(
+		tools.success_rate,
+		path,
+		`${rowPath}.tools.success_rate`,
+	);
+	if (successRate > 1) {
+		invalidSavedRun(
+			path,
+			`${rowPath}.tools.success_rate`,
+			"must be between 0 and 1.",
+		);
+	}
+	const parsedToolCounts = {
+		file_read: requireNonnegativeInteger(
+			toolCounts.file_read,
+			path,
+			`${rowPath}.tools.by_type.file_read`,
+		),
+		afol_command: requireNonnegativeInteger(
+			toolCounts.afol_command,
+			path,
+			`${rowPath}.tools.by_type.afol_command`,
+		),
+		shell: requireNonnegativeInteger(
+			toolCounts.shell,
+			path,
+			`${rowPath}.tools.by_type.shell`,
+		),
+		agent_message: requireNonnegativeInteger(
+			toolCounts.agent_message,
+			path,
+			`${rowPath}.tools.by_type.agent_message`,
+		),
+	};
+	if (
+		Object.values(parsedToolCounts).reduce((sum, count) => sum + count, 0) !==
+		totalCalls
+	) {
+		invalidSavedRun(
+			path,
+			`${rowPath}.tools.by_type`,
+			"must sum to tools.total_calls.",
+		);
+	}
+	const toolErrorCount = requireNonnegativeInteger(
+		tools.error_count,
+		path,
+		`${rowPath}.tools.error_count`,
+	);
+	if (toolErrorCount > totalCalls) {
+		invalidSavedRun(
+			path,
+			`${rowPath}.tools.error_count`,
+			"must not exceed tools.total_calls.",
+		);
+	}
 
 	return {
-		schema_version: requireString(
+		schema_version: requireEnum(
 			record.schema_version,
+			[BENCH_SCHEMA_VERSION],
 			path,
 			`${rowPath}.schema_version`,
-		) as typeof BENCH_SCHEMA_VERSION,
-		run_id: requireString(record.run_id, path, `${rowPath}.run_id`),
-		scenario_id: requireString(
+		),
+		run_id: requireNonemptyString(record.run_id, path, `${rowPath}.run_id`),
+		scenario_id: requireNonemptyString(
 			record.scenario_id,
 			path,
 			`${rowPath}.scenario_id`,
 		),
-		pack_id: requireString(record.pack_id, path, `${rowPath}.pack_id`),
-		status: requireEnum(
-			record.status,
-			["passed", "failed", "blocked"],
-			path,
-			`${rowPath}.status`,
-		),
+		pack_id: requireNonemptyString(record.pack_id, path, `${rowPath}.pack_id`),
+		status,
 		mode: requireEnum(
 			record.mode,
 			["live", "cli-micro"],
 			path,
 			`${rowPath}.mode`,
 		),
-		git_commit: requireString(record.git_commit, path, `${rowPath}.git_commit`),
-		model: requireString(record.model, path, `${rowPath}.model`),
-		timestamp: requireString(record.timestamp, path, `${rowPath}.timestamp`),
-		tokens: {
-			input: requireFiniteNumber(tokens.input, path, `${rowPath}.tokens.input`),
-			output: requireFiniteNumber(
-				tokens.output,
-				path,
-				`${rowPath}.tokens.output`,
-			),
-			cached_input: requireFiniteNumber(
-				tokens.cached_input,
-				path,
-				`${rowPath}.tokens.cached_input`,
-			),
-			reasoning_output: requireFiniteNumber(
-				tokens.reasoning_output,
-				path,
-				`${rowPath}.tokens.reasoning_output`,
-			),
-			total: requireFiniteNumber(tokens.total, path, `${rowPath}.tokens.total`),
-		},
-		timing: {
-			wall_clock_ms: requireFiniteNumber(
-				timing.wall_clock_ms,
-				path,
-				`${rowPath}.timing.wall_clock_ms`,
-			),
-		},
+		git_commit: requireNonemptyString(
+			record.git_commit,
+			path,
+			`${rowPath}.git_commit`,
+		),
+		model: requireNonemptyString(record.model, path, `${rowPath}.model`),
+		timestamp: requireNonemptyString(
+			record.timestamp,
+			path,
+			`${rowPath}.timestamp`,
+		),
+		tokens: parsedTokens,
+		timing: { wall_clock_ms: wallClockMs },
 		tools: {
-			total_calls: requireFiniteNumber(
-				tools.total_calls,
-				path,
-				`${rowPath}.tools.total_calls`,
-			),
-			success_rate: requireFiniteNumber(
-				tools.success_rate,
-				path,
-				`${rowPath}.tools.success_rate`,
-			),
-			by_type: {
-				file_read: requireFiniteNumber(
-					toolCounts.file_read,
-					path,
-					`${rowPath}.tools.by_type.file_read`,
-				),
-				afol_command: requireFiniteNumber(
-					toolCounts.afol_command,
-					path,
-					`${rowPath}.tools.by_type.afol_command`,
-				),
-				shell: requireFiniteNumber(
-					toolCounts.shell,
-					path,
-					`${rowPath}.tools.by_type.shell`,
-				),
-				agent_message: requireFiniteNumber(
-					toolCounts.agent_message,
-					path,
-					`${rowPath}.tools.by_type.agent_message`,
-				),
-			},
-			error_count: requireFiniteNumber(
-				tools.error_count,
-				path,
-				`${rowPath}.tools.error_count`,
-			),
+			total_calls: totalCalls,
+			success_rate: successRate,
+			by_type: parsedToolCounts,
+			error_count: toolErrorCount,
 		},
 		effectiveness: {
 			task_completed: requireBoolean(
@@ -480,31 +608,15 @@ function parseBenchResult(
 				path,
 				`${rowPath}.effectiveness.task_completed`,
 			),
-			error_count: requireFiniteNumber(
+			error_count: requireNonnegativeInteger(
 				effectiveness.error_count,
 				path,
 				`${rowPath}.effectiveness.error_count`,
 			),
 		},
 		plan_quality: planQuality,
-		thresholds: {
-			max_output_tokens: requireFiniteNumber(
-				thresholds.max_output_tokens,
-				path,
-				`${rowPath}.thresholds.max_output_tokens`,
-			),
-			max_duration_ms: requireFiniteNumber(
-				thresholds.max_duration_ms,
-				path,
-				`${rowPath}.thresholds.max_duration_ms`,
-			),
-			min_tool_success_rate: requireFiniteNumber(
-				thresholds.min_tool_success_rate,
-				path,
-				`${rowPath}.thresholds.min_tool_success_rate`,
-			),
-		},
-		pass: requireBoolean(record.pass, path, `${rowPath}.pass`),
+		thresholds: parsedThresholds,
+		pass,
 		notes: requireStringArray(record.notes, path, `${rowPath}.notes`),
 	};
 }
@@ -512,21 +624,19 @@ function parseBenchResult(
 function parseSavedRunResults(
 	resultsRaw: unknown[],
 	path: string,
+	packId: string,
 ): BenchResult[] {
-	const results: BenchResult[] = [];
-	for (const [index, entry] of resultsRaw.entries()) {
-		try {
-			results.push(parseBenchResult(entry, path, index));
-		} catch (error) {
-			if (!(error instanceof Error)) {
-				throw error;
-			}
-			if (!error.message.startsWith(`Malformed benchmark run ${path}:`)) {
-				throw error;
-			}
+	return resultsRaw.map((entry, index) => {
+		const result = parseBenchResult(entry, path, index);
+		if (result.pack_id !== packId) {
+			invalidSavedRun(
+				path,
+				`results[${index}].pack_id`,
+				`must match archive pack_id "${packId}".`,
+			);
 		}
-	}
-	return results;
+		return result;
+	});
 }
 
 function parseToolCounts(value: unknown): BenchToolTypeCounts | null {
@@ -736,28 +846,28 @@ export function loadSavedRun(path: string): SavedRunArchive | null {
 	if (!data) {
 		return null;
 	}
-	const resultsRaw = Array.isArray(data.results) ? data.results : null;
-	if (!resultsRaw) {
-		return null;
+	const schemaVersion = requireEnum(
+		data.schema_version,
+		[BENCH_SCHEMA_VERSION],
+		path,
+		"schema_version",
+	);
+	const runId = requireNonemptyString(data.run_id, path, "run_id");
+	const packId = requireNonemptyString(data.pack_id, path, "pack_id");
+	const timestamp = requireNonemptyString(data.timestamp, path, "timestamp");
+	if (!Array.isArray(data.results)) {
+		invalidSavedRun(path, "results", "must be an array.");
 	}
-	const results = parseSavedRunResults(resultsRaw, path);
-	if (resultsRaw.length > 0 && results.length === 0) {
-		invalidSavedRun(path, "results", "must include at least one valid row.");
+	const resultsRaw = data.results;
+	if (resultsRaw.length === 0) {
+		invalidSavedRun(path, "results", "must include at least one result.");
 	}
+	const results = parseSavedRunResults(resultsRaw, path, packId);
 	return {
-		schema_version:
-			typeof data.schema_version === "string"
-				? data.schema_version
-				: BENCH_SCHEMA_VERSION,
-		run_id:
-			typeof data.run_id === "string"
-				? data.run_id
-				: `bench-${Date.now().toString(36)}`,
-		pack_id: typeof data.pack_id === "string" ? data.pack_id : "unknown",
-		timestamp:
-			typeof data.timestamp === "string"
-				? data.timestamp
-				: new Date().toISOString(),
+		schema_version: schemaVersion,
+		run_id: runId,
+		pack_id: packId,
+		timestamp,
 		results,
 		report:
 			typeof data.report === "object" && data.report !== null

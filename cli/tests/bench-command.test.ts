@@ -75,7 +75,7 @@ function createProjectRoot(): string {
 
 function validSavedBenchResult(overrides: Record<string, unknown> = {}) {
 	return {
-		schema_version: "afol.benchmark/v2",
+		schema_version: "2.0.0",
 		run_id: "run-1",
 		scenario_id: "scenario-1",
 		pack_id: "comprehensive-live",
@@ -123,10 +123,28 @@ describe("benchmark metrics", () => {
 		expect(classifyCommand("/usr/bin/zsh -lc 'afol spec list --json'")).toBe(
 			"afol_command",
 		);
-		expect(classifyCommand("./afol status")).toBe("shell");
-		expect(classifyCommand("/usr/bin/zsh -lc './afol status'")).toBe("shell");
+		expect(classifyCommand("./afol status")).toBe("afol_command");
+		expect(classifyCommand("/usr/bin/zsh -lc './afol status'")).toBe(
+			"afol_command",
+		);
 		expect(classifyCommand("echo hello")).toBe("shell");
 		expect(classifyCommand("git status --short")).toBe("shell");
+	});
+
+	test("classifies repo-local AFOL protocol adapters", () => {
+		expect(classifyCommand("bun run cli/main.ts status --json")).toBe(
+			"afol_command",
+		);
+		expect(classifyCommand("bun run kernel -- status --json")).toBe(
+			"afol_command",
+		);
+		expect(classifyCommand("./afol status --json")).toBe("afol_command");
+		expect(classifyCommand("echo ready && ./afol status --json")).toBe(
+			"afol_command",
+		);
+		expect(classifyCommand("echo ready | ./afol status --json")).toBe(
+			"afol_command",
+		);
 	});
 
 	test("parseEventStream extracts tokens, tool calls, errors, and planning signals", () => {
@@ -476,13 +494,17 @@ describe("bench command surfaces", () => {
 		}
 	});
 
-	test("report filters malformed saved run rows", async () => {
+	test("report rejects malformed saved run rows", async () => {
 		const root = createProjectRoot();
 		try {
 			const runPath = join(root, "malformed-run.json");
 			writeFileSync(
 				runPath,
 				JSON.stringify({
+					schema_version: "2.0.0",
+					run_id: "run-1",
+					pack_id: "comprehensive-live",
+					timestamp: "2026-06-17T00:00:00.000Z",
 					results: [{ scenario_id: "s1" }, validSavedBenchResult()],
 				}),
 				"utf8",
@@ -494,11 +516,11 @@ describe("bench command surfaces", () => {
 				root,
 				captured.io,
 			);
-			expect(code).toBe(0);
-			expect(captured.stderr).toHaveLength(0);
-			expect(captured.stdout[0]).toContain(
-				"results: 1 passed=1 failed=0 blocked=0",
-			);
+			expect(code).toBe(2);
+			expect(captured.stdout).toHaveLength(0);
+			expect(captured.stderr).toHaveLength(1);
+			expect(captured.stderr[0]).toContain("Malformed benchmark run");
+			expect(captured.stderr[0]).toContain("results[0]");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -510,7 +532,13 @@ describe("bench command surfaces", () => {
 			const runPath = join(root, "invalid-run.json");
 			writeFileSync(
 				runPath,
-				JSON.stringify({ results: [{ scenario_id: "s1" }] }),
+				JSON.stringify({
+					schema_version: "2.0.0",
+					run_id: "run-1",
+					pack_id: "comprehensive-live",
+					timestamp: "2026-06-17T00:00:00.000Z",
+					results: [],
+				}),
 				"utf8",
 			);
 			const captured = captureIo();
@@ -525,6 +553,69 @@ describe("bench command surfaces", () => {
 			expect(captured.stderr).toHaveLength(1);
 			expect(captured.stderr[0]).toContain("Malformed benchmark run");
 			expect(captured.stderr[0]).toContain("results must include");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report rejects receipts whose total tokens do not reconcile", async () => {
+		const root = createProjectRoot();
+		try {
+			const runPath = join(root, "invalid-tokens.json");
+			const result = validSavedBenchResult();
+			(result.tokens as { total: number }).total = 99;
+			writeFileSync(
+				runPath,
+				JSON.stringify({
+					schema_version: "2.0.0",
+					run_id: "run-1",
+					pack_id: "comprehensive-live",
+					timestamp: "2026-06-17T00:00:00.000Z",
+					results: [result],
+				}),
+				"utf8",
+			);
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--run", runPath],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr[0]).toContain("tokens.total");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report rejects receipt rows with a mismatched archive pack", async () => {
+		const root = createProjectRoot();
+		try {
+			const runPath = join(root, "mismatched-pack.json");
+			writeFileSync(
+				runPath,
+				JSON.stringify({
+					schema_version: "2.0.0",
+					run_id: "run-1",
+					pack_id: "comprehensive-live",
+					timestamp: "2026-06-17T00:00:00.000Z",
+					results: [validSavedBenchResult({ pack_id: "cli-micro" })],
+				}),
+				"utf8",
+			);
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--run", runPath],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stdout).toHaveLength(0);
+			expect(captured.stderr).toHaveLength(1);
+			expect(captured.stderr[0]).toContain("results[0].pack_id");
+			expect(captured.stderr[0]).toContain("archive pack_id");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -36,6 +36,12 @@ export type BenchThresholds = {
 	max_output_tokens: number;
 	max_duration_ms: number;
 	min_tool_success_rate: number;
+	/** Total provider-reported tokens, including cached/reasoning fields. */
+	max_total_tokens?: number;
+	/** Number of observed AFOL protocol commands in the agent trace. */
+	max_afol_commands?: number;
+	/** Number of AFOL-bearing command executions in the agent trace. */
+	max_round_trips?: number;
 };
 
 export type BenchScenarioExpected = {

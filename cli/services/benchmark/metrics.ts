@@ -1,7 +1,8 @@
 import type { BenchToolType, RawMetrics } from "./types";
 
 const FILE_READ_RE = /(^|\s)(sed|cat|head|tail|rg|grep|less|more|bat)\b/;
-const AFOL_COMMAND_RE = /(^|&&|\|\||;|\n)\s*afol\b/;
+const AFOL_COMMAND_RE =
+	/(^|&&|\|\||\||;|\n)\s*(?:(?:\.\/)?afol\b|bun\s+run\s+cli\/main\.ts\b|bun\s+run\s+kernel\s+--(?:\s|$))/;
 const SHELL_LC_RE =
 	/(?:^|\s)(?:[./\w-]+\/)?(?:sh|bash|zsh)\s+-lc\s+(['"])([\s\S]*)\1\s*$/;
 
@@ -28,12 +29,16 @@ export function normalizeCommandForBenchmark(command: string): string {
 	return shellMatch ? (shellMatch[2] ?? "").trim() : trimmed;
 }
 
+export function isAfolProtocolCommand(command: string): boolean {
+	return AFOL_COMMAND_RE.test(normalizeCommandForBenchmark(command));
+}
+
 export function classifyCommand(command: string): BenchToolType {
 	const normalizedCommand = normalizeCommandForBenchmark(command);
 	if (FILE_READ_RE.test(normalizedCommand) || command.includes("Read")) {
 		return "file_read";
 	}
-	if (AFOL_COMMAND_RE.test(normalizedCommand)) {
+	if (isAfolProtocolCommand(normalizedCommand)) {
 		return "afol_command";
 	}
 	return "shell";

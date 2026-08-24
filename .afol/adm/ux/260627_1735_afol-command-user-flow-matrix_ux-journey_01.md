@@ -142,6 +142,10 @@ benchmark_pack: all-tool-surface
 - Benchmark pack: `afol validate bench --json` for full release claims;
   targeted `afol validate bench --pack <pack-id> --json` while burning down
   one tool family.
+- F-31 benchmark boundary: saved runtime snapshots are validated as redacted
+  receipts from the external fixed harness. `afol bench runtime-live` is
+  receipt metadata/dry-run only; AFOL never runs the model or makes a live
+  result claim from local execution.
 - Report or workbench evidence:
   `.afol/wb/<session>/.evidence.jsonl` plus saved benchmark reports under
   `.afol/data/benchmarks/results/**` when available.
