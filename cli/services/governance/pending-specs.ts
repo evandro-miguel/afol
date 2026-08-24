@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { resolveAdmPaths } from "../adm/paths";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -847,6 +847,26 @@ export function activateRoadmapFeature(
 	return { featureId, status: "activated" };
 }
 
+function projectRelativePath(root: string, path: string): string | null {
+	const projectRoot = resolve(root);
+	const absolutePath = isAbsolute(path)
+		? resolve(path)
+		: resolve(projectRoot, path);
+	const projectRelative = relative(projectRoot, absolutePath).replaceAll(
+		"\\",
+		"/",
+	);
+	if (
+		!projectRelative ||
+		isAbsolute(projectRelative) ||
+		projectRelative === ".." ||
+		projectRelative.startsWith("../")
+	) {
+		return null;
+	}
+	return projectRelative;
+}
+
 function parseGoverningSpecsFromSection(
 	root: string,
 	section: string,
@@ -868,13 +888,9 @@ function parseGoverningSpecsFromSection(
 		}
 		const cleaned = candidate.replace(/^`+|`+$/g, "").trim();
 		if (!cleaned) continue;
-		const absolute = resolve(root, cleaned);
-		const canonicalRoot = resolve(root);
-		if (!absolute.startsWith(`${canonicalRoot}/`) && absolute !== canonicalRoot)
-			continue;
-		const relative = absolute.slice(canonicalRoot.length + 1);
-		if (relative) {
-			specPaths.add(relative.replaceAll("\\", "/"));
+		const projectRelative = projectRelativePath(root, cleaned);
+		if (projectRelative) {
+			specPaths.add(projectRelative);
 		}
 	}
 	return [...specPaths];
@@ -894,8 +910,11 @@ export function resolveGovernanceCatalog(
 	const featureStatus = roadmapFeatureStatus(featureSection, featureId);
 	if (featureStatus !== "active" && featureStatus !== "final")
 		throw new Error(`Roadmap feature is not active: ${featureId}`);
-	const relative = (path: string) =>
-		path.slice(resolve(root).length + 1).replaceAll("\\", "/");
+	const projectRelative = (path: string) => {
+		const result = projectRelativePath(root, path);
+		if (!result) throw new Error(`Path is outside project root: ${path}`);
+		return result;
+	};
 	const matches = findCanonicalSpecDocuments(root, parentSpec);
 	if (matches.length !== 1)
 		throw new Error(`Parent spec must resolve uniquely: ${parentSpec}`);
@@ -939,8 +958,8 @@ export function resolveGovernanceCatalog(
 	if (trimString(fm.roadmap_feature) !== featureId)
 		throw new Error(`Parent spec roadmap_feature mismatch: ${parentSpec}`);
 	const governingSpecs = parseGoverningSpecsFromSection(root, featureSection);
-	const specPathCandidate = relative(specPath);
-	const requestedSpecPathCandidate = relative(requestedSpecPath);
+	const specPathCandidate = projectRelative(specPath);
+	const requestedSpecPathCandidate = projectRelative(requestedSpecPath);
 	if (
 		!governingSpecs.includes(specPathCandidate) &&
 		!governingSpecs.includes(specPathCandidate.replaceAll("\\", "/")) &&
@@ -950,9 +969,9 @@ export function resolveGovernanceCatalog(
 	}
 	return {
 		specId,
-		roadmapPath: relative(roadmapPath),
+		roadmapPath: projectRelative(roadmapPath),
 		roadmapHash: sha256(roadmap),
-		specPath: relative(specPath),
+		specPath: projectRelative(specPath),
 		specHash: sha256(spec),
 	};
 }
