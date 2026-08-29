@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	chmodSync,
@@ -2178,11 +2178,7 @@ describe("scenario benchmark execution", () => {
 			"",
 		);
 		expect(
-			resolveAfolExecutable(
-				undefined,
-				"/$bunfs/root/cli/main.ts",
-				linuxAfol,
-			),
+			resolveAfolExecutable(undefined, "/$bunfs/root/cli/main.ts", linuxAfol),
 		).toBe(linuxAfol);
 		expect(
 			resolveAfolExecutable(
@@ -2213,6 +2209,84 @@ describe("scenario benchmark execution", () => {
 			join(artifactRoot, process.platform === "win32" ? "afol.exe" : "afol"),
 		);
 	});
+
+	test("isolates concurrent compiled artifact staging from the repository", async () => {
+		const sharedBuildArtifactsBefore = readdirSync(process.cwd()).filter(
+			(entry) => entry.startsWith(".bun-build"),
+		);
+		expect(sharedBuildArtifactsBefore).toEqual([]);
+		const childSource = [
+			'const { prepareCompiledReleaseArtifact } = await import("./cli/validate/scenario-execution.ts");',
+			"const artifact = prepareCompiledReleaseArtifact(process.cwd());",
+			"console.log(artifact.binaryPath);",
+			"artifact.cleanup();",
+		].join("\n");
+		const results = await Promise.all(
+			[0, 1].map(
+				() =>
+					new Promise<{ path: string; status: number | null; stderr: string }>(
+						(resolve, reject) => {
+							const child = spawn(process.execPath, ["-e", childSource], {
+								cwd: process.cwd(),
+								stdio: ["ignore", "pipe", "pipe"],
+							});
+							let stdout = "";
+							let stderr = "";
+							child.stdout.on("data", (chunk: Buffer) => {
+								stdout += chunk.toString();
+							});
+							child.stderr.on("data", (chunk: Buffer) => {
+								stderr += chunk.toString();
+							});
+							child.once("error", reject);
+							child.once("close", (status) =>
+								resolve({ path: stdout.trim(), status, stderr }),
+							);
+						},
+					),
+			),
+		);
+		const paths = results.map((result) => result.path);
+		for (const result of results) {
+			if (result.status !== 0) throw new Error(result.stderr);
+			expect(result.path).toMatch(/afol-bench-release-/);
+			expect(result.path).toContain(
+				join(process.cwd(), ".tmp", "afol-bench-release-"),
+			);
+			expect(existsSync(result.path)).toBe(false);
+		}
+		expect(new Set(paths).size).toBe(2);
+		expect(
+			readdirSync(process.cwd()).filter((entry) =>
+				entry.startsWith(".bun-build"),
+			),
+		).toEqual([]);
+	}, 120_000);
+
+	test("does not remove a replaced compiled artifact root", () => {
+		const artifact = prepareCompiledReleaseArtifact(process.cwd());
+		const artifactRoot = dirname(artifact.binaryPath);
+		const replacementRoot = mkdtempSync(
+			join(process.cwd(), ".tmp", "afol-bench-release-replacement-"),
+		);
+		try {
+			rmSync(replacementRoot, { recursive: true, force: true });
+			renameSync(artifactRoot, replacementRoot);
+			mkdirSync(artifactRoot);
+			writeFileSync(join(artifactRoot, "replacement-sentinel"), "replacement");
+
+			expect(() => artifact.cleanup()).toThrow(
+				"compiled-artifact-root-replaced",
+			);
+			expect(existsSync(join(replacementRoot, "afol"))).toBe(true);
+			expect(
+				readFileSync(join(artifactRoot, "replacement-sentinel"), "utf8"),
+			).toBe("replacement");
+		} finally {
+			rmSync(artifactRoot, { recursive: true, force: true });
+			rmSync(replacementRoot, { recursive: true, force: true });
+		}
+	}, 120_000);
 
 	test("prepares a registered sidecar and executes a compiled mutation", () => {
 		const fixtureRoot = createBenchExecutionFixtureRoot();

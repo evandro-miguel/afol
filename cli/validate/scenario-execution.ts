@@ -59,6 +59,7 @@ const HIGH_CONFIDENCE_TIMING_PACKS = new Set([
 	"workbench-parity",
 ]);
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
+const COMPILED_ARTIFACT_TEMP_ROOT = join(REAL_REPO_ROOT, ".tmp");
 const SANDBOX_COPY_EXCLUDES = [
 	".git",
 	"node_modules",
@@ -722,6 +723,19 @@ function removeSandboxRoot(
 	}
 }
 
+function removeOwnedCompiledArtifactRoot(
+	artifactRoot: string,
+	identity: SandboxRootIdentity,
+): void {
+	const status = removeSandboxRoot(artifactRoot, identity);
+	if (status === "replaced") {
+		throw new Error("compiled-artifact-root-replaced");
+	}
+	if (status === "error") {
+		throw new Error("compiled-artifact-cleanup-failed");
+	}
+}
+
 function createWorkbenchSandboxRoot(projectRoot: string): string {
 	const sandboxRoot = mkdtempSync(
 		join(ensureBenchmarkTempRoot(projectRoot), "afol-bench-sandbox-"),
@@ -801,8 +815,13 @@ export function compiledBenchmarkArtifactPath(artifactRoot: string): string {
 export function prepareCompiledReleaseArtifact(
 	projectRoot: string,
 ): PreparedCompiledReleaseArtifact {
-	const artifactParent = ensureBenchmarkTempRoot(projectRoot);
-	const artifactRoot = mkdtempSync(join(artifactParent, "afol-bench-release-"));
+	mkdirSync(COMPILED_ARTIFACT_TEMP_ROOT, { recursive: true });
+	const artifactRoot = mkdtempSync(
+		join(COMPILED_ARTIFACT_TEMP_ROOT, "afol-bench-release-"),
+	);
+	const artifactIdentity = captureSandboxRootIdentity(artifactRoot);
+	const cleanup = (): void =>
+		removeOwnedCompiledArtifactRoot(artifactRoot, artifactIdentity);
 	const targetBinary = compiledBenchmarkArtifactPath(artifactRoot);
 	try {
 		if (isCompiledBunRuntime()) {
@@ -832,7 +851,7 @@ export function prepareCompiledReleaseArtifact(
 				git_commit: commit,
 				source_state_sha256: sourceState.sha256,
 				source_dirty: sourceState.dirty,
-				cleanup: () => rmSync(artifactRoot, { recursive: true, force: true }),
+				cleanup,
 			};
 		}
 		const versionResult = boundedSpawn("bun", ["run", "version:generate"], {
@@ -846,7 +865,7 @@ export function prepareCompiledReleaseArtifact(
 		}
 		const sourceState = benchmarkSourceState(projectRoot);
 		const result = boundedSpawn("bun", compiledReleaseBuildArgs(targetBinary), {
-			cwd: REAL_REPO_ROOT,
+			cwd: artifactRoot,
 			timeoutMs: 300_000,
 		});
 		if (!result.ok) {
@@ -881,10 +900,10 @@ export function prepareCompiledReleaseArtifact(
 			git_commit: commit,
 			source_state_sha256: sourceState.sha256,
 			source_dirty: sourceState.dirty,
-			cleanup: () => rmSync(artifactRoot, { recursive: true, force: true }),
+			cleanup,
 		};
 	} catch (error) {
-		rmSync(artifactRoot, { recursive: true, force: true });
+		cleanup();
 		throw error;
 	}
 }
