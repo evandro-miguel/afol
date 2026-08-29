@@ -115,28 +115,31 @@ describe("public export boundary", () => {
 		}
 	});
 
-	test("audit rejects private state, sensitive files, and credential patterns", () => {
-		const root = mkdtempSync(join(tmpdir(), "public-audit-sensitive-"));
-		try {
-			mkdirSync(join(root, ".afol"), { recursive: true });
-			writeFileSync(join(root, ".env"), "SECRET=example\n");
-			writeFileSync(
-				join(root, "token.txt"),
-				"github_pat_abcdefghijklmnopqrstuvwxyz123456\n",
-			);
-			writeFileSync(join(root, ".env.example"), "SAFE=placeholder\n");
+	test(
+		"audit rejects private state, sensitive files, and credential patterns",
+		() => {
+			const root = mkdtempSync(join(tmpdir(), "public-audit-sensitive-"));
+			try {
+				mkdirSync(join(root, ".afol"), { recursive: true });
+				writeFileSync(join(root, ".env"), "SECRET=example\n");
+				writeFileSync(
+					join(root, "token.txt"),
+					"github_pat_abcdefghijklmnopqrstuvwxyz123456\n",
+				);
+				writeFileSync(join(root, ".env.example"), "SAFE=placeholder\n");
 
-			const result = runBun(auditScript, [root], repoRoot);
-			expect(result.status).not.toBe(0);
-			const output = outputOf(result);
-			expect(output).toContain(".afol: private-state-directory");
-			expect(output).toContain(".env: environment-file");
-			expect(output).toContain("token.txt: github-token");
-			expect(output).not.toContain(".env.example: environment-file");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+				const result = runBun(auditScript, [root], repoRoot);
+				expect(result.status).not.toBe(0);
+				const output = outputOf(result);
+				expect(output).toContain(".afol: private-state-directory");
+				expect(output).toContain(".env: environment-file");
+				expect(output).toContain("token.txt: github-token");
+				expect(output).not.toContain(".env.example: environment-file");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test.skipIf(process.platform === "win32")(
 		"rejects relative and absolute symlinks during export",

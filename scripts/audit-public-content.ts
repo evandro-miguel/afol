@@ -53,8 +53,12 @@ function visit(path: string): void {
 		return;
 	}
 	if (stats.isDirectory()) {
-		if ([".afol", ".agents"].includes(name)) {
+		if (name === ".afol") {
 			findings.push(`${name}: private-state-directory`);
+			return;
+		}
+		if (name === ".agents") {
+			findings.push(`${name}: factory-only-directory`);
 			return;
 		}
 		if ([".git", "node_modules", "dist", "coverage"].includes(name)) return;

@@ -5,8 +5,9 @@
 Linux x64 is the supported alpha target. Build with the Bun version pinned in
 `package.json`:
 
+Clone the public repository into a directory named `afol`, then run:
+
 ```bash
-git clone <public-repository-url> afol
 cd afol
 bun install --frozen-lockfile
 bun run build
