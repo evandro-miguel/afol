@@ -697,6 +697,45 @@ describe("spec-gate system", () => {
 		}
 	});
 
+	test("activateRoadmapFeature restores bytes after an injected second-write failure", () => {
+		const root = createFixture();
+		try {
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const parentPath = join(root, ".afol", "adm", "specs", "parent-spec.md");
+			mkdirSync(dirname(roadmapPath), { recursive: true });
+			writeFileSync(
+				roadmapPath,
+				"# Roadmap\n\n### F-31 Fixture\n\n- Status: planned\n",
+				"utf8",
+			);
+			writeFileSync(
+				parentPath,
+				"---\ndoc_type: spec\nid: parent-spec\nstatus: planned\nroadmap_feature: F-31\n---\n\n# Parent\n",
+				"utf8",
+			);
+			const roadmapBefore = readFileSync(roadmapPath);
+			const parentBefore = readFileSync(parentPath);
+
+			expect(() =>
+				activateRoadmapFeature(root, "F-31", "parent-spec", {
+					failOnSecondWrite: true,
+				}),
+			).toThrow(
+				"Injected governance activation failure on second write; restoration=complete",
+			);
+			expect(readFileSync(roadmapPath).equals(roadmapBefore)).toBe(true);
+			expect(readFileSync(parentPath).equals(parentBefore)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("activateRoadmapFeature preserves structured parent spec frontmatter", () => {
 		const root = createFixture();
 		try {

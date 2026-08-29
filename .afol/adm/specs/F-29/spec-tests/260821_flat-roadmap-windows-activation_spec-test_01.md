@@ -23,8 +23,9 @@ risk_level: high
 ## Intent
 
 - Journey or behavior under test: an AFOL operator resolves governance and
-  activates a planned feature from a Windows-native checkout using either
-  supported roadmap layout.
+  activates a planned feature using Windows-compatible path forms and either
+  supported roadmap layout. This Linux-local test does not establish native
+  Windows execution.
 - Why this test strategy is needed now: the source resolver previously assumed
   the nested roadmap path while downstream templates can ship the flat path.
   Ordered parent-first activation must also be proven as convergent rather than
@@ -93,6 +94,9 @@ risk_level: high
 - Functional result: both supported roadmap layouts produce the same governed
   feature/spec behavior; rejected validation does not mutate state; and an
   interrupted ordered activation can be retried to convergence.
+- Platform boundary: local Linux execution proves path normalization and
+  containment handling only; native Windows runtime and host-specific link
+  behavior remain external evidence.
 - Non-functional expectation: deterministic, offline, project-contained, and
   independent of the installed global AFOL binary.
 - Failure messaging expectation: identify the invalid layout, feature, parent,

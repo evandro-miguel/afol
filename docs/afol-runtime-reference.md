@@ -258,13 +258,15 @@ idempotent convergence: AFOL writes the parent spec first and the roadmap
 feature second. It makes no multi-file atomicity promise. An interruption may
 leave the parent `active` while the feature is still `planned` and therefore
 not governable; retrying the same command completes the transition. If AFOL
-observes a write error it attempts restoration, but crash safety is provided by
+observes a write error it attempts restoration and reports
+`restoration=complete` or `restoration=failed`, but crash safety is provided by
 the write order, not by guaranteed rollback. `active` is an idempotent no-op
 and `final` cannot be reopened. Governance resolution accepts the nested
 `.afol/adm/roadmap/GENERAL-ROADMAP.md` layout and falls back to the flat
 `.afol/adm/roadmap.md` layout when the nested file is absent. The selected
 roadmap and its containing path components must not be symlinks, junctions, or
-other reparse points.
+other reparse points. Local Linux checks cover this path-compatibility and
+containment logic only; they do not establish native Windows runtime support.
 
 Bulk waive is optional cemetery cleanup only. Shipping one feature never
 requires bulk-waiving historical pending entries.

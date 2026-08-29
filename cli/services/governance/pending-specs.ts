@@ -880,11 +880,16 @@ type RoadmapActivationResult = {
 	parentNewStatus?: "active";
 };
 
+export type GovernanceActivationRuntime = {
+	failAfterFirstWrite?: boolean;
+	failOnSecondWrite?: boolean;
+};
+
 function activateRoadmapFeatureLocked(
 	root: string,
 	featureId: string,
 	parentSpec?: string,
-	runtime: { failAfterFirstWrite?: boolean } = {},
+	runtime: GovernanceActivationRuntime = {},
 ): RoadmapActivationResult {
 	const roadmapPath = resolveGovernanceRoadmapPath(root);
 	const roadmap = readFileSync(roadmapPath, "utf8");
@@ -947,35 +952,56 @@ function activateRoadmapFeatureLocked(
 	}
 	const originals = new Map<string, string>([[roadmapPath, roadmap]]);
 	if (parent && parentPath) originals.set(parentPath, parentDocument);
+	let interrupted = false;
 	try {
 		let writeCount = 0;
 		for (const [path, content] of updates) {
+			writeCount += 1;
+			if (runtime.failOnSecondWrite && writeCount === 2)
+				throw new Error(
+					"Injected governance activation failure on second write",
+				);
 			atomicWriteText(
 				path === roadmapPath
 					? assertSafeGovernanceRoadmapPath(root, path)
 					: path,
 				content,
 			);
-			writeCount += 1;
-			if (runtime.failAfterFirstWrite && writeCount === 1)
+			if (runtime.failAfterFirstWrite && writeCount === 1) {
+				interrupted = true;
 				throw new Error("Injected governance activation failure");
-		}
-	} catch (error) {
-		if (!runtime.failAfterFirstWrite) {
-			for (const [path, content] of originals) {
-				try {
-					atomicWriteText(
-						path === roadmapPath
-							? assertSafeGovernanceRoadmapPath(root, path)
-							: path,
-						content,
-					);
-				} catch {
-					// Preserve the original write error; rollback is best effort.
-				}
 			}
 		}
-		throw error;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (interrupted) {
+			throw new Error(
+				`${message}; restoration=skipped (simulated interruption after first write)`,
+			);
+		}
+		let restorationError: unknown;
+		for (const [path, content] of originals) {
+			try {
+				atomicWriteText(
+					path === roadmapPath
+						? assertSafeGovernanceRoadmapPath(root, path)
+						: path,
+					content,
+				);
+			} catch (rollbackError) {
+				restorationError ??= rollbackError;
+			}
+		}
+		if (restorationError) {
+			const restorationMessage =
+				restorationError instanceof Error
+					? restorationError.message
+					: String(restorationError);
+			throw new Error(
+				`INTEGRITY_ERROR: governance activation failed; restoration=failed: ${restorationMessage}; original error: ${message}`,
+			);
+		}
+		throw new Error(`${message}; restoration=complete`);
 	}
 	return {
 		featureId,
@@ -1000,7 +1026,7 @@ export function activateRoadmapFeature(
 	root: string,
 	featureId: string,
 	parentSpec?: string,
-	runtime: { failAfterFirstWrite?: boolean } = {},
+	runtime: GovernanceActivationRuntime = {},
 ): RoadmapActivationResult {
 	return withSessionLock(root, GOVERNANCE_LOCK, () =>
 		activateRoadmapFeatureLocked(root, featureId, parentSpec, runtime),

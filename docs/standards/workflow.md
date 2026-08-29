@@ -44,8 +44,11 @@ Create or update the roadmap feature in `.afol/adm/roadmap/GENERAL-ROADMAP.md`
   second. This is a fail-safe, idempotent convergence protocol, not an atomic
   multi-file transaction: an interruption can leave the parent `active` while
   the feature remains `planned` (temporarily non-governable), and retrying the
-  command completes convergence. An observed write error attempts restoration,
-  but crash safety comes from the write order rather than a rollback guarantee.
+  command completes convergence. An observed write error attempts restoration
+  and reports `restoration=complete` or `restoration=failed`, but crash safety
+  comes from the write order rather than a rollback guarantee.
+  Local Linux checks cover the path-compatibility and containment logic only;
+  they do not establish native Windows runtime support.
   An active feature is a no-op and a final feature is never reopened; an active
   residual child spec may govern work under its final parent.
 - `-F` and `-P` are compact aliases for `--feature-id` and `--parent-spec`.

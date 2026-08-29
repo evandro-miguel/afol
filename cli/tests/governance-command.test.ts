@@ -10,7 +10,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { normalizeScopedFlags, normalizeSubcommandAction } from "../aliases";
 import { runGovernanceCommand } from "../commands/governance";
-import { remoteOperationContext } from "../core/operation-context";
+import {
+	defaultOperationContext,
+	remoteOperationContext,
+} from "../core/operation-context";
 import {
 	type PendingSpecEntry,
 	readPendingSpecIndex,
@@ -301,6 +304,32 @@ describe("governance command", () => {
 			"roadmap feature activated: F-31",
 			"parent spec activated: parent-spec",
 		]);
+	});
+
+	test("activate-feature reports restoration after an injected second-write failure", () => {
+		const root = createFixture();
+		const roadmapPath = writeRoadmapFeature(root, "F-31", "planned");
+		const specPath = writeParentSpec(root, "planned");
+		const roadmapBefore = readFileSync(roadmapPath);
+		const specBefore = readFileSync(specPath);
+		const stderr: string[] = [];
+
+		expect(
+			runGovernanceCommand(
+				"activate-feature",
+				["--feature-id", "F-31", "--parent-spec", "parent-spec"],
+				root,
+				{ stdout: () => undefined, stderr: (message) => stderr.push(message) },
+				defaultOperationContext(),
+				{ failOnSecondWrite: true },
+			),
+		).toBe(2);
+		expect(stderr[0]).toContain(
+			"Injected governance activation failure on second write",
+		);
+		expect(stderr[0]).toContain("restoration=complete");
+		expect(readFileSync(roadmapPath)).toEqual(roadmapBefore);
+		expect(readFileSync(specPath)).toEqual(specBefore);
 	});
 
 	test("activate-feature parses a CRLF parent spec", () => {

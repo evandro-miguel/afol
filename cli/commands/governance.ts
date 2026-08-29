@@ -7,6 +7,7 @@ import {
 import {
 	activateRoadmapFeature,
 	formatPendingSpecBlocker,
+	type GovernanceActivationRuntime,
 	readPendingSpecIndex,
 	repairPendingSpecIndex,
 	resolvePendingSpec,
@@ -323,12 +324,14 @@ function runActivateFeatureCommand(
 	args: string[],
 	root: string,
 	io: GovernanceIo,
+	runtime: GovernanceActivationRuntime = {},
 ): number {
 	const parsed = parseActivateFeatureArgs(args);
 	const result = activateRoadmapFeature(
 		root,
 		parsed.featureId,
 		parsed.parentSpec || undefined,
+		runtime,
 	);
 	if (parsed.json) {
 		io.stdout(
@@ -474,6 +477,7 @@ export function runGovernanceCommand(
 	root: string = process.cwd(),
 	io: GovernanceIo = DEFAULT_IO,
 	ctx: OperationContext = defaultOperationContext(),
+	runtime: GovernanceActivationRuntime = {},
 ): number {
 	try {
 		const resolvedAction = action || "pending";
@@ -492,7 +496,7 @@ export function runGovernanceCommand(
 				throw new Error(
 					"governance activate-feature requires local interactive approval",
 				);
-			return runActivateFeatureCommand(args, root, io);
+			return runActivateFeatureCommand(args, root, io, runtime);
 		}
 		if (resolvedAction === "bulk-waive") {
 			if (requiresApproval(ctx))

@@ -35,9 +35,10 @@ risk_level: high
 Downstream scaffolds can legitimately retain the flat roadmap payload shipped
 by older templates, while the AFOL source repository uses the nested roadmap
 layout. The resolver must support both layouts without weakening canonical
-path checks. Windows-native operators also need the same behavior without
-host-global path assumptions. The activation contract is kept in this child
-because roadmap status and parent-spec status form one governance transition.
+path checks. Windows-compatible path inputs must follow the same project-local
+rules; this child does not claim native Windows execution, which remains
+external evidence. The activation contract is kept in this child because
+roadmap status and parent-spec status form one governance transition.
 
 ## Required Behavior
 
@@ -58,8 +59,9 @@ because roadmap status and parent-spec status form one governance transition.
   leave the parent `active` while the feature remains `planned` and therefore
   temporarily non-governable; retrying the command completes convergence.
 - If a write error is observed, attempt restoration of the mutation already
-  made and report the result. Crash safety relies on the ordered writes, not on
-  a guaranteed rollback or atomic multi-file commit.
+  made and report `restoration=complete` or `restoration=failed`. Crash safety
+  relies on the ordered writes, not on a guaranteed rollback or atomic
+  multi-file commit.
 - Preserve the existing no-op behavior for an already-active feature and the
   fail-closed behavior for final or otherwise invalid governance records.
 
