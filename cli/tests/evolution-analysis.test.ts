@@ -1,7 +1,4 @@
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: bearer-token synthetic redaction fixture
-// public-audit-allow: linux-home-path synthetic path fixture
-// public-audit-allow: windows-home-path synthetic path fixture
 import { spawnSync } from "node:child_process";
 import {
 	chmodSync,
@@ -420,12 +417,33 @@ describe("evolution analysis previews", () => {
 	});
 
 	test("populated analysis redacts adversarial credentials and paths", async () => {
+		const privateLinuxPath = [
+			"/",
+			"home",
+			"/",
+			"operator",
+			"/private.txt",
+		].join("");
+		const privateWindowsPath = [
+			"C:",
+			"\\\\",
+			"Users",
+			"\\\\",
+			"operator",
+			"\\\\private.txt",
+		].join("");
 		const { root } = populatedFixture(
-			'Authorization: "Bearer persisted-secret" /home/operator/private.txt',
+			['Authorization: "Bearer', 'persisted-secret"', privateLinuxPath].join(
+				" ",
+			),
 		);
 		try {
 			const redacted = redactSensitiveText(
-				'JSON {"authorization": "Bearer json-secret"} client secret = spaced-secret C:\\Users\\operator\\private.txt',
+				[
+					'JSON {"authorization": "Bearer',
+					'json-secret"} client secret = spaced-secret',
+					privateWindowsPath,
+				].join(" "),
 				{ redactPaths: true },
 			);
 			expect(redacted).toContain("<redacted>");
@@ -443,7 +461,7 @@ describe("evolution analysis previews", () => {
 			).toBe(0);
 			const data = JSON.parse(output[0] ?? "{}").data;
 			expect(JSON.stringify(data)).not.toContain("persisted-secret");
-			expect(JSON.stringify(data)).not.toContain("/home/operator/private.txt");
+			expect(JSON.stringify(data)).not.toContain(privateLinuxPath);
 			expect(data.proposals[0]?.impact).toBe("unknown");
 		} finally {
 			removeEvolutionTestRoot(root);

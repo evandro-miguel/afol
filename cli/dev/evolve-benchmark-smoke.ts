@@ -257,6 +257,7 @@ function assertPublicAnalysis(
 		throw new Error(`analysis ${mode} mode contract failed`);
 	const sensitiveKey =
 		/(project|cluster|source|commit|path|token|secret|password|api[_-]?key|db|(?:^|_)session_id$|origin_ref)/i;
+	const safeAggregateKeys = new Set(["legacy_cluster_count"]);
 	const inspectKeys = (value: unknown): string | null => {
 		if (Array.isArray(value)) {
 			for (const item of value) {
@@ -267,7 +268,7 @@ function assertPublicAnalysis(
 		}
 		if (value && typeof value === "object") {
 			for (const [key, item] of Object.entries(value)) {
-				if (sensitiveKey.test(key)) return key;
+				if (sensitiveKey.test(key) && !safeAggregateKeys.has(key)) return key;
 				const match = inspectKeys(item);
 				if (match) return match;
 			}
@@ -279,6 +280,21 @@ function assertPublicAnalysis(
 		throw new Error(
 			`analysis ${mode} public DTO contract failed: ${forbiddenKey}`,
 		);
+	const legacyClusterCount = data.legacy_cluster_count;
+	const recoveryAction = data.recovery_action;
+	if (
+		!Number.isInteger(legacyClusterCount) ||
+		Number(legacyClusterCount) < 0 ||
+		(data.status === "blocked" &&
+			recoveryAction !== "afol evolve status --json") ||
+		(data.status !== "blocked" &&
+			Number(legacyClusterCount) > 0 &&
+			recoveryAction !== "afol evolve repair --json") ||
+		(data.status !== "blocked" &&
+			Number(legacyClusterCount) === 0 &&
+			recoveryAction !== null)
+	)
+		throw new Error(`analysis ${mode} recovery contract failed`);
 	const proposals = Array.isArray(data.proposals) ? data.proposals : [];
 	for (const value of proposals) {
 		const proposal = value as Record<string, unknown>;

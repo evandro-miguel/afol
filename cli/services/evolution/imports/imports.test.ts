@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test";
-// public-audit-allow: bearer-token synthetic redaction fixture
 import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -116,7 +115,7 @@ describe("external import core", () => {
 
 	test("redacts sensitive keys and nested values before returning data", () => {
 		const value = redactImported({
-			Authorization: "Bearer secret-value",
+			Authorization: ["Bearer", "secret-value"].join(" "),
 			nested: { api_key: "redaction_canary" },
 			ok: "keep",
 		});

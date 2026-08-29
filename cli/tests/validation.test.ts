@@ -23,7 +23,7 @@ const runtimeLiveBenchmarkProfile = {
 const runtimeLiveBenchmarkRefreshCommand = "external fixed harness receipt";
 const runtimeLiveBenchmarkValidationCommand =
 	"afol validate bench --pack runtime-live-agent --json";
-const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand}`;
+const runtimeLiveBenchmarkRefreshGuidance = `run:${runtimeLiveBenchmarkRefreshCommand};then:${runtimeLiveBenchmarkValidationCommand};continue:scripted-packs-without-live-claim`;
 const runtimeLiveBenchmarkRefreshNote = `obtain a fresh receipt from the external fixed harness, place it at .afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json, then validate with ${runtimeLiveBenchmarkValidationCommand}`;
 const slowValidationTestTimeoutMs =
 	process.platform === "win32" ? 360_000 : 60_000;

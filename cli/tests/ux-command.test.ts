@@ -91,7 +91,9 @@ The operator verifies that afol maintenance warnings are visible before closing 
 
 ## Entry And Exit
 
-Entry is a changed maintenance cadence. Exit is validated UX and benchmark evidence.
+- Entry point: a changed maintenance cadence.
+- Success exit: UX and benchmark evidence are validated.
+- Recovery exit: validation names the repair and preserves the current state.
 
 ## Flow
 
@@ -101,7 +103,17 @@ Entry is a changed maintenance cadence. Exit is validated UX and benchmark evide
 
 ## Expected Result
 
-The system names maintenance warnings and the related scenario evidence.
+- Output: maintenance warnings and related scenario evidence.
+- Durable state change: none for validation commands.
+- Warning or review prompt: the exact missing coverage and repair command.
+- Token/output budget: default output remains below 5k tokens.
+
+## States And Recovery
+
+- Default: run the validation.
+- Error: preserve state and show the failing field.
+- Partial failure: continue unaffected checks and report the failed check.
+- Success: show the evidence lane and next safe action.
 
 ## Evidence
 
@@ -404,6 +416,7 @@ status: draft
 		expect(payload.created).toBe(false);
 		expect(payload.dry_run).toBe(true);
 		expect(payload.path).toBe(".afol/adm/ux/fixture-source_ux-journey_01.md");
+		expect(payload.entry).toMatchObject({ missing_fields: [] });
 		expect(
 			existsSync(join(root, ".afol/adm/ux/fixture-source_ux-journey_01.md")),
 		).toBe(false);
@@ -566,5 +579,125 @@ status: draft
 		const payload = parsePayload(captured);
 		expect(payload.ok).toBe(false);
 		expect(payload.error_count).toBeGreaterThan(0);
+	});
+
+	test("rejects journeys without explicit output, exits, and recovery states", async () => {
+		write(
+			".afol/adm/ux/unsafe-flow_ux-journey_01.md",
+			`
+---
+doc_type: ux-journey
+id: unsafe-flow_ux-journey_01
+theme: Unsafe Flow
+status: active
+roadmap_feature: F-TEST
+parent_spec: fixture-parent_spec_01
+---
+
+# UX Journey: Unsafe Flow
+
+## Purpose
+
+Run a command.
+
+## Entry And Exit
+
+The flow starts and eventually ends.
+
+## Flow
+
+1. Run the command.
+
+## Expected Result
+
+The command works.
+
+## Evidence
+
+Use a test.
+
+## Metrics
+
+It passes.
+
+## Acceptance
+
+- [ ] Complete
+`,
+		);
+		const captured = captureIo();
+		expect(await runUxCommand("validate", ["--json"], root, captured.io)).toBe(
+			1,
+		);
+		const payload = parsePayload(captured);
+		const messages = JSON.stringify(payload.issues);
+		expect(messages).toContain("Success exit:");
+		expect(messages).toContain("Recovery exit:");
+		expect(messages).toContain("## States And Recovery");
+		expect(messages).toContain("Output:");
+		expect(messages).toContain("Warning or review prompt:");
+	});
+
+	test("rejects marker-only journeys without an actionable recovery transition", async () => {
+		write(
+			".afol/adm/ux/marker-only_ux-journey_01.md",
+			`
+---
+doc_type: ux-journey
+id: marker-only_ux-journey_01
+theme: Marker Only
+status: active
+roadmap_feature: F-TEST
+parent_spec: fixture-parent_spec_01
+---
+
+# UX Journey: Marker Only
+
+## Purpose
+
+Run a command.
+
+## Entry And Exit
+
+- Success exit: Present
+- Recovery exit: Present
+
+## Flow
+
+1. Run the command.
+
+## Expected Result
+
+- Output: Present
+- Durable state change: Present
+- Warning or review prompt: Present
+- Token/output budget: Present
+
+## States And Recovery
+
+Everything is present.
+
+## Evidence
+
+Use a test.
+
+## Metrics
+
+It passes.
+
+## Acceptance
+
+- [ ] Complete
+`,
+		);
+		const captured = captureIo();
+		expect(await runUxCommand("validate", ["--json"], root, captured.io)).toBe(
+			1,
+		);
+		const payload = parsePayload(captured);
+		expect(payload.ok).toBe(false);
+		expect(JSON.stringify(payload)).toContain(
+			"States And Recovery: actionable transition",
+		);
 	});
 });

@@ -27,10 +27,25 @@ const REQUIRED_UX_HEADINGS = [
 	"## Entry And Exit",
 	"## Flow",
 	"## Expected Result",
+	"## States And Recovery",
 	"## Evidence",
 	"## Metrics",
 	"## Acceptance",
 ];
+
+const REQUIRED_UX_MARKERS = [
+	"Success exit:",
+	"Recovery exit:",
+	"Output:",
+	"Durable state change:",
+	"Warning or review prompt:",
+	"Token/output budget:",
+];
+
+const UX_RECOVERY_STATE_RE =
+	/\b(?:blocked|empty|error|fail(?:ed|ure)?|invalid|partial|permission|rejected|stale|unavailable)\b/i;
+const UX_RECOVERY_ACTION_RE =
+	/`[^`]+`|\b(?:add|continue|correct|fix|inspect|investigate|keep|list|preserve|preview|refresh|repair|resume|retry|review|re-?run|restore|return|roll back|use|wait|waive)\b/i;
 
 type Frontmatter = Record<string, string>;
 
@@ -225,6 +240,32 @@ function sourceForDocType(
 	return "spec";
 }
 
+function extractMarkerValue(body: string, marker: string): string {
+	const lines = body.split("\n");
+	const index = lines.findIndex((line) => line.includes(marker));
+	if (index < 0) return "";
+	const inline = lines[index]?.split(marker, 2)[1]?.trim() ?? "";
+	if (inline) return inline;
+	for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+		const candidate = lines[cursor]?.trim() ?? "";
+		if (!candidate) continue;
+		if (candidate.startsWith("#") || candidate.startsWith("-")) return "";
+		return candidate;
+	}
+	return "";
+}
+
+function extractSection(body: string, heading: string): string {
+	const start = body.indexOf(heading);
+	if (start < 0) return "";
+	const contentStart = start + heading.length;
+	const nextHeading = body.indexOf("\n## ", contentStart);
+	return body.slice(
+		contentStart,
+		nextHeading < 0 ? body.length : nextHeading,
+	);
+}
+
 function requiredUxMissingFields(document: MarkdownDocument): string[] {
 	if (document.frontmatter.doc_type !== "ux-journey") {
 		return [];
@@ -246,6 +287,21 @@ function requiredUxMissingFields(document: MarkdownDocument): string[] {
 		if (!document.body.includes(heading)) {
 			missing.push(heading);
 		}
+	}
+	for (const marker of REQUIRED_UX_MARKERS) {
+		if (!extractMarkerValue(document.body, marker)) {
+			missing.push(marker);
+		}
+	}
+	const recoverySection = extractSection(
+		document.body,
+		"## States And Recovery",
+	);
+	if (
+		!UX_RECOVERY_STATE_RE.test(recoverySection) ||
+		!UX_RECOVERY_ACTION_RE.test(recoverySection)
+	) {
+		missing.push("States And Recovery: actionable transition");
 	}
 	return missing;
 }
@@ -461,6 +517,19 @@ function renderRegisteredJourney(
 		"- Durable state change: only `afol ux register --from-spec <spec-id>` writes a draft under the configured `adm_dir` UX registry.",
 		"- Warning or review prompt: missing scenario, stale session, or maintenance review remains visible before claiming coverage.",
 		"- Token/output budget: default output stays below 5k tokens.",
+		"",
+		"## States And Recovery",
+		"",
+		"- Default: show the governing flow and the narrowest safe command.",
+		"- Loading or in-progress: preserve state and show what is being checked.",
+		"- Empty or no results: explain why and name the first useful action.",
+		"- Error: name the failed condition and an exact correction path.",
+		"- Partial failure: keep successful evidence and retry only the failed lane.",
+		"- Permission denied or approval required: keep preview available without mutation.",
+		"- Stale state: name the rebuild or refresh command and preserve canonical state.",
+		"- Success: show completion evidence and the next safe action.",
+		"- First use: offer dry-run or inspection before mutation.",
+		"- Returning user: resume from saved state without repeating completed writes.",
 		"",
 		"## Evidence",
 		"",

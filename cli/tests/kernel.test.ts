@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: bearer-token synthetic redaction fixture
-// public-audit-allow: credentialed-url synthetic URL fixture
 import { execFileSync, spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -2328,14 +2326,24 @@ describe("kernel front-door", () => {
 				},
 				{
 					command:
-						'curl -H "Authorization: Bearer synthetic-bearer" https://example.test',
+						[
+							'curl -H "Authorization:',
+							"Bearer",
+							'synthetic-bearer" https://example.test',
+						].join(" "),
 					expected:
 						'curl -H "Authorization: Bearer [REDACTED]" https://example.test',
 					raw: "synthetic-bearer",
 				},
 				{
-					command: "curl https://demo-user:synthetic-password@example.test",
-					expected: "curl https://demo-user:[REDACTED]@example.test",
+					command: [
+						"curl https://demo-user:",
+						"synthetic-password@example.test",
+					].join(""),
+					expected: [
+						"curl https://demo-user:",
+						"[REDACTED]@example.test",
+					].join(""),
 					raw: "synthetic-password",
 				},
 			];

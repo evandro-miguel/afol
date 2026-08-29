@@ -141,7 +141,7 @@ describe("public export boundary", () => {
 		},
 	);
 
-	test("audit permits explicitly annotated synthetic fixtures", () => {
+	test("audit rejects detected content even when an allow annotation is present", () => {
 		const root = mkdtempSync(join(tmpdir(), "public-audit-allowed-"));
 		try {
 			writeFileSync(
@@ -157,8 +157,11 @@ describe("public export boundary", () => {
 			);
 
 			const result = runBun(auditScript, [root], repoRoot);
-			expect(result.status).toBe(0);
-			expect(outputOf(result)).toContain("public content audit passed");
+			expect(result.status).not.toBe(0);
+			const output = outputOf(result);
+			expect(output).toContain("fixtures.txt: credentialed-url");
+			expect(output).toContain("fixtures.txt: windows-home-path");
+			expect(output).toContain("fixtures.txt: linux-home-path");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

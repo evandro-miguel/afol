@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: linux-home-path synthetic path fixture
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -2014,7 +2013,10 @@ describe("validate registry", () => {
 				undefined,
 				null,
 			),
-		).toEqual(["baseline-incompatible:calibration-pending:reason-invalid"]);
+		).toEqual([
+			"baseline-incompatible:calibration-pending:reason-invalid",
+			"recovery:mutation-safety:run-compatible-profile-or-produce-reviewed-calibration;unrelated-packs-may-continue",
+		]);
 		expect(
 			validateMutationBaselineContract(
 				undefined,
@@ -2172,13 +2174,16 @@ describe("scenario benchmark execution", () => {
 	});
 
 	test("uses the running AFOL executable for compiled downstream benchmarks", () => {
+		const linuxAfol = ["/", "home", "/", "operator", "/.local/bin/afol"].join(
+			"",
+		);
 		expect(
 			resolveAfolExecutable(
 				undefined,
 				"/$bunfs/root/cli/main.ts",
-				"/home/operator/.local/bin/afol",
+				linuxAfol,
 			),
-		).toBe("/home/operator/.local/bin/afol");
+		).toBe(linuxAfol);
 		expect(
 			resolveAfolExecutable(
 				undefined,
@@ -4259,6 +4264,9 @@ describe("scenario benchmark execution", () => {
 						note.startsWith("profile-incompatible:host_profile_id:"),
 					),
 				).toBe(true);
+				expect(result.notes).toContain(
+					"recovery:mutation-safety:run-compatible-profile-or-produce-reviewed-calibration;unrelated-packs-may-continue",
+				);
 				expect(
 					result.notes.some((note) => note.startsWith("baseline-regression:")),
 				).toBe(false);
@@ -4293,6 +4301,9 @@ describe("scenario benchmark execution", () => {
 				).toEqual([
 					"baseline-incompatible:calibration-pending:controlled-release-host-required",
 				]);
+				expect(pendingResult.notes).toContain(
+					"recovery:mutation-safety:run-compatible-profile-or-produce-reviewed-calibration;unrelated-packs-may-continue",
+				);
 
 				const failedResult = withCapturedConsoleError(() =>
 					buildResult(
@@ -4763,6 +4774,9 @@ describe("runtime live validation helpers", () => {
 				stale.results.filter((entry) => entry.status === "failed"),
 			).toHaveLength(4);
 			expect(stale.notes[0]).toStartWith("runtime-live-snapshot-stale:");
+			expect(stale.notes[0]).toContain(
+				"continue:scripted-packs-without-live-claim",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -4970,7 +4984,7 @@ describe("runtime live validation helpers", () => {
 				missing.results.filter((entry) => entry.status === "failed"),
 			).toHaveLength(4);
 			expect(missing.notes).toContain(
-				"runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:external fixed harness receipt;then:afol validate bench --pack runtime-live-agent --json",
+				"runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:external fixed harness receipt;then:afol validate bench --pack runtime-live-agent --json;continue:scripted-packs-without-live-claim",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

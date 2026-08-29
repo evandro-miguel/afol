@@ -129,6 +129,21 @@ benchmark_pack: all-tool-surface
 - Token/output budget: default command output should stay under 5k output
   tokens; benchmark thresholds may be stricter per scenario.
 
+## States And Recovery
+
+| State | User-visible output | Safe correction or continuation |
+| --- | --- | --- |
+| default | Command, side effect, journey, and scenario lane | Execute the narrowest matching lane |
+| in progress | Scenario id and bounded progress/result state | Wait or inspect the saved result; do not repeat writes blindly |
+| empty or no match | Exact command or subcommand without coverage | Add a named backlog/scenario and keep unrelated lanes available |
+| expected rejection | Nonzero exit plus the violated guardrail | Correct the input or use the documented recovery command; no unsafe mutation |
+| partial failure | Passed and failed scenarios remain separate | Retry only failed scenarios and preserve successful evidence |
+| permission or approval required | Required actor, session, task, or reason is named | Preview/dry-run remains available until authority is supplied |
+| stale or incompatible evidence | Snapshot age or profile mismatch and refresh path | Re-run the matching harness/profile; never relabel as passed |
+| success | Expected result, evidence lane, and next gate | Continue without rerunning completed writes |
+| first use | Compact discovery and dry-run path | Reach first value without committing mutation |
+| returning user | Current status, warnings, and next unresolved lane | Resume from saved state and skip proven lanes |
+
 ## Evidence
 
 - Scripted scenario:

@@ -93,6 +93,19 @@ benchmark_pack: governance-history
 - Token/output budget: `afol ux` commands should remain below 500 output tokens
   by default; any command exceeding 5,000 output tokens is a bug.
 
+## States And Recovery
+
+| State | User-visible output | Safe correction or continuation |
+| --- | --- | --- |
+| default | Compact journey and coverage summary | Inspect one journey or tool without mutation |
+| empty | No journey or tool match | List valid ids, then retry with a listed id |
+| invalid journey | Exact missing heading, marker, or frontmatter field | Repair from `docs/templates/ux-journey.md`; existing state is unchanged |
+| partial coverage | Covered and uncovered commands remain distinguishable | Add the missing implemented scenario; covered lanes may continue |
+| permission denied | Registration states that local approval is required | Keep the dry-run preview and rerun from an authorized local context |
+| stale live evidence | Snapshot age and receipt refresh command are shown | Refresh through the external harness; scripted checks remain usable |
+| success | Validation count, coverage, and next inspection command are shown | Continue to the relevant benchmark or release gate |
+| returning user | Current registry counts and new issues are summarized | Resume from the named issue without repeating successful checks |
+
 ## Evidence
 
 - Scripted scenario:

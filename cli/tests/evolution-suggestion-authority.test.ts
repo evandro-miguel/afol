@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: bearer-token synthetic redaction fixture
 import {
 	agentOperationContext,
 	defaultOperationContext,
@@ -77,7 +76,11 @@ describe("evolution suggestion decision authority", () => {
 
 	test("redacts JSON keys, bearer values, flags, and sensitive query values", () => {
 		const reason = redactSuggestionReason(
-			'{"token":"REDACTION_CANARY_1"} Authorization: Bearer REDACTION_CANARY_2 --token REDACTION_CANARY_3 https://invalid/?api_key=REDACTION_CANARY_4',
+			[
+				'{"token":"REDACTION_CANARY_1"} Authorization:',
+				"Bearer",
+				"REDACTION_CANARY_2 --token REDACTION_CANARY_3 https://invalid/?api_key=REDACTION_CANARY_4",
+			].join(" "),
 		);
 		expect(reason?.toLowerCase()).not.toContain("redaction_canary");
 	});

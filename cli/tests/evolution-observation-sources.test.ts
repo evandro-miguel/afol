@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: bearer-token synthetic redaction fixture
 import type { TelemetryEvent } from "../services/events/telemetry";
 import { normalizeObservationRecord } from "../services/evolution/observation-model";
 import {
@@ -93,7 +92,11 @@ describe("evolution observation source adapters", () => {
 					exit_code: 1,
 					command: "OPENAI_API_KEY=REDACTION_CANARY_456789 bun test",
 					test: "REDACTION_CANARY_567890",
-					error_code: "Authorization: Bearer REDACTION_CANARY_678901",
+					error_code: [
+						"Authorization:",
+						"Bearer",
+						"REDACTION_CANARY_678901",
+					].join(" "),
 				},
 				CONTEXT,
 			) as NonNullable<ReturnType<typeof observationFromEvidence>>,

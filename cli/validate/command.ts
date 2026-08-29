@@ -47,6 +47,8 @@ const TOKEN_RULE_NONIDEAL = 5_000;
 const TOKEN_RULE_PROHIBITIVE = 10_000;
 const BASELINE_TIMING_REGRESSION_FACTOR = 1.25;
 const MUTATION_PROCESS_JITTER_FLOOR_MS = 50;
+const MUTATION_PROFILE_RECOVERY_NOTE =
+	"recovery:mutation-safety:run-compatible-profile-or-produce-reviewed-calibration;unrelated-packs-may-continue";
 const TIMING_THRESHOLD_KEYS = new Set([
 	"max_duration_ms",
 	"min_duration_ms",
@@ -333,6 +335,7 @@ export function collectProfileCompatibilityNotes(
 	if (baseline.calibration_status === "pending") {
 		return [
 			`baseline-incompatible:calibration-pending:${formatMutationCalibrationReason(baseline.calibration_reason)}`,
+			MUTATION_PROFILE_RECOVERY_NOTE,
 		];
 	}
 	if (!execution) {
@@ -374,6 +377,7 @@ export function collectProfileCompatibilityNotes(
 			`profile-incompatible:sample_count:${execution.metrics.sample_count}<${RELEASE_BENCH_SAMPLES}`,
 		);
 	}
+	if (notes.length > 0) notes.push(MUTATION_PROFILE_RECOVERY_NOTE);
 	return notes;
 }
 

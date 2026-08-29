@@ -3,7 +3,7 @@
   "scenario_id": "route-task",
   "scenario_version": "1.0.0",
   "pack_id": "routing-accuracy",
-  "command": "afol st",
+	"command": "afol st -S benchmark-missing-session -T T-01",
   "expected_exit": 2,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",

@@ -78,7 +78,6 @@ function visit(path: string): void {
 	}
 	const content = bytes.toString("utf8");
 	for (const [id, pattern] of patterns) {
-		if (content.includes(`public-audit-allow: ${id}`)) continue;
 		if (pattern.test(content)) findings.push(`${name}: ${id}`);
 	}
 }

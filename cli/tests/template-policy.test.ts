@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: linux-home-path synthetic path fixture
 import {
 	existsSync,
 	mkdirSync,
@@ -318,7 +317,7 @@ describe("template forbidden-content policy", () => {
 			"src/project-template/.afol/data/benchmarks/catalog/scenarios/update-safety",
 		];
 		const forbiddenReferences = [
-			"/home/ozy/",
+			["/", "home", "/", "ozy", "/"].join(""),
 			"/tmp/",
 			"src/project-template",
 			".agents",
@@ -349,6 +348,21 @@ describe("template forbidden-content policy", () => {
 					expect(content).toContain("'docs'");
 				}
 			}
+		}
+	});
+
+	test("route-task scenarios cannot start a task from the current active session", async () => {
+		for (const scenarioPath of [
+			".afol/data/benchmarks/catalog/scenarios/routing-accuracy/route-task.json",
+			"src/project-template/.afol/data/benchmarks/catalog/scenarios/routing-accuracy/route-task.json",
+		]) {
+			const scenario = JSON.parse(
+				await readFile(join(process.cwd(), scenarioPath), "utf8"),
+			) as Record<string, unknown>;
+			expect(scenario.command).toBe(
+				"afol st -S benchmark-missing-session -T T-01",
+			);
+			expect(scenario.expected_exit).toBe(2);
 		}
 	});
 

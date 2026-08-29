@@ -142,7 +142,10 @@ Expected usage:
 - `afol ux show <journey-id>`: inspect one journey, including commands and
   evidence links.
 - `afol ux validate`: fail when required standards/templates or standalone
-  journey fields are missing.
+  journey fields are missing. Every standalone journey must name its success
+  exit, recovery exit, visible output, durable-state effect, warning/review
+  prompt, output budget, and `States And Recovery`; a flow without a safe next
+  action cannot count as UX coverage.
 - `afol ux coverage --tool <afol-command>`: show journeys that mention a tool.
 - `afol ux register --from-spec <spec-id>`: create a draft journey from a
   governing spec without replacing that spec.

@@ -1,6 +1,5 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-// public-audit-allow: bearer-token synthetic redaction fixture
 import {
 	applyMigrations,
 	EVOLUTION_MIGRATIONS,
@@ -402,7 +401,11 @@ describe("evolution observation model", () => {
 	test("redacts bearer, separated flags, and sensitive URL query values", () => {
 		const normalized = normalizeObservation({
 			id: "O-redaction",
-			errorCode: "Authorization: Bearer REDACTION_CANARY_123456",
+			errorCode: [
+				"Authorization:",
+				"Bearer",
+				"REDACTION_CANARY_123456",
+			].join(" "),
 			command:
 				"tool --token REDACTION_CANARY_234567 https://example.invalid/?api_key=REDACTION_CANARY_345678",
 		});

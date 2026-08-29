@@ -35,7 +35,7 @@ const LIVE_BENCHMARK_SCENARIO_IDS: Record<string, string> = {
 const LIVE_BENCHMARK_REFRESH_COMMAND = "external fixed harness receipt";
 const LIVE_BENCHMARK_VALIDATE_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
-const LIVE_BENCHMARK_REFRESH_GUIDANCE = `run:${LIVE_BENCHMARK_REFRESH_COMMAND};then:${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
+const LIVE_BENCHMARK_REFRESH_GUIDANCE = `run:${LIVE_BENCHMARK_REFRESH_COMMAND};then:${LIVE_BENCHMARK_VALIDATE_COMMAND};continue:scripted-packs-without-live-claim`;
 const LIVE_BENCHMARK_REFRESH_NOTE = `obtain a fresh receipt from the external fixed harness, place it at ${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH}, then validate with ${LIVE_BENCHMARK_VALIDATE_COMMAND}`;
 
 interface LiveRunnerProfile {

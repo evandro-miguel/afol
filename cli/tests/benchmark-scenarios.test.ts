@@ -3,8 +3,10 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runQuickTaskCommand } from "../commands/quick-task";
+import { runStartCommand } from "../commands/workbench";
 import { resolveCommand } from "../router";
 import { listBenchScenarios } from "../services/benchmark/scenarios";
+import { newWorkstream } from "../services/workbench/lifecycle";
 
 type FleetScenario = {
 	scenario_id: string;
@@ -47,6 +49,43 @@ function lifecycleScenario() {
 }
 
 describe("governed-task-lifecycle benchmark contract", () => {
+	test("route-task cannot mutate an active fixture session", async () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-route-task-isolation-"));
+		try {
+			const created = newWorkstream(root, "active fixture", {
+				noSpecRequiredReason: "benchmark isolation fixture",
+			});
+			const scenario = JSON.parse(
+				readFileSync(
+					join(
+						process.cwd(),
+						".afol/data/benchmarks/catalog/scenarios/routing-accuracy/route-task.json",
+					),
+					"utf8",
+				),
+			) as { command: string; expected_exit: number };
+			const resolution = resolveCommand(scenario.command.split(" ").slice(1));
+			expect(resolution.kind).toBe("start");
+			if (resolution.kind !== "start") throw new Error("Expected start route");
+
+			const before = {
+				active: readFileSync(created.activeSessionPath, "utf8"),
+				task: readFileSync(created.taskPath, "utf8"),
+				evidence: readFileSync(created.evidencePath, "utf8"),
+			};
+			expect(await runStartCommand(resolution.args, root)).toBe(
+				scenario.expected_exit,
+			);
+			expect(readFileSync(created.activeSessionPath, "utf8")).toBe(
+				before.active,
+			);
+			expect(readFileSync(created.taskPath, "utf8")).toBe(before.task);
+			expect(readFileSync(created.evidencePath, "utf8")).toBe(before.evidence);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("seeds a valid governing spec", () => {
 		const root = mkdtempSync(join(tmpdir(), "afol-benchmark-scenario-"));
 		try {
