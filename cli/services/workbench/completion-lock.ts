@@ -31,6 +31,8 @@ const READ_WRITE_NOFOLLOW = fsConstants.O_RDWR | NOFOLLOW;
 interface LockIdentity {
 	dev: bigint;
 	ino: bigint;
+	birthtimeNs: bigint;
+	ctimeNs: bigint;
 }
 
 interface GenerationFence {
@@ -114,19 +116,49 @@ function isProcessAlive(pid: number): boolean {
 
 function identity(fd: number): LockIdentity {
 	const stat = fstatSync(fd, { bigint: true });
-	return { dev: stat.dev, ino: stat.ino };
+	return {
+		dev: stat.dev,
+		ino: stat.ino,
+		birthtimeNs: stat.birthtimeNs,
+		ctimeNs: stat.ctimeNs,
+	};
+}
+
+function identityFromStat(stat: {
+	dev: bigint;
+	ino: bigint;
+	birthtimeNs: bigint;
+	ctimeNs: bigint;
+}): LockIdentity {
+	return {
+		dev: stat.dev,
+		ino: stat.ino,
+		birthtimeNs: stat.birthtimeNs,
+		ctimeNs: stat.ctimeNs,
+	};
 }
 
 function sameIdentity(left: LockIdentity, right: LockIdentity): boolean {
-	return left.dev === right.dev && left.ino === right.ino;
+	return (
+		left.dev === right.dev &&
+		left.ino === right.ino &&
+		left.birthtimeNs === right.birthtimeNs &&
+		left.ctimeNs === right.ctimeNs
+	);
+}
+
+function sameFile(left: LockIdentity, right: LockIdentity): boolean {
+	return (
+		left.dev === right.dev &&
+		left.ino === right.ino &&
+		left.birthtimeNs === right.birthtimeNs
+	);
 }
 
 function pathHasIdentity(path: string, expected: LockIdentity): boolean {
 	try {
 		const stat = lstatSync(path, { bigint: true });
-		return (
-			stat.isFile() && sameIdentity({ dev: stat.dev, ino: stat.ino }, expected)
-		);
+		return stat.isFile() && sameIdentity(identityFromStat(stat), expected);
 	} catch {
 		return false;
 	}
@@ -244,7 +276,11 @@ function restoreGeneration(
 	previous: string,
 	io?: CompletionFenceIo,
 ): void {
-	if (!pathHasIdentity(path, expected)) {
+	const currentIdentity = identity(fd);
+	if (
+		!sameFile(currentIdentity, expected) ||
+		!pathHasIdentity(path, currentIdentity)
+	) {
 		throw new Error(
 			"Task completion fence ownership was lost before recovery.",
 		);
@@ -344,13 +380,23 @@ function createFreshGeneration(
 			}
 			throw error;
 		}
-		if (!pathHasIdentity(path, temporaryIdentity)) {
+		// Publishing and removing the temporary hard link both change ctime.
+		// Refresh the descriptor identity after each link-count mutation.
+		temporaryIdentity = identity(fd);
+		if (
+			!pathHasIdentity(path, temporaryIdentity) ||
+			!pathHasIdentity(temporaryPath, temporaryIdentity)
+		) {
 			throw new Error("Task completion fence publication ownership was lost.");
 		}
 		if (!unlinkOwned(temporaryPath, temporaryIdentity, io?.unlink)) {
 			throw new Error(
 				"Task completion fence temporary alias could not be removed.",
 			);
+		}
+		temporaryIdentity = identity(fd);
+		if (!pathHasIdentity(path, temporaryIdentity)) {
+			throw new Error("Task completion fence publication ownership was lost.");
 		}
 		return { fd, generation: 1, identity: temporaryIdentity };
 	} catch (error) {
@@ -574,32 +620,51 @@ export async function withTaskCompletionLock<T>(
 	}, heartbeatMs);
 	heartbeat.unref();
 
+	let result: T | undefined;
+	let actionError: unknown;
+	let stillOwned = false;
 	try {
-		return await action({
+		result = await action({
 			generation,
 			ownerToken,
 			signal: abort.signal,
 			assertOwned,
 		});
+	} catch (error) {
+		actionError = error;
 	} finally {
 		clearInterval(heartbeat);
 		try {
-			const ownershipProbe = randomUUID();
-			metadata = {
-				...metadata,
-				heartbeat_at: new Date().toISOString(),
-				ownership_probe: ownershipProbe,
-			};
-			writeMetadataFd(ownerFd, metadata);
-			ownedIdentity = identity(ownerFd);
-			const current = readOwnedMetadata(lockPath, ownedIdentity);
-			if (
-				current?.owner_token === ownerToken &&
-				current.generation === generation &&
-				current.ownership_probe === ownershipProbe
-			) {
-				unlinkOwned(lockPath, ownedIdentity);
+			assertOwned();
+			stillOwned = true;
+		} catch {
+			markLost();
+		}
+		try {
+			if (stillOwned) {
+				const ownershipProbe = randomUUID();
+				metadata = {
+					...metadata,
+					heartbeat_at: new Date().toISOString(),
+					ownership_probe: ownershipProbe,
+				};
+				writeMetadataFd(ownerFd, metadata);
+				ownedIdentity = identity(ownerFd);
+				const current = readOwnedMetadata(lockPath, ownedIdentity);
+				if (
+					current?.owner_token !== ownerToken ||
+					current.generation !== generation ||
+					current.ownership_probe !== ownershipProbe ||
+					!unlinkOwned(lockPath, ownedIdentity)
+				) {
+					stillOwned = false;
+					markLost();
+				}
 			}
+		} catch (error) {
+			stillOwned = false;
+			markLost();
+			if (actionError === undefined) actionError = error;
 		} finally {
 			try {
 				closeSync(fenceFd);
@@ -607,5 +672,10 @@ export async function withTaskCompletionLock<T>(
 				closeSync(ownerFd);
 			}
 		}
+		if (!stillOwned && actionError === undefined) {
+			actionError = new Error("Task completion lock ownership was lost.");
+		}
 	}
+	if (actionError !== undefined) throw actionError;
+	return result as T;
 }

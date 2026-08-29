@@ -2,7 +2,16 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	closeSync,
+	existsSync,
+	fsyncSync,
+	openSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -48,6 +57,20 @@ function portableRelativePath(from: string, to: string): string {
 	return relative(from, to).replaceAll("\\", "/");
 }
 
+function fsyncPath(path: string): void {
+	let fd: number | null = null;
+	try {
+		fd = openSync(path, "r");
+		fsyncSync(fd);
+	} catch {
+		// Directory fsync is best-effort; non-file paths may not support this.
+	} finally {
+		if (fd !== null) {
+			closeSync(fd);
+		}
+	}
+}
+
 export type BuildReleaseArtifactOptions = {
 	cwd?: string;
 	outfile?: string;
@@ -85,6 +108,34 @@ function canonicalizeCompiledReleaseBuildArgs(args: string[]): string[] {
 	);
 }
 
+function writeTextAtomically(
+	outfilePath: string,
+	outputGuard: ReturnType<typeof prepareReleaseOutputFile> | null,
+	cwd: string,
+	content: string,
+): void {
+	const tempPath = `${outfilePath}.tmp-${process.pid}-${Date.now()}`;
+	const tempGuard = outputGuard
+		? prepareReleaseOutputFile(cwd, tempPath)
+		: null;
+	try {
+		writeFileSync(tempPath, content, "utf8");
+		if (tempGuard) {
+			assertReleaseOutputFileStable(tempGuard, true);
+		}
+		fsyncPath(tempPath);
+		renameSync(tempPath, outfilePath);
+		fsyncPath(dirname(outfilePath));
+		if (outputGuard) {
+			assertReleaseOutputFileStable(outputGuard, true);
+		}
+	} finally {
+		if (existsSync(tempPath)) {
+			rmSync(tempPath, { force: true });
+		}
+	}
+}
+
 export function writeCompiledReleaseBuildReceipt(
 	outfile: string,
 	buildArgs: string[],
@@ -92,8 +143,10 @@ export function writeCompiledReleaseBuildReceipt(
 ): string {
 	const receiptPath = compiledReleaseBuildReceiptPath(outfile);
 	const outputGuard = cwd ? prepareReleaseOutputFile(cwd, receiptPath) : null;
-	writeFileSync(
+	writeTextAtomically(
 		receiptPath,
+		outputGuard,
+		cwd ?? process.cwd(),
 		`${JSON.stringify(
 			{
 				artifact_sha256: sha256Hex(readFileSync(outfile)),
@@ -102,9 +155,7 @@ export function writeCompiledReleaseBuildReceipt(
 			null,
 			2,
 		)}\n`,
-		"utf8",
 	);
-	if (outputGuard) assertReleaseOutputFileStable(outputGuard, true);
 	return receiptPath;
 }
 

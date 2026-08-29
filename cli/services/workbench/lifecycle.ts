@@ -36,6 +36,7 @@ import {
 	appendEventsAndRebuildWorkBenchIndex,
 	rebuildWorkBenchIndex,
 } from "../local-state/workbench-index";
+import { admitsEvidenceTransitionIssue } from "../project/evidence-transition-admission";
 import {
 	admitsLegacyEvidenceIssue,
 	validLegacyEvidenceBaseline,
@@ -294,6 +295,11 @@ export type CloseSessionOptions = {
 	 * sessions; the strict path is unchanged when the option is absent.
 	 */
 	admitLegacyBaseline?: boolean;
+	/**
+	 * Dedicated transition-admit route: waive only the current hash-bound
+	 * post-cutoff no-op debt while closing. Normal close never sets this.
+	 */
+	admitTransitionAdmission?: boolean;
 };
 
 export type CloseSessionReport = {
@@ -2951,6 +2957,20 @@ export function closeSession(
 					verification.openTasks.length === 0 &&
 					!verification.issues.some(isBlockingVerifyIssue);
 			}
+			if (options.admitTransitionAdmission) {
+				verification.issues = verification.issues.filter(
+					(issue) =>
+						!admitsEvidenceTransitionIssue(
+							root,
+							paths.sessionDir,
+							issue,
+							verification.openTasks.length > 0,
+						),
+				);
+				verification.allCompleted =
+					verification.openTasks.length === 0 &&
+					!verification.issues.some(isBlockingVerifyIssue);
+			}
 			pushChecklistCloseWarnings(checklistCloseWarnings, verification);
 			if (!verification.allCompleted) {
 				const message =
@@ -3047,6 +3067,20 @@ export function closeSession(
 			// write, but only if the durable close is strictly terminally coherent.
 			if (!closeEventRecorded) {
 				const verification = verifyWorkbenchTasks(paths.sessionDir, true);
+				if (options.admitTransitionAdmission) {
+					verification.issues = verification.issues.filter(
+						(issue) =>
+							!admitsEvidenceTransitionIssue(
+								root,
+								paths.sessionDir,
+								issue,
+								verification.openTasks.length > 0,
+							),
+					);
+					verification.allCompleted =
+						verification.openTasks.length === 0 &&
+						!verification.issues.some(isBlockingVerifyIssue);
+				}
 				pushChecklistCloseWarnings(checklistCloseWarnings, verification);
 				if (!verification.allCompleted) {
 					const message =

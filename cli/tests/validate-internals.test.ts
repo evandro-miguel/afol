@@ -1094,7 +1094,7 @@ describe("validate registry", () => {
 				(scenario) => scenario.scenario_id === "tool-surface-coverage-matrix",
 			);
 			expect(toolSurfaceScenario?.coverage?.subcommands).toContain(
-				"governance gov af -F <F-id>",
+				"governance gov af -F <F-id> [-P <spec-id>]",
 			);
 			const uxRegistryScenario = snapshot.scenariosByPack[
 				"governance-history"
@@ -1504,12 +1504,12 @@ describe("validate registry", () => {
 			);
 			const withoutActivateFeatureCoverage = withoutSurfaceCoverageFor(
 				"governance",
-				"governance gov af -F <F-id>",
+				"governance gov af -F <F-id> [-P <spec-id>]",
 			);
 			expect(
 				validateRegistryContract(withoutActivateFeatureCoverage),
 			).toContain(
-				"tool-subcommand-coverage-missing:governance gov af -F <F-id>",
+				"tool-subcommand-coverage-missing:governance gov af -F <F-id> [-P <spec-id>]",
 			);
 			const governanceScenarios =
 				snapshot.scenariosByPack["governance-history"];
@@ -3018,6 +3018,89 @@ describe("scenario benchmark execution", () => {
 		}
 	});
 
+	test("reports an unexpected completion-lock rename instead of ignoring its inode", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const lockPath = resolveTaskCompletionLockPath(
+				root,
+				"bench-session",
+				"T-01",
+			);
+			const renamedPath = `${lockPath}.unexpected-rename`;
+			mkdirSync(dirname(lockPath), { recursive: true });
+			const now = new Date().toISOString();
+			writeFileSync(
+				lockPath,
+				`${JSON.stringify({
+					pid: process.pid,
+					host: "fixture-host",
+					owner_token: "owner",
+					ownership_probe: "probe",
+					generation: 1,
+					acquired_at: now,
+					heartbeat_at: now,
+				})}\n`,
+				"utf8",
+			);
+			const relativeRenamedPath = renamedPath
+				.slice(root.length + 1)
+				.replaceAll("\\", "/");
+			const scenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "bench-unexpected-lock-rename",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: `node -e 'require("node:fs").renameSync(${JSON.stringify(lockPath)}, ${JSON.stringify(renamedPath)})'`,
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {},
+			};
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: 1,
+				warmupCount: 0,
+			});
+			expect(result.passed).toBe(false);
+			expect(
+				result.notes.find((note) => note.startsWith("side-effect-leak:")),
+			).toContain(relativeRenamedPath);
+
+			const tombstonePath = `${lockPath}.tombstone-00000000-0000-4000-8000-000000000000`;
+			writeFileSync(
+				lockPath,
+				`${JSON.stringify({
+					pid: process.pid,
+					host: "fixture-host",
+					owner_token: "owner-2",
+					ownership_probe: "probe-2",
+					generation: 2,
+					acquired_at: now,
+					heartbeat_at: now,
+				})}\n`,
+				"utf8",
+			);
+			const benignTombstone = runScenarioCommand(
+				root,
+				{
+					...scenario,
+					scenario_id: "bench-valid-lock-tombstone",
+					command: `node -e 'require("node:fs").renameSync(${JSON.stringify(lockPath)}, ${JSON.stringify(tombstonePath)})'`,
+				},
+				{ sampleCount: 1, warmupCount: 0 },
+			);
+			expect(benignTombstone.passed).toBe(true);
+			expect(existsSync(tombstonePath)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("executes commands, records failures, and blocks tracked-file leaks", () => {
 		const root = createBenchExecutionFixtureRoot();
 		try {
@@ -3550,86 +3633,89 @@ describe("scenario benchmark execution", () => {
 						timing_p50_ms: 10_000,
 						timing_p95_ms: 10_000,
 					};
-					await withTaskCompletionLock(
-						root,
-						"bench-session",
-						"T-01",
-						async () => {
-							const ownerLockPath = resolveTaskCompletionLockPath(
-								root,
-								"bench-session",
-								"T-01",
-							);
-							const fencePath = `${ownerLockPath}.fence`;
-							const originalLock = readFileSync(ownerLockPath, "utf8");
-							const originalFence = readFileSync(fencePath, "utf8");
-							const relativeLockPath = ownerLockPath
-								.slice(root.length + 1)
-								.replaceAll("\\", "/");
-							const expectedLeakPath =
-								mutation.target === "fence"
-									? `${relativeLockPath}.fence`
-									: relativeLockPath;
-							try {
-								const result = withCapturedConsoleError(() =>
-									buildResult(
-										root,
-										{
-											schema_version: "1.0.0",
-											scenario_id: `bench-hostile-lock-${mutation.id}`,
-											scenario_version: "1.0.0",
-											pack_id: "pstr-integrity",
-											command: mutation.command(ownerLockPath),
-											result_schema: "1.0.0",
-											oracle: "normalized-envelope-and-threshold-check",
-											thresholds: {
-												max_duration_ms: 10_000,
-												max_p95_ms: 10_000,
-												max_output_tokens: 100,
-												min_tool_success_rate: 1,
+					await expect(
+						withTaskCompletionLock(
+							root,
+							"bench-session",
+							"T-01",
+							async () => {
+								const ownerLockPath = resolveTaskCompletionLockPath(
+									root,
+									"bench-session",
+									"T-01",
+								);
+								const ownerPath = ownerLockPath;
+								const fencePath = `${ownerLockPath}.fence`;
+								const originalLock = readFileSync(ownerPath, "utf8");
+								const originalFence = readFileSync(fencePath, "utf8");
+								const relativeLockPath = ownerLockPath
+									.slice(root.length + 1)
+									.replaceAll("\\", "/");
+								const mutationPath =
+									mutation.target === "fence" ? ownerLockPath : ownerPath;
+								const expectedLeakPath =
+									mutation.target === "fence"
+										? `${relativeLockPath}.fence`
+										: relativeLockPath;
+								try {
+									const result = withCapturedConsoleError(() =>
+										buildResult(
+											root,
+											{
+												schema_version: "1.0.0",
+												scenario_id: `bench-hostile-lock-${mutation.id}`,
+												scenario_version: "1.0.0",
+												pack_id: "pstr-integrity",
+												command: mutation.command(mutationPath),
+												result_schema: "1.0.0",
+												oracle: "normalized-envelope-and-threshold-check",
+												thresholds: {
+													max_duration_ms: 10_000,
+													max_p95_ms: 10_000,
+													max_output_tokens: 100,
+													min_tool_success_rate: 1,
+												},
+												baseline_id: "bench-v1",
+												deterministic_metrics: {},
 											},
-											baseline_id: "bench-v1",
-											deterministic_metrics: {},
-										},
-										baselinePath,
-										baseline,
-									),
-								);
-								expect(result.result.status).toBe("failed");
-								const leakReported = result.result.notes.some(
-									(note) =>
-										note.startsWith("side-effect-leak:") &&
-										note.includes(expectedLeakPath),
-								);
-								if (!leakReported) {
-									throw new Error(
-										`missing side-effect leak for ${mutation.id}: ${JSON.stringify(result.result.notes)}`,
+											baselinePath,
+											baseline,
+										),
 									);
+									expect(result.result.status).toBe("failed");
+									const leakReported = result.result.notes.some(
+										(note) =>
+											note.startsWith("side-effect-leak:") &&
+											note.includes(expectedLeakPath),
+									);
+									if (!leakReported) {
+										throw new Error(
+											`missing side-effect leak for ${mutation.id}: ${JSON.stringify(result.result.notes)}`,
+										);
+									}
+									if (mutation.target === "fence") {
+										expect(readFileSync(fencePath, "utf8")).toBe("999999\n");
+										expect(readFileSync(ownerPath, "utf8")).toBe(originalLock);
+									} else {
+										expect(readFileSync(ownerPath, "utf8")).not.toBe(
+											originalLock,
+										);
+										expect(readFileSync(fencePath, "utf8")).toBe(originalFence);
+									}
+								} finally {
+									writeFileSync(ownerPath, originalLock, "utf8");
+									writeFileSync(fencePath, originalFence, "utf8");
 								}
-								if (mutation.target === "fence") {
-									expect(readFileSync(fencePath, "utf8")).toBe("999999\n");
-									expect(readFileSync(ownerLockPath, "utf8")).toBe(
-										originalLock,
-									);
-								} else {
-									expect(readFileSync(ownerLockPath, "utf8")).not.toBe(
-										originalLock,
-									);
-									expect(readFileSync(fencePath, "utf8")).toBe(originalFence);
-								}
-							} finally {
-								writeFileSync(ownerLockPath, originalLock, "utf8");
-								writeFileSync(fencePath, originalFence, "utf8");
-							}
-						},
-						{ heartbeatMs: 60_000 },
-					);
+							},
+							{ heartbeatMs: 60_000 },
+						),
+					).rejects.toThrow("ownership was lost");
 					const ownerLockPath = resolveTaskCompletionLockPath(
 						root,
 						"bench-session",
 						"T-01",
 					);
-					expect(existsSync(ownerLockPath)).toBe(false);
+					expect(existsSync(ownerLockPath)).toBe(true);
 				} finally {
 					rmSync(root, { recursive: true, force: true });
 				}
@@ -3652,64 +3738,67 @@ describe("scenario benchmark execution", () => {
 					timing_p50_ms: 10_000,
 					timing_p95_ms: 10_000,
 				};
-				await withTaskCompletionLock(
-					root,
-					"bench-session",
-					"T-01",
-					async () => {
-						ownerLockPath = resolveTaskCompletionLockPath(
-							root,
-							"bench-session",
-							"T-01",
-						);
-						const original = readFileSync(ownerLockPath, "utf8");
-						const replacementPath = `${ownerLockPath}.hostile-replacement`;
-						const replaceOwner =
-							process.platform === "win32"
-								? "try { fs.renameSync(replacement,p); } catch (error) { if (error.code !== 'EPERM') throw error; fs.unlinkSync(p); fs.renameSync(replacement,p); }"
-								: "fs.renameSync(replacement,p)";
-						const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerLockPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); ${replaceOwner}'`;
-						const result = withCapturedConsoleError(() =>
-							buildResult(
+				await expect(
+					withTaskCompletionLock(
+						root,
+						"bench-session",
+						"T-01",
+						async () => {
+							ownerLockPath = resolveTaskCompletionLockPath(
 								root,
-								{
-									schema_version: "1.0.0",
-									scenario_id: "bench-hostile-lock-atomic-replacement",
-									scenario_version: "1.0.0",
-									pack_id: "pstr-integrity",
-									command,
-									result_schema: "1.0.0",
-									oracle: "normalized-envelope-and-threshold-check",
-									thresholds: {
-										max_duration_ms: 10_000,
-										max_p95_ms: 10_000,
-										max_output_tokens: 100,
-										min_tool_success_rate: 1,
+								"bench-session",
+								"T-01",
+							);
+							const ownerPath = ownerLockPath;
+							const original = readFileSync(ownerPath, "utf8");
+							const replacementPath = `${ownerPath}.hostile-replacement`;
+							const replaceOwner =
+								process.platform === "win32"
+									? "try { fs.renameSync(replacement,p); } catch (error) { if (error.code !== 'EPERM') throw error; fs.unlinkSync(p); fs.renameSync(replacement,p); }"
+									: "fs.renameSync(replacement,p)";
+							const command = `node -e 'const fs=require("node:fs"); const p=${JSON.stringify(ownerPath)}; const replacement=${JSON.stringify(replacementPath)}; const value=fs.readFileSync(p,"utf8"); fs.writeFileSync(replacement,value,"utf8"); ${replaceOwner}'`;
+							const result = withCapturedConsoleError(() =>
+								buildResult(
+									root,
+									{
+										schema_version: "1.0.0",
+										scenario_id: "bench-hostile-lock-atomic-replacement",
+										scenario_version: "1.0.0",
+										pack_id: "pstr-integrity",
+										command,
+										result_schema: "1.0.0",
+										oracle: "normalized-envelope-and-threshold-check",
+										thresholds: {
+											max_duration_ms: 10_000,
+											max_p95_ms: 10_000,
+											max_output_tokens: 100,
+											min_tool_success_rate: 1,
+										},
+										baseline_id: "bench-v1",
+										deterministic_metrics: {},
 									},
-									baseline_id: "bench-v1",
-									deterministic_metrics: {},
-								},
-								baselinePath,
-								baseline,
-							),
-						);
-						const relativeLockPath = ownerLockPath
-							.slice(root.length + 1)
-							.replaceAll("\\", "/");
-						expect(result.result.status).toBe("failed");
-						expect(
-							result.result.notes.some((note) =>
-								note.includes(`side-effect-leak:${relativeLockPath}`),
-							),
-						).toBe(true);
-						expect(readFileSync(ownerLockPath, "utf8")).toBe(original);
-					},
-					{ heartbeatMs: 60_000 },
-				);
-				// POSIX rename replaces the inode, so cleanup must preserve the foreign
-				// file. Windows may replace contents while retaining the owned open file;
-				// the final descriptor probe proves that cleanup is safe in that case.
-				expect(existsSync(ownerLockPath)).toBe(process.platform !== "win32");
+									baselinePath,
+									baseline,
+								),
+							);
+							const relativeLockPath = ownerLockPath
+								.slice(root.length + 1)
+								.replaceAll("\\", "/");
+							const relativeOwnerPath = relativeLockPath;
+							expect(result.result.status).toBe("failed");
+							expect(
+								result.result.notes.some((note) =>
+									note.includes(`side-effect-leak:${relativeOwnerPath}`),
+								),
+							).toBe(true);
+							expect(readFileSync(ownerPath, "utf8")).toBe(original);
+						},
+						{ heartbeatMs: 60_000 },
+					),
+				).rejects.toThrow("ownership was lost");
+				// Replaced owner metadata remains for explicit recovery; cleanup cannot
+				// claim ownership after the owner inode changes.
+				expect(existsSync(ownerLockPath)).toBe(true);
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 			}
@@ -3734,55 +3823,59 @@ describe("scenario benchmark execution", () => {
 					timing_p95_ms: 10_000,
 				};
 				let ownerLockPath = "";
-				await withTaskCompletionLock(
-					root,
-					"bench-session",
-					"T-01",
-					async () => {
-						ownerLockPath = resolveTaskCompletionLockPath(
-							root,
-							"bench-session",
-							"T-01",
-						);
-						const command = `node -e 'const fs=require("node:fs"); const p=".afol/wb/.locks"; try { const stat=fs.lstatSync(p); if (stat.isSymbolicLink()) fs.unlinkSync(p); else fs.rmSync(p,{recursive:true,force:true}); } catch {} fs.symlinkSync(${JSON.stringify(target)},p,"dir")'`;
-						const result = withCapturedConsoleError(() =>
-							buildResult(
+				await expect(
+					withTaskCompletionLock(
+						root,
+						"bench-session",
+						"T-01",
+						async () => {
+							ownerLockPath = resolveTaskCompletionLockPath(
 								root,
-								{
-									schema_version: "1.0.0",
-									scenario_id: "bench-lock-root-symlink",
-									scenario_version: "1.0.0",
-									pack_id: "pstr-integrity",
-									command,
-									result_schema: "1.0.0",
-									oracle: "normalized-envelope-and-threshold-check",
-									thresholds: {
-										max_duration_ms: 10_000,
-										max_p95_ms: 10_000,
-										max_output_tokens: 100,
-										min_tool_success_rate: 1,
+								"bench-session",
+								"T-01",
+							);
+							const command = `node -e 'const fs=require("node:fs"); const p=".afol/wb/.locks"; try { const stat=fs.lstatSync(p); if (stat.isSymbolicLink()) fs.unlinkSync(p); else fs.rmSync(p,{recursive:true,force:true}); } catch {} fs.symlinkSync(${JSON.stringify(target)},p,"dir")'`;
+							const result = withCapturedConsoleError(() =>
+								buildResult(
+									root,
+									{
+										schema_version: "1.0.0",
+										scenario_id: "bench-lock-root-symlink",
+										scenario_version: "1.0.0",
+										pack_id: "pstr-integrity",
+										command,
+										result_schema: "1.0.0",
+										oracle: "normalized-envelope-and-threshold-check",
+										thresholds: {
+											max_duration_ms: 10_000,
+											max_p95_ms: 10_000,
+											max_output_tokens: 100,
+											min_tool_success_rate: 1,
+										},
+										baseline_id: "bench-v1",
+										deterministic_metrics: {},
 									},
-									baseline_id: "bench-v1",
-									deterministic_metrics: {},
-								},
-								baselinePath,
-								baseline,
-							),
-						);
-						expect(result.result.status).toBe("failed");
-						expect(
-							result.result.notes.some((note) =>
-								note.startsWith("side-effect-leak:.afol/wb/.locks"),
-							),
-						).toBe(true);
-						expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(false);
-						expect(readFileSync(join(target, "preserve.txt"), "utf8")).toBe(
-							"preserve\n",
-						);
-						expect(existsSync(ownerLockPath)).toBe(false);
-					},
-					{ heartbeatMs: 60_000 },
-				);
+									baselinePath,
+									baseline,
+								),
+							);
+							expect(result.result.status).toBe("failed");
+							expect(
+								result.result.notes.some((note) =>
+									note.startsWith("side-effect-leak:.afol/wb/.locks"),
+								),
+							).toBe(true);
+							expect(existsSync(join(root, ".afol", "wb", ".locks"))).toBe(
+								false,
+							);
+							expect(readFileSync(join(target, "preserve.txt"), "utf8")).toBe(
+								"preserve\n",
+							);
+							expect(existsSync(ownerLockPath)).toBe(false);
+						},
+						{ heartbeatMs: 60_000 },
+					),
+				).rejects.toThrow("ownership was lost");
 				// Replacing the root destroyed the owner's inode. Cleanup removes only
 				// the hostile symlink and does not claim that the owner survived.
 				expect(existsSync(ownerLockPath)).toBe(false);

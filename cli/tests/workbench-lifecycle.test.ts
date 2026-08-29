@@ -7521,4 +7521,81 @@ describe("durable lifecycle auxiliary failures", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("transition admission close is opt-in while normal close stays strict", () => {
+		const root = mkRoot("transition-admit-close");
+		try {
+			const created = newWorkstream(root, "transition admission close", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const originalTask = readFileSync(created.taskPath, "utf8");
+			const original = loadEvidenceEntries(created.evidencePath)[0];
+			writeFileSync(
+				created.evidencePath,
+				`${JSON.stringify({
+					...original,
+					command: "true",
+					result: "failed",
+					exit_code: 1,
+					provenance: "observed",
+				})}\n`,
+			);
+
+			expect(() => closeSession(root, created.session)).toThrow(
+				"failed strict verification",
+			);
+			const admission = transitionAdmitEvidence(
+				root,
+				{
+					sessionId: created.session,
+					taskId: "T-01",
+					policy: "no-op-evidence-v1",
+					issue: "AFOL-96",
+					approval: "approved transition close",
+					confirm: true,
+				},
+				{ allowOpen: true },
+			);
+			expect(admission.written).toBe(true);
+			expect(() => closeSession(root, created.session)).toThrow(
+				"failed strict verification",
+			);
+			const mutatedTask = originalTask.replace(
+				"Execute requested lifecycle work.",
+				"mutated after admission; Execute requested lifecycle work.",
+			);
+			expect(mutatedTask).not.toBe(originalTask);
+			writeFileSync(created.taskPath, mutatedTask);
+			expect(() =>
+				closeSession(root, created.session, {
+					admitTransitionAdmission: true,
+				}),
+			).toThrow("failed strict verification");
+			writeFileSync(created.taskPath, originalTask);
+			closeSession(root, created.session, {
+				admitTransitionAdmission: true,
+			});
+			expect(isSessionClosed(root, created.session)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

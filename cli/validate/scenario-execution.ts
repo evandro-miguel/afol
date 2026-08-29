@@ -77,6 +77,8 @@ const WORKBENCH_SANDBOX_CONTRACT_FILES = [
 ] as const;
 const COMPLETION_LOCKS_ROOT = ".afol/wb/.locks";
 const COMPLETION_LOCK_FILE_RE = /^completion-[a-f0-9]{64}\.lock(?:\.fence)?$/;
+const COMPLETION_LOCK_TOMBSTONE_RE =
+	/^completion-[a-f0-9]{64}\.lock\.tombstone-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const RUNTIME_STATE_GUARD_PATHS = [
 	".afol/state",
 	".afol/data/events",
@@ -976,16 +978,47 @@ function hashFile(path: string): string {
 }
 
 function statIdentity(stat: Stats): string {
-	return `${stat.dev}:${stat.ino}`;
+	return `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`;
 }
 
 function expectedCompletionLockFile(path: string): "lock" | "fence" | null {
 	const prefix = `${COMPLETION_LOCKS_ROOT}/`;
 	if (!path.startsWith(prefix)) return null;
 	const relativePath = path.slice(prefix.length);
-	if (relativePath.includes("/") || !COMPLETION_LOCK_FILE_RE.test(relativePath))
-		return null;
-	return relativePath.endsWith(".lock.fence") ? "fence" : "lock";
+	if (
+		!relativePath.includes("/") &&
+		COMPLETION_LOCK_FILE_RE.test(relativePath)
+	) {
+		return relativePath.endsWith(".lock.fence") ? "fence" : "lock";
+	}
+	return null;
+}
+
+function isCompletionLockTombstonePath(path: string): boolean {
+	const prefix = `${COMPLETION_LOCKS_ROOT}/`;
+	if (!path.startsWith(prefix)) return false;
+	const relativePath = path.slice(prefix.length);
+	return (
+		!relativePath.includes("/") &&
+		COMPLETION_LOCK_TOMBSTONE_RE.test(relativePath)
+	);
+}
+
+function isCompletionLockTombstoneFor(
+	lockPath: string,
+	tombstonePath: string,
+): boolean {
+	return (
+		isCompletionLockTombstonePath(tombstonePath) &&
+		tombstonePath.startsWith(`${lockPath}.tombstone-`)
+	);
+}
+
+function isManagedCompletionLockPath(path: string): boolean {
+	return (
+		expectedCompletionLockFile(path) !== null ||
+		isCompletionLockTombstonePath(path)
+	);
 }
 
 function parseCompletionLockMetadata(
@@ -1085,12 +1118,13 @@ function completionLockStateSnapshot(projectRoot: string): CompletionLockState {
 					entries.push({ type: "symlink", path, identity });
 				} else if (stat.isFile()) {
 					const raw = readFileSync(absolutePath);
+					const expectedKind = expectedCompletionLockFile(path);
 					entries.push({
 						type: "regular",
 						path,
 						identity,
 						fingerprint: createHash("sha256").update(raw).digest("hex"),
-						...(expectedCompletionLockFile(path) === "lock"
+						...(expectedKind === "lock" || isCompletionLockTombstonePath(path)
 							? {
 									metadata: parseCompletionLockMetadata(raw.toString("utf8")),
 								}
@@ -1165,10 +1199,48 @@ function completionLockChangedPaths(
 	const afterByPath = new Map(
 		after.entries.map((entry) => [entry.path, entry]),
 	);
+	const benignTombstoneIdentities = new Set<string>();
+	for (const beforeEntry of before.entries) {
+		if (
+			beforeEntry.identity === undefined ||
+			expectedCompletionLockFile(beforeEntry.path) !== "lock" ||
+			afterByPath.has(beforeEntry.path) ||
+			beforeEntry.metadata === undefined ||
+			beforeEntry.metadata === null
+		) {
+			continue;
+		}
+		const beforeMetadata = beforeEntry.metadata;
+		const tombstone = after.entries.find((afterEntry) => {
+			const afterMetadata = afterEntry.metadata;
+			return (
+				afterEntry.identity === beforeEntry.identity &&
+				afterEntry.type === "regular" &&
+				isCompletionLockTombstoneFor(beforeEntry.path, afterEntry.path) &&
+				afterMetadata !== undefined &&
+				afterMetadata !== null &&
+				immutableCompletionMetadataMatches(beforeMetadata, afterMetadata)
+			);
+		});
+		if (tombstone !== undefined) {
+			benignTombstoneIdentities.add(beforeEntry.identity);
+		}
+	}
 	for (const path of new Set([...beforeByPath.keys(), ...afterByPath.keys()])) {
 		const beforeEntry = beforeByPath.get(path);
 		const afterEntry = afterByPath.get(path);
-		if (!beforeEntry || !afterEntry || beforeEntry.type !== afterEntry.type) {
+		if (!beforeEntry || !afterEntry) {
+			const entry = beforeEntry ?? afterEntry;
+			if (
+				entry?.identity !== undefined &&
+				benignTombstoneIdentities.has(entry.identity)
+			) {
+				continue;
+			}
+			changed.add(path);
+			continue;
+		}
+		if (beforeEntry.type !== afterEntry.type) {
 			changed.add(path);
 			continue;
 		}
@@ -1215,7 +1287,7 @@ function cleanupAddedCompletionLockEntries(
 		.filter((entry) => !beforePaths.has(entry.path))
 		.sort((left, right) => right.path.length - left.path.length);
 	for (const entry of additions) {
-		if (expectedCompletionLockFile(entry.path)) continue;
+		if (isManagedCompletionLockPath(entry.path)) continue;
 		const absolutePath = join(projectRoot, entry.path);
 		try {
 			const stat = lstatSync(absolutePath);

@@ -434,12 +434,27 @@ describe("session-lock", () => {
 			const replacementIno = statSync(witnessPath).ino;
 			const buffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2);
 			const signals = new Int32Array(buffer);
-			const worker = runReplaceAfterReclaimWorker(
-				lockPath,
-				replacementPath,
-				buffer,
-			);
-			waitForSignal(signals, REPLACE_READY);
+			let worker: Promise<void> | null = null;
+			const beforeStaleLockIdentityCheck =
+				process.platform === "win32"
+					? () => {
+							unlinkSync(lockPath);
+							linkSync(replacementPath, lockPath);
+							unlinkSync(replacementPath);
+							Atomics.store(signals, REPLACE_DONE, 1);
+						}
+					: undefined;
+			const sessionLockOptions = beforeStaleLockIdentityCheck
+				? { beforeStaleLockIdentityCheck }
+				: undefined;
+			if (process.platform !== "win32") {
+				worker = runReplaceAfterReclaimWorker(
+					lockPath,
+					replacementPath,
+					buffer,
+				);
+				waitForSignal(signals, REPLACE_READY);
+			}
 
 			let acquired = false;
 			let thrown: unknown;
@@ -447,15 +462,22 @@ describe("session-lock", () => {
 				withPatchedDateNow(
 					Date.now(),
 					() =>
-						withSessionLock(root, session, () => {
-							acquired = true;
-						}),
+						withSessionLock(
+							root,
+							session,
+							() => {
+								acquired = true;
+							},
+							sessionLockOptions,
+						),
 					31_000,
 				);
 			} catch (error) {
 				thrown = error;
 			}
-			await worker;
+			if (worker !== null) {
+				await worker;
+			}
 
 			expect(Atomics.load(signals, REPLACE_DONE)).toBe(1);
 			expect(acquired).toBe(false);

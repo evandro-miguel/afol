@@ -86,7 +86,7 @@
 			"governance pending [--all] [--json]",
 			"governance gov rs -S <id> -F <F-id> -P <spec-id>",
 			"governance gov rs -S <id> --no-spec-required -r \"<reason>\"",
-			"governance gov af -F <F-id>",
+			"governance gov af -F <F-id> [-P <spec-id>]",
 			"governance bulk-waive --reason \"<text>\" [--limit N] [--dry-run] [--json]",
 			"governance bulk-waive --reason \"<text>\" --session <id> [--session <id2>...]",
 			"governance repair-index",

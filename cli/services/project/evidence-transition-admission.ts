@@ -7,7 +7,6 @@ import { withSessionLock } from "../io/session-lock";
 import { isSessionClosed } from "../workbench/session-lifecycle-state";
 import { loadEvidenceEntries, sessionPaths } from "../workbench/session-reader";
 import {
-	evidenceResultIsSuccess,
 	isNoopExecutionCommand,
 	verifyWorkbenchTasks,
 } from "../workbench/verify";
@@ -148,6 +147,10 @@ export type TransitionAdmitInput = {
 	approval: string;
 	confirm: boolean;
 };
+export type TransitionAdmitOptions = {
+	/** The combined opt-in route may admit a terminal open session before close. */
+	allowOpen?: boolean;
+};
 export type TransitionAdmitResult = {
 	dry_run: boolean;
 	written: boolean;
@@ -159,6 +162,7 @@ export type TransitionAdmitResult = {
 export function transitionAdmitEvidence(
 	root: string,
 	input: TransitionAdmitInput,
+	options: TransitionAdmitOptions = {},
 ): TransitionAdmitResult {
 	const sessionId = input.sessionId.trim();
 	const taskId = input.taskId.trim();
@@ -180,7 +184,7 @@ export function transitionAdmitEvidence(
 	const paths = sessionPaths(root, sessionId);
 	if (!existsSync(paths.sessionDir))
 		throw new Error(`Session folder not found: ${paths.sessionDir}`);
-	if (!isSessionClosed(root, sessionId))
+	if (!isSessionClosed(root, sessionId) && !options.allowOpen)
 		throw new Error(
 			`Session ${sessionId} is not closed; transition-admit only applies to closed sessions.`,
 		);
@@ -190,20 +194,18 @@ export function transitionAdmitEvidence(
 			throw new Error(
 				`Session ${sessionId} has open tasks; refuse transition-admit.`,
 			);
-		const matching = verification.issues.filter(
-			(issue) => issue.taskId === taskId,
-		);
-		const evidenceIssues = matching.filter(
+		const evidenceIssues = verification.issues.filter(
 			(issue) =>
-				issue.type === "missing_evidence" || issue.type === "failed_evidence",
+				issue.taskId === taskId &&
+				(issue.type === "missing_evidence" || issue.type === "failed_evidence"),
 		);
-		if (evidenceIssues.length !== 1)
+		if (
+			evidenceIssues.length !== 1 ||
+			evidenceIssues[0]?.taskId !== taskId ||
+			verification.issues.length !== 1
+		)
 			throw new Error(
-				`Task ${taskId} must have exactly one missing or failed evidence issue to admit.`,
-			);
-		if (matching.some((issue) => !evidenceIssues.includes(issue)))
-			throw new Error(
-				`Task ${taskId} has debt outside missing or failed evidence; transition-admit refuses it.`,
+				`Task ${taskId} must have exactly one eligible missing or failed evidence issue to admit.`,
 			);
 		const issue = evidenceIssues[0];
 		if (!issue?.file)
@@ -211,17 +213,21 @@ export function transitionAdmitEvidence(
 		const board = stateBoardHash(issue.file);
 		if (!board) throw new Error(`Cannot hash State Board for ${taskId}.`);
 		const ledger = evidenceLedger(issue.file, paths.sessionDir);
+		const observedEntries = loadEvidenceEntries(
+			join(paths.sessionDir, ".evidence.jsonl"),
+		).filter(
+			(entry) => entry.task_id === taskId && entry.provenance === "observed",
+		);
+		const eligibleNoopEntries = observedEntries.filter(
+			(entry) =>
+				typeof entry.exit_code === "number" &&
+				typeof entry.command === "string" &&
+				isNoopExecutionCommand(entry.command),
+		);
 		const causedByNoopPolicyTransition =
 			ledger.present &&
-			loadEvidenceEntries(join(paths.sessionDir, ".evidence.jsonl")).some(
-				(entry) =>
-					entry.task_id === taskId &&
-					entry.provenance === "observed" &&
-					entry.exit_code === 0 &&
-					evidenceResultIsSuccess(entry.result) &&
-					typeof entry.command === "string" &&
-					isNoopExecutionCommand(entry.command),
-			);
+			observedEntries.length === 1 &&
+			eligibleNoopEntries.length === 1;
 		if (!causedByNoopPolicyTransition) {
 			throw new Error(
 				`Task ${taskId} is not debt caused by the registered no-op evidence policy transition.`,
