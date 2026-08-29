@@ -11,9 +11,9 @@ hide the factory history, other branches, or internal `.afol/` records.
 Create the public source tree only through the allowlisted export:
 
 ```bash
-rm -rf ../afol-public-candidate
-bun run public:export -- ../afol-public-candidate
-cd ../afol-public-candidate
+TARGET="$(mktemp -d ../afol-public-candidate.XXXXXX)"
+bun run public:export -- "$TARGET"
+cd "$TARGET"
 bun run public:audit
 ```
 

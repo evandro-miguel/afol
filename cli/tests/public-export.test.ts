@@ -141,6 +141,29 @@ describe("public export boundary", () => {
 		},
 	);
 
+	test("audit permits explicitly annotated synthetic fixtures", () => {
+		const root = mkdtempSync(join(tmpdir(), "public-audit-allowed-"));
+		try {
+			writeFileSync(
+				join(root, "fixtures.txt"),
+				[
+					"public-audit-allow: credentialed-url",
+					"public-audit-allow: windows-home-path",
+					"public-audit-allow: linux-home-path",
+					["https://", "user:placeholder@", "example.test/path"].join(""),
+					["C:", "\\\\", "Users", "\\\\", "Fixture", "\\\\", "repo"].join(""),
+					["/", "home", "/", "fixture", "/", "repo"].join(""),
+				].join("\n"),
+			);
+
+			const result = runBun(auditScript, [root], repoRoot);
+			expect(result.status).toBe(0);
+			expect(outputOf(result)).toContain("public content audit passed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test.skipIf(process.platform === "win32")(
 		"rejects relative and absolute symlinks during export",
 		() => {

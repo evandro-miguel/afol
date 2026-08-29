@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 // public-audit-allow: bearer-token synthetic redaction fixture
 // public-audit-allow: linux-home-path synthetic path fixture
+// public-audit-allow: windows-home-path synthetic path fixture
 import { spawnSync } from "node:child_process";
 import {
 	chmodSync,

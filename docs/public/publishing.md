@@ -28,8 +28,7 @@ The final command must print nothing. Record the exact SHA and command results.
 From the validated private checkout:
 
 ```bash
-TARGET="../afol-public-candidate"
-rm -rf "$TARGET"
+TARGET="$(mktemp -d ../afol-public-candidate.XXXXXX)"
 bun run public:export -- "$TARGET"
 cd "$TARGET"
 bun run public:audit

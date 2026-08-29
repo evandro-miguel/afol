@@ -15,8 +15,7 @@
   documented local engineering contract.
 - AFOL is not a multi-user authentication or sandbox boundary.
 - Bun is required to build and test from source.
-- The transition-admission repair path has a known terminal-session limitation
-  tracked in issue #96.
+- The transition-admission repair path has a known terminal-session limitation.
 - Evolution, fleet, memory/library adoption, telemetry, receipts, and provider
   adapters are outside the stable alpha contract.
 - Coverage numbers in engineering notes apply to selected surfaces unless a

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 // public-audit-allow: bearer-token synthetic redaction fixture
+// public-audit-allow: credentialed-url synthetic URL fixture
 import { execFileSync, spawnSync } from "node:child_process";
 import {
 	existsSync,

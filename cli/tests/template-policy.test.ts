@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// public-audit-allow: linux-home-path synthetic path fixture
 import {
 	existsSync,
 	mkdirSync,
