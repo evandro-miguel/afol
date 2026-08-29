@@ -24,6 +24,10 @@ Intent -> Spec -> Task -> Execution -> Evidence -> Close
 
 ## Install from source
 
+The public `afol.public` repository is the canonical engine and release source.
+A private factory checkout may retain governance and export sanitized source,
+but builds and release validation must run from a clean `afol.public` checkout.
+
 Build with the pinned Bun toolchain:
 
 ```bash

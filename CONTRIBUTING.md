@@ -30,8 +30,10 @@ bun run validate:release
 
 Security checks include Gitleaks and OSV Scanner. Do not commit generated drift.
 Documentation changes should preserve working relative links and valid Markdown
-structure. All release evidence is produced locally against the exact
-candidate SHA; this repository has no hosted CI workflow under ADR-009.
+structure. All release evidence is produced locally against the exact public
+`afol.public` candidate SHA; a private factory checkout is only the governance
+and export-factory surface. This repository has no hosted CI workflow under
+ADR-009.
 
 ## Security and privacy
 
