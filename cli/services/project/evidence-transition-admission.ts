@@ -7,6 +7,7 @@ import { withSessionLock } from "../io/session-lock";
 import { isSessionClosed } from "../workbench/session-lifecycle-state";
 import { loadEvidenceEntries, sessionPaths } from "../workbench/session-reader";
 import {
+	evidenceResultIsSuccess,
 	isNoopExecutionCommand,
 	verifyWorkbenchTasks,
 } from "../workbench/verify";
@@ -107,7 +108,7 @@ export function admitsEvidenceTransitionIssue(
 ): boolean {
 	if (
 		hasOpenTasks ||
-		(issue.type !== "missing_evidence" && issue.type !== "failed_evidence") ||
+		issue.type !== "missing_evidence" ||
 		!issue.taskId ||
 		!issue.file
 	)
@@ -195,9 +196,7 @@ export function transitionAdmitEvidence(
 				`Session ${sessionId} has open tasks; refuse transition-admit.`,
 			);
 		const evidenceIssues = verification.issues.filter(
-			(issue) =>
-				issue.taskId === taskId &&
-				(issue.type === "missing_evidence" || issue.type === "failed_evidence"),
+			(issue) => issue.taskId === taskId && issue.type === "missing_evidence",
 		);
 		if (
 			evidenceIssues.length !== 1 ||
@@ -205,7 +204,7 @@ export function transitionAdmitEvidence(
 			verification.issues.length !== 1
 		)
 			throw new Error(
-				`Task ${taskId} must have exactly one eligible missing or failed evidence issue to admit.`,
+				`Task ${taskId} must have exactly one eligible missing evidence issue to admit.`,
 			);
 		const issue = evidenceIssues[0];
 		if (!issue?.file)
@@ -220,7 +219,8 @@ export function transitionAdmitEvidence(
 		);
 		const eligibleNoopEntries = observedEntries.filter(
 			(entry) =>
-				typeof entry.exit_code === "number" &&
+				entry.exit_code === 0 &&
+				evidenceResultIsSuccess(entry.result) &&
 				typeof entry.command === "string" &&
 				isNoopExecutionCommand(entry.command),
 		);
@@ -237,7 +237,7 @@ export function transitionAdmitEvidence(
 			policy_id: TRANSITION_ADMISSION_POLICY,
 			session_id: sessionId,
 			task_id: taskId,
-			issue_type: issue.type as "missing_evidence" | "failed_evidence",
+			issue_type: "missing_evidence",
 			state_board_sha256: board,
 			evidence_ledger_sha256: ledger.hash,
 			evidence_ledger_present: ledger.present,
@@ -252,6 +252,7 @@ export function transitionAdmitEvidence(
 		const admissions = (current?.admissions ?? []).filter(
 			(entry) =>
 				!(
+					entry.issue_type === "missing_evidence" &&
 					entry.session_id === admission.session_id &&
 					entry.task_id === admission.task_id
 				),

@@ -1918,16 +1918,6 @@ export function assertClosedTaskReverificationEligible(
 			`Task ${input.taskId} is ${task.state}; reverify only accepts closed done tasks.`,
 		);
 	}
-	const issue = verifyWorkbenchTasks(paths.sessionDir, true).issues.find(
-		(entry) =>
-			entry.taskId === input.taskId &&
-			(entry.type === "missing_evidence" || entry.type === "failed_evidence"),
-	);
-	if (!issue) {
-		throw new Error(
-			`Task ${input.taskId} has no missing or failed evidence eligible for reverify.`,
-		);
-	}
 }
 
 export function recordClosedTaskReverification(

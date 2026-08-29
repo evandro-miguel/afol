@@ -17,9 +17,12 @@ import {
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
-import { evidenceTransitionAdmissionPath } from "../services/project/evidence-transition-admission";
+import {
+	evidenceTransitionAdmissionPath,
+	loadEvidenceTransitionAdmissions,
+} from "../services/project/evidence-transition-admission";
 import { LEGACY_EVIDENCE_BASELINE_FILE } from "../services/project/legacy-evidence-baseline";
-import { isSessionClosed } from "../services/workbench/lifecycle";
+import { closeSession, isSessionClosed } from "../services/workbench/lifecycle";
 
 type CapturedIo = {
 	stdout: string[];
@@ -95,6 +98,34 @@ function rebuildIndexes(root: string): void {
 
 function baselinePath(root: string): string {
 	return join(root, ".afol", "adm", "source", LEGACY_EVIDENCE_BASELINE_FILE);
+}
+
+function writeHistoricalFailedTransitionAdmission(root: string): void {
+	writeFileSync(
+		evidenceTransitionAdmissionPath(root),
+		`${JSON.stringify(
+			{
+				schema_version: 1,
+				policy_id: "no-op-evidence-v1",
+				admissions: [
+					{
+						policy_id: "no-op-evidence-v1",
+						session_id: "260718_1557_historical-failed",
+						task_id: "T-01",
+						issue_type: "failed_evidence",
+						state_board_sha256: "a".repeat(64),
+						evidence_ledger_sha256: "b".repeat(64),
+						evidence_ledger_present: true,
+						issue: "https://example.invalid/historical-failed",
+						approval: "historical record",
+					},
+				],
+			},
+			null,
+			2,
+		)}\n`,
+		"utf8",
+	);
 }
 
 function writeClosedSession(
@@ -244,6 +275,80 @@ describe("afol evidence admit", () => {
 		}
 	});
 
+	test("historical failed transition rows remain readable without strict failure", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-legacy-read";
+		try {
+			writeClosedSession(
+				root,
+				session,
+				["| T-01 | done | worker | verified task |"],
+				{
+					evidenceLines: [
+						JSON.stringify({
+							task_id: "T-01",
+							command: "bun test cli/tests/evidence-admit.test.ts",
+							result: "passed",
+							exit_code: 0,
+							id: "E-transition-legacy-read",
+							created_at: "2026-08-18T16:20:00.000Z",
+							provenance: "observed",
+						}),
+					],
+				},
+			);
+			writeHistoricalFailedTransitionAdmission(root);
+			rebuildIndexes(root);
+
+			const loaded = loadEvidenceTransitionAdmissions(root);
+			expect(loaded?.admissions).toHaveLength(1);
+			expect(loaded?.admissions[0]?.issue_type).toBe("failed_evidence");
+
+			const captured = captureIo();
+			const code = await runValidateCommand(
+				root,
+				["--strict", "--json"],
+				captured.io,
+			);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				report?: { ok?: boolean };
+			};
+			expect(payload.report?.ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("failed evidence cannot authorize transition admission close", () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-failed-close";
+		try {
+			writeOpenSession(root, session);
+			writeFileSync(
+				join(root, ".afol", "wb", session, ".evidence.jsonl"),
+				`${JSON.stringify({
+					task_id: "T-01",
+					command: "bun test",
+					result: "failed",
+					exit_code: 1,
+					id: "E-transition-failed-close",
+					created_at: "2026-08-18T16:20:00.000Z",
+					provenance: "observed",
+				})}\n`,
+				"utf8",
+			);
+			rebuildIndexes(root);
+
+			expect(() =>
+				closeSession(root, session, { admitTransitionAdmission: true }),
+			).toThrow("failed strict verification");
+			expect(isSessionClosed(root, session)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("transition-admit admits and closes one terminal post-cutoff debt", async () => {
 		const root = createFixture();
 		const session = "260818_1620_transition-open";
@@ -254,14 +359,15 @@ describe("afol evidence admit", () => {
 				`${JSON.stringify({
 					task_id: "T-01",
 					command: "true",
-					result: "failed",
-					exit_code: 1,
-					id: "E-transition-failed",
+					result: "passed",
+					exit_code: 0,
+					id: "E-transition-noop",
 					created_at: "2026-08-18T16:20:00.000Z",
 					provenance: "observed",
 				})}\n`,
 				"utf8",
 			);
+			writeHistoricalFailedTransitionAdmission(root);
 			rebuildIndexes(root);
 
 			const result = await captureEvidenceCommand(root, [
@@ -287,9 +393,14 @@ describe("afol evidence admit", () => {
 			) as { admissions: Array<Record<string, unknown>> };
 			expect(admission.admissions).toEqual([
 				expect.objectContaining({
-					session_id: session,
+					session_id: "260718_1557_historical-failed",
 					task_id: "T-01",
 					issue_type: "failed_evidence",
+				}),
+				expect.objectContaining({
+					session_id: session,
+					task_id: "T-01",
+					issue_type: "missing_evidence",
 					approval: "approved transition repair",
 				}),
 			]);
@@ -323,9 +434,9 @@ describe("afol evidence admit", () => {
 				`${JSON.stringify({
 					task_id: "T-01",
 					command: "true",
-					result: "failed",
-					exit_code: 1,
-					id: "E-transition-retry",
+					result: "passed",
+					exit_code: 0,
+					id: "E-transition-retry-noop",
 					created_at: "2026-08-18T16:20:00.000Z",
 					provenance: "observed",
 				})}\n`,
@@ -374,19 +485,19 @@ describe("afol evidence admit", () => {
 				),
 				"utf8",
 			);
-			const failed = (taskId: string) =>
+			const noopSuccess = (taskId: string) =>
 				JSON.stringify({
 					task_id: taskId,
 					command: "true",
-					result: "failed",
-					exit_code: 1,
+					result: "passed",
+					exit_code: 0,
 					id: `E-transition-${taskId}`,
 					created_at: "2026-08-18T16:20:00.000Z",
 					provenance: "observed",
 				});
 			writeFileSync(
 				join(root, ".afol", "wb", session, ".evidence.jsonl"),
-				`${failed("T-01")}\n${failed("T-02")}\n`,
+				`${noopSuccess("T-01")}\n${noopSuccess("T-02")}\n`,
 				"utf8",
 			);
 			rebuildIndexes(root);
@@ -417,19 +528,24 @@ describe("afol evidence admit", () => {
 		const session = "260818_1620_transition-mixed-ledger";
 		try {
 			writeOpenSession(root, session);
-			const failed = (id: string, command: string) =>
+			const evidence = (
+				id: string,
+				command: string,
+				result: string,
+				exit_code: number,
+			) =>
 				JSON.stringify({
 					task_id: "T-01",
 					command,
-					result: "failed",
-					exit_code: 1,
+					result,
+					exit_code,
 					id,
 					created_at: "2026-08-18T16:20:00.000Z",
 					provenance: "observed",
 				});
 			writeFileSync(
 				join(root, ".afol", "wb", session, ".evidence.jsonl"),
-				`${failed("E-transition-noop", "true")}\n${failed("E-transition-real", "bun test cli/tests/evidence-admit.test.ts")}\n`,
+				`${evidence("E-transition-noop", "true", "passed", 0)}\n${evidence("E-transition-real", "bun test cli/tests/evidence-admit.test.ts", "failed", 1)}\n`,
 				"utf8",
 			);
 			rebuildIndexes(root);
@@ -449,8 +565,193 @@ describe("afol evidence admit", () => {
 				"--confirm",
 			]);
 			expect(result.code).toBe(2);
-			expect(result.stderr.join("\n")).toContain("not debt caused");
+			expect(result.stderr.join("\n")).toContain("exactly one eligible");
 			expect(isSessionClosed(root, session)).toBe(false);
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit refuses a non-success no-op result", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-non-success";
+		try {
+			writeClosedSession(
+				root,
+				session,
+				["| T-01 | done | worker | terminal task |"],
+				{
+					evidenceLines: [
+						JSON.stringify({
+							task_id: "T-01",
+							command: "true",
+							result: "unknown",
+							exit_code: 0,
+							id: "E-transition-unknown",
+							created_at: "2026-08-18T16:20:00.000Z",
+							provenance: "observed",
+						}),
+					],
+				},
+			);
+			rebuildIndexes(root);
+
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"reject non-success",
+				"--confirm",
+			]);
+			expect(result.code).toBe(2);
+			expect(result.stderr.join("\n")).toContain("not debt caused");
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit refuses a successful no-op with nonzero exit", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-nonzero";
+		try {
+			writeClosedSession(
+				root,
+				session,
+				["| T-01 | done | worker | terminal task |"],
+				{
+					evidenceLines: [
+						JSON.stringify({
+							task_id: "T-01",
+							command: "true",
+							result: "passed",
+							exit_code: 1,
+							id: "E-transition-nonzero",
+							created_at: "2026-08-18T16:20:00.000Z",
+							provenance: "observed",
+						}),
+					],
+				},
+			);
+			rebuildIndexes(root);
+
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"reject nonzero exit",
+				"--confirm",
+			]);
+			expect(result.code).toBe(2);
+			expect(result.stderr.join("\n")).toContain("exactly one eligible");
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit refuses failed evidence", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-failed";
+		try {
+			writeClosedSession(
+				root,
+				session,
+				["| T-01 | done | worker | terminal task |"],
+				{
+					evidenceLines: [
+						JSON.stringify({
+							task_id: "T-01",
+							command: "true",
+							result: "failed",
+							exit_code: 1,
+							id: "E-transition-failed",
+							created_at: "2026-08-18T16:20:00.000Z",
+							provenance: "observed",
+						}),
+					],
+				},
+			);
+			rebuildIndexes(root);
+
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"reject failed evidence",
+				"--confirm",
+			]);
+			expect(result.code).toBe(2);
+			expect(result.stderr.join("\n")).toContain("exactly one eligible");
+			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition-admit refuses invalid evidence", async () => {
+		const root = createFixture();
+		const session = "260818_1620_transition-invalid";
+		try {
+			writeClosedSession(
+				root,
+				session,
+				["| T-01 | done | worker | terminal task |"],
+				{
+					evidenceLines: [
+						JSON.stringify({
+							task_id: "T-01",
+							command: "bun test",
+							result: "passed",
+							exit_code: 0,
+							id: "E-transition-invalid",
+							created_at: "2026-08-18T16:20:00.000Z",
+							provenance: "observed",
+							verification_run_id: "run-does-not-exist",
+						}),
+					],
+				},
+			);
+			rebuildIndexes(root);
+
+			const result = await captureEvidenceCommand(root, [
+				"transition-admit",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--policy",
+				"no-op-evidence-v1",
+				"--issue",
+				"AFOL-96",
+				"--approval",
+				"reject invalid evidence",
+				"--confirm",
+			]);
+			expect(result.code).toBe(2);
+			expect(result.stderr.join("\n")).toMatch(/eligible|invalid/i);
 			expect(existsSync(evidenceTransitionAdmissionPath(root))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

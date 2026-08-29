@@ -7348,6 +7348,51 @@ describe("durable lifecycle auxiliary failures", () => {
 		}
 	});
 
+	test("appends observed reverification when existing evidence already passes", () => {
+		const root = mkRoot("closed-reverify-existing-evidence");
+		try {
+			const created = newWorkstream(root, "closed reverify existing evidence", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+			const before = loadEvidenceEntries(created.evidencePath);
+
+			const appended = recordClosedTaskReverification(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test -- closed-reverify-existing-evidence",
+				result: "passed",
+				exitCode: 0,
+			});
+
+			expect(appended.provenance).toBe("observed");
+			expect(loadEvidenceEntries(created.evidencePath)).toHaveLength(
+				before.length + 1,
+			);
+			expect(isSessionClosed(root, created.session)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("refuses reverification for an open task", () => {
 		const root = mkRoot("open-reverify");
 		try {
@@ -7480,7 +7525,14 @@ describe("durable lifecycle auxiliary failures", () => {
 			const original = loadEvidenceEntries(created.evidencePath)[0];
 			writeFileSync(
 				created.evidencePath,
-				`${JSON.stringify({ ...original, result: "failed", command: "bun test", provenance: "declared", exit_code: undefined })}\n${JSON.stringify({ ...original, id: `${original?.id}-noop`, command: "true" })}\n`,
+				`${JSON.stringify({
+					...original,
+					id: `${original?.id}-noop`,
+					command: "true",
+					result: "passed",
+					exit_code: 0,
+					provenance: "observed",
+				})}\n`,
 			);
 			expect(() =>
 				transitionAdmitEvidence(root, {
@@ -7501,7 +7553,7 @@ describe("durable lifecycle auxiliary failures", () => {
 				confirm: true,
 			});
 			expect(admitted.written).toBe(true);
-			expect(admitted.admission.issue_type).toBe("failed_evidence");
+			expect(admitted.admission.issue_type).toBe("missing_evidence");
 			const issue = verifyWorkbenchTasks(created.sessionDir, true).issues[0];
 			if (!issue) throw new Error("fixture must retain missing_evidence");
 			expect(
@@ -7553,8 +7605,8 @@ describe("durable lifecycle auxiliary failures", () => {
 				`${JSON.stringify({
 					...original,
 					command: "true",
-					result: "failed",
-					exit_code: 1,
+					result: "passed",
+					exit_code: 0,
 					provenance: "observed",
 				})}\n`,
 			);
