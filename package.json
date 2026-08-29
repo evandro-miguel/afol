@@ -28,7 +28,7 @@
 		"template:generate": "bun run cli/dev/generate-template.ts",
 		"template:check": "bun run cli/dev/generate-template.ts --check && bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
-		"lint:biome": "biome check cli --formatter-enabled=false",
+		"lint:biome": "biome check cli --line-ending=lf",
 		"lint:oxlint": "oxlint cli",
 		"lint:knip": "knip --dependencies --use-tsconfig-files --max-issues 0",
 		"lint:knip:informative": "knip --dependencies --use-tsconfig-files --max-issues 20",

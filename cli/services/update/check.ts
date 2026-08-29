@@ -919,8 +919,7 @@ function collectRemovedTemplateOperations(
 				(entry?.owner === "managed" || (!entry && directHash !== undefined)) &&
 				(entry?.hash ?? directHash) !== undefined &&
 				!statSync(absolutePath).isDirectory() &&
-				sha256Hex(readText(absolutePath)) ===
-					(entry?.hash ?? directHash)
+				sha256Hex(readText(absolutePath)) === (entry?.hash ?? directHash)
 			) {
 				return {
 					kind: "remove-stale",

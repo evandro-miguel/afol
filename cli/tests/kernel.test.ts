@@ -2325,12 +2325,11 @@ describe("kernel front-door", () => {
 					raw: "synthetic-database-url",
 				},
 				{
-					command:
-						[
-							'curl -H "Authorization:',
-							"Bearer",
-							'synthetic-bearer" https://example.test',
-						].join(" "),
+					command: [
+						'curl -H "Authorization:',
+						"Bearer",
+						'synthetic-bearer" https://example.test',
+					].join(" "),
 					expected:
 						'curl -H "Authorization: Bearer [REDACTED]" https://example.test',
 					raw: "synthetic-bearer",
@@ -2340,10 +2339,9 @@ describe("kernel front-door", () => {
 						"curl https://demo-user:",
 						"synthetic-password@example.test",
 					].join(""),
-					expected: [
-						"curl https://demo-user:",
-						"[REDACTED]@example.test",
-					].join(""),
+					expected: ["curl https://demo-user:", "[REDACTED]@example.test"].join(
+						"",
+					),
 					raw: "synthetic-password",
 				},
 			];

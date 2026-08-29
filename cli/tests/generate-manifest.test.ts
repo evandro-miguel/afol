@@ -106,11 +106,7 @@ describe("generate manifest template path classification", () => {
 			const lfPath = join(root, "rule-lf.md");
 			const crlfPath = join(root, "rule-crlf.md");
 			writeFileSync(lfPath, "title: Example\nbody: unchanged\n", "utf8");
-			writeFileSync(
-				crlfPath,
-				"title: Example\r\nbody: unchanged\r\n",
-				"utf8",
-			);
+			writeFileSync(crlfPath, "title: Example\r\nbody: unchanged\r\n", "utf8");
 
 			expect(hashManagedFile(crlfPath)).toBe(hashManagedFile(lfPath));
 		} finally {

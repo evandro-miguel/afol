@@ -260,10 +260,7 @@ function extractSection(body: string, heading: string): string {
 	if (start < 0) return "";
 	const contentStart = start + heading.length;
 	const nextHeading = body.indexOf("\n## ", contentStart);
-	return body.slice(
-		contentStart,
-		nextHeading < 0 ? body.length : nextHeading,
-	);
+	return body.slice(contentStart, nextHeading < 0 ? body.length : nextHeading);
 }
 
 function requiredUxMissingFields(document: MarkdownDocument): string[] {

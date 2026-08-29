@@ -28,8 +28,7 @@ export function openEvolutionDbReadOnly(dbPath: string): Database {
 		uri.href,
 		constants.SQLITE_OPEN_READONLY | constants.SQLITE_OPEN_URI,
 	);
-	if (hasWalSidecars)
-		db.fileControl(constants.SQLITE_FCNTL_PERSIST_WAL, 1);
+	if (hasWalSidecars) db.fileControl(constants.SQLITE_FCNTL_PERSIST_WAL, 1);
 	return db;
 }
 

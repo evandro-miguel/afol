@@ -408,6 +408,8 @@ describe("release and toolchain contracts", () => {
 		expect(scripts.typecheck).toBe("tsc --noEmit -p tsconfig.json");
 		expect(scripts["typecheck:ts7:informative"]).toBeUndefined();
 		expect(scripts["lint:biome"]).toContain("biome check cli");
+		expect(scripts["lint:biome"]).not.toContain("--formatter-enabled=false");
+		expect(scripts["lint:biome"]).toContain("--line-ending=lf");
 		expect(scripts["lint:knip"]).toBe(
 			"knip --dependencies --use-tsconfig-files --max-issues 0",
 		);
@@ -524,6 +526,23 @@ describe("release and toolchain contracts", () => {
 			expect(scripts["validate:project-benchmarks"]).toContain(
 				"bun run validate:mutation-performance && bun run coverage:project-benchmarks",
 			);
+		}
+	});
+
+	test("Biome formatter gate rejects malformed TypeScript", () => {
+		const root = mkdtempSync(join(tmpdir(), "biome-format-gate-"));
+		const source = join(root, "malformed.ts");
+		try {
+			writeFileSync(source, "const value={foo:1};\r\n", "utf8");
+			const result = spawnSync(
+				process.execPath,
+				["x", "biome", "check", source, "--line-ending=lf"],
+				{ cwd: repoRoot, encoding: "utf8" },
+			);
+			expect(result.status).not.toBe(0);
+			expect(`${result.stdout}${result.stderr}`).toMatch(/format/i);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
