@@ -780,15 +780,18 @@ describe("evolution analysis previews", () => {
 				["review", [reviewId ?? "", "--json"]],
 			] as const) {
 				const output: string[] = [];
-				expect(
-					await runEvolveCommand(
-						action,
-						[...args],
-						root,
-						{ stdout: (value) => output.push(value), stderr: () => {} },
-						defaultOperationContext(),
-					),
-				).toBe(0);
+				const errors: string[] = [];
+				const exitCode = await runEvolveCommand(
+					action,
+					[...args],
+					root,
+					{
+						stdout: (value) => output.push(value),
+						stderr: (value) => errors.push(value),
+					},
+					defaultOperationContext(),
+				);
+				expect(exitCode, `${action}: ${errors.join("; ")}`).toBe(0);
 				const data = JSON.parse(output[0] ?? "{}").data;
 				expect(Buffer.byteLength(output[0] ?? "", "utf8")).toBeLessThanOrEqual(
 					4_000,

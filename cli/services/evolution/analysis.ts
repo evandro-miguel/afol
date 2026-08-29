@@ -3,7 +3,11 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { readProjectConfig } from "../project/paths";
 import { recurrenceThresholdsFromSettings } from "./config";
-import { assertSafeEvolutionTarget, evolutionDbPath } from "./db";
+import {
+	assertSafeEvolutionTarget,
+	evolutionDbPath,
+	openEvolutionDbReadOnly,
+} from "./db";
 import { checkEvolutionDbHealth, type EvolutionDbHealth } from "./health";
 import { productionDayJournalPath } from "./journal";
 import { observationJournalPath } from "./observation-journal";
@@ -53,6 +57,7 @@ type AnalysisFileSnapshot = {
 	dev: number | null;
 	ino: number | null;
 	size: number | null;
+	mtimeMs: number | null;
 };
 
 export type EvolutionAnalysisReadOnlyHooks = {
@@ -624,6 +629,7 @@ function analysisFileSnapshot(path: string): AnalysisFileSnapshot {
 			dev: Number(stat.dev),
 			ino: Number(stat.ino),
 			size: Number(stat.size),
+			mtimeMs: stat.mtimeMs,
 		};
 	} catch (error) {
 		if (
@@ -632,7 +638,14 @@ function analysisFileSnapshot(path: string): AnalysisFileSnapshot {
 			"code" in error &&
 			(error as { code?: unknown }).code === "ENOENT"
 		)
-			return { path, exists: false, dev: null, ino: null, size: null };
+			return {
+				path,
+				exists: false,
+				dev: null,
+				ino: null,
+				size: null,
+				mtimeMs: null,
+			};
 		throw error;
 	}
 }
@@ -704,10 +717,11 @@ function assertAnalysisStateUnchanged(
 			actual.exists !== expected.exists ||
 			actual.dev !== expected.dev ||
 			actual.ino !== expected.ino ||
-			actual.size !== expected.size
+			actual.size !== expected.size ||
+			actual.mtimeMs !== expected.mtimeMs
 		)
 			throw new Error(
-				"evolution analysis state changed during read-only analysis",
+				`evolution analysis state changed during read-only analysis: ${expected.path} size=${expected.size}->${actual.size} mtime=${expected.mtimeMs}->${actual.mtimeMs}`,
 			);
 	}
 }
@@ -868,36 +882,40 @@ export function analyzeEvolutionProject(
 			},
 			...options,
 		});
+	// Reject oversized or unsafe state before any deferred SQLite finalizer can
+	// checkpoint WAL content over the file being validated.
+	assertAnalysisStateLimits(root, resolved, dbPath);
+	// Bun may retain native SQLite statement finalizers after Database.close().
+	// Drain prior handles before defining the read-only analysis boundary.
+	Bun.gc(true);
 	const stateBefore = assertAnalysisStateLimits(root, resolved, dbPath);
-	let health: EvolutionDbHealth;
-	try {
-		health = checkEvolutionDbHealth(dbPath, projectId, {
-			root,
-			projectId,
-			timezone: resolved.timezone,
-			evolutionEventsDir: resolved.paths.evolutionEventsDir,
-		});
-	} catch (error) {
-		assertAnalysisStateUnchanged(stateBefore);
-		throw error;
-	}
-	assertAnalysisStateUnchanged(stateBefore);
-	if (!health.ok)
-		return analyzeEvolution({
-			projectId,
-			state: {
-				ok: false,
-				stale: health.migration_stale,
-				findings: health.findings,
-			},
-			...options,
-		});
 	hooks.beforeOpen?.(dbPath);
 	assertAnalysisStateUnchanged(stateBefore);
 	let db: Database | undefined;
 	try {
-		db = new Database(dbPath, { readonly: true });
+		db = openEvolutionDbReadOnly(dbPath);
+		const health: EvolutionDbHealth = checkEvolutionDbHealth(
+			dbPath,
+			projectId,
+			{
+				root,
+				projectId,
+				timezone: resolved.timezone,
+				evolutionEventsDir: resolved.paths.evolutionEventsDir,
+			},
+			db,
+		);
 		assertAnalysisStateUnchanged(stateBefore);
+		if (!health.ok)
+			return analyzeEvolution({
+				projectId,
+				state: {
+					ok: false,
+					stale: health.migration_stale,
+					findings: health.findings,
+				},
+				...options,
+			});
 		assertProjectedSourceRefLimits(db, projectId);
 		const projection = readActiveSuggestionProjection(db, projectId);
 		const observationFingerprints = Number(
@@ -1047,6 +1065,7 @@ export function analyzeEvolutionProject(
 			...options,
 		});
 	} finally {
+		assertAnalysisStateUnchanged(stateBefore);
 		db?.close();
 		assertAnalysisStateUnchanged(stateBefore);
 	}

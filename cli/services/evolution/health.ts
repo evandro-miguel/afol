@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { unmatchedApplyPrepares } from "./apply-journal";
-import { assertSafeEvolutionTarget } from "./db";
+import { assertSafeEvolutionTarget, openEvolutionDbReadOnly } from "./db";
 import {
 	evaluationJournalPath,
 	validateEvaluationProjection,
@@ -304,6 +304,7 @@ export function checkEvolutionDbHealth(
 	dbPath: string,
 	expectedProjectId?: string,
 	canonicalContext?: EvolutionHealthContext,
+	existingDb?: Database,
 ): EvolutionDbHealth {
 	if (!existsSync(dbPath))
 		return {
@@ -326,7 +327,8 @@ export function checkEvolutionDbHealth(
 			],
 		};
 	const findings: EvolutionDbFinding[] = [];
-	let db: Database | null = null;
+	let db: Database | null = existingDb ?? null;
+	const ownsDb = existingDb === undefined;
 	let schemaOk = true;
 	let walEnabled = false;
 	let migrationVersion = 0;
@@ -341,7 +343,7 @@ export function checkEvolutionDbHealth(
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
-		db = new Database(dbPath, { readonly: true });
+		db ??= openEvolutionDbReadOnly(dbPath);
 		migrationVersion = readUserVersion(db);
 		const journal = scalarString(
 			db.query("PRAGMA journal_mode").get() as Record<string, unknown> | null,
@@ -683,7 +685,7 @@ export function checkEvolutionDbHealth(
 			message: `evolution db unavailable: ${(error as Error).message}`,
 		});
 	} finally {
-		db?.close();
+		if (ownsDb) db?.close();
 	}
 	return {
 		ok: schemaOk && findings.every((finding) => finding.severity !== "fail"),

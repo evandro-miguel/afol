@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import { constants, Database } from "bun:sqlite";
 import {
 	chmodSync,
 	existsSync,
@@ -7,6 +7,7 @@ import {
 	realpathSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { withExternalPathLockSync } from "../io/session-lock";
 import { resolveProjectWritePath } from "../project/root";
 import { applyMigrations, EVOLUTION_SCHEMA_VERSION } from "./migrations";
@@ -16,6 +17,21 @@ const BUSY_TIMEOUT_MS = 5000;
 const BUSY_RETRY_MS = 25;
 const WINDOWS_RESERVED_DEVICE_NAMES =
 	/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+
+export function openEvolutionDbReadOnly(dbPath: string): Database {
+	const uri = pathToFileURL(dbPath);
+	uri.searchParams.set("mode", "ro");
+	const hasWalSidecars =
+		existsSync(`${dbPath}-wal`) && existsSync(`${dbPath}-shm`);
+	uri.searchParams.set(hasWalSidecars ? "readonly_shm" : "immutable", "1");
+	const db = new Database(
+		uri.href,
+		constants.SQLITE_OPEN_READONLY | constants.SQLITE_OPEN_URI,
+	);
+	if (hasWalSidecars)
+		db.fileControl(constants.SQLITE_FCNTL_PERSIST_WAL, 1);
+	return db;
+}
 
 type EvolutionFileStat = NonNullable<ReturnType<typeof lstatSync>>;
 
@@ -175,6 +191,7 @@ export function openEvolutionDb(dbPath: string): Database {
 	return withExternalPathLockSync(dbPath, () => {
 		const db = new Database(dbPath);
 		try {
+			db.fileControl(constants.SQLITE_FCNTL_PERSIST_WAL, 1);
 			assertSafeEvolutionTarget(dbPath, "evolution db", false);
 			ensurePrivatePermissions(dbPath);
 			db.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT_MS};`);
