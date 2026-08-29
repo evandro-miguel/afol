@@ -1,10 +1,18 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+} from "node:fs";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { resolveAdmPaths } from "../adm/paths";
 import { atomicWriteText } from "../io/atomic";
+import { assertSafeSourceFile } from "../io/safe-source";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
+import { resolveProjectWritePath } from "../project/root";
 import {
 	findCanonicalSpecDocuments,
 	listCanonicalSpecDocuments,
@@ -78,7 +86,7 @@ export type SessionPendingSpecNotice = {
 
 const INDEX_FILE = "pending-specs.json";
 const GOVERNANCE_LOCK = "__governance-pending-specs__";
-const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const DEFAULT_PENDING_SPEC_RESOLUTION_HINT =
 	'run afol gov rs --session <session> -F <F-id> -P <spec-id> or waive with afol gov rs --session <session> --no-spec-required -r "<reason>"';
 
@@ -128,6 +136,25 @@ function renderFrontmatter(record: Record<string, unknown>): string {
 		return `${key}: ${yamlScalar(String(value ?? ""))}`;
 	});
 	return `---\n${lines.join("\n")}\n---\n\n`;
+}
+
+function replaceFrontmatterScalar(
+	content: string,
+	key: string,
+	value: string,
+): string {
+	const match = FRONTMATTER_RE.exec(content);
+	if (!match) throw new Error("Document frontmatter is invalid");
+	const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const fieldPattern = new RegExp(`^${escapedKey}[ \\t]*:[^\\r\\n]*`, "gm");
+	const matches = match[0].match(fieldPattern) ?? [];
+	if (matches.length !== 1)
+		throw new Error(`Frontmatter field must resolve uniquely: ${key}`);
+	const updatedBlock = match[0].replace(
+		fieldPattern,
+		`${key}: ${yamlScalar(value)}`,
+	);
+	return updatedBlock + content.slice(match[0].length);
 }
 
 function parseFrontmatter(content: string): Record<string, unknown> | null {
@@ -809,18 +836,57 @@ function roadmapFeatureStatus(section: string, featureId: string): string {
 	return match[1].toLowerCase();
 }
 
-export function activateRoadmapFeature(
-	root: string,
-	featureId: string,
-): {
+function assertSafeGovernanceRoadmapPath(root: string, target: string): string {
+	const projectRoot = realpathSync(root);
+	const relativePath = projectRelativePath(projectRoot, target);
+	if (!relativePath) {
+		throw new Error(
+			`Governance roadmap path is outside the project root: ${target}`,
+		);
+	}
+	const resolved = resolveProjectWritePath(projectRoot, relativePath);
+	if (!resolved.ok) {
+		throw new Error(`Governance roadmap path is unsafe: ${resolved.error}`);
+	}
+	assertSafeSourceFile(resolved.value.path, "Governance roadmap", false);
+	if (!projectRelativePath(projectRoot, realpathSync(resolved.value.path))) {
+		throw new Error(
+			`Governance roadmap path is outside the project root: ${target}`,
+		);
+	}
+	return resolved.value.path;
+}
+
+function resolveGovernanceRoadmapPath(root: string): string {
+	const { admDir, roadmapDir } = resolveAdmPaths(root);
+	for (const candidate of [
+		join(roadmapDir, "GENERAL-ROADMAP.md"),
+		join(admDir, "roadmap.md"),
+	]) {
+		if (existsSync(candidate))
+			return assertSafeGovernanceRoadmapPath(root, candidate);
+	}
+	throw new Error("Governance roadmap not found");
+}
+
+type RoadmapActivationResult = {
 	featureId: string;
 	status: "activated" | "already_active";
-} {
-	const roadmapPath = join(
-		resolveAdmPaths(root).roadmapDir,
-		"GENERAL-ROADMAP.md",
-	);
-	if (!existsSync(roadmapPath)) throw new Error("Governance roadmap not found");
+	parentSpec?: string;
+	parentStatus?: "activated" | "already_active";
+	featurePreviousStatus?: "planned" | "active";
+	featureNewStatus?: "active";
+	parentPreviousStatus?: "planned" | "active";
+	parentNewStatus?: "active";
+};
+
+function activateRoadmapFeatureLocked(
+	root: string,
+	featureId: string,
+	parentSpec?: string,
+	runtime: { failAfterFirstWrite?: boolean } = {},
+): RoadmapActivationResult {
+	const roadmapPath = resolveGovernanceRoadmapPath(root);
 	const roadmap = readFileSync(roadmapPath, "utf8");
 	const { lines, start, end } = roadmapFeatureRange(roadmap, featureId);
 	const statusIndex = lines.findIndex(
@@ -833,18 +899,112 @@ export function activateRoadmapFeature(
 		?.replace(/^-\s*Status:\s*/i, "")
 		.trim()
 		.toLowerCase();
-	if (status === "active") return { featureId, status: "already_active" };
 	if (status === "final")
 		throw new Error(
 			`Roadmap feature is final and cannot be reopened: ${featureId}`,
 		);
-	if (status !== "planned")
+	if (status !== "planned" && status !== "active")
 		throw new Error(
 			`Roadmap feature cannot be activated from status ${status || "unknown"}: ${featureId}`,
 		);
-	lines[statusIndex] = "- Status: active";
-	atomicWriteText(roadmapPath, `${lines.join("\n").replace(/\n*$/, "")}\n`);
-	return { featureId, status: "activated" };
+
+	const parent = parentSpec?.trim();
+	let parentPath = "";
+	let parentDocument = "";
+	let parentStatus: "activated" | "already_active" | undefined;
+	if (parent) {
+		const matches = findCanonicalSpecDocuments(root, parent);
+		if (matches.length !== 1 || !matches[0])
+			throw new Error(`Parent spec must resolve uniquely: ${parent}`);
+		const document = matches[0];
+		if (trimString(document.frontmatter.doc_type) !== "spec")
+			throw new Error(`Parent spec doc_type must be spec: ${parent}`);
+		if (trimString(document.frontmatter.roadmap_feature) !== featureId)
+			throw new Error(`Parent spec roadmap_feature mismatch: ${parent}`);
+		const candidateStatus = trimString(
+			document.frontmatter.status,
+		).toLowerCase();
+		if (candidateStatus !== "planned" && candidateStatus !== "active")
+			throw new Error(
+				`Parent spec cannot be activated from status ${candidateStatus || "unknown"}: ${parent}`,
+			);
+		parentPath = document.path;
+		parentDocument = document.content;
+		parentStatus =
+			candidateStatus === "active" ? "already_active" : "activated";
+	}
+
+	const updates: Array<[string, string]> = [];
+	if (parent && parentStatus === "activated") {
+		updates.push([
+			parentPath,
+			replaceFrontmatterScalar(parentDocument, "status", "active"),
+		]);
+	}
+	if (status === "planned") {
+		lines[statusIndex] = "- Status: active";
+		updates.push([roadmapPath, `${lines.join("\n").replace(/\n*$/, "")}\n`]);
+	}
+	const originals = new Map<string, string>([[roadmapPath, roadmap]]);
+	if (parent && parentPath) originals.set(parentPath, parentDocument);
+	try {
+		let writeCount = 0;
+		for (const [path, content] of updates) {
+			atomicWriteText(
+				path === roadmapPath
+					? assertSafeGovernanceRoadmapPath(root, path)
+					: path,
+				content,
+			);
+			writeCount += 1;
+			if (runtime.failAfterFirstWrite && writeCount === 1)
+				throw new Error("Injected governance activation failure");
+		}
+	} catch (error) {
+		if (!runtime.failAfterFirstWrite) {
+			for (const [path, content] of originals) {
+				try {
+					atomicWriteText(
+						path === roadmapPath
+							? assertSafeGovernanceRoadmapPath(root, path)
+							: path,
+						content,
+					);
+				} catch {
+					// Preserve the original write error; rollback is best effort.
+				}
+			}
+		}
+		throw error;
+	}
+	return {
+		featureId,
+		status: status === "planned" ? "activated" : "already_active",
+		...(parent && parentStatus
+			? {
+					parentSpec: parent,
+					parentStatus,
+					featurePreviousStatus: status,
+					featureNewStatus: "active" as const,
+					parentPreviousStatus:
+						parentStatus === "activated"
+							? ("planned" as const)
+							: ("active" as const),
+					parentNewStatus: "active" as const,
+				}
+			: {}),
+	};
+}
+
+export function activateRoadmapFeature(
+	root: string,
+	featureId: string,
+	parentSpec?: string,
+	runtime: { failAfterFirstWrite?: boolean } = {},
+): RoadmapActivationResult {
+	return withSessionLock(root, GOVERNANCE_LOCK, () =>
+		activateRoadmapFeatureLocked(root, featureId, parentSpec, runtime),
+	);
 }
 
 function projectRelativePath(root: string, path: string): string | null {
@@ -901,9 +1061,7 @@ export function resolveGovernanceCatalog(
 	featureId: string,
 	parentSpec: string,
 ) {
-	const adm = resolveAdmPaths(root);
-	const roadmapPath = join(adm.roadmapDir, "GENERAL-ROADMAP.md");
-	if (!existsSync(roadmapPath)) throw new Error("Governance roadmap not found");
+	const roadmapPath = resolveGovernanceRoadmapPath(root);
 	const roadmap = readFileSync(roadmapPath, "utf8");
 	const { lines, start, end } = roadmapFeatureRange(roadmap, featureId);
 	const featureSection = lines.slice(start, end).join("\n");
@@ -912,7 +1070,8 @@ export function resolveGovernanceCatalog(
 		throw new Error(`Roadmap feature is not active: ${featureId}`);
 	const projectRelative = (path: string) => {
 		const result = projectRelativePath(root, path);
-		if (!result) throw new Error(`Path is outside project root: ${path}`);
+		if (!result)
+			throw new Error(`Governance path is outside the project root: ${path}`);
 		return result;
 	};
 	const matches = findCanonicalSpecDocuments(root, parentSpec);

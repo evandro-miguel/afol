@@ -3,7 +3,7 @@ doc_type: reference
 id: afol_runtime_reference
 status: active
 created_at: '2026-06-17T00:00:00Z'
-updated_at: '2026-07-15T00:00:00Z'
+updated_at: '2026-08-21T14:00:20Z'
 ---
 
 # AFOL Runtime Reference
@@ -242,11 +242,29 @@ projection in a later observation flow.
 ```bash
 afol governance pending --json
 afol gov rs -S <session-id> -F <F-id> -P <spec-id>
+afol gov af -F <F-id> [-P <spec-id>]
 afol gov rs -S <session-id> --no-spec-required -r "<reason>"
 afol gov bulk-waive -r "<reason>" [--limit 20] [--dry-run]
 afol catchup
 afol catchup --fix
 ```
+
+`afol gov af` (`governance activate-feature`) activates a planned roadmap
+feature. `-F/--feature-id` is required; `-P/--parent-spec` is optional. When
+the parent is supplied, AFOL validates that it is a unique, project-contained
+`spec` bound to the same feature and still `planned` or `active`, then validates
+all other inputs and targets before writing. Activation is fail-safe,
+idempotent convergence: AFOL writes the parent spec first and the roadmap
+feature second. It makes no multi-file atomicity promise. An interruption may
+leave the parent `active` while the feature is still `planned` and therefore
+not governable; retrying the same command completes the transition. If AFOL
+observes a write error it attempts restoration, but crash safety is provided by
+the write order, not by guaranteed rollback. `active` is an idempotent no-op
+and `final` cannot be reopened. Governance resolution accepts the nested
+`.afol/adm/roadmap/GENERAL-ROADMAP.md` layout and falls back to the flat
+`.afol/adm/roadmap.md` layout when the nested file is absent. The selected
+roadmap and its containing path components must not be symlinks, junctions, or
+other reparse points.
 
 Bulk waive is optional cemetery cleanup only. Shipping one feature never
 requires bulk-waiving historical pending entries.

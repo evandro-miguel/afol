@@ -17,10 +17,10 @@ function stringValue(value: unknown): string {
 }
 
 function parseFrontmatter(content: string): Record<string, unknown> | null {
-	const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(content);
+	const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
 	if (!match?.[1]) return null;
 	try {
-		const parsed = Bun.YAML.parse(match[1]);
+		const parsed = Bun.YAML.parse(match[1].replaceAll("\r\n", "\n"));
 		return parsed !== null &&
 			typeof parsed === "object" &&
 			!Array.isArray(parsed)

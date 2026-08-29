@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_workflow-standard_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-05-28T18:29:58Z'
+updated_at: '2026-08-21T14:00:20Z'
 title: Workflow Standards
 ---
 
@@ -38,9 +38,22 @@ Create or update the roadmap feature in `.afol/adm/roadmap/GENERAL-ROADMAP.md`
 - Every meaningful feature must have a roadmap entry
 - The roadmap is the source of truth for feature inventory and status
 - No non-trivial implementation starts before this exists
-- A planned feature may be activated with `afol gov af -F <F-id>`; an active
-  feature is a no-op and a final feature is never reopened. An active residual
-  child spec may govern work under its final parent.
+- A planned feature may be activated with `afol gov af -F <F-id> [-P
+  <spec-id>]`. With `-P`, AFOL validates every input and target before
+  writing, activates the parent spec first, and activates the roadmap feature
+  second. This is a fail-safe, idempotent convergence protocol, not an atomic
+  multi-file transaction: an interruption can leave the parent `active` while
+  the feature remains `planned` (temporarily non-governable), and retrying the
+  command completes convergence. An observed write error attempts restoration,
+  but crash safety comes from the write order rather than a rollback guarantee.
+  An active feature is a no-op and a final feature is never reopened; an active
+  residual child spec may govern work under its final parent.
+- `-F` and `-P` are compact aliases for `--feature-id` and `--parent-spec`.
+  A rejected validation leaves every target unchanged. The resolver supports
+  the canonical nested roadmap and the flat `.afol/adm/roadmap.md`
+  compatibility layout, with nested-first precedence. The selected roadmap
+  file and every containing path component must be a regular path; symlinks,
+  junctions, and other reparse points are rejected before reads or writes.
 
 #### Step 2: Parent Spec
 

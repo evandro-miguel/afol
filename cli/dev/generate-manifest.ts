@@ -8,7 +8,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 
 import { kernelRegistry } from "../registry";
 import {
@@ -43,6 +43,24 @@ const TEMPLATE_MANAGED_HASH_DIRS = [
 	".afol/adm/source/universal-skills",
 ] as const;
 
+const TEXT_FILE_EXTENSIONS = new Set([
+	".css",
+	".csv",
+	".html",
+	".ini",
+	".js",
+	".json",
+	".jsx",
+	".md",
+	".toml",
+	".ts",
+	".tsx",
+	".txt",
+	".xml",
+	".yaml",
+	".yml",
+]);
+
 type ManifestPayload = {
 	commands?: unknown;
 	command_stability?: unknown;
@@ -64,6 +82,25 @@ function readJsonObject(path: string): ManifestPayload {
 
 function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
+}
+
+function canonicalManagedBytes(path: string, content: Buffer): Buffer {
+	if (
+		!TEXT_FILE_EXTENSIONS.has(extname(path).toLowerCase()) ||
+		content.includes(0)
+	) {
+		return content;
+	}
+
+	const text = content.toString("utf8");
+	if (!Buffer.from(text, "utf8").equals(content)) {
+		return content;
+	}
+	return Buffer.from(text.replaceAll("\r\n", "\n"), "utf8");
+}
+
+export function hashManagedFile(path: string): string {
+	return sha256Hex(canonicalManagedBytes(path, readFileSync(path)));
 }
 
 export function isTemplateManifestPath(manifestPath: string): boolean {
@@ -144,7 +181,7 @@ export function refreshManagedHashes(
 		if (!existsSync(absolutePath)) {
 			continue;
 		}
-		refreshed[path] = sha256Hex(readFileSync(absolutePath));
+		refreshed[path] = hashManagedFile(absolutePath);
 	}
 	return refreshed;
 }
