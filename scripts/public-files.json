@@ -25,7 +25,7 @@
     "src"
   ],
   "mapped_directories": {
-    "docs/public": "docs"
+    "docs/public": "docs/public"
   },
   "mapped_files": {
     "docs/public/AGENTS.md": "AGENTS.md"

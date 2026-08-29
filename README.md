@@ -22,18 +22,23 @@ a reproducible check. AFOL makes the path explicit and inspectable on disk:
 Intent -> Spec -> Task -> Execution -> Evidence -> Close
 ```
 
-## Local development
+## Install from source
 
-Build from source with Bun 1.3.14 or newer:
+Build with the pinned Bun toolchain:
 
 ```bash
 bun install --frozen-lockfile
 bun run build
-./dist/afol --version
+install -Dm755 ./dist/afol "$HOME/.local/bin/afol"
+"$HOME/.local/bin/afol" --version
 ```
 
-AFOL is binary-first. The npm `package.json` is for source builds and is marked
-private; it is not a registry package.
+Ensure `$HOME/.local/bin` is on `PATH` before using `afol` from another shell.
+
+AFOL is intended to run as a standalone binary. The npm `package.json` exists
+for source builds and is marked private; AFOL is not a registry package.
+Source publication and standalone-binary distribution are separate release
+actions. Do not assume a source tag includes a promoted binary.
 
 ## Platform and validation boundary
 
@@ -92,6 +97,8 @@ stability flag on every command.
 - [Security model](docs/public/security-model.md)
 - [Troubleshooting](docs/public/troubleshooting.md)
 - [Upgrade and rollback](docs/public/upgrade-and-rollback.md)
+- [Release process](docs/public/release-process.md)
+- [Publishing checklist](docs/public/publishing.md)
 - [Known limitations](docs/public/known-limitations.md)
 - [Roadmap](ROADMAP.md)
 - [Case study](docs/public/case-study/README.md)

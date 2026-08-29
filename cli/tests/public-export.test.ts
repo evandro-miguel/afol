@@ -29,21 +29,25 @@ function outputOf(result: ReturnType<typeof runBun>): string {
 }
 
 describe("public export boundary", () => {
-	test("maps the public governance instructions to the export root", () => {
+	test("maps public instructions while preserving documentation paths", () => {
 		const config = JSON.parse(
 			readFileSync(join(repoRoot, "scripts", "public-files.json"), "utf8"),
 		) as {
+			mapped_directories?: Record<string, string>;
 			mapped_files?: Record<string, string>;
 			exclude?: string[];
 		};
 
+		expect(config.mapped_directories).toEqual({
+			"docs/public": "docs/public",
+		});
 		expect(config.mapped_files).toEqual({
 			"docs/public/AGENTS.md": "AGENTS.md",
 		});
 		expect(config.exclude).toContain("cli/tests/public-export.test.ts");
 	});
 
-	test("keeps smoke:example while exporting mapped files", () => {
+	test("keeps README doc links and smoke:example in the public export", () => {
 		const root = mkdtempSync(join(tmpdir(), "public-export-mapped-"));
 		try {
 			const scriptsDir = join(root, "scripts");
@@ -55,9 +59,9 @@ describe("public export boundary", () => {
 			writeFileSync(
 				join(scriptsDir, "public-files.json"),
 				JSON.stringify({
-					files: ["package.json"],
+					files: ["package.json", "README.md"],
 					directories: [],
-					mapped_directories: { "docs/public": "docs" },
+					mapped_directories: { "docs/public": "docs/public" },
 					mapped_files: { "docs/public/AGENTS.md": "AGENTS.md" },
 					exclude: [],
 				}),
@@ -73,7 +77,15 @@ describe("public export boundary", () => {
 					},
 				}),
 			);
+			writeFileSync(
+				join(root, "README.md"),
+				"[Getting started](docs/public/getting-started.md)\n",
+			);
 			writeFileSync(join(sourceDir, "AGENTS.md"), "public instructions\n");
+			writeFileSync(
+				join(sourceDir, "getting-started.md"),
+				"# Getting started\n",
+			);
 
 			const result = runBun(
 				join(scriptsDir, "export-public.ts"),
@@ -84,12 +96,43 @@ describe("public export boundary", () => {
 			expect(readFileSync(join(target, "AGENTS.md"), "utf8")).toBe(
 				"public instructions\n",
 			);
-			expect(existsSync(join(target, "docs", "AGENTS.md"))).toBe(false);
+			expect(existsSync(join(target, "docs", "public", "AGENTS.md"))).toBe(
+				false,
+			);
+			expect(
+				existsSync(join(target, "docs", "public", "getting-started.md")),
+			).toBe(true);
+			expect(readFileSync(join(target, "README.md"), "utf8")).toContain(
+				"docs/public/getting-started.md",
+			);
 			const manifest = JSON.parse(
 				readFileSync(join(target, "package.json"), "utf8"),
 			) as { scripts?: Record<string, string> };
 			expect(manifest.scripts?.["smoke:example"]).toBe("echo smoke");
 			expect(manifest.scripts?.["public:export"]).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("audit rejects private state, sensitive files, and credential patterns", () => {
+		const root = mkdtempSync(join(tmpdir(), "public-audit-sensitive-"));
+		try {
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(join(root, ".env"), "SECRET=example\n");
+			writeFileSync(
+				join(root, "token.txt"),
+				"github_pat_abcdefghijklmnopqrstuvwxyz123456\n",
+			);
+			writeFileSync(join(root, ".env.example"), "SAFE=placeholder\n");
+
+			const result = runBun(auditScript, [root], repoRoot);
+			expect(result.status).not.toBe(0);
+			const output = outputOf(result);
+			expect(output).toContain(".afol: private-state-directory");
+			expect(output).toContain(".env: environment-file");
+			expect(output).toContain("token.txt: github-token");
+			expect(output).not.toContain(".env.example: environment-file");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

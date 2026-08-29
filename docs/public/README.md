@@ -1,6 +1,6 @@
 # Documentation
 
-Public product docs for AFOL. Start at the root [README](../README.md).
+Public product docs for AFOL. Start at the root [README](../../README.md).
 
 | Page | Use |
 | --- | --- |
@@ -11,7 +11,8 @@ Public product docs for AFOL. Start at the root [README](../README.md).
 | [Security model](security-model.md) | What AFOL does and does not protect |
 | [Troubleshooting](troubleshooting.md) | Common failures |
 | [Upgrade and rollback](upgrade-and-rollback.md) | Template updates and binary rollback |
-| [Release process](release-process.md) | How release assets are produced |
+| [Release process](release-process.md) | Source and binary release boundaries |
+| [Publishing checklist](publishing.md) | Fresh-history public cutover |
 | [Known limitations](known-limitations.md) | Alpha scope |
 | [Case study](case-study/README.md) | Design constraints and trade-offs |
 | [Architecture quality](architecture-quality.md) | Measured engineering baseline |

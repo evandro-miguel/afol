@@ -1,8 +1,29 @@
 # Getting started
 
-Use a verified Linux x64 release asset supplied for the candidate, or build
-`./dist/afol` from this repository. Then create a Git repository and run
-`afol init`.
+## Install the source alpha
+
+Linux x64 is the supported alpha target. Build with the Bun version pinned in
+`package.json`:
+
+```bash
+git clone <public-repository-url> afol
+cd afol
+bun install --frozen-lockfile
+bun run build
+install -Dm755 ./dist/afol "$HOME/.local/bin/afol"
+"$HOME/.local/bin/afol" --version
+```
+
+Ensure `$HOME/.local/bin` is on `PATH`.
+
+A source tag does not imply that a standalone binary was promoted. Use a
+downloadable binary only when its GitHub Release supplies the artifact,
+checksum, provenance, security report, license bundle, and installation
+instructions for that exact version.
+
+## Create a project
+
+Create a Git repository and initialize AFOL:
 
 ```bash
 mkdir afol-demo
@@ -31,9 +52,9 @@ afol close
 AFOL writes mutable state under `.afol/` and provider metadata under
 `.agents/`. The `afol` executable must stay outside the project.
 
-Use `afol help` and `afol help <command>` for flags. See
-[Command reference](command-reference.md) and
-[Troubleshooting](troubleshooting.md).
+Use `afol help` and `afol help <command>` for flags. See the
+[command reference](command-reference.md) and
+[troubleshooting guide](troubleshooting.md).
 
 Linux x64 is the supported alpha target. WSL2 has observed local smoke; native
 Windows is experimental, and macOS/ARM are unsupported.
