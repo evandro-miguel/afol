@@ -8,6 +8,7 @@ import {
 import {
 	exportSessionState,
 	hydrateSession,
+	isStale,
 	loadSessionState,
 	validateSessionState,
 } from "../services/state/session-state";
@@ -22,6 +23,7 @@ type StateAction = "show" | "validate" | "sync" | "export";
 type StateSnapshotJson = {
 	session?: string;
 	snapshot?: NonNullable<ReturnType<typeof loadSessionState>>;
+	stale?: boolean;
 };
 
 type StateValidationJson = {
@@ -83,9 +85,11 @@ function resolveSessionId(projectRoot: string, parsed: { sessionId?: string }) {
 
 function formatSnapshot(
 	snapshot: NonNullable<ReturnType<typeof loadSessionState>>,
+	stale = false,
 ): string {
 	return [
 		`state: ${snapshot.sessionId}`,
+		`freshness: ${stale ? "stale" : "current"}`,
 		`hydrated_at: ${snapshot.hydratedAt}`,
 		`sources: ${snapshot.sourceFiles.length}`,
 		`plan_files: ${snapshot.summary.planFiles}`,
@@ -122,13 +126,18 @@ function writeSnapshotJson(
 	io: CommandIo,
 	action: Exclude<StateAction, "validate">,
 	snapshot: NonNullable<ReturnType<typeof loadSessionState>>,
+	stale?: boolean,
 ): void {
 	const envelope = envelopeWithLegacyKeys(
 		envelopeOk<StateSnapshotJson>(
-			{ session: snapshot.sessionId, snapshot },
+			{
+				session: snapshot.sessionId,
+				snapshot,
+				...(stale === undefined ? {} : { stale }),
+			},
 			{ action: `state.${action}` },
 		),
-		["snapshot", "session"],
+		["snapshot", "session", "stale"],
 	);
 	io.stdout(stringifyEnvelope(envelope));
 }
@@ -265,9 +274,14 @@ export async function runStateCommand(
 			return 1;
 		}
 		if (parsed.json) {
-			writeSnapshotJson(io, stateAction, snapshot);
+			writeSnapshotJson(
+				io,
+				stateAction,
+				snapshot,
+				isStale(projectRoot, sessionId),
+			);
 		} else {
-			io.stdout(formatSnapshot(snapshot));
+			io.stdout(formatSnapshot(snapshot, isStale(projectRoot, sessionId)));
 		}
 		return 0;
 	} catch (error) {

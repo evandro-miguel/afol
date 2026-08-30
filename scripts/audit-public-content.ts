@@ -1,12 +1,25 @@
 #!/usr/bin/env bun
 
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	join,
+	relative,
+	resolve,
+} from "node:path";
 
 const root = resolve(process.argv[2] ?? process.cwd());
 const findings: string[] = [];
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const SKIPPED_TOP_LEVEL_DIRECTORIES = new Set([
+	".git",
+	"node_modules",
+	"dist",
+	"coverage",
+]);
 const patterns: Array<[string, RegExp]> = [
 	["linux-home-path", /\/home\/[A-Za-z0-9._-]+\//u],
 	["mac-home-path", /\/Users\/[A-Za-z0-9._-]+\//u],
@@ -25,6 +38,55 @@ const patterns: Array<[string, RegExp]> = [
 	["stripe-live-key", /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b/u],
 	["credentialed-url", /\bhttps?:\/\/[^/\s:@]+:[^/\s@]+@/u],
 ];
+const HISTORY_SYNTHETIC_LITERALS = new Map<string, string[]>([
+	[
+		"cli/services/evolution/imports/imports.test.ts",
+		[["Bearer", "secret-value"].join(" ")],
+	],
+	[
+		"cli/tests/evolution-analysis.test.ts",
+		[
+			["Bearer", "persisted-secret"].join(" "),
+			["Bearer", "json-secret"].join(" "),
+			["/", "home", "/", "operator", "/private.txt"].join(""),
+			["C:", "\\\\", "Users", "\\\\", "operator", "\\\\private.txt"].join(""),
+		],
+	],
+	[
+		"cli/tests/evolution-observation-model.test.ts",
+		[["Bearer", "REDACTION_CANARY_123456"].join(" ")],
+	],
+	[
+		"cli/tests/evolution-observation-sources.test.ts",
+		[["Bearer", "REDACTION_CANARY_678901"].join(" ")],
+	],
+	[
+		"cli/tests/evolution-suggestion-authority.test.ts",
+		[["Bearer", "REDACTION_CANARY_2"].join(" ")],
+	],
+	[
+		"cli/tests/kernel.test.ts",
+		[
+			["Bearer", "synthetic-bearer"].join(" "),
+			[
+				"https://",
+				"demo-user",
+				":",
+				"synthetic-password",
+				"@",
+				"example.test",
+			].join(""),
+			[
+				"https://",
+				"demo-user",
+				":",
+				"[REDACTED]",
+				"@",
+				"example.test",
+			].join(""),
+		],
+	],
+]);
 
 const sensitiveFileNames = new Set([
 	".netrc",
@@ -47,7 +109,11 @@ function sensitiveFileFinding(name: string): string | null {
 	return null;
 }
 
-function auditContent(name: string, bytes: Uint8Array): void {
+function auditContent(
+	name: string,
+	bytes: Uint8Array,
+	syntheticLiterals: readonly string[] = [],
+): void {
 	const sensitiveName = sensitiveFileFinding(name);
 	if (sensitiveName) findings.push(`${name}: ${sensitiveName}`);
 	if (bytes.byteLength > MAX_FILE_BYTES) {
@@ -58,7 +124,10 @@ function auditContent(name: string, bytes: Uint8Array): void {
 		findings.push(`${name}: binary-file`);
 		return;
 	}
-	const content = Buffer.from(bytes).toString("utf8");
+	let content = Buffer.from(bytes).toString("utf8");
+	for (const literal of syntheticLiterals) {
+		content = content.replaceAll(literal, "<synthetic-redaction-canary>");
+	}
 	for (const [id, pattern] of patterns) {
 		if (pattern.test(content)) findings.push(`${name}: ${id}`);
 	}
@@ -67,6 +136,7 @@ function auditContent(name: string, bytes: Uint8Array): void {
 function visit(path: string): void {
 	const stats = lstatSync(path);
 	const name = relative(root, path).split("\\").join("/") || ".";
+	if (name === ".git") return;
 	if (stats.isSymbolicLink()) {
 		findings.push(`${name}: symlink`);
 		return;
@@ -85,6 +155,78 @@ function visit(path: string): void {
 		return;
 	}
 	auditContent(name, readFileSync(path));
+}
+
+function localLinkTarget(source: string, rawTarget: string): void {
+	let target = rawTarget.trim();
+	if (target.startsWith("<") && target.endsWith(">")) {
+		target = target.slice(1, -1);
+	}
+	if (
+		!target ||
+		target.startsWith("#") ||
+		/^[a-z][a-z0-9+.-]*:/iu.test(target)
+	) {
+		return;
+	}
+	const targetWithoutFragment = target.split(/[?#]/u, 1)[0];
+	let decoded: string;
+	try {
+		decoded = decodeURIComponent(targetWithoutFragment);
+	} catch {
+		findings.push(`${source}: invalid-local-link`);
+		return;
+	}
+	const candidate = targetWithoutFragment.startsWith("/")
+		? resolve(root, decoded.slice(1))
+		: resolve(dirname(join(root, source)), decoded);
+	const relativeTarget = relative(root, candidate);
+	if (relativeTarget.startsWith("..") || isAbsolute(relativeTarget)) {
+		findings.push(`${source}: link-outside-root:${rawTarget}`);
+		return;
+	}
+	if (!existsSync(candidate)) {
+		findings.push(`${source}: missing-local-link:${rawTarget}`);
+	}
+}
+
+function auditMarkdownLinks(path: string): void {
+	const stats = lstatSync(path);
+	const name = relative(root, path).split("\\").join("/") || ".";
+	if (name === ".git" || name === ".afol" || name === ".agents") return;
+	if (SKIPPED_TOP_LEVEL_DIRECTORIES.has(name.split("/", 1)[0] ?? "")) return;
+	if (stats.isSymbolicLink()) return;
+	if (stats.isDirectory()) {
+		for (const entry of readdirSync(path))
+			auditMarkdownLinks(join(path, entry));
+		return;
+	}
+	if (!/\.md$/iu.test(name)) return;
+	const content = readFileSync(path, "utf8").replace(/```[\s\S]*?```/gu, "");
+	for (const [label, pattern] of [
+		["unsupported-done-option", /afol\s+(?:done|d)\b[^\n]*--execute\b/iu],
+		[
+			"unsupported-evidence-option",
+			/afol\s+(?:evidence|e)\b[^\n]*--outcome\b/iu,
+		],
+	] as const) {
+		if (pattern.test(content)) findings.push(`${name}: ${label}`);
+	}
+	const markdownLinks = /\]\((<[^>]+>|[^)\s]+)(?:\s+["'][^)]*)?\)/gu;
+	for (const match of content.matchAll(markdownLinks)) {
+		if (match[1]) localLinkTarget(name, match[1]);
+	}
+	const htmlLinks = /\bhref\s*=\s*["']([^"']+)["']/giu;
+	for (const match of content.matchAll(htmlLinks)) {
+		if (match[1]) localLinkTarget(name, match[1]);
+	}
+}
+
+function auditPublicExamples(): void {
+	const example = join(root, "examples", "README.md");
+	if (!existsSync(example)) {
+		findings.push("examples/README.md: missing-public-example");
+	}
 }
 
 type ReachableBlob = {
@@ -207,15 +349,20 @@ function auditReachableHistory(): void {
 			findings.push(".git: reachable-history-audit");
 			return;
 		}
-		auditContent(
-			`history/${blob.paths[0]}`,
-			contents.subarray(contentStart, contentEnd),
-		);
+		for (const path of blob.paths) {
+			auditContent(
+				`history/${path}`,
+				contents.subarray(contentStart, contentEnd),
+				HISTORY_SYNTHETIC_LITERALS.get(path),
+			);
+		}
 		offset = contentEnd + 1;
 	}
 }
 
 visit(root);
+auditMarkdownLinks(root);
+auditPublicExamples();
 auditReachableHistory();
 if (findings.length > 0) {
 	throw new Error(`public content audit failed:\n${findings.join("\n")}`);

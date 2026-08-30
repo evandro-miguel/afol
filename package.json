@@ -71,6 +71,7 @@
 		"release:windows": "bun run test:full && bun run build && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
 		"release:provenance": "bun run cli/dev/release-provenance.ts",
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
+		"release:stage": "bun run cli/dev/stage-release.ts",
 		"smoke:dist": "bun run cli/dev/dist-smoke.ts",
 		"smoke:wsl2": "bun run cli/dev/dist-smoke.ts --wsl2",
 		"smoke:clean": "bun run cli/dev/clean-smoke.ts",

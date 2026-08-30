@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
+import { atomicWriteText } from "../services/io/atomic";
 import { releaseArtifactPath } from "./build-release";
 import {
 	resolveExistingReleaseArtifact,
@@ -949,7 +950,7 @@ export function writeReleaseSecurityScanReport(
 	}
 	const outputPath = join(cwd, RELEASE_SECURITY_EVIDENCE_PATH);
 	const outputGuard = prepareReleaseOutputFile(cwd, outputPath);
-	writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+	atomicWriteText(outputPath, `${JSON.stringify(report, null, 2)}\n`);
 	assertReleaseOutputFileStable(outputGuard, true);
 	return outputPath;
 }

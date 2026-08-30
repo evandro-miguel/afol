@@ -2,16 +2,11 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-	existsSync,
-	readFileSync,
-	renameSync,
-	statSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { atomicWriteText } from "../services/io/atomic";
 import {
 	compiledReleaseBuildArgs,
 	DEFAULT_BUILD_COMMAND,
@@ -634,11 +629,7 @@ function writeFileAtomically(
 	content: string,
 	outputGuard = prepareReleaseOutputFile(cwd, path),
 ): void {
-	const tempPath = `${path}.tmp-${process.pid}-${Date.now()}`;
-	const tempGuard = prepareReleaseOutputFile(cwd, tempPath);
-	writeFileSync(tempPath, content, "utf8");
-	assertReleaseOutputFileStable(tempGuard, true);
-	renameSync(tempPath, path);
+	atomicWriteText(path, content);
 	assertReleaseOutputFileStable(outputGuard, true);
 }
 

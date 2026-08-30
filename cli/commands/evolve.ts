@@ -1,4 +1,3 @@
-import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
@@ -45,6 +44,7 @@ import {
 	repairEvolutionDerivedState,
 	resolveDailySuggestion,
 	resolveEvolutionConfig,
+	withEvolutionDbSnapshot,
 } from "../services/evolution";
 import {
 	discoverAdoptionCandidates,
@@ -377,17 +377,13 @@ function runExternalList(
 	const resolved = resolveEvolutionConfig(readProjectConfig(root));
 	if (!resolved.projectId) throw new Error("evolution project id is required");
 	const dbPath = evolutionDbPath(root, resolved.paths.evolutionDb);
-	const rows = existsSync(dbPath)
-		? (() => {
-				assertSafeEvolutionTarget(dbPath, "evolution db", false);
-				const db = new Database(dbPath, { readonly: true });
-				try {
-					return listExternalImports(db, resolved.projectId as string);
-				} finally {
-					db.close();
-				}
-			})()
-		: [];
+	let rows: ReturnType<typeof listExternalImports> = [];
+	if (existsSync(dbPath)) {
+		assertSafeEvolutionTarget(dbPath, "evolution db", false);
+		rows = withEvolutionDbSnapshot(dbPath, (db) =>
+			listExternalImports(db, resolved.projectId as string),
+		);
+	}
 	const imports = rows.map((row) => ({
 		import_id: row.import_id,
 		provider: row.provider,
@@ -1972,12 +1968,9 @@ function readDbStatus(
 		recurrenceThresholds?: RecurrenceThresholds;
 	},
 ): EvolutionStatus {
-	const db = new Database(path, { readonly: true });
-	try {
-		return getEvolutionStatus(db, expectedProjectId, canonicalContext);
-	} finally {
-		db.close();
-	}
+	return withEvolutionDbSnapshot(path, (db) =>
+		getEvolutionStatus(db, expectedProjectId, canonicalContext),
+	);
 }
 
 function recurrenceThresholds(
@@ -2105,7 +2098,10 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 	}
 	const dbExists = existsSync(dbPath);
 	const dbHealth =
-		dbExists && resolved.configured && resolved.projectId
+		dbExists &&
+		resolved.configured &&
+		resolved.projectId &&
+		!journalLockActiveBefore
 			? checkEvolutionDbHealth(dbPath, resolved.projectId, {
 					root: projectRoot,
 					projectId: resolved.projectId,
@@ -2115,6 +2111,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 				})
 			: null;
 	const dbNeedsRebuild =
+		journalLockActiveBefore ||
 		dbHealth?.findings.some(
 			(finding) =>
 				finding.severity === "fail" &&

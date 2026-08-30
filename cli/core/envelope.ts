@@ -7,6 +7,7 @@ export type EnvelopeError = {
 export type EnvelopeDiagnostic = {
 	kind: "unexpected" | "integrity";
 	report_id: string;
+	persisted?: boolean;
 };
 
 export type ResultEnvelope<T> = {

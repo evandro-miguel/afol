@@ -1,5 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+	closeSync,
+	existsSync,
+	openSync,
+	readdirSync,
+	readFileSync,
+	readSync,
+} from "node:fs";
 import { join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { computeSourceHash, type SourceHash } from "../../core/source-hash";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
@@ -15,6 +24,8 @@ import {
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
+const STATE_READ_BUFFER_BYTES = 64 * 1024;
+const MAX_STATE_SOURCE_LINE_CHARS = 1_000_000;
 
 type StateSourceKind = "plan" | "task" | "log" | "evidence";
 
@@ -90,6 +101,68 @@ function readText(path: string): string {
 	return existsSync(path) ? readFileSync(path, "utf8") : "";
 }
 
+function computeFileSourceHash(path: string): SourceHash {
+	const hash = createHash("sha256");
+	const decoder = new StringDecoder("utf8");
+	const buffer = Buffer.allocUnsafe(STATE_READ_BUFFER_BYTES);
+	const fd = openSync(path, "r");
+	try {
+		for (;;) {
+			const bytesRead = readSync(fd, buffer, 0, buffer.length, null);
+			if (bytesRead === 0) break;
+			hash.update(decoder.write(buffer.subarray(0, bytesRead)), "utf8");
+		}
+		hash.update(decoder.end(), "utf8");
+		return { algorithm: "sha256", hash: hash.digest("hex") };
+	} finally {
+		closeSync(fd);
+	}
+}
+
+function* readTextLines(
+	path: string,
+): Generator<{ line: string; lineNumber: number }> {
+	const decoder = new StringDecoder("utf8");
+	const buffer = Buffer.allocUnsafe(STATE_READ_BUFFER_BYTES);
+	const fd = openSync(path, "r");
+	let pending = "";
+	let lineNumber = 0;
+	try {
+		for (;;) {
+			const bytesRead = readSync(fd, buffer, 0, buffer.length, null);
+			if (bytesRead === 0) break;
+			pending += decoder.write(buffer.subarray(0, bytesRead));
+			let newline = pending.indexOf("\n");
+			while (newline >= 0) {
+				lineNumber += 1;
+				const rawLine = pending.slice(0, newline);
+				yield {
+					line: rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine,
+					lineNumber,
+				};
+				pending = pending.slice(newline + 1);
+				newline = pending.indexOf("\n");
+			}
+			if (pending.length > MAX_STATE_SOURCE_LINE_CHARS) {
+				throw new Error(
+					`State source line exceeds ${MAX_STATE_SOURCE_LINE_CHARS} characters at ${path}:${lineNumber + 1}`,
+				);
+			}
+		}
+		pending += decoder.end();
+		if (pending.length > MAX_STATE_SOURCE_LINE_CHARS) {
+			throw new Error(
+				`State source line exceeds ${MAX_STATE_SOURCE_LINE_CHARS} characters at ${path}:${lineNumber + 1}`,
+			);
+		}
+		if (pending.length > 0) {
+			yield { line: pending, lineNumber: lineNumber + 1 };
+		}
+	} finally {
+		closeSync(fd);
+	}
+}
+
 function classify(name: string): StateSourceKind | null {
 	if (name === ".evidence.jsonl") return "evidence";
 	if (name === "plan.md" || name.includes("_plan_")) return "plan";
@@ -119,7 +192,7 @@ function sourceFilesForSession(
 		files.push({
 			path: entry.name,
 			kind,
-			hash: computeSourceHash(readText(path)),
+			hash: computeFileSourceHash(path),
 		});
 	}
 	return files.sort((a, b) => a.path.localeCompare(b.path));
@@ -153,10 +226,11 @@ function countEvidenceEntries(path: string): number {
 	if (!existsSync(path)) {
 		return 0;
 	}
-	return readFileSync(path, "utf8")
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter((line) => line.length > 0).length;
+	let count = 0;
+	for (const { line } of readTextLines(path)) {
+		if (line.trim()) count += 1;
+	}
+	return count;
 }
 
 function sourceHash(files: readonly StateSourceFile[]): SourceHash {
@@ -288,9 +362,7 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 
 			const evidencePath = join(snapshot.sessionPath, ".evidence.jsonl");
 			if (existsSync(evidencePath)) {
-				for (const [lineIndex, line] of readText(evidencePath)
-					.split(/\r?\n/)
-					.entries()) {
+				for (const { line, lineNumber } of readTextLines(evidencePath)) {
 					const trimmed = line.trim();
 					if (!trimmed) {
 						continue;
@@ -300,7 +372,7 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 						parsed = JSON.parse(trimmed) as Record<string, unknown>;
 					} catch {
 						throw new Error(
-							`Invalid evidence JSON at ${evidencePath}:${lineIndex + 1}`,
+							`Invalid evidence JSON at ${evidencePath}:${lineNumber}`,
 						);
 					}
 					const evidenceId = typeof parsed.id === "string" ? parsed.id : null;
@@ -322,7 +394,7 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 						typeof parsed.result === "string" ? parsed.result : null;
 					if (!evidenceId || !taskId || !createdAt || !command || !result) {
 						throw new Error(
-							`Incomplete evidence at ${evidencePath}:${lineIndex + 1}`,
+							`Incomplete evidence at ${evidencePath}:${lineNumber}`,
 						);
 					}
 					db.query(

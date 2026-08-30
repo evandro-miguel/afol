@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
 	CLI_MICRO_THRESHOLDS,
@@ -64,9 +65,7 @@ describe("CLI micro benchmark thresholds", () => {
 	});
 
 	test("accounts for stdout and stderr and keeps 5k output diagnostic", () => {
-		const tempRoot = join(process.cwd(), ".afol", "tmp", "tests");
-		mkdirSync(tempRoot, { recursive: true });
-		const root = mkdtempSync(join(tempRoot, "cli-micro-stderr-"));
+		const root = mkdtempSync(join(tmpdir(), "cli-micro-stderr-"));
 		try {
 			const scriptPath = join(root, "emit-output.js");
 			writeFileSync(

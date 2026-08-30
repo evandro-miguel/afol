@@ -272,6 +272,8 @@ describe("public export boundary", () => {
 			runGit(source, ["config", "user.name", "Public Fixture"]);
 			runGit(source, ["config", "user.email", "fixture@example.invalid"]);
 			writeFileSync(join(source, "README.md"), "# safe\n");
+			mkdirSync(join(source, "examples"));
+			writeFileSync(join(source, "examples", "README.md"), "# Example\n");
 			mkdirSync(join(source, "src", "project-template", ".afol"), {
 				recursive: true,
 			});
@@ -279,7 +281,7 @@ describe("public export boundary", () => {
 				join(source, "src", "project-template", ".afol", "config.json"),
 				"template\n",
 			);
-			runGit(source, ["add", "README.md", "src"]);
+			runGit(source, ["add", "README.md", "examples", "src"]);
 			runGit(source, ["commit", "-qm", "safe baseline"]);
 
 			const unreachable = spawnSync("git", ["hash-object", "-w", "--stdin"], {

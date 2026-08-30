@@ -95,10 +95,10 @@ function pendingSpecQuestion(
 ): string {
 	if (missing.length === 1) {
 		return missing[0] === "roadmap_feature"
-			? "Which roadmap feature governs this closed session?"
-			: "Which parent spec governs this closed session?";
+			? "Which roadmap feature governs this session?"
+			: "Which parent spec governs this session?";
 	}
-	return "Which roadmap feature and parent spec govern this closed session?";
+	return "Which roadmap feature and parent spec govern this session?";
 }
 
 function pendingSpecNextStep(session: string, resolutionHint: string): string {

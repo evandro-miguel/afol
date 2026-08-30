@@ -815,13 +815,22 @@ export function compiledBenchmarkArtifactPath(artifactRoot: string): string {
 export function prepareCompiledReleaseArtifact(
 	projectRoot: string,
 ): PreparedCompiledReleaseArtifact {
+	const tempRootExisted = existsSync(COMPILED_ARTIFACT_TEMP_ROOT);
 	mkdirSync(COMPILED_ARTIFACT_TEMP_ROOT, { recursive: true });
 	const artifactRoot = mkdtempSync(
 		join(COMPILED_ARTIFACT_TEMP_ROOT, "afol-bench-release-"),
 	);
 	const artifactIdentity = captureSandboxRootIdentity(artifactRoot);
-	const cleanup = (): void =>
+	const cleanup = (): void => {
 		removeOwnedCompiledArtifactRoot(artifactRoot, artifactIdentity);
+		if (tempRootExisted) return;
+		try {
+			rmdirSync(COMPILED_ARTIFACT_TEMP_ROOT);
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException).code;
+			if (code !== "ENOENT" && code !== "ENOTEMPTY") throw error;
+		}
+	};
 	const targetBinary = compiledBenchmarkArtifactPath(artifactRoot);
 	try {
 		if (isCompiledBunRuntime()) {

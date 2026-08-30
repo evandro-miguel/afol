@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -309,6 +310,68 @@ status: draft
 		expect(JSON.stringify(payload)).toContain(
 			"fixture-maintenance_ux-journey_01",
 		);
+	});
+
+	test("fails closed when a tool has no UX coverage", async () => {
+		const captured = captureIo();
+		expect(
+			await runUxCommand(
+				"coverage",
+				["--tool", "feedback", "--json"],
+				root,
+				captured.io,
+			),
+		).toBe(1);
+		const payload = parsePayload(captured);
+		expect(payload.ok).toBe(false);
+		expect(payload.count).toBe(0);
+		expect(payload.hint).toContain("Register a UX journey");
+	});
+
+	test("bounds verbose JSON when the UX registry is large", async () => {
+		const template = readFileSync(
+			join(root, ".afol", "adm", "ux", "fixture-maintenance_ux-journey_01.md"),
+			"utf8",
+		);
+		for (let index = 0; index < 200; index += 1) {
+			const id = `fixture-bulk-${index}_ux-journey_01`;
+			write(
+				`.afol/adm/ux/${id}.md`,
+				template
+					.replaceAll("fixture-maintenance_ux-journey_01", id)
+					.replaceAll("Maintenance Warning UX", `Bulk UX ${index}`),
+			);
+		}
+		const captured = captureIo();
+		expect(
+			await runUxCommand("list", ["--json", "--verbose"], root, captured.io),
+		).toBe(0);
+		expect(
+			Buffer.byteLength(captured.stdout[0] ?? "", "utf8"),
+		).toBeLessThanOrEqual(12_000);
+		const payload = parsePayload(captured);
+		expect(payload.details_truncated).toBe(true);
+		expect(payload.entries_omitted).toBeGreaterThan(0);
+	});
+
+	test("bounds validation JSON when an invalid registry has many issues", async () => {
+		for (let index = 0; index < 160; index += 1) {
+			const id = `fixture-invalid-${index}_ux-journey_01`;
+			write(
+				`.afol/adm/ux/${id}.md`,
+				`---\ndoc_type: ux-journey\nid: ${id}\nstatus: active\n---\n\n# Invalid UX ${index}\n`,
+			);
+		}
+		const captured = captureIo();
+		expect(await runUxCommand("validate", ["--json"], root, captured.io)).toBe(
+			1,
+		);
+		expect(
+			Buffer.byteLength(captured.stdout[0] ?? "", "utf8"),
+		).toBeLessThanOrEqual(12_000);
+		const payload = parsePayload(captured);
+		expect(payload.details_truncated).toBe(true);
+		expect(payload.issues_omitted).toBeGreaterThan(0);
 	});
 
 	test("shows one UX journey by id", async () => {

@@ -14,6 +14,7 @@ const CATEGORY_ORDER: readonly CommandCategory[] = [
 ];
 
 const HELP_LINE_LIMIT = 120;
+const JSON_OUTPUT_BYTE_LIMIT = 16_000;
 
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
 	core: "Core",
@@ -201,6 +202,19 @@ type HelpFormatOptions = {
 	intent?: HelpIntent;
 };
 
+function compactCatalogEntry(entry: CommandCatalogEntry): CommandCatalogEntry {
+	return {
+		command: entry.command,
+		aliases: entry.aliases,
+		kind: entry.kind,
+		sideEffect: entry.sideEffect,
+		requires_approval: entry.requires_approval,
+		stability: entry.stability,
+		description: entry.description,
+		category: entry.category,
+	};
+}
+
 function filterCommandsByIntent(
 	commands: readonly CommandSpec[],
 	intent?: HelpIntent,
@@ -253,9 +267,17 @@ export function buildCommandCatalog(
 
 export function formatCatalogJson(
 	registry = kernelRegistry,
-	options: { intent?: HelpIntent } = {},
+	options: HelpFormatOptions = {},
 ): string {
-	return `${JSON.stringify(buildCommandCatalog(registry, options), null, 2)}\n`;
+	const catalog = buildCommandCatalog(registry, options);
+	if (options.verbose === undefined) {
+		return `${JSON.stringify(catalog, null, 2)}\n`;
+	}
+	if (!options.verbose) {
+		return `${JSON.stringify(catalog.map(compactCatalogEntry))}\n`;
+	}
+	const verbose = JSON.stringify(catalog);
+	return `${Buffer.byteLength(verbose, "utf8") <= JSON_OUTPUT_BYTE_LIMIT ? verbose : JSON.stringify(catalog.map(compactCatalogEntry))}\n`;
 }
 
 export function buildCommandHelpJson(

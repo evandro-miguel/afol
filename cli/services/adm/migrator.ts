@@ -1,16 +1,6 @@
-import {
-	closeSync,
-	existsSync,
-	fsyncSync,
-	mkdirSync,
-	openSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
-import { atomicWriteText } from "../io/atomic";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { atomicWriteBytes, atomicWriteText } from "../io/atomic";
 import { resolveProjectPath, resolveProjectWritePath } from "../project/root";
 import { type AdmManifestEntry, buildAdmMigrationPlan } from "./planner";
 
@@ -28,48 +18,6 @@ type ArchivePath = {
 	relativePath: string;
 	path: string;
 };
-
-function fsyncPath(path: string): void {
-	let fd: number | null = null;
-	try {
-		fd = openSync(path, "r");
-		fsyncSync(fd);
-	} catch {
-		// Some filesystems do not support directory fsync.
-	} finally {
-		if (fd !== null) {
-			closeSync(fd);
-		}
-	}
-}
-
-function sanitizeTempLabel(path: string): string {
-	return path
-		.replace(/[\\/:*?"<>|]/g, "_")
-		.replace(/\.{2,}/g, "_")
-		.replace(/\s+/g, "-")
-		.replace(/^$/g, "file");
-}
-
-function atomicWriteBytes(path: string, content: Uint8Array): void {
-	const dir = dirname(path);
-	mkdirSync(dir, { recursive: true });
-	const tempPath = join(
-		dir,
-		`.${sanitizeTempLabel(path)}.${process.pid}.${Date.now()}.tmp`,
-	);
-	try {
-		writeFileSync(tempPath, content);
-		fsyncPath(tempPath);
-		renameSync(tempPath, path);
-		fsyncPath(dir);
-	} catch (error) {
-		if (existsSync(tempPath)) {
-			rmSync(tempPath, { force: true });
-		}
-		throw error;
-	}
-}
 
 function formatTimestamp(now: Date): string {
 	const date = [

@@ -333,6 +333,59 @@ describe("state sqlite", () => {
 		}
 	});
 
+	test("hydrateSession streams evidence larger than the read buffer", () => {
+		const root = createFixture();
+		try {
+			const evidencePath = join(
+				root,
+				".afol",
+				"wb",
+				"test-session",
+				".evidence.jsonl",
+			);
+			const entries = Array.from({ length: 2_000 }, (_, index) =>
+				JSON.stringify({
+					id: `E-${index}`,
+					task_id: "T-01",
+					created_at: "2026-08-30T00:00:00Z",
+					command: "bun test",
+					result: "passed",
+				}),
+			);
+			writeFileSync(evidencePath, `${entries.join("\n")}\n`, "utf8");
+
+			const snapshot = hydrateSession(root, "test-session");
+			expect(snapshot.summary.evidenceEntries).toBe(2_000);
+			const db = openDb(root);
+			try {
+				const row = db
+					.query("SELECT COUNT(*) AS count FROM evidence WHERE session_id = ?")
+					.get("test-session") as { count: number };
+				expect(row.count).toBe(2_000);
+			} finally {
+				db.close();
+			}
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("hydrateSession rejects an unbounded evidence line", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, ".afol", "wb", "test-session", ".evidence.jsonl"),
+				"x".repeat(1_000_001),
+				"utf8",
+			);
+			expect(() => hydrateSession(root, "test-session")).toThrow(
+				"State source line exceeds 1000000 characters",
+			);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
 	test("hydrateSession computes and stores source hash", () => {
 		const root = createFixture();
 		try {

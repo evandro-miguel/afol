@@ -287,27 +287,29 @@ describe("template forbidden-content policy", () => {
 		expect(validateRegistryContract(snapshot)).toEqual([]);
 	});
 
-	test("template governance matrix mirrors the root command contract", async () => {
+	test("template governance matrix mirrors private governance when present", async () => {
 		const projectRoot = process.cwd();
 		const readMatrix = (relativePath: string) =>
 			readFile(join(projectRoot, relativePath), "utf8").then((content) =>
 				JSON.parse(content),
 			);
-		const [rootMatrix, templateMatrix] = await Promise.all([
-			readMatrix(
-				".afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json",
-			),
-			readMatrix(
-				"src/project-template/.afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json",
-			),
-		]);
+		const rootMatrixPath =
+			".afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json";
+		const templateMatrix = await readMatrix(
+			"src/project-template/.afol/data/benchmarks/catalog/scenarios/governance-history/tool-surface-coverage-matrix.json",
+		);
 
-		expect(templateMatrix.coverage.commands).toEqual(
-			rootMatrix.coverage.commands,
-		);
-		expect(templateMatrix.coverage.subcommands).toEqual(
-			rootMatrix.coverage.subcommands,
-		);
+		expect(templateMatrix.coverage.commands.length).toBeGreaterThan(0);
+		expect(templateMatrix.coverage.subcommands.length).toBeGreaterThan(0);
+		if (existsSync(join(projectRoot, rootMatrixPath))) {
+			const rootMatrix = await readMatrix(rootMatrixPath);
+			expect(templateMatrix.coverage.commands).toEqual(
+				rootMatrix.coverage.commands,
+			);
+			expect(templateMatrix.coverage.subcommands).toEqual(
+				rootMatrix.coverage.subcommands,
+			);
+		}
 	});
 
 	test("template PSTR and fleet scenarios use public synthetic fixtures", async () => {
@@ -355,7 +357,7 @@ describe("template forbidden-content policy", () => {
 		for (const scenarioPath of [
 			".afol/data/benchmarks/catalog/scenarios/routing-accuracy/route-task.json",
 			"src/project-template/.afol/data/benchmarks/catalog/scenarios/routing-accuracy/route-task.json",
-		]) {
+		].filter((path) => existsSync(join(process.cwd(), path)))) {
 			const scenario = JSON.parse(
 				await readFile(join(process.cwd(), scenarioPath), "utf8"),
 			) as Record<string, unknown>;
@@ -414,6 +416,7 @@ describe("template forbidden-content policy", () => {
 		];
 		const metadataMatches: string[] = [];
 		for (const relativePath of metadataFiles) {
+			if (!existsSync(join(projectRoot, relativePath))) continue;
 			const content = await readFile(join(projectRoot, relativePath), "utf8");
 			if (content.includes("agentic-folder-sys")) {
 				metadataMatches.push(relativePath);
@@ -469,6 +472,7 @@ describe("template forbidden-content policy", () => {
 		];
 		const matches: string[] = [];
 		for (const relativePath of metadataFiles) {
+			if (!existsSync(join(projectRoot, relativePath))) continue;
 			const content = await readFile(join(projectRoot, relativePath), "utf8");
 			if (content.includes("agentic-scaffold-mcp")) {
 				matches.push(relativePath);

@@ -1,12 +1,13 @@
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { readProjectConfig } from "../project/paths";
 import { recurrenceThresholdsFromSettings } from "./config";
 import {
 	assertSafeEvolutionTarget,
+	type EvolutionDbSnapshot,
 	evolutionDbPath,
-	openEvolutionDbReadOnly,
+	openEvolutionDbSnapshot,
 } from "./db";
 import { checkEvolutionDbHealth, type EvolutionDbHealth } from "./health";
 import { productionDayJournalPath } from "./journal";
@@ -891,9 +892,10 @@ export function analyzeEvolutionProject(
 	const stateBefore = assertAnalysisStateLimits(root, resolved, dbPath);
 	hooks.beforeOpen?.(dbPath);
 	assertAnalysisStateUnchanged(stateBefore);
-	let db: Database | undefined;
+	let snapshot: EvolutionDbSnapshot | undefined;
 	try {
-		db = openEvolutionDbReadOnly(dbPath);
+		snapshot = openEvolutionDbSnapshot(dbPath);
+		const { db } = snapshot;
 		const health: EvolutionDbHealth = checkEvolutionDbHealth(
 			dbPath,
 			projectId,
@@ -1066,7 +1068,7 @@ export function analyzeEvolutionProject(
 		});
 	} finally {
 		assertAnalysisStateUnchanged(stateBefore);
-		db?.close();
+		snapshot?.close();
 		assertAnalysisStateUnchanged(stateBefore);
 	}
 }

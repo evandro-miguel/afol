@@ -29,7 +29,7 @@ superseded_by: ""
 - Cons:
 - Risks:
 
-2) Option B
+1) Option B
 
 - Pros:
 - Cons:

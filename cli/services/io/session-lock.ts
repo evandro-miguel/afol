@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
 	closeSync,
 	existsSync,
@@ -7,6 +7,7 @@ import {
 	lstatSync,
 	mkdirSync,
 	openSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	unlinkSync,
@@ -28,6 +29,7 @@ const heldLocks = new Map<string, number>();
 const HOSTNAME = hostname().toLowerCase();
 const PROCESS_STARTED_AT_MS = Date.now() - process.uptime() * 1_000;
 const PROCESS_START_TOKEN = readProcessStartToken(process.pid);
+const PROCESS_OWNER_TOKEN = randomUUID();
 
 interface LockIdentity {
 	dev: bigint;
@@ -38,6 +40,7 @@ interface SessionLockMetadata extends LockIdentity {
 	isParsed: boolean;
 	pid?: number;
 	processStartToken?: string;
+	ownerToken?: string;
 	acquiredAtMs: number | null;
 	host?: string;
 	raw: string | null;
@@ -259,6 +262,7 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 		const payload = parsed as {
 			pid?: unknown;
 			process_start_token?: unknown;
+			owner_token?: unknown;
 			acquired_at?: unknown;
 			host?: unknown;
 		};
@@ -271,6 +275,11 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 			typeof payload.process_start_token === "string" &&
 			/^\d+$/.test(payload.process_start_token)
 				? payload.process_start_token
+				: undefined;
+		const ownerToken =
+			typeof payload.owner_token === "string" &&
+			/^[0-9a-f-]{36}$/i.test(payload.owner_token)
+				? payload.owner_token
 				: undefined;
 		const acquiredAtRaw = payload.acquired_at;
 		const acquiredAtMs =
@@ -289,6 +298,7 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 			isParsed: true,
 			...(pid !== undefined ? { pid } : {}),
 			...(processStartToken !== undefined ? { processStartToken } : {}),
+			...(ownerToken !== undefined ? { ownerToken } : {}),
 			raw: raw,
 			mtimeMs,
 		};
@@ -603,6 +613,113 @@ export function resolveExternalPathLockPath(canonicalPath: string): string {
 		: resolvedPath;
 	const key = createHash("sha256").update(physicalPath).digest("hex");
 	return join(tmpdir(), "afol-external-locks", `${key}.lock`);
+}
+
+export type ExternalPathLease<T> = {
+	value: T;
+	release: () => void;
+};
+
+function resolveExternalPathLeaseDir(canonicalPath: string): string {
+	return `${resolveExternalPathLockPath(canonicalPath)}.leases`;
+}
+
+/**
+ * Establish a process-owned lease while holding the path coordination lock.
+ * The caller must release it only after the returned resource is fully closed.
+ */
+export function establishExternalPathLeaseSync<T>(
+	canonicalPath: string,
+	action: () => T,
+): ExternalPathLease<T> {
+	return withExternalPathLockSync(canonicalPath, () => {
+		const leaseDir = resolveExternalPathLeaseDir(canonicalPath);
+		mkdirSync(leaseDir, { recursive: true });
+		const leasePath = join(leaseDir, `${process.pid}-${randomUUID()}.lease`);
+		const fd = openSync(leasePath, "wx");
+		let identity: LockIdentity | null = null;
+		try {
+			identity = readFdIdentity(fd);
+			writeFileSync(
+				fd,
+				`${JSON.stringify({
+					pid: process.pid,
+					...(PROCESS_START_TOKEN !== null
+						? { process_start_token: PROCESS_START_TOKEN }
+						: {}),
+					owner_token: PROCESS_OWNER_TOKEN,
+					acquired_at: new Date().toISOString(),
+					host: HOSTNAME,
+					resource: resolve(canonicalPath),
+				})}\n`,
+				"utf8",
+			);
+			fsyncSync(fd);
+		} finally {
+			closeSync(fd);
+		}
+
+		let released = false;
+		const release = () => {
+			if (released) return;
+			released = true;
+			if (identity !== null) unlinkIfIdentityMatches(leasePath, identity);
+		};
+		try {
+			return { value: action(), release };
+		} catch (error) {
+			release();
+			throw error;
+		}
+	});
+}
+
+/** Wait for every live resource lease while new leases are externally blocked. */
+export function waitForExternalPathLeasesToDrainSync(
+	canonicalPath: string,
+): void {
+	const leaseDir = resolveExternalPathLeaseDir(canonicalPath);
+	const startedAt = Date.now();
+	for (;;) {
+		let activeCount = 0;
+		let entries: string[];
+		try {
+			entries = readdirSync(leaseDir).filter((entry) =>
+				entry.endsWith(".lease"),
+			);
+		} catch (error) {
+			if (errorCode(error) === "ENOENT") return;
+			throw error;
+		}
+		for (const entry of entries) {
+			const leasePath = join(leaseDir, entry);
+			const metadata = readLockMetadata(leasePath);
+			if (metadata === null) continue;
+			// This function and same-module SQLite writes are synchronous. The
+			// current isolate cannot mutate the DB while it is copying the files.
+			if (
+				metadata.pid === process.pid &&
+				metadata.ownerToken === PROCESS_OWNER_TOKEN
+			) {
+				continue;
+			}
+			const staleMetadata = shouldRecoverStaleLock(leasePath, Date.now());
+			if (
+				staleMetadata !== null &&
+				tryReclaimStaleLock(leasePath, staleMetadata)
+			) {
+				continue;
+			}
+			activeCount += 1;
+		}
+		if (activeCount === 0) return;
+		if (Date.now() - startedAt >= LOCK_TIMEOUT_MS) {
+			throw new Error(
+				`Timed out waiting for ${activeCount} external path lease(s) to close`,
+			);
+		}
+		sleepSync(LOCK_RETRY_MS);
+	}
 }
 
 export async function withExternalPathLock<T>(

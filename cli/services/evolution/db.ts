@@ -1,14 +1,20 @@
 import { constants, Database } from "bun:sqlite";
 import {
 	chmodSync,
+	copyFileSync,
 	existsSync,
 	lstatSync,
 	mkdirSync,
+	mkdtempSync,
 	realpathSync,
+	rmSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { withExternalPathLockSync } from "../io/session-lock";
+import { basename, dirname, join, resolve } from "node:path";
+import {
+	establishExternalPathLeaseSync,
+	waitForExternalPathLeasesToDrainSync,
+	withExternalPathLockSync,
+} from "../io/session-lock";
 import { resolveProjectWritePath } from "../project/root";
 import { applyMigrations, EVOLUTION_SCHEMA_VERSION } from "./migrations";
 
@@ -17,20 +23,6 @@ const BUSY_TIMEOUT_MS = 5000;
 const BUSY_RETRY_MS = 25;
 const WINDOWS_RESERVED_DEVICE_NAMES =
 	/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-
-export function openEvolutionDbReadOnly(dbPath: string): Database {
-	const uri = pathToFileURL(dbPath);
-	uri.searchParams.set("mode", "ro");
-	const hasWalSidecars =
-		existsSync(`${dbPath}-wal`) && existsSync(`${dbPath}-shm`);
-	uri.searchParams.set(hasWalSidecars ? "readonly_shm" : "immutable", "1");
-	const db = new Database(
-		uri.href,
-		constants.SQLITE_OPEN_READONLY | constants.SQLITE_OPEN_URI,
-	);
-	if (hasWalSidecars) db.fileControl(constants.SQLITE_FCNTL_PERSIST_WAL, 1);
-	return db;
-}
 
 type EvolutionFileStat = NonNullable<ReturnType<typeof lstatSync>>;
 
@@ -139,6 +131,116 @@ export function assertSafeEvolutionTarget(
 	}
 }
 
+function evolutionSnapshotParent(dbPath: string): string {
+	let current = dirname(resolve(dbPath));
+	while (dirname(current) !== current) {
+		if (basename(current) === ".afol") return join(current, "tmp");
+		current = dirname(current);
+	}
+	return join(dirname(resolve(dbPath)), ".afol-tmp");
+}
+
+function sameEvolutionFile(
+	left: EvolutionFileStat,
+	right: EvolutionFileStat,
+): boolean {
+	return (
+		left.dev === right.dev &&
+		left.ino === right.ino &&
+		left.size === right.size &&
+		left.mtimeMs === right.mtimeMs
+	);
+}
+
+export type EvolutionDbSnapshot = {
+	db: Database;
+	close: () => void;
+};
+
+/** Copy a stable DB/WAL pair; SQLite rebuilds disposable SHM lock state. */
+export function openEvolutionDbSnapshot(dbPath: string): EvolutionDbSnapshot {
+	return withExternalPathLockSync(dbPath, () => {
+		waitForExternalPathLeasesToDrainSync(dbPath);
+		const sourcePaths = [dbPath, `${dbPath}-wal`, `${dbPath}-shm`].filter(
+			(path) => existsSync(path),
+		);
+		if (sourcePaths[0] !== dbPath)
+			throw new Error(`missing evolution db: ${dbPath}`);
+		const before = sourcePaths.map((path) => {
+			const stat = assertSafeEvolutionTarget(
+				path,
+				"evolution snapshot source",
+				false,
+			);
+			if (stat === null)
+				throw new Error(`missing evolution snapshot source: ${path}`);
+			return { path, stat };
+		});
+		const parent = evolutionSnapshotParent(dbPath);
+		inspectExistingParent(join(parent, "snapshot"));
+		mkdirSync(parent, { recursive: true });
+		if (process.platform !== "win32") chmodSync(parent, 0o700);
+		inspectExistingParent(join(parent, "snapshot"));
+		const snapshotDir = mkdtempSync(join(parent, "evolution-analysis-"));
+		if (process.platform !== "win32") chmodSync(snapshotDir, 0o700);
+		try {
+			for (const source of sourcePaths) {
+				// SHM is a transient WAL index with process lock state. Rebuild it in
+				// the disposable directory instead of copying stale lock bytes.
+				if (source === `${dbPath}-shm`) continue;
+				const target = join(snapshotDir, basename(source));
+				copyFileSync(source, target);
+				if (process.platform !== "win32") chmodSync(target, 0o600);
+			}
+			for (const expected of before) {
+				const actual = assertSafeEvolutionTarget(
+					expected.path,
+					"evolution snapshot source",
+					false,
+				);
+				if (actual === null)
+					throw new Error(
+						`missing evolution snapshot source: ${expected.path}`,
+					);
+				if (!sameEvolutionFile(expected.stat, actual))
+					throw new Error(
+						`evolution database changed while creating analysis snapshot: ${expected.path}`,
+					);
+			}
+			const snapshotDbPath = join(snapshotDir, basename(dbPath));
+			const db = new Database(snapshotDbPath, { readonly: true });
+			let closed = false;
+			return {
+				db,
+				close: () => {
+					if (closed) return;
+					closed = true;
+					try {
+						db.close();
+					} finally {
+						rmSync(snapshotDir, { recursive: true, force: true });
+					}
+				},
+			};
+		} catch (error) {
+			rmSync(snapshotDir, { recursive: true, force: true });
+			throw error;
+		}
+	});
+}
+
+export function withEvolutionDbSnapshot<T>(
+	dbPath: string,
+	action: (db: Database) => T,
+): T {
+	const snapshot = openEvolutionDbSnapshot(dbPath);
+	try {
+		return action(snapshot.db);
+	} finally {
+		snapshot.close();
+	}
+}
+
 function ensurePrivatePermissions(dbPath: string): void {
 	if (process.platform === "win32") return;
 	const stateDir = dirname(dbPath);
@@ -187,7 +289,7 @@ export function openEvolutionDb(dbPath: string): Database {
 	assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 	assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
 	ensurePrivatePermissions(dbPath);
-	return withExternalPathLockSync(dbPath, () => {
+	const leased = establishExternalPathLeaseSync(dbPath, () => {
 		const db = new Database(dbPath);
 		try {
 			db.fileControl(constants.SQLITE_FCNTL_PERSIST_WAL, 1);
@@ -232,6 +334,30 @@ export function openEvolutionDb(dbPath: string): Database {
 			throw error;
 		}
 	});
+	const db = leased.value;
+	const originalClose = db.close.bind(db);
+	let closed = false;
+	const close = (throwOnError?: boolean) => {
+		if (closed) return;
+		originalClose(throwOnError);
+		closed = true;
+		leased.release();
+	};
+	try {
+		Object.defineProperty(db, "close", {
+			configurable: false,
+			value: close,
+			writable: false,
+		});
+	} catch (error) {
+		try {
+			originalClose();
+		} finally {
+			leased.release();
+		}
+		throw error;
+	}
+	return db;
 }
 
 export function closeEvolutionDb(db: Database): void {

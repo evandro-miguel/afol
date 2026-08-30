@@ -32,7 +32,7 @@ state the gap and record follow-up when recurrence is likely.
 | Ambiguous/product request | Decision intake, parent spec, RULE-002 |
 | Feature/workstream | Roadmap, parent spec, RULE-002 |
 | Spec or managed doc | RULE-003 and matching template |
-| Workbench artifact | `AGENTS.md`, RULE-002/RULE-004, `afol help start|done|close` |
+| Workbench artifact | `AGENTS.md`, RULE-002/RULE-004, `afol help start \| done \| close` |
 | Project-local skill | `AGENTS.md`, rules, `afol help skill`, RULE-002 |
 | Code | Project config, nearest tests, language skill |
 | Command/tool | `AGENTS.md`, rules, `afol help <command>`, docs/tests |

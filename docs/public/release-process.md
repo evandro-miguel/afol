@@ -49,6 +49,44 @@ Before attaching a binary to a GitHub Release, the exact candidate must have:
 Until every item is satisfied, publish source only and do not attach the
 standalone executable.
 
+### Deterministic Linux x64 staging
+
+After `validate:release` has produced `dist/afol`, its provenance, and its
+release security report, place the reviewed compliance bundle under
+`release/compliance/linux-x64/`. It must contain `compliance-review.json` plus
+every approved notice, license, and relinkable-material file. The review record
+uses schema `afol.release-compliance/v1` and binds the exact artifact SHA-256,
+source commit, Bun version, reviewer, review time, and sorted `license_files`.
+The staging command will not generate or approve that legal decision.
+
+Then run:
+
+```bash
+bun run release:stage
+cd dist/release/afol-linux-x64
+sha256sum -c afol-linux-x64.sha256
+```
+
+The deterministic staged directory contains:
+
+- `afol-linux-x64`
+- `afol-linux-x64.sha256`
+- `provenance.json`
+- `security-scan.json`
+- `sbom.spdx.json`
+- `manifest.json`
+- `licenses/`
+
+The command rejects an unapproved or mismatched compliance review, incomplete
+license inventory, non-passing dependency or secret scan, mismatched source or
+artifact hash, non-Linux-x64 provenance, symlink escape, or missing evidence.
+The checksum names the final downloadable asset, so verification works after
+all assets are downloaded into one empty directory.
+
+Staging is necessary but not sufficient for publication. Run the documented
+download, install, example, rollback, and uninstall smoke against the actual
+published URLs before attaching or promoting the binary.
+
 ## Local release evidence
 
 Per ADR-009, this repository ships no hosted CI workflow. Local validation

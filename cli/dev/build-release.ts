@@ -3,10 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-	closeSync,
 	existsSync,
-	fsyncSync,
-	openSync,
 	readFileSync,
 	renameSync,
 	rmSync,
@@ -14,6 +11,10 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	syncDirectoryDurablyIfSupported,
+	syncFileDurably,
+} from "../services/io/durable-sync";
 import {
 	assertReleaseOutputFileStable,
 	prepareReleaseOutputFile,
@@ -55,20 +56,6 @@ export function compiledReleaseBuildArgs(
 
 function portableRelativePath(from: string, to: string): string {
 	return relative(from, to).replaceAll("\\", "/");
-}
-
-function fsyncPath(path: string): void {
-	let fd: number | null = null;
-	try {
-		fd = openSync(path, "r");
-		fsyncSync(fd);
-	} catch {
-		// Directory fsync is best-effort; non-file paths may not support this.
-	} finally {
-		if (fd !== null) {
-			closeSync(fd);
-		}
-	}
 }
 
 export type BuildReleaseArtifactOptions = {
@@ -123,9 +110,9 @@ function writeTextAtomically(
 		if (tempGuard) {
 			assertReleaseOutputFileStable(tempGuard, true);
 		}
-		fsyncPath(tempPath);
+		syncFileDurably(tempPath);
 		renameSync(tempPath, outfilePath);
-		fsyncPath(dirname(outfilePath));
+		syncDirectoryDurablyIfSupported(dirname(outfilePath));
 		if (outputGuard) {
 			assertReleaseOutputFileStable(outputGuard, true);
 		}

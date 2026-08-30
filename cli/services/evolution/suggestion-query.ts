@@ -1,8 +1,11 @@
-import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { readProjectConfig } from "../project/paths";
 import { localDateForTimezone } from "./config";
-import { assertSafeEvolutionTarget, evolutionDbPath } from "./db";
+import {
+	assertSafeEvolutionTarget,
+	evolutionDbPath,
+	withEvolutionDbSnapshot,
+} from "./db";
 import { getEvolutionStatus } from "./health";
 import { EVOLUTION_SCHEMA_VERSION } from "./migrations";
 import { assertEvolutionProjectionCheckpoint } from "./projection-checkpoint";
@@ -95,8 +98,7 @@ function derive(
 	assertSafeEvolutionTarget(dbPath, "evolution db", false);
 	assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 	assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
-	const db = new Database(dbPath, { readonly: true });
-	try {
+	return withEvolutionDbSnapshot(dbPath, (db) => {
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		const status = getEvolutionStatus(db, projectId);
 		if (status.migration_version !== EVOLUTION_SCHEMA_VERSION)
@@ -128,9 +130,7 @@ function derive(
 			derivation,
 			receipts: receiptProjection.receipts,
 		};
-	} finally {
-		db.close();
-	}
+	});
 }
 
 function rankedAvailableSuggestions(

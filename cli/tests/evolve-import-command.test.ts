@@ -55,6 +55,14 @@ function capture() {
 	};
 }
 
+function snapshotEvolutionFiles(dbPath: string) {
+	return [dbPath, `${dbPath}-wal`, `${dbPath}-shm`].map((path) => ({
+		path,
+		exists: existsSync(path),
+		bytes: existsSync(path) ? readFileSync(path) : null,
+	}));
+}
+
 describe("evolve external import commands", () => {
 	test("preview reads without creating evolution state or exposing records", async () => {
 		const { root, source } = fixture();
@@ -108,7 +116,7 @@ describe("evolve external import commands", () => {
 				expect(JSON.stringify(confirmPayload)).not.toContain("secret-value");
 
 				const dbPath = join(root, ".afol", "state", "evolution.db");
-				const before = readFileSync(dbPath);
+				const before = snapshotEvolutionFiles(dbPath);
 				const listed = capture();
 				expect(
 					await runEvolveCommand(
@@ -124,7 +132,7 @@ describe("evolve external import commands", () => {
 					"<redacted-local-source>",
 				);
 				expect(JSON.stringify(listPayload)).not.toContain(root);
-				expect(readFileSync(dbPath)).toEqual(before);
+				expect(snapshotEvolutionFiles(dbPath)).toEqual(before);
 			} finally {
 				removeEvolutionTestRoot(root);
 			}

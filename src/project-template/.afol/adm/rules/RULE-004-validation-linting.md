@@ -38,7 +38,7 @@ afol verify-tasks --strict
 ## Validation Commands
 
 | Scope | Command |
-|-------|---------|
+| ------- | --------- |
 | Project structure | `afol validate project --json` |
 | Workbench tasks | `afol verify-tasks --strict` |
 | Local state indexes | `afol local-state rebuild --json` |

@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { withSessionLock } from "../io/session-lock";
 import { readProjectConfig } from "../project/paths";
@@ -7,6 +7,7 @@ import {
 	assertSafeEvolutionTarget,
 	evolutionDbPath,
 	openEvolutionDb,
+	withEvolutionDbSnapshot,
 } from "./db";
 import {
 	readEvaluationJournal,
@@ -178,15 +179,8 @@ export function previewEvolutionDerivedState(
 		resolved.eventsDir,
 	).length;
 
-	let db: Database | null = input.db ?? null;
-	let owned = false;
-	if (!db && existsSync(resolved.dbPath)) {
-		assertSafeEvolutionTarget(resolved.dbPath, "evolution db", false);
-		db = new Database(resolved.dbPath, { readonly: true });
-		owned = true;
-	}
-	try {
-		return baseResult(
+	const render = (db: Database | null) =>
+		baseResult(
 			"preview",
 			resolved,
 			observationEvents,
@@ -195,9 +189,10 @@ export function previewEvolutionDerivedState(
 			evaluationEvents,
 			readVersion(db),
 		);
-	} finally {
-		if (owned) db?.close();
-	}
+	if (input.db) return render(input.db);
+	if (!existsSync(resolved.dbPath)) return render(null);
+	assertSafeEvolutionTarget(resolved.dbPath, "evolution db", false);
+	return withEvolutionDbSnapshot(resolved.dbPath, render);
 }
 
 /** Rebuild all evolution projections needed by suggestion reads. */

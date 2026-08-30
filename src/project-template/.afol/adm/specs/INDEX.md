@@ -6,7 +6,7 @@ id: specs_index
 # Specs INDEX
 
 | Metric | Count |
-|--------|-------|
+| -------- | ------- |
 | Total | 0 |
 | Draft | 0 |
 | Active | 0 |

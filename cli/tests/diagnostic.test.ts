@@ -36,6 +36,7 @@ describe("unexpected and integrity diagnostic boundary", () => {
 			});
 			expect(payload.diagnostic.kind).toBe("unexpected");
 			expect(payload.diagnostic.report_id).toMatch(/^FB-[0-9]+-/);
+			expect(payload.diagnostic.persisted).toBe(true);
 			expect(stdout[0]).not.toContain("hunter2");
 		} finally {
 			console.log = log;
@@ -137,6 +138,7 @@ describe("unexpected and integrity diagnostic boundary", () => {
 			).toBe(1);
 			expect(stderr).toHaveLength(1);
 			expect(stderr[0]).toStartWith("err UNEXPECTED_ERROR");
+			expect(stderr[0]).toContain("persisted=no");
 		} finally {
 			console.error = error;
 		}

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -25,6 +26,7 @@ import {
 } from "../validate/hot-path-benchmark";
 import {
 	maxSampleOutputBytes,
+	prepareCompiledReleaseArtifact,
 	runScenarioCommand,
 } from "../validate/scenario-execution";
 import type { HotPathScenarioConfig, Scenario } from "../validate/types";
@@ -131,15 +133,24 @@ describe("F-32 hot-path benchmark runner", () => {
 			hot_path: { operation: "status", mode: "default" },
 		};
 
-		const result = runScenarioCommand(process.cwd(), scenario, {
-			sampleCount: 1,
-			warmupCount: 0,
-		});
+		const root = mkdtempSync(join(tmpdir(), "f32-hot-path-compiled-"));
+		const artifact = prepareCompiledReleaseArtifact(process.cwd());
+		try {
+			const result = runScenarioCommand(root, scenario, {
+				sampleCount: 1,
+				warmupCount: 0,
+				artifact,
+			});
 
-		expect(result.passed).toBe(true);
-		expect(result.profile.execution_mode).toBe("compiled-release");
-		expect(result.profile.artifact_mode).toBe("bun-compile");
-		expect(result.profile.artifact_sha256).not.toBe("source");
+			expect(result.passed).toBe(true);
+			expect(result.profile.execution_mode).toBe("compiled-release");
+			expect(result.profile.artifact_mode).toBe("bun-compile");
+			expect(result.profile.artifact_sha256).not.toBe("source");
+			expect(existsSync(join(root, ".afol"))).toBe(false);
+		} finally {
+			artifact.cleanup();
+			rmSync(root, { recursive: true, force: true });
+		}
 	}, 30_000);
 
 	test("source runtime reports the source execution profile unchanged", () => {

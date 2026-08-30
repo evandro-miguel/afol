@@ -426,7 +426,10 @@ describe("Evolution canonical projection and concurrency", () => {
 				{ stdout: "pipe", stderr: "pipe" },
 			);
 			waitForFile(healthReady);
+			Bun.sleepSync(100);
+			expect(existsSync(healthResult)).toBe(false);
 			holdDb.exec("COMMIT");
+			holdDb.close();
 			expect(await appendChild.exited).toBe(0);
 			expect(await healthChild.exited).toBe(0);
 			expect(JSON.parse(readFileSync(healthResult, "utf8"))).toMatchObject({

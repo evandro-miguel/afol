@@ -703,6 +703,18 @@ describe("state commands", () => {
 				),
 			).toBe(1);
 			expect(captured.stdout.join("\n")).toContain("state validate: fail");
+			const shown = captureIo();
+			expect(
+				await runStateCommand(
+					"show",
+					["-S", "test-session", "--json"],
+					root,
+					shown.io,
+				),
+			).toBe(0);
+			const shownPayload = parseEnvelope(shown.stdout);
+			expect(shownPayload.stale).toBe(true);
+			expect((shownPayload.data as { stale: boolean }).stale).toBe(true);
 		} finally {
 			removeTestRoot(root);
 		}

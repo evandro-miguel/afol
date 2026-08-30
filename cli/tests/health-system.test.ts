@@ -285,11 +285,17 @@ describe("health system", () => {
 			).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				exit_code: number;
-				findings: Array<{ area: string; severity: string; message: string }>;
+				data: {
+					findings: Array<{
+						area: string;
+						severity: string;
+						message: string;
+					}>;
+				};
 			};
 			expect(payload.exit_code).toBe(1);
 			expect(
-				payload.findings.some(
+				payload.data.findings.some(
 					(finding) =>
 						finding.area === "adm" &&
 						finding.severity === "fail" &&
@@ -818,7 +824,8 @@ describe("health system", () => {
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.exit_code).toBe(1);
 			expect(payload.ok).toBe(false);
-			expect(Array.isArray(payload.findings)).toBe(true);
+			expect(payload.findings).toBeUndefined();
+			expect(Array.isArray(payload.data.findings)).toBe(true);
 			expect(payload.summary).toEqual({
 				fail: expect.any(Number),
 				warn: expect.any(Number),
@@ -1440,6 +1447,70 @@ describe("health system", () => {
 			expect(payload.checked_areas).toEqual(["wb"]);
 			expect(payload.release).toBe(false);
 			expect(payload.data.summary).toEqual({ fail: 0, warn: 0, info: 0 });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol health full --json compacts repeated state drift under the output budget", async () => {
+		const root = createFixture();
+		const session = "260830_0900_health-state-drift";
+		const sessionDir = join(root, ".afol", "wb", session);
+		try {
+			mkdirSync(sessionDir, { recursive: true });
+			const db = openDb(root);
+			try {
+				db.query(
+					"INSERT INTO sessions (session_id, hydrated_at, source_algorithm, source_hash, session_path) VALUES (?, ?, ?, ?, ?)",
+				).run(
+					session,
+					"2026-08-30T09:00:00.000Z",
+					"sha256",
+					"a".repeat(64),
+					sessionDir,
+				);
+				const insert = db.query(
+					"INSERT INTO source_files (session_id, path, kind, source_hash) VALUES (?, ?, ?, ?)",
+				);
+				for (let index = 0; index < 200; index += 1) {
+					insert.run(
+						session,
+						`missing-${String(index).padStart(3, "0")}.md`,
+						"task",
+						"b".repeat(64),
+					);
+				}
+			} finally {
+				db.close();
+			}
+
+			const captured = captureIo();
+			expect(
+				await runHealthCommand(["full", "--json"], root, captured.io),
+			).toBe(0);
+			const output = captured.stdout[0] ?? "";
+			expect(new TextEncoder().encode(output).byteLength).toBeLessThanOrEqual(
+				20_000,
+			);
+			const payload = JSON.parse(output) as {
+				data: {
+					findings: Array<{ area: string; message: string }>;
+					findings_omitted: number;
+					findings_total: number;
+				};
+			};
+			expect(payload.data.findings_omitted).toBe(199);
+			expect(payload.data.findings_total).toBeGreaterThanOrEqual(200);
+			expect(payload.data.findings.length).toBeLessThan(
+				payload.data.findings_total,
+			);
+			expect(
+				payload.data.findings.some(
+					(finding) =>
+						finding.area === "state" &&
+						finding.message.includes("200 hydrated files drift"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -1,7 +1,8 @@
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
+import { observeSessionLock } from "../io/session-lock";
 import { unmatchedApplyPrepares } from "./apply-journal";
-import { assertSafeEvolutionTarget, openEvolutionDbReadOnly } from "./db";
+import { assertSafeEvolutionTarget, withEvolutionDbSnapshot } from "./db";
 import {
 	evaluationJournalPath,
 	validateEvaluationProjection,
@@ -21,6 +22,21 @@ import { validatePreferenceProjection } from "./preference-journal";
 import type { ProductionDay } from "./production-days";
 import { validateEvolutionProjectionCheckpoint } from "./projection-checkpoint";
 import { validateSuggestionReceiptProjection } from "./suggestion-journal";
+
+const EVOLUTION_JOURNAL_LOCK = "__evolution-journal__";
+const EVOLUTION_HEALTH_WAIT_MS = 5_000;
+const EVOLUTION_HEALTH_RETRY_MS = 25;
+
+function waitForEvolutionJournalIdle(root: string): void {
+	const deadline = Date.now() + EVOLUTION_HEALTH_WAIT_MS;
+	for (;;) {
+		const observed = observeSessionLock(root, EVOLUTION_JOURNAL_LOCK);
+		if (!observed.active || observed.pid === process.pid) return;
+		if (Date.now() >= deadline)
+			throw new Error("timed out waiting for evolution journal update");
+		Bun.sleepSync(EVOLUTION_HEALTH_RETRY_MS);
+	}
+}
 
 export type EvolutionDbFinding = {
 	severity: "fail" | "warn" | "info";
@@ -327,7 +343,7 @@ export function checkEvolutionDbHealth(
 			],
 		};
 	const findings: EvolutionDbFinding[] = [];
-	let db: Database | null = existingDb ?? null;
+	const db: Database | null = existingDb ?? null;
 	const ownsDb = existingDb === undefined;
 	let schemaOk = true;
 	let walEnabled = false;
@@ -343,7 +359,17 @@ export function checkEvolutionDbHealth(
 		assertSafeEvolutionTarget(dbPath, "evolution db", false);
 		assertSafeEvolutionTarget(`${dbPath}-wal`, "evolution db WAL");
 		assertSafeEvolutionTarget(`${dbPath}-shm`, "evolution db SHM");
-		db ??= openEvolutionDbReadOnly(dbPath);
+		if (db === null) {
+			if (canonicalContext) waitForEvolutionJournalIdle(canonicalContext.root);
+			return withEvolutionDbSnapshot(dbPath, (snapshotDb) =>
+				checkEvolutionDbHealth(
+					dbPath,
+					expectedProjectId,
+					canonicalContext,
+					snapshotDb,
+				),
+			);
+		}
 		migrationVersion = readUserVersion(db);
 		const journal = scalarString(
 			db.query("PRAGMA journal_mode").get() as Record<string, unknown> | null,

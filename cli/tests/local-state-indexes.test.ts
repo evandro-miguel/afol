@@ -1965,6 +1965,43 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("bounds verbose rebuild snapshots and reports omitted entries", async () => {
+		const root = buildFixture();
+		try {
+			const bulkDir = join(root, "bulk");
+			mkdirSync(bulkDir, { recursive: true });
+			for (let index = 0; index < 500; index += 1) {
+				writeFileSync(
+					join(bulkDir, `file-${index}.txt`),
+					`${"indexed ".repeat(20)}\n`,
+					"utf8",
+				);
+			}
+			const stdout: string[] = [];
+			const io = {
+				stdout: (message: string) => stdout.push(message),
+				stderr: () => {},
+			};
+
+			expect(
+				await runLocalStateCommand(
+					["rebuild", "--json", "--verbose"],
+					root,
+					io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(stdout.at(-1) ?? "{}") as {
+				snapshot_truncated?: boolean;
+				snapshot_omitted?: number;
+			};
+			expect(payload.snapshot_truncated).toBe(true);
+			expect(payload.snapshot_omitted).toBeGreaterThan(0);
+			expect(stdout.at(-1)?.length ?? 0).toBeLessThan(40_000);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("local-state rebuild --json is denied in restricted context", async () => {
 		const root = buildFixture();
 		try {

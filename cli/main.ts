@@ -235,11 +235,17 @@ export async function main(argv: string[]): Promise<number> {
 				);
 				return 2;
 			}
+			if (verboseRequested && !parsedHelp.intent) {
+				console.error(
+					'err help-json-too-large hint="add --for planning, execution, or maintenance"',
+				);
+				return 2;
+			}
 			console.log(
-				formatCatalogJson(
-					kernelRegistry,
-					parsedHelp.intent ? { intent: parsedHelp.intent } : {},
-				),
+				formatCatalogJson(kernelRegistry, {
+					verbose: verboseRequested,
+					...(parsedHelp.intent ? { intent: parsedHelp.intent } : {}),
+				}),
 			);
 			return 0;
 		}
@@ -804,11 +810,14 @@ export async function runWithDiagnostics(
 					diagnostic: {
 						kind: diagnostic.kind,
 						report_id: diagnostic.report_id,
+						persisted: diagnostic.persisted,
 					},
 				}),
 			);
 		} else {
-			console.error(`err ${code} ${message} report_id=${diagnostic.report_id}`);
+			console.error(
+				`err ${code} ${message} report_id=${diagnostic.report_id} persisted=${diagnostic.persisted ? "yes" : "no"}`,
+			);
 		}
 		return 1;
 	}

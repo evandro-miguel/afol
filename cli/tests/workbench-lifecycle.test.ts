@@ -1016,7 +1016,7 @@ describe("workbench lifecycle service", () => {
 			expect(quickTaskData.governance_status).toBe("pending_spec");
 			expect(quickTaskData.pending_spec).toBe(true);
 			expect(quickTaskData.pending_spec_question).toBe(
-				"Which roadmap feature and parent spec govern this closed session?",
+				"Which roadmap feature and parent spec govern this session?",
 			);
 			expect(quickTaskData.next_command).toContain("afol gov rs");
 
@@ -1028,7 +1028,7 @@ describe("workbench lifecycle service", () => {
 			]);
 			expect(human.status).toBe(0);
 			expect(human.stdout as string).toContain(
-				"question: Which roadmap feature and parent spec govern this closed session?",
+				"question: Which roadmap feature and parent spec govern this session?",
 			);
 			expect(human.stdout as string).toContain("next: run afol gov rs");
 			expect(human.stdout as string).not.toContain('hint="');

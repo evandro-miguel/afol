@@ -23,6 +23,8 @@ type ParsedArgs = {
 	journeyId: string;
 };
 
+const JSON_OUTPUT_BYTE_LIMIT = 12_000;
+
 const UX_COMMAND_HELP = [
 	"Usage: afol ux <action> [options]",
 	"",
@@ -155,6 +157,129 @@ function listEntry(entry: UxJourneyEntry): Record<string, unknown> {
 	};
 }
 
+function truncateUtf8(value: string, maxBytes: number): string {
+	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	let result = "";
+	for (const character of value) {
+		if (Buffer.byteLength(`${result + character}...`, "utf8") > maxBytes) {
+			break;
+		}
+		result += character;
+	}
+	return `${result}...`;
+}
+
+function boundedJsonValue(value: unknown, depth = 0): unknown {
+	if (typeof value === "string") return truncateUtf8(value, 320);
+	if (
+		value === null ||
+		typeof value === "number" ||
+		typeof value === "boolean"
+	) {
+		return value;
+	}
+	if (Array.isArray(value)) {
+		return value.slice(0, 16).map((item) => boundedJsonValue(item, depth + 1));
+	}
+	if (typeof value === "object" && depth < 2) {
+		return Object.fromEntries(
+			Object.entries(value as Record<string, unknown>)
+				.slice(0, 24)
+				.map(([key, item]) => [key, boundedJsonValue(item, depth + 1)]),
+		);
+	}
+	return undefined;
+}
+
+function compactIssue(issue: unknown): Record<string, unknown> {
+	const record = issue as Record<string, unknown>;
+	return {
+		severity: boundedJsonValue(record.severity),
+		path: boundedJsonValue(record.path),
+		message: boundedJsonValue(record.message),
+	};
+}
+
+function boundedJsonData(
+	data: Record<string, unknown>,
+	fits: (candidate: Record<string, unknown>) => boolean,
+): Record<string, unknown> {
+	if (fits(data)) return data;
+
+	const entries = Array.isArray(data.entries) ? data.entries : null;
+	const issues = Array.isArray(data.issues) ? data.issues : null;
+	const compactEntries =
+		entries?.slice(0, 48).map((entry) => {
+			const record = entry as Record<string, unknown>;
+			return boundedJsonValue({
+				id: record.id,
+				status: record.status,
+				source: record.source,
+				doc_type: record.doc_type,
+			});
+		}) ?? [];
+	const compactIssues = issues?.slice(0, 48).map(compactIssue) ?? [];
+	const compactBase = Object.fromEntries(
+		Object.entries(data)
+			.filter(([key]) => key !== "entries" && key !== "issues")
+			.map(([key, value]) => [key, boundedJsonValue(value)]),
+	);
+	let entryLimit = compactEntries.length;
+	let issueLimit = compactIssues.length;
+	const buildCandidate = (): Record<string, unknown> => ({
+		...compactBase,
+		...(entries === null
+			? {}
+			: {
+					entries: compactEntries.slice(0, entryLimit),
+					entries_omitted: Math.max(0, entries.length - entryLimit),
+				}),
+		...(issues === null
+			? {}
+			: {
+					issues: compactIssues.slice(0, issueLimit),
+					issues_omitted: Math.max(0, issues.length - issueLimit),
+				}),
+		details_truncated: true,
+		detail_hint:
+			"Use afol ux show <journey-id> or a filtered command for full details.",
+	});
+
+	for (;;) {
+		const candidate = buildCandidate();
+		if (fits(candidate)) return candidate;
+		if (entryLimit === 0 && issueLimit === 0) break;
+		const entryBytes = Buffer.byteLength(
+			JSON.stringify(compactEntries.slice(0, entryLimit)),
+			"utf8",
+		);
+		const issueBytes = Buffer.byteLength(
+			JSON.stringify(compactIssues.slice(0, issueLimit)),
+			"utf8",
+		);
+		if (issueLimit > 0 && (entryLimit === 0 || issueBytes >= entryBytes)) {
+			issueLimit = Math.floor(issueLimit / 2);
+		} else {
+			entryLimit = Math.floor(entryLimit / 2);
+		}
+	}
+
+	return {
+		ok: typeof data.ok === "boolean" ? data.ok : true,
+		...(typeof data.count === "number" ? { count: data.count } : {}),
+		...(typeof data.error_count === "number"
+			? { error_count: data.error_count }
+			: {}),
+		...(typeof data.warning_count === "number"
+			? { warning_count: data.warning_count }
+			: {}),
+		details_truncated: true,
+		payload_omitted: true,
+		detail_hint:
+			"Use afol ux show <journey-id> or a filtered command for full details.",
+	};
+}
+
 function formatEntries(entries: UxJourneyEntry[], verbose: boolean): string {
 	if (entries.length === 0) {
 		return "  none";
@@ -222,12 +347,36 @@ function writeJson(
 	ok = true,
 	exitCode = ok ? 0 : 1,
 ): void {
-	writeLegacyJsonEnvelope(io, `ux.${action}`, data, {
-		ok,
-		exitCode,
-		errorCode: "UX_FAILED",
-		errorMessage: "ux command failed",
-	});
+	const render = (candidate: Record<string, unknown>): string => {
+		let output = "";
+		writeLegacyJsonEnvelope(
+			{
+				stdout: (message) => {
+					output = message;
+				},
+				stderr: () => {},
+			},
+			`ux.${action}`,
+			candidate,
+			{
+				ok,
+				exitCode,
+				errorCode: "UX_FAILED",
+				errorMessage: "ux command failed",
+			},
+		);
+		return output;
+	};
+	const bounded = boundedJsonData(
+		data,
+		(candidate) =>
+			Buffer.byteLength(render(candidate), "utf8") <= JSON_OUTPUT_BYTE_LIMIT,
+	);
+	const output = render(bounded);
+	if (Buffer.byteLength(output, "utf8") > JSON_OUTPUT_BYTE_LIMIT) {
+		throw new Error("ux JSON output exceeded its internal byte limit");
+	}
+	io.stdout(output);
 }
 
 export async function runUxCommand(
@@ -342,24 +491,30 @@ export async function runUxCommand(
 				throw new Error("Missing --tool for ux coverage.");
 			}
 			const entries = coverageForTool(projectRoot, parsed.tool);
+			const ok = entries.length > 0;
 			const data = {
-				ok: true,
+				ok,
 				tool: parsed.tool,
 				count: entries.length,
 				entries: entries.map(compactEntry),
+				...(ok
+					? {}
+					: {
+							hint: `Register a UX journey covering ${parsed.tool} before claiming coverage.`,
+						}),
 			};
 			if (parsed.json) {
-				writeJson(io, uxAction, data);
+				writeJson(io, uxAction, data, ok, ok ? 0 : 1);
 			} else {
-				io.stdout(
-					[
-						`ux coverage: ${parsed.tool}`,
-						`journeys: ${entries.length}`,
-						formatEntries(entries, parsed.verbose),
-					].join("\n"),
-				);
+				const lines = [
+					`ux coverage: ${parsed.tool}`,
+					`journeys: ${entries.length}`,
+					formatEntries(entries, parsed.verbose),
+				];
+				if (ok) io.stdout(lines.join("\n"));
+				else io.stderr(`${lines.join("\n")}\n${data.hint}`);
 			}
-			return 0;
+			return ok ? 0 : 1;
 		}
 
 		if (!parsed.fromSpec) {

@@ -6,16 +6,21 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import { checkHealth } from "../services/health/checker";
-import type { HealthArea } from "../services/health/types";
+import type { HealthArea, HealthFinding } from "../services/health/types";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type HealthScope = "core" | "full" | "release";
 
 type HealthJsonData = ReturnType<typeof checkHealth> & {
 	checked_areas: readonly HealthArea[];
+	findings_omitted: number;
+	findings_total: number;
 	release: boolean;
 	scope: HealthScope;
 };
+
+const JSON_STATE_DRIFT_DETAIL_LIMIT = 10;
+const JSON_STATE_DRIFT_EXAMPLE_LIMIT = 3;
 
 const AREAS = new Set<HealthArea>([
 	"adm",
@@ -143,15 +148,55 @@ function formatFinding(finding: {
 		.join("\n");
 }
 
+function compactJsonFindings(findings: readonly HealthFinding[]): {
+	findings: HealthFinding[];
+	omitted: number;
+} {
+	const repeatedStateDrift = findings.filter(
+		(finding) =>
+			finding.area === "state" &&
+			/^(missing|stale) hydrated file /.test(finding.message),
+	);
+	if (repeatedStateDrift.length <= JSON_STATE_DRIFT_DETAIL_LIMIT) {
+		return { findings: [...findings], omitted: 0 };
+	}
+
+	const repeated = new Set(repeatedStateDrift);
+	const stale = repeatedStateDrift.filter((finding) =>
+		finding.message.startsWith("stale "),
+	).length;
+	const missing = repeatedStateDrift.length - stale;
+	const examples = repeatedStateDrift
+		.slice(0, JSON_STATE_DRIFT_EXAMPLE_LIMIT)
+		.map((finding) => finding.message)
+		.join("; ");
+	return {
+		findings: [
+			...findings.filter((finding) => !repeated.has(finding)),
+			{
+				area: "state",
+				severity: "warn",
+				message: `${repeatedStateDrift.length} hydrated files drift (${stale} stale, ${missing} missing); examples: ${examples}`,
+				hint: "run afol validate drift --json for full findings, then rehydrate affected sessions",
+			},
+		],
+		omitted: repeatedStateDrift.length - 1,
+	};
+}
+
 function writeJsonReport(
 	io: CommandIo,
 	report: ReturnType<typeof checkHealth>,
 	parsed: ReturnType<typeof parseArgs>,
 	checkedAreas: readonly HealthArea[],
 ): void {
+	const compacted = compactJsonFindings(report.findings);
 	const data: HealthJsonData = {
 		...report,
 		checked_areas: checkedAreas,
+		findings: compacted.findings,
+		findings_omitted: compacted.omitted,
+		findings_total: report.findings.length,
 		release: parsed.release || parsed.scope === "release",
 		scope: parsed.scope,
 	};
@@ -167,7 +212,6 @@ function writeJsonReport(
 			envelopeWithLegacyKeys(envelope, [
 				"ok",
 				"checked_at",
-				"findings",
 				"summary",
 				"scope",
 				"checked_areas",

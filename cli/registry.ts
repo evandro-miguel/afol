@@ -518,7 +518,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 					'transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval "<text>" [--dry-run|--confirm] [--json]',
 				sideEffect: "write",
 				description:
-					"Hash-bind closed post-cutoff missing/failed evidence debt under the registered no-op policy (preview by default)",
+					"Hash-bind closed post-cutoff missing evidence debt under the registered no-op policy (preview by default)",
 			},
 			{
 				usage:

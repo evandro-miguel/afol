@@ -1,7 +1,9 @@
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	rmdirSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -457,10 +459,13 @@ function runSample(
 	command: string,
 	artifact?: PreparedCompiledReleaseArtifact,
 ): HotPathSample {
-	mkdirSync(join(projectRoot, ".afol", "tmp"), { recursive: true });
-	const fixtureRoot = mkdtempSync(
-		join(projectRoot, ".afol", "tmp", "f32-hot-path-"),
-	);
+	const afolDir = join(projectRoot, ".afol");
+	const tempDir = join(afolDir, "tmp");
+	const afolDirExisted = existsSync(afolDir);
+	const tempDirExisted = existsSync(tempDir);
+	mkdirSync(tempDir, { recursive: true });
+	const fixtureRoot = mkdtempSync(join(tempDir, "f32-hot-path-"));
+	const notes: string[] = [];
 	try {
 		const fixture = prepareFixture(fixtureRoot, scenario.operation);
 		const invocation = invokeHotPath(
@@ -478,7 +483,6 @@ function runSample(
 			counters["status.health"] +
 			counters["status.catchup"] +
 			counters["workbench.local_state_refresh"];
-		const notes: string[] = [];
 		notes.push(...invocation.notes);
 		if (outputBytes > HOT_PATH_OUTPUT_LIMIT_BYTES) {
 			notes.push(
@@ -519,6 +523,20 @@ function runSample(
 		};
 	} finally {
 		rmSync(fixtureRoot, { recursive: true, force: true });
+		for (const [path, existed] of [
+			[tempDir, tempDirExisted],
+			[afolDir, afolDirExisted],
+		] as const) {
+			if (existed) continue;
+			try {
+				rmdirSync(path);
+			} catch (error) {
+				const code = (error as NodeJS.ErrnoException).code;
+				if (code !== "ENOENT" && code !== "ENOTEMPTY") {
+					notes.push(`hot-path-cleanup-error:${code ?? "unknown"}`);
+				}
+			}
+		}
 	}
 }
 

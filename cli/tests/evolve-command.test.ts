@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	copyFileSync,
 	existsSync,
@@ -140,6 +141,25 @@ function captureIo() {
 			stderr: (message: string) => stderr.push(message),
 		},
 	};
+}
+
+function snapshotEvolutionDbState(root: string) {
+	const paths = [
+		evolutionDbPath(root),
+		`${evolutionDbPath(root)}-wal`,
+		`${evolutionDbPath(root)}-shm`,
+	];
+	return paths.map((path) => {
+		const exists = existsSync(path);
+		const bytes = exists ? readFileSync(path) : null;
+		return {
+			path,
+			exists,
+			bytes,
+			sha256: bytes ? createHash("sha256").update(bytes).digest("hex") : null,
+			mtimeMs: exists ? statSync(path).mtimeMs : null,
+		};
+	});
 }
 
 async function holdChildSessionLock(root: string, session: string) {
@@ -403,8 +423,7 @@ describe("evolve status", () => {
 				],
 			);
 			db.close();
-			const dbPath = evolutionDbPath(root);
-			const before = readFileSync(dbPath);
+			const before = snapshotEvolutionDbState(root);
 			const captured = captureIo();
 			expect(
 				await runEvolveCommand("status", ["--json"], root, captured.io),
@@ -415,7 +434,7 @@ describe("evolve status", () => {
 				recurring_cluster_count: 0,
 				latest_production_day: { ordinal_sequence: 1 },
 			});
-			expect(readFileSync(dbPath)).toEqual(before);
+			expect(snapshotEvolutionDbState(root)).toEqual(before);
 		} finally {
 			removeEvolutionTestRoot(root);
 		}

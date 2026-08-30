@@ -573,6 +573,37 @@ describe("kernel front-door", () => {
 			expect(
 				catalogPayload.every((entry) => !entry.aliases.includes(entry.command)),
 			).toBe(true);
+			expect(Buffer.byteLength(catalog.stdout as string, "utf8")).toBeLessThan(
+				16_000,
+			);
+			expect(catalogPayload.every((entry) => !("subcommands" in entry))).toBe(
+				true,
+			);
+
+			const unboundedVerbose = runKernel(root, ["help", "--json", "--verbose"]);
+			expect(unboundedVerbose.status).toBe(2);
+			expect(unboundedVerbose.stderr as string).toContain(
+				"add --for planning, execution, or maintenance",
+			);
+
+			const boundedVerbose = runKernel(root, [
+				"help",
+				"--json",
+				"--verbose",
+				"--for",
+				"planning",
+			]);
+			expect(boundedVerbose.status).toBe(0);
+			expect(
+				Buffer.byteLength(boundedVerbose.stdout as string, "utf8"),
+			).toBeLessThan(20_000);
+			expect(
+				(
+					JSON.parse(boundedVerbose.stdout as string) as Array<{
+						subcommands?: unknown[];
+					}>
+				).some((entry) => Array.isArray(entry.subcommands)),
+			).toBe(true);
 
 			const single = runKernel(root, ["help", "status", "--json"]);
 			expect(single.status).toBe(0);

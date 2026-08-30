@@ -28,6 +28,8 @@ import { type CommandIo, DEFAULT_IO } from "./io";
 
 type LocalStateCommand = "rebuild" | "freshness";
 
+const JSON_OUTPUT_BYTE_LIMIT = 16_000;
+
 type ParsedArgs = {
 	json: boolean;
 	verbose: boolean;
@@ -57,6 +59,8 @@ type RebuildPayload = {
 	output: "compact" | "verbose";
 	hint?: string;
 	snapshot?: RebuildSnapshot;
+	snapshot_truncated?: boolean;
+	snapshot_omitted?: number;
 };
 
 function resultEnvelope<T extends Record<string, unknown>>(
@@ -122,6 +126,54 @@ function summarizeRebuild(snapshot: RebuildSnapshot): RebuildSummary {
 	};
 }
 
+function truncateArrays(
+	value: unknown,
+	limit: number,
+	omitted: { count: number },
+): unknown {
+	if (Array.isArray(value)) {
+		if (value.length > limit) omitted.count += value.length - limit;
+		return value
+			.slice(0, limit)
+			.map((entry) => truncateArrays(entry, limit, omitted));
+	}
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, entry]) => [
+				key,
+				truncateArrays(entry, limit, omitted),
+			]),
+		);
+	}
+	return value;
+}
+
+function boundedSnapshot(snapshot: RebuildSnapshot): {
+	snapshot: RebuildSnapshot;
+	omitted: number;
+	truncated: boolean;
+} {
+	if (
+		Buffer.byteLength(JSON.stringify({ snapshot }), "utf8") <=
+		JSON_OUTPUT_BYTE_LIMIT
+	) {
+		return { snapshot, omitted: 0, truncated: false };
+	}
+	for (const limit of [32, 16, 8, 4]) {
+		const omitted = { count: 0 };
+		const bounded = truncateArrays(snapshot, limit, omitted) as RebuildSnapshot;
+		if (
+			Buffer.byteLength(JSON.stringify({ snapshot: bounded }), "utf8") <=
+			JSON_OUTPUT_BYTE_LIMIT
+		) {
+			return { snapshot: bounded, omitted: omitted.count, truncated: true };
+		}
+	}
+	const omitted = { count: 0 };
+	const bounded = truncateArrays(snapshot, 1, omitted) as RebuildSnapshot;
+	return { snapshot: bounded, omitted: omitted.count, truncated: true };
+}
+
 function formatFreshness(root: string): {
 	ok: boolean;
 	checks: { id: string; ok: boolean; message: string }[];
@@ -174,6 +226,7 @@ export async function runLocalStateCommand(
 				const workbench = rebuildWorkBenchIndex(projectRoot);
 				const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
 				const summary = summarizeRebuild(snapshot);
+				const bounded = boundedSnapshot(snapshot);
 
 				if (parsed.json) {
 					const compactPayload: RebuildPayload = {
@@ -182,9 +235,17 @@ export async function runLocalStateCommand(
 						summary,
 						output: parsed.verbose ? "verbose" : "compact",
 						...(parsed.verbose
-							? { snapshot }
+							? {
+									snapshot: bounded.snapshot,
+									...(bounded?.truncated
+										? {
+												snapshot_truncated: true,
+												snapshot_omitted: bounded.omitted,
+											}
+										: {}),
+								}
 							: {
-									hint: "Use `afol local-state rebuild --json --verbose` for full index snapshots.",
+									hint: "Use `afol local-state rebuild --json --verbose` for bounded index details.",
 								}),
 					};
 					io.stdout(
@@ -192,7 +253,15 @@ export async function runLocalStateCommand(
 							envelopeWithLegacyKeys(
 								resultEnvelope(compactPayload, `local-state.${command}`, 0),
 								parsed.verbose
-									? ["ok", "command", "summary", "output", "snapshot"]
+									? [
+											"ok",
+											"command",
+											"summary",
+											"output",
+											"snapshot",
+											"snapshot_truncated",
+											"snapshot_omitted",
+										]
 									: ["ok", "command", "summary", "output", "hint"],
 							),
 						),

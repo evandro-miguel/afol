@@ -16,7 +16,7 @@ updated_at: '2026-06-27T00:00:00Z'
 ## Active Rules
 
 | ID | Rule | Purpose |
-|----|------|---------|
+| ---- | ------ | --------- |
 | RULE-002 | [workstream-creation](./RULE-002-workstream-creation.md) | Governed workstream creation and closure |
 | RULE-003 | [documentation-standards](./RULE-003-documentation-standards.md) | Frontmatter and Markdown standards |
 | RULE-004 | [validation-linting](./RULE-004-validation-linting.md) | Completion validation |
@@ -71,7 +71,7 @@ afol verify-tasks --strict
 ## References
 
 | Location | Content |
-|----------|---------|
+| ---------- | --------- |
 | `AGENTS.md` | Repository-level AFOL policy |
 | `.afol/adm/tools.json` | Static AFOL command catalog |
 | `.afol/adm/rules/` | Static rule set |
