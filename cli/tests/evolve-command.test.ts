@@ -458,6 +458,8 @@ describe("evolve status", () => {
 					"J-malformed",
 				],
 			);
+			// Settle WAL pages before taking a byte-level read-only baseline.
+			db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
 			db.close();
 
 			const dbPath = evolutionDbPath(root);
