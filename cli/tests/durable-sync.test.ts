@@ -42,6 +42,20 @@ describe("durable sync", () => {
 		expect(fake.closed).toEqual([42]);
 	});
 
+	test("ignores only Windows file fsync EPERM", () => {
+		const windows = operations({ syncError: failure("EPERM") });
+		expect(() =>
+			syncFileDurably("artifact", windows.io, "win32"),
+		).not.toThrow();
+		expect(windows.closed).toEqual([42]);
+
+		const linux = operations({ syncError: failure("EPERM") });
+		expect(() => syncFileDurably("artifact", linux.io, "linux")).toThrow(
+			"EPERM",
+		);
+		expect(linux.closed).toEqual([42]);
+	});
+
 	test("ignores only unsupported directory fsync failures", () => {
 		for (const code of ["EBADF", "EINVAL", "ENOTSUP", "EOPNOTSUPP"]) {
 			const fake = operations({ syncError: failure(code) });

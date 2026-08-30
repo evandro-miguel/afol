@@ -12,6 +12,16 @@ const systemOperations: DurableSyncOperations = {
 	close: closeSync,
 };
 
+function isUnsupportedFileSync(
+	error: unknown,
+	platform: NodeJS.Platform,
+): boolean {
+	return (
+		platform === "win32" &&
+		(error as NodeJS.ErrnoException | null)?.code === "EPERM"
+	);
+}
+
 function isUnsupportedDirectorySync(error: unknown): boolean {
 	const code = (error as NodeJS.ErrnoException | null)?.code;
 	return (
@@ -25,10 +35,18 @@ function isUnsupportedDirectorySync(error: unknown): boolean {
 export function syncFileDurably(
 	path: string,
 	operations: DurableSyncOperations = systemOperations,
+	platform: NodeJS.Platform = process.platform,
 ): void {
 	const fd = operations.open(path);
 	try {
-		operations.sync(fd);
+		try {
+			operations.sync(fd);
+		} catch (error) {
+			// Bun on Windows can reject regular-file fsync with EPERM after the
+			// write succeeds. Preserve atomic replacement while failing closed for
+			// every other platform and I/O error.
+			if (!isUnsupportedFileSync(error, platform)) throw error;
+		}
 	} finally {
 		operations.close(fd);
 	}
