@@ -33,11 +33,16 @@ Build with the pinned Bun toolchain:
 ```bash
 bun install --frozen-lockfile
 bun run build
-install -Dm755 ./dist/afol "$HOME/.local/bin/afol"
-"$HOME/.local/bin/afol" --version
+bun run release:provenance
+sha256sum -c dist/afol.sha256
 ```
 
-Ensure `$HOME/.local/bin` is on `PATH` before using `afol` from another shell.
+Do not overwrite a live executable directly. Keep `dist/afol`, its checksum,
+and `dist/afol.provenance.json` together, then follow the documented
+[install, upgrade, rollback, and uninstall procedure](docs/public/upgrade-and-rollback.md).
+That procedure preserves the current executable before replacement and
+installs the provenance sidecar with the candidate. Ensure `$HOME/.local/bin`
+is on `PATH` before using `afol` from another shell.
 
 AFOL is intended to run as a standalone binary. The npm `package.json` exists
 for source builds and is marked private; AFOL is not a registry package.

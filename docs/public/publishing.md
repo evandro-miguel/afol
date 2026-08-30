@@ -62,6 +62,8 @@ bun run validate:template
 bun run validate:bootstrap
 bun run test:full
 bun run coverage:check
+bun run build
+bun run release:provenance
 bun run smoke:example
 ```
 

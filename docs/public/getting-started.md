@@ -11,11 +11,15 @@ Clone the public repository into a directory named `afol`, then run:
 cd afol
 bun install --frozen-lockfile
 bun run build
-install -Dm755 ./dist/afol "$HOME/.local/bin/afol"
-"$HOME/.local/bin/afol" --version
+bun run release:provenance
+sha256sum -c dist/afol.sha256
 ```
 
-Ensure `$HOME/.local/bin` is on `PATH`.
+Keep the binary, checksum, and provenance sidecar together. Follow
+[Upgrade and rollback](upgrade-and-rollback.md) to preserve any installed
+binary, stage the verified candidate, test it, roll it back, or uninstall it.
+Do not copy `dist/afol` directly over a live executable. Ensure
+`$HOME/.local/bin` is on `PATH`.
 
 A source tag does not imply that a standalone binary was promoted. Use a
 downloadable binary only when its GitHub Release supplies the artifact,
