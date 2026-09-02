@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "wb-done-argv",
+  "scenario_version": "1.0.0",
+  "pack_id": "workbench-parity",
+  "command": "afol d T-01 -- echo ok",
+  "sandbox": true,
+  "setup": [
+    [
+      "bun",
+      "-e",
+      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-done-argv'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'),session+'\\n','utf8'); writeFileSync(join(dir,session+'_plan_01.md'), '# Plan: argv\\n\\n## Execution Plan\\n\\n- T-01: argv verification\\n','utf8'); writeFileSync(join(dir,session+'_task_01.md'), '# Tasks: argv\\n\\n## State Board\\n\\n| Task | State | Owner | Notes |\\n|------|-------|-------|-------|\\n| T-01 | pending | worker | argv verification |\\n','utf8'); writeFileSync(join(dir,session+'_log_01.md'), '# Log\\n\\n## Timeline\\n\\n- seed\\n','utf8'); writeFileSync(join(dir,'.evidence.jsonl'),'','utf8');"
+    ],
+    [
+      "git",
+      "init",
+      "-q"
+    ],
+    [
+      "bun",
+      "-e",
+      "const{readFileSync:r,rmSync,writeFileSync:w}=require('node:fs');const{join}=require('node:path');const root=process.cwd(),session='sb-done-argv',branch=r(join(root,'.git','HEAD'),'utf8').trim().replace('ref: refs/heads/','');w(join(root,'.afol','wb','session-context.json'),JSON.stringify({bindings:[{session,branch,worktree:root,actor:null,last_touched:new Date().toISOString()}]})+'\\n','utf8');rmSync(join(root,'.afol','wb','.active_session'));"
+    ],
+    [
+      "afol",
+      "st",
+      "T-01"
+    ]
+  ],
+  "coverage": {
+    "subcommands": [
+      "done -- <argv...>"
+    ],
+    "journeys": [
+      "afol-command-user-flow-matrix"
+    ],
+    "features": [
+      "F-29"
+    ],
+    "specs": [
+      "260715_afol-1-0-linux-wsl-finalization_spec_01",
+      "260715_afol-1-0-local-diagnostics_spec-child_01"
+    ]
+  },
+  "expected_exit": 0,
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 500,
+    "max_p50_ms": 200,
+    "max_p95_ms": 500,
+    "max_argv_chars": 40,
+    "max_output_tokens": 80,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "workbench-parity-v1",
+  "deterministic_metrics": {
+    "duration_ms": 180,
+    "timing_p50_ms": 150,
+    "timing_p95_ms": 260,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 48,
+    "context_bytes": 1024,
+    "output_bytes": 280,
+    "argv_chars": 24,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0.0",
+  "id": "mcp",
+  "name": "Model Context Protocol",
+  "category": "protocol_reference",
+  "status": "active",
+  "source_access": "official_docs",
+  "last_reviewed_at": "2026-06-18",
+  "stale_after_days": 90,
+  "confidence": "high",
+  "similarity_axes": {
+    "mcp_tools": {
+      "score": 5,
+      "evidence_refs": ["mcp-tools"]
+    },
+    "release_governance": {
+      "score": 3,
+      "evidence_refs": ["mcp-spec-repo"]
+    },
+    "safe_mutation": {
+      "score": 3,
+      "evidence_refs": ["mcp-tools"]
+    }
+  },
+  "similarities": [
+    {
+      "axis": "mcp_tools",
+      "claim": "Defines structured tool metadata and schemas that clients can validate before invocation.",
+      "evidence_refs": ["mcp-tools"]
+    }
+  ],
+  "differences": [
+    {
+      "claim": "MCP is a protocol surface, not a project-local governance system."
+    }
+  ],
+  "lessons_for_afol": [
+    {
+      "axis": "mcp_tools",
+      "lesson": "Keep agent-facing command outputs schema-shaped so callers can validate compact structured results."
+    }
+  ],
+  "do_not_copy": [
+    {
+      "reason": "Do not treat protocol flexibility as product governance; AFOL still needs local policy and lifecycle rules."
+    }
+  ],
+  "source_refs": [
+    {
+      "id": "mcp-tools",
+      "title": "MCP tools specification",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+      "source_type": "spec",
+      "claim": "MCP tools include metadata describing their schema and are exposed for model invocation through clients.",
+      "axes": ["mcp_tools", "safe_mutation"]
+    },
+    {
+      "id": "mcp-spec-repo",
+      "title": "MCP specification repository",
+      "url": "https://github.com/modelcontextprotocol/modelcontextprotocol",
+      "source_type": "official_repo",
+      "claim": "The official repository publishes the protocol specification and schema assets.",
+      "axes": ["release_governance"]
+    }
+  ]
+}

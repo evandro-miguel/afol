@@ -1,0 +1,13 @@
+[allowlist]
+description = "Ignore generated dependency caches and repo-map hash manifests."
+paths = [
+  '''^\.agents/cache/''',
+  '''^\.agents/runtime/\.venv/''',
+  '''^\.gitnexus/''',
+  '''^docs/map/extra/''',
+  '''^node_modules/''',
+  '''^dist/''',
+]
+regexes = [
+  '''"[^"]+\.md":\s*"[a-f0-9]{40,64}"''',
+]

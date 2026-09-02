@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_id": "evolution-core-v2",
+  "pack_id": "evolution-core",
+  "host_profile_id": "ci-linux-x64",
+  "sample_count": 3,
+  "warmup_count": 1,
+  "timing_p50_ms": 1279,
+  "timing_p95_ms": 1766,
+  "tokenizer_id": "output-bytes-divided-by-4",
+  "tokenizer_version": "1",
+  "git_commit": "ffbf031e6e68",
+  "source_repository": "github.com/evandro-miguel/afol",
+  "run_id": "bench-evolution-core-evolution-status-contract-1.1.0",
+  "timestamp": "2026-07-26T02:54:28.057Z",
+  "results_count": 1,
+  "provenance": "fresh-local-runnable-smoke"
+}

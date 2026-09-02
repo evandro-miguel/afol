@@ -1,0 +1,71 @@
+# Retired runtime surfaces. Do not recreate them.
+# .agents/scripts, .agents/runtime, .agents/wb
+
+# Local tool caches
+uv.lock
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.codex/
+**/.structure-cache.json
+.gitnexus
+
+# AFOL mutable data
+.afol/pstr/*
+!.afol/pstr/
+.afol/state/*
+!.afol/state/
+.afol/data/events/
+.afol/data/index/
+.afol/data/session/
+.afol/data/mutations/
+.afol/data/migrations/*
+!.afol/data/migrations/
+.afol/data/benchmarks/catalog/results/*
+
+src/project-template/.afol/tmp/*
+!src/project-template/.afol/tmp/
+!src/project-template/.afol/tmp/README.md
+
+src/project-template/.afol/data/events/*
+src/project-template/.afol/data/index/*
+!src/project-template/.afol/data/events/
+!src/project-template/.afol/data/events/README.md
+!src/project-template/.afol/data/index/
+!src/project-template/.afol/data/index/README.md
+
+.agents/cache/universal-skills/
+
+.tmp/
+.afol/tmp/*
+!.afol/tmp/
+!.afol/tmp/README.md
+
+.afol/external/*
+!.afol/external/
+!.afol/external/README.md
+src/project-template/.afol/external/*
+!src/project-template/.afol/external/
+!src/project-template/.afol/external/README.md
+
+.afol/wb/.active_session
+.afol/wb/session-context.json
+.afol/wb/.locks/
+.worktree/
+.coverage
+
+# Local secrets
+.env
+.env.local
+.env.*.local
+
+# Generated install/build outputs
+node_modules/
+dist/
+.bun-build*
+
+# Reproducible source artifacts that must stay versioned
+!bun.lock
+!cli/generated/template.ts

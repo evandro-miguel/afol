@@ -1,0 +1,23 @@
+name: Source release problem
+description: Report source checkout, validation, tag, or upgrade failures
+title: "release: "
+labels: [release]
+body:
+  - type: input
+    id: release
+    attributes:
+      label: Source release and commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Validation command and sanitized result
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Platform and source environment
+    validations:
+      required: true

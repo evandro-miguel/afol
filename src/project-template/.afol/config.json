@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "project": {
+    "id": "db91cdd1-bb3f-495b-bacc-ab46321d67ae",
+    "timezone": "UTC",
+    "name": "afol-template"
+  },
+  "adapters": {
+    "antigravity": {
+      "enabled": false
+    }
+  },
+  "paths": {
+    "agents_dir": ".agents",
+    "mutable_dir": ".afol",
+    "adm_dir": ".afol/adm",
+    "rules_dir": ".afol/adm/rules",
+    "hooks_dir": ".afol/adm/hooks",
+    "skills_dir": ".agents/skills",
+    "wb_dir": ".afol/wb",
+    "active_session_file": ".afol/wb/.active_session",
+    "tmp_dir": ".afol/tmp",
+    "data_dir": ".afol/data",
+    "data_index_dir": ".afol/data/index",
+    "events_file": ".afol/data/events/events.jsonl",
+    "mutations_dir": ".afol/data/mutations",
+    "mutation_backups_dir": ".afol/data/mutations/backups",
+    "mutation_archives_dir": ".afol/data/mutations/archives",
+    "external_dir": ".afol/external",
+    "evolution_db": ".afol/state/evolution.db",
+    "evolution_data_dir": ".afol/data/evolution",
+    "evolution_events_dir": ".afol/data/events/evolution",
+    "lock_file": ".agents/lock.json",
+    "manifest_file": ".agents/manifest.json",
+    "docs_dir": "docs"
+  },
+  "pstr": {
+    "areas": []
+  },
+  "evolution": {
+    "enabled": true,
+    "suggestions": {
+      "first_session_of_day": true,
+      "dedupe_scope": "project",
+      "max_visible_per_day": 1,
+      "remind_skipped_next_day": true,
+      "deep_review_after_production_days": 5
+    },
+    "preferences": {
+      "soft_decay_after_production_days": 7,
+      "stop_guiding_after_production_days": 20,
+      "minimum_effective_confidence": 0.65,
+      "decay_curve": "linear"
+    },
+    "recurrence": {
+      "minimum_occurrences": 3,
+      "minimum_distinct_sessions": 2,
+      "minimum_distinct_production_days": 2
+    },
+    "large_change": {
+      "changed_files": 20,
+      "changed_lines": 1000,
+      "critical_paths_trigger": true
+    },
+    "external": {
+      "mode": "explicit_import_only",
+      "storage": "normalized_sections",
+      "store_raw": false,
+      "redact_before_persist": true
+    },
+    "autonomy": {
+      "auto_observe": false,
+      "auto_refresh_preference_projections": true,
+      "auto_clean_derived_state": true,
+      "auto_apply_mode": "none"
+    }
+  },
+  "skills_sync": {
+    "project_dir": ".agents/skills"
+  },
+  "rules": {
+    "resolver": {
+      "max_chars_per_rule": 2000,
+      "max_chars_total": 4000
+    }
+  },
+  "hooks": {
+    "resolver": {
+      "max_chars_per_message": 1000,
+      "max_chars_total": 3000
+    }
+  }
+}

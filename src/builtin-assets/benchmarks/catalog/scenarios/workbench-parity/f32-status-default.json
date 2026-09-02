@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "f32-status-default",
+  "scenario_version": "1.0.0",
+  "pack_id": "workbench-parity",
+  "command": "afol status --json",
+  "sandbox": false,
+  "runner": "hot-path",
+  "hot_path": { "operation": "status", "mode": "default" },
+  "coverage": {
+    "commands": ["status"],
+    "journeys": ["f32-hot-path-default-vs-derived"],
+    "features": ["F-32"],
+    "specs": ["260731_hot-path-observability-and-derived-state-separation_spec_01"]
+  },
+  "result_schema": "1.0.0",
+  "oracle": "f32-hot-path-instrumentation",
+  "thresholds": {
+    "max_p50_ms": 100,
+    "max_p95_ms": 300,
+    "max_output_bytes": 20000,
+    "max_output_tokens": 5000,
+    "max_telemetry_append_count": 0,
+    "max_derived_work_calls": 0,
+    "min_sample_count": 20
+  },
+  "baseline_id": "workbench-parity-v1",
+  "deterministic_metrics": {
+    "duration_ms": 0,
+    "timing_p50_ms": 0,
+    "timing_p95_ms": 0,
+    "error_count": 0,
+    "retry_count": 0,
+    "output_tokens": 0,
+    "output_bytes": 0,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

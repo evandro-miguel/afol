@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "state-export",
+  "scenario_version": "1.0.0",
+  "pack_id": "state-projection",
+  "command": "afol state export -S sb-state-projection",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const{mkdirSync,rmSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd(),session='sb-state-projection',dir=join(root,'.afol','wb',session);rmSync(dir,{recursive:true,force:true});mkdirSync(dir,{recursive:true});writeFileSync(join(dir,'plan.md'),'# State projection fixture\\n','utf8');writeFileSync(join(dir,'task.md'),'# Tasks\\n\\n| Task | State | Owner | Notes |\\n|------|-------|-------|-------|\\n| T-01 | pending | worker | fixture |\\n','utf8');"
+    ],
+    ["afol", "hydrate", "-S", "sb-state-projection"]
+  ],
+  "coverage": {
+    "subcommands": [
+      "state export|ex [--session <session-id>] [--json]"
+    ],
+    "journeys": ["workbench-state-export"]
+  },
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 300,
+    "max_p95_ms": 300,
+    "max_output_tokens": 417,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "state-projection-v1",
+  "implementation_status": "implemented",
+  "deterministic_metrics": {
+    "duration_ms": 62,
+    "timing_p50_ms": 62,
+    "timing_p95_ms": 69,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 163,
+    "context_bytes": 0,
+    "output_bytes": 653,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "measurement": {
+    "status": "observed",
+    "source": "fresh-local-runnable-smoke",
+    "sample_count": 3,
+    "warmup_count": 1,
+    "git_commit": "3297ae1660103ffa77a3d78f0edbf705bd2f8f68",
+    "source_repository": "github.com/evandro-miguel/afol",
+    "timestamp": "2026-08-23T19:30:59.130Z"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "feature-spec-coverage-matrix",
+  "scenario_version": "1.0.0",
+  "pack_id": "governance-history",
+  "command": "afol bench list",
+  "sandbox": true,
+  "objective": "Prove project feature/spec scenario coverage once the downstream project adds F-xx roadmap features and root specs.",
+  "expected_result": "The benchmark catalog lists the feature/spec coverage scenario. Projects with F-xx roadmap features must map every feature to one governing spec and cover every root spec through implemented benchmark scenarios.",
+  "use_cases": [
+    "downstream maintainer verifies every project feature has a spec",
+    "agent checks feature, spec, tool, and UX coverage before execution",
+    "release reviewer blocks production-readiness claims when scenario coverage is missing"
+  ],
+  "coverage": {
+    "commands": [
+      "validate",
+      "spec",
+      "ux",
+      "bench"
+    ],
+    "subcommands": [
+      "validate bench --pack <pack-id> --json",
+      "spec list [--json] [--verbose]",
+      "ux validate",
+      "bench list",
+      "evolve evaluate <id> [--record] [--superseded-by <id>] [-j]"
+    ],
+    "journeys": [
+      "feature-spec-scenario-coverage",
+      "afol-command-user-flow-matrix",
+      "ux-journey-registry-control"
+    ]
+  },
+  "result_schema": "1.0.0",
+  "oracle": "feature-spec-coverage-contract",
+  "thresholds": {
+    "max_duration_ms": 1000,
+    "max_p95_ms": 1000,
+    "max_output_tokens": 1200,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "governance-history-v1",
+  "expected_exit": 0,
+  "deterministic_metrics": {
+    "duration_ms": 180,
+    "timing_p50_ms": 160,
+    "timing_p95_ms": 260,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 900,
+    "prompt_tokens": 0,
+    "output_tokens": 260,
+    "context_bytes": 4200,
+    "output_bytes": 1300,
+    "tool_call_count": 4,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

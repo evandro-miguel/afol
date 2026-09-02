@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_id": "mutation-safety-v1",
+  "pack_id": "mutation-safety",
+  "calibration_status": "observed",
+  "sample_count": 20,
+  "warmup_count": 1,
+  "git_commit": "4c70a4672b164a65d58e0b7244752bc51fd21711",
+  "source_repository": "github.com/evandro-miguel/afol",
+  "timestamp": "2026-07-29T16:33:06.368Z",
+  "provenance": "controlled-local-release-calibration-20260729",
+  "host_profile_id": "linux-x64-intel-r-core-tm-i9-14900k",
+  "os": "linux",
+  "arch": "x64",
+  "cpu_class": "intel-r-core-tm-i9-14900k",
+  "bun_version": "1.3.14",
+  "runtime_version": "1.3.14",
+  "execution_mode": "compiled-release",
+  "artifact_mode": "bun-compile",
+  "artifact_sha256": "1ff366ff969ba69eaf7a03f496d85fbd02cd137b9c58a5a27dff23ddba36d1b5",
+  "scenarios": {
+    "mut-dry-run": {
+      "scenario_id": "mut-dry-run",
+      "scenario_version": "1.0.0",
+      "timing_p50_ms": 33,
+      "timing_p95_ms": 37,
+      "sample_count": 20,
+      "warmup_count": 1
+    },
+    "mut-move": {
+      "scenario_id": "mut-move",
+      "scenario_version": "1.0.0",
+      "timing_p50_ms": 41,
+      "timing_p95_ms": 48,
+      "sample_count": 20,
+      "warmup_count": 1
+    },
+    "mut-patch": {
+      "scenario_id": "mut-patch",
+      "scenario_version": "1.0.0",
+      "timing_p50_ms": 43,
+      "timing_p95_ms": 55,
+      "sample_count": 20,
+      "warmup_count": 1
+    },
+    "mut-protected": {
+      "scenario_id": "mut-protected",
+      "scenario_version": "1.0.0",
+      "timing_p50_ms": 26,
+      "timing_p95_ms": 29,
+      "sample_count": 20,
+      "warmup_count": 1
+    },
+    "mut-undo": {
+      "scenario_id": "mut-undo",
+      "scenario_version": "1.0.0",
+      "timing_p50_ms": 38,
+      "timing_p95_ms": 54,
+      "sample_count": 20,
+      "warmup_count": 1
+    }
+  }
+}

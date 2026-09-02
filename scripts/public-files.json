@@ -1,0 +1,29 @@
+{
+  "allowed_root_directories": [
+    ".github",
+    "cli",
+    "docs",
+    "examples",
+    "scripts",
+    "src"
+  ],
+  "allowed_root_files": [
+    ".gitattributes",
+    ".gitignore",
+    ".gitleaks.toml",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "ROADMAP.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "THIRD_PARTY_NOTICES.md",
+    "afol",
+    "bun.lock",
+    "package.json",
+    "tsconfig.json"
+  ]
+}

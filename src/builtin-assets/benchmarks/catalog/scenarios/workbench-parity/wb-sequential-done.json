@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "wb-sequential-done",
+  "scenario_version": "1.1.0",
+  "pack_id": "workbench-parity",
+  "command": "afol d T-01 -x \"bun --version\" -x \"bun --version\" -x \"bun --version\" -x \"bun --version\" -x \"bun --version\" -x \"bun --version\" -x \"bun --version\" -x \"bun --version\"",
+  "sandbox": true,
+  "setup": [
+    [
+      "bun",
+      "-e",
+      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='wb-sequential-done'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'),session+'\\n','utf8'); writeFileSync(join(dir,session+'_plan_01.md'), '# Plan: sequential\\n\\n## Execution Plan\\n\\n- T-01: sequential\\n','utf8'); writeFileSync(join(dir,session+'_task_01.md'), '# Tasks: sequential\\n\\n## State Board\\n\\n| Task | State | Owner | Notes |\\n|------|-------|-------|-------|\\n| T-01 | pending | worker | sequential |\\n','utf8'); writeFileSync(join(dir,session+'_log_01.md'), '# Log\\n\\n## Timeline\\n\\n- seed\\n','utf8'); writeFileSync(join(dir,'.evidence.jsonl'),'','utf8');"
+    ],
+    [
+      "git",
+      "init",
+      "-q"
+    ],
+    [
+      "bun",
+      "-e",
+      "const{readFileSync:r,rmSync,writeFileSync:w}=require('node:fs');const{join}=require('node:path');const root=process.cwd(),session='wb-sequential-done',branch=r(join(root,'.git','HEAD'),'utf8').trim().replace('ref: refs/heads/','');w(join(root,'.afol','wb','session-context.json'),JSON.stringify({bindings:[{session,branch,worktree:root,actor:null,last_touched:new Date().toISOString()}]})+'\\n','utf8');rmSync(join(root,'.afol','wb','.active_session'));"
+    ],
+    [
+      "afol",
+      "st",
+      "T-01"
+    ],
+    [
+      "bun",
+      "-e",
+      "const {rmSync}=require('node:fs'); for (const path of ['cli','src','docs','tests','.claude']) rmSync(path,{recursive:true,force:true});"
+    ]
+  ],
+  "coverage": {
+    "features": [
+      "F-03"
+    ],
+    "specs": [
+      "260716_1234_agent-cli-sequential-verification-runs_spec-child_01"
+    ],
+    "journeys": [
+      "afol-command-user-flow-matrix"
+    ]
+  },
+  "expected_exit": 0,
+  "result_schema": "1.0.0",
+  "oracle": "eight-step-json-output-and-authored-cost-threshold",
+  "thresholds": {
+    "max_duration_ms": 400,
+    "max_p50_ms": 400,
+    "max_p95_ms": 400,
+    "max_argv_chars": 239,
+    "max_output_tokens": 500,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "workbench-parity-v1",
+  "deterministic_metrics": {
+    "duration_ms": 150,
+    "timing_p50_ms": 150,
+    "timing_p95_ms": 200,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 120,
+    "context_bytes": 1024,
+    "output_bytes": 90,
+    "tool_call_count": 1,
+    "tool_success_rate": 1,
+    "argv_chars": 163,
+    "verification_steps": 8,
+    "repeated_lifecycle_argv_chars": 240,
+    "authored_command_savings_chars": 77
+  },
+  "implementation_status": "implemented"
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0.0",
+  "axes": {
+    "repo_context_map": {
+      "weight": 15,
+      "description": "Uses compact repository maps or context ranking"
+    },
+    "agent_task_lifecycle": {
+      "weight": 15,
+      "description": "Models task, session, evidence, or agent lifecycle"
+    },
+    "safe_mutation": {
+      "weight": 15,
+      "description": "Controls edits, rollback, diffs, backups, or approvals"
+    },
+    "local_state": {
+      "weight": 10,
+      "description": "Stores agent state locally and predictably"
+    },
+    "skills_modes_rules": {
+      "weight": 10,
+      "description": "Uses modes, rules, skills, manifests, or instruction packs"
+    },
+    "mcp_tools": {
+      "weight": 10,
+      "description": "Exposes structured tools, resources, prompts, or schemas"
+    },
+    "evals_benchmarks": {
+      "weight": 10,
+      "description": "Has evals, scenarios, scorecards, or regression tests"
+    },
+    "multi_agent": {
+      "weight": 10,
+      "description": "Supports multi-agent or delegated execution"
+    },
+    "release_governance": {
+      "weight": 5,
+      "description": "Has CI, release gates, provenance, or validation"
+    }
+  }
+}

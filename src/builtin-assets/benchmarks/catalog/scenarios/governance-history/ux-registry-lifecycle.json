@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "ux-registry-lifecycle",
+  "scenario_version": "1.0.0",
+  "pack_id": "governance-history",
+  "command": "afol ux validate --json",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const{mkdirSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd();const journey='public-template-ux-fixture_ux-journey_01';const spec='public-template-ux-fixture_spec-child_01';mkdirSync(join(root,'.afol','adm','ux'),{recursive:true});mkdirSync(join(root,'.afol','adm','specs'),{recursive:true});writeFileSync(join(root,'.afol','adm','ux',journey+'.md'),`---\ndoc_type: ux-journey\nid: ${journey}\ntheme: public-template-ux-fixture\nstatus: draft\nroadmap_feature: unassigned\nparent_spec: ${spec}\n---\n\n# UX Journey: Public Template Fixture\n\n## Purpose\n\n- Goal: validate a public synthetic journey.\n\n## Entry And Exit\n\n- Entry point: benchmark setup.\n- Success exit: registry validation passes.\n\n## Flow\n\n- AFOL command/tool: \\`afol maintenance\\`.\n\n## Expected Result\n\n- Output: compact registry status.\n\n## Evidence\n\n- Scripted scenario: governance-history.\n\n## Metrics\n\n- Completion criterion: \\`afol ux validate\\` exits 0.\n\n## Acceptance\n\n- [ ] Synthetic fixture is discoverable\n`);writeFileSync(join(root,'.afol','adm','specs',spec+'.md'),`---\ndoc_type: spec-child\nid: ${spec}\ntheme: public-template-ux-fixture\nstatus: draft\nroadmap_feature: unassigned\nparent_spec: ${spec}\n---\n\n# Public Template Fixture Spec\n\nThis synthetic fixture covers \\`afol ux validate\\` and \\`afol maintenance\\`.\n`);"
+    ],
+    [
+      "afol",
+      "ux",
+      "list",
+      "--json"
+    ],
+    [
+      "afol",
+      "ux",
+      "show",
+      "public-template-ux-fixture_ux-journey_01",
+      "--json"
+    ],
+    [
+      "afol",
+      "ux",
+      "coverage",
+      "--tool",
+      "maintenance",
+      "--json"
+    ],
+    [
+      "afol",
+      "ux",
+      "register",
+      "--from-spec",
+      "public-template-ux-fixture_spec-child_01",
+      "--dry-run",
+      "--json"
+    ]
+  ],
+  "coverage": {
+    "commands": [
+      "ux",
+      "maintenance"
+    ],
+    "subcommands": [
+      "ux list",
+      "ux show <journey-id>",
+      "ux validate",
+      "ux coverage --tool <afol-command>",
+      "ux register --from-spec <spec-id>"
+    ],
+    "journeys": [
+      "ux-journey-registry-control",
+      "maintenance-warning-coverage-review"
+    ]
+  },
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 300,
+    "max_p95_ms": 300,
+    "max_output_tokens": 500,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "governance-history-v1",
+  "expected_exit": 0,
+  "deterministic_metrics": {
+    "duration_ms": 120,
+    "timing_p50_ms": 110,
+    "timing_p95_ms": 160,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 240,
+    "prompt_tokens": 0,
+    "output_tokens": 95,
+    "context_bytes": 1400,
+    "output_bytes": 520,
+    "tool_call_count": 5,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KERNEL_SCRIPT="${SCRIPT_DIR}/cli/main.ts"
+
+if [ ! -f "${KERNEL_SCRIPT}" ]; then
+  echo "error: missing kernel script: ${KERNEL_SCRIPT}" >&2
+  exit 127
+fi
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "error: bun >=1.3.14 is required to run afol" >&2
+  exit 127
+fi
+
+exec bun "${KERNEL_SCRIPT}" "$@"

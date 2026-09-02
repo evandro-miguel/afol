@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "kernel": "agentic-cli-ts",
+  "optional": true,
+  "commands": {
+    "status": [
+      "s",
+      "status"
+    ],
+    "feedback": [
+      "fb",
+      "feedback"
+    ],
+    "validate": [
+      "v",
+      "ck",
+      "check",
+      "validate"
+    ],
+    "init": [
+      "i",
+      "init"
+    ],
+    "start": [
+      "st",
+      "start"
+    ],
+    "done": [
+      "d",
+      "done"
+    ],
+    "transition": [
+      "tr",
+      "transition"
+    ],
+    "new": [
+      "n",
+      "new"
+    ],
+    "log": [
+      "l",
+      "log"
+    ],
+    "quick-task": [
+      "qt",
+      "quick-task"
+    ],
+    "governance": [
+      "gov",
+      "governance"
+    ],
+    "evidence": [
+      "e",
+      "evidence"
+    ],
+    "legacy": [
+      "lg",
+      "legacy"
+    ],
+    "hook": [
+      "hk",
+      "hook"
+    ],
+    "rule": [
+      "r",
+      "rule"
+    ],
+    "skill": [
+      "sk",
+      "skill"
+    ],
+    "close": [
+      "c",
+      "close"
+    ],
+    "file": [
+      "f",
+      "file"
+    ],
+    "fleet": [
+      "fleet"
+    ],
+    "update": [
+      "up",
+      "update"
+    ],
+    "bootstrap": [
+      "b",
+      "bootstrap"
+    ],
+    "verify": [
+      "vf",
+      "verify"
+    ],
+    "verify-tasks": [
+      "vt",
+      "verify-tasks"
+    ],
+    "local-state": [
+      "ls",
+      "local-state"
+    ],
+    "pstr": [
+      "ps",
+      "pstr"
+    ],
+    "ctx": [
+      "cx",
+      "ctx"
+    ],
+    "state": [
+      "stt",
+      "state"
+    ],
+    "hydrate": [
+      "hy",
+      "hydrate"
+    ],
+    "render": [
+      "render"
+    ],
+    "library": [
+      "lb",
+      "library"
+    ],
+    "memory": [
+      "mm",
+      "memory"
+    ],
+    "evolve": [
+      "evolve"
+    ],
+    "adm": [
+      "ad",
+      "adm"
+    ],
+    "spec": [
+      "sp",
+      "spec"
+    ],
+    "ux": [
+      "ux"
+    ],
+    "adr": [
+      "adr"
+    ],
+    "changelog": [
+      "cl",
+      "changelog"
+    ],
+    "health": [
+      "ht",
+      "health"
+    ],
+    "db": [
+      "db"
+    ],
+    "doctor": [
+      "dr",
+      "doctor"
+    ],
+    "maintenance": [
+      "mt",
+      "maintenance"
+    ],
+    "sweep": [
+      "sw",
+      "sweep"
+    ],
+    "schema": [
+      "sc",
+      "schema"
+    ],
+    "bench": [
+      "be",
+      "bench"
+    ],
+    "project-benchmark": [
+      "pb",
+      "project-benchmark"
+    ],
+    "catchup": [
+      "cu",
+      "catchup"
+    ],
+    "preflight": [
+      "pf",
+      "preflight"
+    ],
+    "adapter": [
+      "adp",
+      "adapter"
+    ],
+    "telemetry": [
+      "tel",
+      "telemetry"
+    ],
+    "receipt": [
+      "receipt"
+    ],
+    "session": [
+      "ss",
+      "session"
+    ]
+  },
+  "ownership": {
+    "project-owned": [
+      ".afol/config.json",
+      ".agents/lock.json",
+      ".agents/manifest.json",
+      ".agents/skills",
+      ".afol/adm",
+      ".afol/data/benchmarks",
+      ".afol/data/telemetry",
+      ".afol/library",
+      ".afol/memory",
+      ".afol/wb",
+      "AGENTS.md",
+      "docs/lessons",
+      "docs/standards",
+      "docs/telemetry",
+      "docs/templates"
+    ],
+    "generated": [
+      ".afol/data/events",
+      ".afol/data/index",
+      ".afol/tmp"
+    ],
+    "ignored": [
+      ".afol/data/README.md",
+      ".afol/pstr/README.md"
+    ],
+    "conflict": []
+  },
+  "allowed_payload": {
+    "optional_seed": [
+      ".afol/adm/source/universal-skills"
+    ],
+    "optional_adapters": [
+      ".claude"
+    ],
+    "project_templates": [
+      "docs/templates"
+    ]
+  },
+  "managed_hashes": {
+    ".afol/adm/hooks/README.md": "9cef6a63437d6acefdc29cc1d365c9652996b3a63b56dea86a7698fece852d3f",
+    ".afol/adm/hooks/coordination-radar.md": "21cab4fc371cf183d6ef67e96ace30f1bad2352c1c589b2cc6c532bdad076ca3",
+    ".afol/adm/hooks/index.json": "f090d9113eded29a33d58b8d6f04ed2a288a60e51483ef247713c4e6f0ff46bc",
+    ".afol/adm/rules/README.md": "82c484842d42fe25d2a9405b191646d359a7b5c40bcdd974d8c3b382286f69db",
+    ".afol/adm/rules/RULE-002-workstream-creation.md": "2095193efd1a8ac84b37219ef2bb9c99d20b2f920800c72309548365146b717c",
+    ".afol/adm/rules/RULE-003-documentation-standards.md": "9336f98a2e7d0ee31fd4dadf50b4bca6f1a47c3b419ba1b1e1e0cfffe91ada97",
+    ".afol/adm/rules/RULE-004-validation-linting.md": "f220c365a8e80b4b2688b368d4b3c5c75d9d7c8678c2ba6b4ae072f0ffd632bc",
+    ".afol/adm/rules/RULE-005-folder-structure.md": "9c2e055888b8a111fcabf59848e48bd2f4cddbca8632e26e4b353d6dfebdd7df",
+    ".afol/adm/rules/RULE-006-applicable-rule-resolution.md": "c0cc32192e28ce5d45ca7ae83cfefe2ff6d81da03369d12f65770b7374921d3a",
+    ".afol/adm/rules/RULE-007-postmortem-governance-review.md": "4da3fe77a7fdcf0d78bd8afc81e02521af371f3eb0eea1f0a8901472f359c207",
+    ".afol/adm/rules/RULE-008-evidence-gated-closure.md": "54b7129f77557146ffff0c9d3d7a7cadd61710f5dbd908f8b170b84997fab325",
+    ".afol/adm/rules/RULE-009-legacy-surface-retirement.md": "3fca351eef30408c207650c785568a75424fb0c5548237c435a889834555f4b5",
+    ".afol/adm/rules/RULE-010-benchmark-quality-contract.md": "ae1b6b57d1607b458cd6a724494bec64c9b8a73e47dc2a375967c15527d8be19",
+    ".afol/adm/rules/RULE-011-maintenance-cadence.md": "b9dd92f89bdce2cf2d69b467db0b002245133937e948164d506f6874ec496d17",
+    ".afol/adm/rules/RULE-012-user-journey-coverage.md": "b86f8ae9cfcd657ed9a54ba7ae709cb9d21d0e0f3b964b7c841f0a8392cc59b7",
+    ".afol/adm/rules/index.json": "34ae2036d35776c0ba67e3fe3bfff947e233a06f0d270c3eaa0ecd88325a555a",
+    ".afol/adm/source/universal-skills/index.json": "a55c79d7c7d9ba3d3483205763bd398377452159dfe5ab77b0d892572c0c7b0a",
+    ".afol/adm/source/universal-skills/profiles/core.json": "ffa2998c873dfe88ed9283602f28d78d162031a678fcb1c27e8beeaf4e449982",
+    ".afol/adm/source/universal-skills/skills/afol-rules/SKILL.md": "e6e20ab4aec3d278cae12698856f6f721a6ce812d69cf354886d317f3615482a",
+    ".afol/adm/tools.json": "edac904e4c47fe4a730dbb1b25e61cfe8b2161f4b8b7d79b6738265f64b13aa0",
+    ".afol/data/events/README.md": "3187e3fb4bbeee880e01d1df6e1f564993ea6370ddde4bd81e16a7bc02b62103",
+    ".afol/data/index/README.md": "5e9866eda19943dbd5f99e7974f33aaf7d42df6e333530b15379c9cacdfc12cf",
+    ".afol/data/telemetry/schemas/event.json": "72f24c2ef94c4007587abc4c54b98baa64926690ca2187c7763a74b74e24d0bf",
+    ".afol/tmp/README.md": "d3a7ca98c510d9f8177a51b193d4dc4d74e8fc07da39aa7de5b901f7348e1b66",
+    ".agents/skills/README.md": "74aa643c7627790039afcf572704f2486b558061de0edd8cf9a56b567d88f4a5"
+  },
+  "command_stability": {
+    "status": "stable",
+    "feedback": "stable",
+    "validate": "stable",
+    "init": "stable",
+    "start": "stable",
+    "done": "stable",
+    "transition": "stable",
+    "new": "stable",
+    "log": "stable",
+    "quick-task": "stable",
+    "governance": "stable",
+    "evidence": "stable",
+    "legacy": "compatibility",
+    "hook": "stable",
+    "rule": "stable",
+    "skill": "stable",
+    "close": "stable",
+    "file": "stable",
+    "fleet": "experimental",
+    "update": "stable",
+    "bootstrap": "stable",
+    "verify": "stable",
+    "verify-tasks": "stable",
+    "local-state": "stable",
+    "pstr": "stable",
+    "ctx": "stable",
+    "state": "stable",
+    "hydrate": "experimental",
+    "render": "compatibility",
+    "library": "experimental",
+    "memory": "experimental",
+    "evolve": "experimental",
+    "adm": "stable",
+    "spec": "stable",
+    "ux": "experimental",
+    "adr": "stable",
+    "changelog": "stable",
+    "health": "stable",
+    "db": "stable",
+    "doctor": "stable",
+    "maintenance": "stable",
+    "sweep": "stable",
+    "schema": "stable",
+    "bench": "experimental",
+    "project-benchmark": "experimental",
+    "catchup": "stable",
+    "preflight": "stable",
+    "adapter": "stable",
+    "telemetry": "experimental",
+    "receipt": "experimental",
+    "session": "stable"
+  }
+}

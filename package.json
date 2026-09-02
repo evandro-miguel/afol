@@ -1,0 +1,89 @@
+{
+	"name": "afol",
+	"private": true,
+	"version": "0.1.0-alpha.1",
+	"license": "MIT",
+	"description": "AFOL CLI and scaffold for governed agentic project workflows",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/evandro-miguel/afol.git"
+	},
+	"homepage": "https://github.com/evandro-miguel/afol#readme",
+	"bugs": {
+		"url": "https://github.com/evandro-miguel/afol/issues"
+	},
+	"packageManager": "bun@1.3.14",
+	"engines": {
+		"bun": ">=1.3.14"
+	},
+	"bin": {
+		"afol": "./afol"
+	},
+	"scripts": {
+		"dev": "bun run cli/main.ts",
+		"version:generate": "bun run cli/dev/generate-version.ts",
+		"version:check": "bun run cli/dev/generate-version.ts --check",
+		"manifest:generate": "bun run cli/dev/generate-manifest.ts",
+		"manifest:check": "bun run cli/dev/generate-manifest.ts --check",
+		"template:generate": "bun run cli/dev/generate-template.ts",
+		"template:check": "bun run cli/dev/generate-template.ts --check && bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"lint:biome": "biome check cli --line-ending=lf",
+		"lint:oxlint": "oxlint cli",
+		"lint:knip": "knip --dependencies --use-tsconfig-files --max-issues 0",
+		"lint:knip:informative": "knip --dependencies --use-tsconfig-files --max-issues 20",
+		"toolchain:diff": "bun run cli/dev/toolchain-smoke.ts",
+		"validate:toolchain": "bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
+		"test": "bun test",
+		"test:full": "bun run cli/dev/full-test.ts",
+		"test:unit": "bun test cli/tests",
+		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
+		"coverage": "bun test --coverage --coverage-reporter=text",
+		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/validate.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/version-metadata.test.ts",
+		"validate": "bun run typecheck && bun test",
+		"validate:template": "bun run template:check",
+		"validate:bootstrap": "bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts",
+		"kernel": "bun run cli/main.ts",
+		"build": "bun run version:generate && bun run cli/dev/build-release.ts",
+		"build:deterministic": "bun install --frozen-lockfile && bun test cli/tests/reproducible-build.test.ts && bun run build",
+		"local-state:rebuild": "bun run kernel -- local-state rebuild --json",
+		"validate:project": "bun run kernel -- v project --strict --json",
+		"validate:security": "bun run security:scan:informative",
+		"security:deps:informative": "bun run cli/dev/security-scan.ts deps",
+		"security:secrets:informative": "bun run cli/dev/security-scan.ts secrets",
+		"security:deps:required": "bun run cli/dev/security-scan.ts deps --required",
+		"security:secrets:required": "bun run cli/dev/security-scan.ts secrets --required",
+		"security:deps:release": "bun run cli/dev/security-scan.ts deps --release --json",
+		"security:secrets:release": "bun run cli/dev/security-scan.ts secrets --release --json",
+		"security:scan:informative": "bun run security:deps:informative && bun run security:secrets:informative",
+		"security:scan:required": "bun run security:deps:required && bun run security:secrets:required",
+		"security:scan:release": "bun run cli/dev/security-scan.ts release",
+		"validate:security:required": "bun run security:scan:required",
+		"validate:security:release": "bun run security:scan:release",
+		"validate:release": "bun run validate:toolchain && bun run public:audit -- . && bun run typecheck && bun run validate:template && bun run validate:bootstrap && bun run test:full && bun run coverage:check && bun run build:deterministic && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
+		"release:windows": "bun run test:full && bun run build && bun run validate:security:release && bun run release:provenance:release && bun run smoke:dist && bun run smoke:clean",
+		"release:provenance": "bun run cli/dev/release-provenance.ts",
+		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
+		"release:stage": "bun run cli/dev/stage-release.ts",
+		"smoke:dist": "bun run cli/dev/dist-smoke.ts",
+		"smoke:wsl2": "bun run cli/dev/dist-smoke.ts --wsl2",
+		"smoke:clean": "bun run cli/dev/clean-smoke.ts",
+		"smoke:example": "bun run cli/dev/public-example-smoke.ts",
+		"public:audit": "bun run scripts/audit-public-content.ts"
+	},
+	"dependencies": {
+		"diff": "^9.0.0",
+		"valibot": "^1.4.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.16",
+		"@types/bun": "^1.3.2",
+		"citty": "^0.2.2",
+		"knip": "^6.15.0",
+		"oxlint": "^1.67.0",
+		"typescript": "7.0.2"
+	},
+	"overrides": {
+		"fast-uri": "3.1.5"
+	}
+}

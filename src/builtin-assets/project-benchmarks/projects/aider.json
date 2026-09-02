@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0.0",
+  "id": "aider",
+  "name": "Aider",
+  "category": "direct_comparable",
+  "status": "active",
+  "source_access": "open_source",
+  "last_reviewed_at": "2026-06-10",
+  "stale_after_days": 90,
+  "confidence": "high",
+  "similarity_axes": {
+    "repo_context_map": {
+      "score": 5,
+      "evidence_refs": ["aider-repomap"]
+    },
+    "local_state": {
+      "score": 4,
+      "evidence_refs": ["aider-local-session"]
+    }
+  },
+  "similarities": [
+    {
+      "axis": "repo_context_map",
+      "claim": "Uses a concise repository map so the model can reason about code beyond the files currently being edited.",
+      "evidence_refs": ["aider-repomap"]
+    },
+    {
+      "axis": "local_state",
+      "claim": "Persists session history and project-local configuration files for continuity across invocations.",
+      "evidence_refs": ["aider-local-session"]
+    }
+  ],
+  "differences": [
+    {
+      "claim": "Optimized for interactive pair programming rather than durable project governance."
+    }
+  ],
+  "lessons_for_afol": [
+    {
+      "axis": "repo_context_map",
+      "lesson": "Expose compact, ranked project context so agents do not need to read broad docs before acting."
+    },
+    {
+      "axis": "local_state",
+      "lesson": "Persist small, discoverable project-local state files so agents resume without re-explaining context."
+    }
+  ],
+  "do_not_copy": [
+    {
+      "reason": "Do not optimize only for chat-driven coding; AFOL also needs durable governance state and validation."
+    }
+  ],
+  "source_refs": [
+    {
+      "id": "aider-repomap",
+      "title": "Aider repository map",
+      "url": "https://aider.chat/docs/repomap.html",
+      "source_type": "official_doc",
+      "claim": "Aider documents a concise repository map containing important classes, functions, types, and call signatures within a token budget.",
+      "axes": ["repo_context_map"]
+    },
+    {
+      "id": "aider-local-session",
+      "title": "Aider session and project state",
+      "url": "https://aider.chat/docs/",
+      "source_type": "official_doc",
+      "claim": "Aider stores .aider* files and chat history in the project to maintain continuity across runs.",
+      "axes": ["local_state"]
+    }
+  ]
+}

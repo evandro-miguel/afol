@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0.0",
+  "id": "openhands",
+  "name": "OpenHands",
+  "category": "direct_comparable",
+  "status": "active",
+  "source_access": "open_source",
+  "last_reviewed_at": "2026-06-20",
+  "stale_after_days": 90,
+  "confidence": "high",
+  "similarity_axes": {
+    "agent_task_lifecycle": {
+      "score": 5,
+      "evidence_refs": ["openhands-sdk-agent"]
+    },
+    "safe_mutation": {
+      "score": 4,
+      "evidence_refs": ["openhands-sandbox"]
+    },
+    "evals_benchmarks": {
+      "score": 5,
+      "evidence_refs": ["openhands-evals"]
+    },
+    "multi_agent": {
+      "score": 4,
+      "evidence_refs": ["openhands-sdk-overview"]
+    }
+  },
+  "similarities": [
+    {
+      "axis": "agent_task_lifecycle",
+      "claim": "Provides an SDK for building agents that interact with code, tools, and actions.",
+      "evidence_refs": ["openhands-sdk-agent"]
+    },
+    {
+      "axis": "evals_benchmarks",
+      "claim": "Documents evaluation harness support for integrating benchmarks.",
+      "evidence_refs": ["openhands-evals"]
+    },
+    {
+      "axis": "multi_agent",
+      "claim": "Composes agents and tools via SDK package boundaries and delegation surfaces.",
+      "evidence_refs": ["openhands-sdk-overview"]
+    }
+  ],
+  "differences": [
+    {
+      "claim": "Targets software-agent execution platforms more than project-local scaffold governance."
+    }
+  ],
+  "lessons_for_afol": [
+    {
+      "axis": "safe_mutation",
+      "lesson": "Keep execution isolation and permission boundaries explicit when agents can run commands or edit files."
+    },
+    {
+      "axis": "evals_benchmarks",
+      "lesson": "Treat benchmark fixtures as first-class regression assets rather than ad hoc demos."
+    },
+    {
+      "axis": "multi_agent",
+      "lesson": "Keep agent composition and delegation boundaries explicit in the SDK rather than implicit in prompts."
+    }
+  ],
+  "do_not_copy": [
+    {
+      "reason": "Do not make the governance layer depend on a heavy remote agent runtime."
+    }
+  ],
+  "source_refs": [
+    {
+      "id": "openhands-sdk-agent",
+      "title": "OpenHands SDK agent API",
+      "url": "https://docs.openhands.dev/sdk/api-reference/openhands.sdk.agent",
+      "source_type": "official_doc",
+      "claim": "OpenHands documents an Agent class that interacts with tools, processes messages, and executes actions.",
+      "axes": ["agent_task_lifecycle"]
+    },
+    {
+      "id": "openhands-sandbox",
+      "title": "OpenHands sandbox overview",
+      "url": "https://docs.openhands.dev/openhands/usage/sandboxes/overview",
+      "source_type": "official_doc",
+      "claim": "OpenHands documents Docker, process, and remote sandbox providers with different isolation tradeoffs.",
+      "axes": ["safe_mutation"]
+    },
+    {
+      "id": "openhands-evals",
+      "title": "OpenHands evaluation harness",
+      "url": "https://docs.openhands.dev/openhands/usage/developers/evaluation-harness",
+      "source_type": "official_doc",
+      "claim": "OpenHands documents an evaluation harness for integrating benchmark tasks into the framework.",
+      "axes": ["evals_benchmarks"]
+    },
+    {
+      "id": "openhands-sdk-overview",
+      "title": "OpenHands SDK architecture overview",
+      "url": "https://docs.openhands.dev/sdk/arch/overview",
+      "source_type": "official_doc",
+      "claim": "OpenHands describes a composable SDK for building and deploying agents with clear package boundaries.",
+      "axes": ["multi_agent"]
+    }
+  ]
+}

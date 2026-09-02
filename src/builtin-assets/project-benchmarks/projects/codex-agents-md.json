@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "id": "codex-agents-md",
+  "name": "Codex AGENTS.md",
+  "category": "adjacent_reference",
+  "status": "active",
+  "source_access": "official_docs",
+  "last_reviewed_at": "2026-06-12",
+  "stale_after_days": 90,
+  "confidence": "high",
+  "similarity_axes": {
+    "skills_modes_rules": {
+      "score": 4,
+      "evidence_refs": ["codex-agents-md"]
+    },
+    "repo_context_map": {
+      "score": 3,
+      "evidence_refs": ["codex-agents-md"]
+    }
+  },
+  "similarities": [
+    {
+      "axis": "skills_modes_rules",
+      "claim": "Uses repository-level instruction files to layer project guidance for coding agents.",
+      "evidence_refs": ["codex-agents-md"]
+    }
+  ],
+  "differences": [
+    {
+      "claim": "AGENTS.md is an instruction convention, not a validation or lifecycle engine."
+    }
+  ],
+  "lessons_for_afol": [
+    {
+      "axis": "skills_modes_rules",
+      "lesson": "Keep project instructions close to the repository and make discovery rules predictable."
+    }
+  ],
+  "do_not_copy": [
+    {
+      "reason": "Do not rely on prose-only instructions where AFOL needs typed command contracts and validation gates."
+    }
+  ],
+  "source_refs": [
+    {
+      "id": "codex-agents-md",
+      "title": "Codex custom instructions with AGENTS.md",
+      "url": "https://developers.openai.com/codex/guides/agents-md",
+      "source_type": "official_doc",
+      "claim": "Codex documents repository-level AGENTS.md files for layering project instructions on top of global guidance.",
+      "axes": ["skills_modes_rules", "repo_context_map"]
+    }
+  ]
+}

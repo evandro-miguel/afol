@@ -1,0 +1,3 @@
+# Canonical template and CLI text is hashed byte-for-byte.
+/cli/** text eol=lf
+/src/project-template/** text eol=lf

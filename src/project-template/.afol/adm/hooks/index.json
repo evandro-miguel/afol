@@ -1,0 +1,23 @@
+{
+  "hooks": [
+    {
+      "id": "COORDINATION-RADAR",
+      "name": "coordination radar reminder",
+      "path": "coordination-radar.md",
+      "enabled": true,
+      "events": ["context.bundle"],
+      "roles": ["orchestrator"],
+      "work_types": ["delivery", "all"],
+      "priority": 90,
+      "contributions": {
+        "messages": [
+          "Before delegating or editing across governed AFOL sessions, review `afol session radar` for open tasks, planned and touched files, and warnings. Radar warnings are context only, not locks; coordinate overlaps before assigning work."
+        ],
+        "tools": [
+          "afol session radar",
+          "afol session radar --json"
+        ]
+      }
+    }
+  ]
+}

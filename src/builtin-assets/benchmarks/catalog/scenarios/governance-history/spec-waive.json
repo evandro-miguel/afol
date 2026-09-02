@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "spec-waive",
+  "scenario_version": "1.0.0",
+  "pack_id": "governance-history",
+  "command": "afol spec waive --session sb-spec-waive --task T-01 --reason approved --adr ADR-sb --json",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-spec-waive'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'), session+'\\n','utf8'); writeFileSync(join(dir,`${session}_task_01.md`), ['---','feature_id: F-sb','parent_spec: \"spec-missing\"','---','','# Tasks','','| Task | State | Owner | Notes |','|------|-------|-------|-------|','| T-01 | pending | worker | seed |',''].join('\\n'),'utf8');"
+    ]
+  ],
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 300,
+    "max_p95_ms": 300,
+    "max_output_tokens": 167,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "governance-history-v1",
+  "deterministic_metrics": {
+    "duration_ms": 120,
+    "timing_p50_ms": 110,
+    "timing_p95_ms": 160,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 42,
+    "context_bytes": 1024,
+    "output_bytes": 240,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

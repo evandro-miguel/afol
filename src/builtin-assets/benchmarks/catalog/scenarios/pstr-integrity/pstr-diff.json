@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "pstr-diff",
+  "scenario_version": "1.0.0",
+  "pack_id": "pstr-integrity",
+  "command": "afol pstr diff --json",
+  "sandbox": true,
+  "setup": [
+    [
+      "node",
+      "-e",
+      "const{mkdirSync,rmSync,writeFileSync}=require('node:fs');const{join}=require('node:path');const root=process.cwd();for(const [dir,file] of [['cli','fixture.ts'],['docs','fixture.md']]){const path=join(root,dir);rmSync(path,{recursive:true,force:true});mkdirSync(path,{recursive:true});writeFileSync(join(path,file),'public fixture\\n');}rmSync(join(root,'.afol','pstr'),{recursive:true,force:true});"
+    ]
+  ],
+  "coverage": {
+    "subcommands": ["pstr diff --json"],
+    "journeys": ["pstr-structure-inspection"]
+  },
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 500,
+    "max_p95_ms": 500,
+    "max_output_tokens": 1200,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "pstr-integrity-v1",
+  "implementation_status": "implemented",
+  "deterministic_metrics": {
+    "duration_ms": 120,
+    "timing_p50_ms": 110,
+    "timing_p95_ms": 160,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 42,
+    "context_bytes": 1024,
+    "output_bytes": 240,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  }
+}

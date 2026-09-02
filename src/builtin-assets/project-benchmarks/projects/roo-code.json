@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "id": "roo-code",
+  "name": "Roo Code",
+  "category": "direct_comparable",
+  "status": "active",
+  "source_access": "open_source",
+  "last_reviewed_at": "2026-06-14",
+  "stale_after_days": 90,
+  "confidence": "high",
+  "similarity_axes": {
+    "skills_modes_rules": {
+      "score": 5,
+      "evidence_refs": ["roo-custom-modes"]
+    },
+    "safe_mutation": {
+      "score": 4,
+      "evidence_refs": ["roo-custom-modes"]
+    }
+  },
+  "similarities": [
+    {
+      "axis": "skills_modes_rules",
+      "claim": "Supports custom modes that tailor behavior and permissions for different tasks.",
+      "evidence_refs": ["roo-custom-modes"]
+    }
+  ],
+  "differences": [
+    {
+      "claim": "Roo Code is editor-centric, while AFOL is a project-local kernel and scaffold."
+    }
+  ],
+  "lessons_for_afol": [
+    {
+      "axis": "skills_modes_rules",
+      "lesson": "Mode and rule surfaces should be explicit, inspectable, and bounded by task intent."
+    },
+    {
+      "axis": "safe_mutation",
+      "lesson": "Permission boundaries should be represented as data rather than hidden prompt behavior."
+    }
+  ],
+  "do_not_copy": [
+    {
+      "reason": "Do not couple AFOL governance to one editor UI or assume interactive approvals are always available."
+    }
+  ],
+  "source_refs": [
+    {
+      "id": "roo-custom-modes",
+      "title": "Roo Code custom modes",
+      "url": "https://roocodeinc.github.io/Roo-Code/features/custom-modes/",
+      "source_type": "official_doc",
+      "claim": "Roo Code documents custom modes that can specialize behavior and restrict access to files, commands, or tools.",
+      "axes": ["skills_modes_rules", "safe_mutation"]
+    }
+  ]
+}

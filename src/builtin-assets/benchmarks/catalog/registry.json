@@ -1,0 +1,160 @@
+{
+  "schema_version": "1.0.0",
+  "coverage": {
+    "schema_version": "1.0.0",
+    "exemptions": [],
+    "subcommand_exemptions": []
+  },
+  "packs": [
+    {
+      "pack_id": "cli-kernel-local",
+      "min_scenarios": 6,
+      "selector_tags": [
+        "cli",
+        "kernel",
+        "local"
+      ]
+    },
+    {
+      "pack_id": "evolution-core",
+      "min_scenarios": 1,
+      "selector_tags": [
+        "evolution",
+        "journal",
+        "production-days",
+        "status"
+      ]
+    },
+    {
+      "pack_id": "routing-accuracy",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "routing",
+        "rules",
+        "skills"
+      ]
+    },
+    {
+      "pack_id": "mutation-safety",
+      "min_scenarios": 5,
+      "selector_tags": [
+        "mutation",
+        "files",
+        "undo",
+        "safety"
+      ]
+    },
+    {
+      "pack_id": "update-safety",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "update",
+        "safety",
+        "template"
+      ]
+    },
+    {
+      "pack_id": "workbench-parity",
+      "min_scenarios": 5,
+      "selector_tags": [
+        "workbench",
+        "parity"
+      ]
+    },
+    {
+      "pack_id": "mcp-parity",
+      "min_scenarios": 5,
+      "selector_tags": [
+        "mcp",
+        "runtime",
+        "parity"
+      ]
+    },
+    {
+      "pack_id": "runtime-live-agent",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "runtime",
+        "live",
+        "risky"
+      ]
+    },
+    {
+      "pack_id": "token-economy",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "token",
+        "prompt",
+        "context"
+      ]
+    },
+    {
+      "pack_id": "pstr-integrity",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "pstr",
+        "structure",
+        "index",
+        "stale"
+      ]
+    },
+    {
+      "pack_id": "context-bundles",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "ctx",
+        "context",
+        "bundle",
+        "token-budget"
+      ]
+    },
+    {
+      "pack_id": "state-projection",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "state",
+        "hydrate",
+        "session"
+      ]
+    },
+    {
+      "pack_id": "memory-governance",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "memory",
+        "knowledge",
+        "continuity"
+      ]
+    },
+    {
+      "pack_id": "library-knowledge",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "library",
+        "sources",
+        "claims",
+        "research"
+      ]
+    },
+    {
+      "pack_id": "governance-history",
+      "min_scenarios": 4,
+      "selector_tags": [
+        "spec",
+        "adr",
+        "changelog",
+        "governance"
+      ]
+    },
+    {
+      "pack_id": "adm-governance",
+      "min_scenarios": 3,
+      "selector_tags": [
+        "adm",
+        "migration",
+        "paths",
+        "validation"
+      ]
+    }
+  ]
+}

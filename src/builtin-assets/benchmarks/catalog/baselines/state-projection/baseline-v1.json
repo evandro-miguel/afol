@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_id": "state-projection-v1",
+  "pack_id": "state-projection",
+  "host_profile_id": "ci-linux-x64",
+  "sample_count": 3,
+  "warmup_count": 1,
+  "timing_p50_ms": 200,
+  "timing_p95_ms": 300,
+  "tokenizer_id": "tiktoken-o200k-base",
+  "tokenizer_version": "recorded",
+  "git_commit": "3297ae1660103ffa77a3d78f0edbf705bd2f8f68",
+  "source_repository": "github.com/evandro-miguel/afol",
+  "timestamp": "2026-08-23T19:30:59.130Z",
+  "provenance": "fresh-local-runnable-smoke"
+}

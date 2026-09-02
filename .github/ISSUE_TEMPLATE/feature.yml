@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a user outcome, not only an implementation
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user outcome
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope and alternatives
+    validations:
+      required: true
+  - type: dropdown
+    id: stability
+    attributes:
+      label: Intended stability
+      options: [Experimental, Stable, Not sure]
+    validations:
+      required: true

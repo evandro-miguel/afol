@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "generated_by": "manual",
+  "rules": [
+    {
+      "id": "RULE-002",
+      "name": "workstream-creation",
+      "path": "RULE-002-workstream-creation.md",
+      "surfaces": ["feature", "workbench", "planning"],
+      "work_types": ["delivery", "implementation"],
+      "priority": 100
+    },
+    {
+      "id": "RULE-003",
+      "name": "documentation-standards",
+      "path": "RULE-003-documentation-standards.md",
+      "surfaces": ["docs", "documentation"],
+      "work_types": ["delivery", "implementation", "docs"],
+      "priority": 60
+    },
+    {
+      "id": "RULE-004",
+      "name": "validation-linting",
+      "path": "RULE-004-validation-linting.md",
+      "surfaces": ["validation", "testing", "feature"],
+      "work_types": ["delivery", "implementation", "validation"],
+      "priority": 100
+    },
+    {
+      "id": "RULE-005",
+      "name": "folder-structure",
+      "path": "RULE-005-folder-structure.md",
+      "surfaces": ["structure", "scaffold"],
+      "work_types": ["delivery", "implementation", "refactor"],
+      "priority": 50
+    },
+    {
+      "id": "RULE-006",
+      "name": "applicable-rule-resolution",
+      "path": "RULE-006-applicable-rule-resolution.md",
+      "surfaces": ["rules", "routing", "feature", "workbench"],
+      "work_types": ["delivery", "implementation", "routing"],
+      "priority": 100
+    },
+    {
+      "id": "RULE-007",
+      "name": "postmortem-governance-review",
+      "path": "RULE-007-postmortem-governance-review.md",
+      "surfaces": ["postmortem", "closure", "workbench"],
+      "work_types": ["closure"],
+      "priority": 40
+    },
+    {
+      "id": "RULE-008",
+      "name": "evidence-gated-closure",
+      "path": "RULE-008-evidence-gated-closure.md",
+      "surfaces": ["workbench", "evidence", "closure"],
+      "work_types": ["delivery", "implementation", "benchmark"],
+      "priority": 90
+    },
+    {
+      "id": "RULE-009",
+      "name": "legacy-surface-retirement",
+      "path": "RULE-009-legacy-surface-retirement.md",
+      "surfaces": ["legacy", "cleanup", "migration"],
+      "work_types": ["refactor", "cleanup"],
+      "priority": 30
+    },
+    {
+      "id": "RULE-010",
+      "name": "benchmark-quality-contract",
+      "path": "RULE-010-benchmark-quality-contract.md",
+      "surfaces": ["benchmark", "evidence", "quality"],
+      "work_types": ["benchmark", "validation"],
+      "priority": 80
+    },
+    {
+      "id": "RULE-011",
+      "name": "maintenance-cadence",
+      "path": "RULE-011-maintenance-cadence.md",
+      "surfaces": ["maintenance", "memory", "library", "workbench", "governance"],
+      "work_types": ["maintenance", "cleanup", "validation", "benchmark"],
+      "priority": 85
+    },
+    {
+      "id": "RULE-012",
+      "name": "user-journey-coverage",
+      "path": "RULE-012-user-journey-coverage.md",
+      "surfaces": ["ux", "journey", "benchmark", "tool", "scenario"],
+      "work_types": ["docs", "benchmark", "validation", "implementation"],
+      "priority": 88
+    }
+  ]
+}
