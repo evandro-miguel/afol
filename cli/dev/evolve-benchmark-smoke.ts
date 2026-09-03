@@ -46,15 +46,17 @@ const TEMPLATE_MANIFEST = readFileSync(
 	),
 	"utf8",
 );
+const CONTRACT_PATH = [
+	".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+	"src/builtin-assets/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+]
+	.map((path) => resolve(import.meta.dir, "../..", path))
+	.find((path) => existsSync(path));
+if (CONTRACT_PATH === undefined) {
+	throw new Error("Evolution benchmark contract is missing");
+}
 const CONTRACT = JSON.parse(
-	readFileSync(
-		resolve(
-			import.meta.dir,
-			"../..",
-			".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
-		),
-		"utf8",
-	),
+	readFileSync(CONTRACT_PATH, "utf8"),
 ) as Record<string, unknown>;
 
 type StatusPayload = { data?: { state?: string } };
@@ -373,6 +375,9 @@ try {
 		healthyStatus.payload.data?.state !== "healthy"
 	)
 		throw new Error("healthy status contract failed");
+	// Bun can defer SQLite finalizers after Database.close(). Drain seeded
+	// handles before defining the read-only analysis boundary.
+	Bun.gc(true);
 	const dbBeforeAnalysis = analysisSnapshot(healthy);
 	const internalAnalysis = analyzeEvolutionProject(healthy);
 	const reviewId = internalAnalysis.proposals[0]?.id;
