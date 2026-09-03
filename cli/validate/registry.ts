@@ -1388,11 +1388,10 @@ export function validateBenchmarkProvenance(
 	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
 	const measurement = scenario.measurement;
 	if (measurement === undefined) {
-		if (
-			scenario.pack_id === "evolution-core" &&
-			baseline.calibration_status !== "pending"
-		) {
-			return [`benchmark-provenance-missing:${prefix}:measurement`];
+		if (scenario.pack_id === "evolution-core") {
+			return baseline.calibration_status === "pending"
+				? validatePendingBaselineContract(baseline, "evolution-baseline")
+				: [`benchmark-provenance-missing:${prefix}:measurement`];
 		}
 		return [];
 	}
@@ -1567,15 +1566,61 @@ function isSyntheticProfileValue(value: string): boolean {
 	);
 }
 
-const MUTATION_CALIBRATION_REASON_MAX_LENGTH = 64;
-const MUTATION_CALIBRATION_REASON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const CALIBRATION_REASON_MAX_LENGTH = 64;
+const CALIBRATION_REASON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PENDING_BASELINE_OBSERVED_FIELDS = [
+	"timing_p50_ms",
+	"timing_p95_ms",
+	"sample_count",
+	"warmup_count",
+	"git_commit",
+	"source_repository",
+	"timestamp",
+	"provenance",
+	"host_profile_id",
+	"os",
+	"arch",
+	"cpu_class",
+	"bun_version",
+	"runtime_version",
+	"execution_mode",
+	"artifact_mode",
+	"artifact_sha256",
+	"scenarios",
+] as const;
+
+function validatePendingBaselineContract(
+	baseline: Baseline,
+	issuePrefix: string,
+): string[] {
+	const issues: string[] = [];
+	if (
+		typeof baseline.calibration_reason !== "string" ||
+		baseline.calibration_reason.trim() === ""
+	) {
+		issues.push(`${issuePrefix}-calibration-reason-required`);
+	} else if (
+		baseline.calibration_reason.length > CALIBRATION_REASON_MAX_LENGTH ||
+		!CALIBRATION_REASON_PATTERN.test(baseline.calibration_reason)
+	) {
+		issues.push(`${issuePrefix}-calibration-reason-format-invalid`);
+	} else if (isSyntheticProfileValue(baseline.calibration_reason)) {
+		issues.push(`${issuePrefix}-calibration-reason-placeholder`);
+	}
+	for (const field of PENDING_BASELINE_OBSERVED_FIELDS) {
+		if (baseline[field] !== undefined) {
+			issues.push(`${issuePrefix}-pending-observed-field:${field}`);
+		}
+	}
+	return issues;
+}
 
 export function formatMutationCalibrationReason(
 	value: string | undefined,
 ): string {
 	return typeof value === "string" &&
-		value.length <= MUTATION_CALIBRATION_REASON_MAX_LENGTH &&
-		MUTATION_CALIBRATION_REASON_PATTERN.test(value)
+		value.length <= CALIBRATION_REASON_MAX_LENGTH &&
+		CALIBRATION_REASON_PATTERN.test(value)
 		? value
 		: "reason-invalid";
 }
@@ -1595,44 +1640,9 @@ export function validateMutationBaselineContract(
 		}
 	}
 	if (baseline.calibration_status === "pending") {
-		if (
-			typeof baseline.calibration_reason !== "string" ||
-			baseline.calibration_reason.trim() === ""
-		) {
-			issues.push("mutation-baseline-calibration-reason-required");
-		} else if (
-			baseline.calibration_reason.length >
-				MUTATION_CALIBRATION_REASON_MAX_LENGTH ||
-			!MUTATION_CALIBRATION_REASON_PATTERN.test(baseline.calibration_reason)
-		) {
-			issues.push("mutation-baseline-calibration-reason-format-invalid");
-		} else if (isSyntheticProfileValue(baseline.calibration_reason)) {
-			issues.push("mutation-baseline-calibration-reason-placeholder");
-		}
-		for (const field of [
-			"timing_p50_ms",
-			"timing_p95_ms",
-			"sample_count",
-			"warmup_count",
-			"git_commit",
-			"source_repository",
-			"timestamp",
-			"provenance",
-			"host_profile_id",
-			"os",
-			"arch",
-			"cpu_class",
-			"bun_version",
-			"runtime_version",
-			"execution_mode",
-			"artifact_mode",
-			"artifact_sha256",
-			"scenarios",
-		] as const) {
-			if (baseline[field] !== undefined) {
-				issues.push(`mutation-baseline-pending-observed-field:${field}`);
-			}
-		}
+		issues.push(
+			...validatePendingBaselineContract(baseline, "mutation-baseline"),
+		);
 		return issues;
 	}
 	if (baseline.calibration_reason !== undefined) {

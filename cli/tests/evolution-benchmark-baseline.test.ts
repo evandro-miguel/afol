@@ -67,5 +67,23 @@ describe("evolution benchmark baseline refresh", () => {
 		expect(validateBenchmarkProvenance(undefined, scenario, baseline)).toEqual(
 			[],
 		);
+
+		const { calibration_reason: _calibrationReason, ...baselineWithoutReason } =
+			baseline;
+		expect(
+			validateBenchmarkProvenance(undefined, scenario, baselineWithoutReason),
+		).toEqual(["evolution-baseline-calibration-reason-required"]);
+		expect(
+			validateBenchmarkProvenance(undefined, scenario, {
+				...baseline,
+				calibration_reason: "pending-calibration",
+			}),
+		).toEqual(["evolution-baseline-calibration-reason-placeholder"]);
+		expect(
+			validateBenchmarkProvenance(undefined, scenario, {
+				...baseline,
+				git_commit: "0123456789ab",
+			}),
+		).toEqual(["evolution-baseline-pending-observed-field:git_commit"]);
 	});
 });
