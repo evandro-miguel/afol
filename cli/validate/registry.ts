@@ -1386,21 +1386,25 @@ export function validateBenchmarkProvenance(
 	now: Date = new Date(),
 ): string[] {
 	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
-	const measurement = scenario.measurement;
-	if (measurement === undefined) {
-		if (scenario.pack_id === "evolution-core") {
-			return baseline.calibration_status === "pending"
-				? validatePendingBaselineContract(baseline, "evolution-baseline")
-				: [`benchmark-provenance-missing:${prefix}:measurement`];
-		}
-		return [];
-	}
 	const issues: string[] = [];
 	if (baseline.baseline_id !== scenario.baseline_id) {
 		issues.push(`benchmark-provenance-mismatch:${prefix}:baseline_id`);
 	}
 	if (baseline.pack_id !== scenario.pack_id) {
 		issues.push(`benchmark-provenance-mismatch:${prefix}:pack_id`);
+	}
+	const measurement = scenario.measurement;
+	if (measurement === undefined) {
+		if (scenario.pack_id === "evolution-core") {
+			if (baseline.calibration_status === "pending") {
+				issues.push(
+					...validatePendingBaselineContract(baseline, "evolution-baseline"),
+				);
+			} else {
+				issues.push(`benchmark-provenance-missing:${prefix}:measurement`);
+			}
+		}
+		return issues;
 	}
 	if (measurement.status !== "observed") {
 		issues.push(
@@ -1615,9 +1619,7 @@ function validatePendingBaselineContract(
 	return issues;
 }
 
-export function formatMutationCalibrationReason(
-	value: string | undefined,
-): string {
+export function formatCalibrationReason(value: string | undefined): string {
 	return typeof value === "string" &&
 		value.length <= CALIBRATION_REASON_MAX_LENGTH &&
 		CALIBRATION_REASON_PATTERN.test(value)

@@ -81,6 +81,8 @@ For work with several steps:
 "$AFOL" start T-01
 # Work on the project.
 "$AFOL" done T-01 -x "bun test"
+"$AFOL" start T-02
+"$AFOL" done T-02 -x "bun test"
 "$AFOL" close
 ```
 

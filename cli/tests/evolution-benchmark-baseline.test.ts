@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { evolutionBaselineWriterTestApi } from "../dev/update-evolution-benchmark-baseline";
+import { collectProfileCompatibilityNotes } from "../validate/command";
 import { validateBenchmarkProvenance } from "../validate/registry";
 import type { Baseline, Scenario } from "../validate/types";
 
@@ -67,6 +68,16 @@ describe("evolution benchmark baseline refresh", () => {
 		expect(validateBenchmarkProvenance(undefined, scenario, baseline)).toEqual(
 			[],
 		);
+		expect(
+			validateBenchmarkProvenance(undefined, scenario, {
+				...baseline,
+				baseline_id: "wrong-baseline",
+				pack_id: "state-projection",
+			}),
+		).toEqual([
+			"benchmark-provenance-mismatch:evolution-core:evolution-status-contract:baseline_id",
+			"benchmark-provenance-mismatch:evolution-core:evolution-status-contract:pack_id",
+		]);
 
 		const { calibration_reason: _calibrationReason, ...baselineWithoutReason } =
 			baseline;
@@ -91,5 +102,32 @@ describe("evolution benchmark baseline refresh", () => {
 				git_commit: "0123456789ab",
 			}),
 		).toEqual(["evolution-baseline-pending-observed-field:git_commit"]);
+	});
+
+	test("reports pending non-mutation baselines as incompatible", () => {
+		const scenario = {
+			schema_version: "1.0.0",
+			scenario_id: "state-export",
+			scenario_version: "1.0.0",
+			pack_id: "state-projection",
+			result_schema: "1.0.0",
+			oracle: "normalized-envelope-and-threshold-check",
+			thresholds: {},
+			baseline_id: "state-projection-v1",
+			deterministic_metrics: {},
+		} satisfies Scenario;
+		const baseline = {
+			schema_version: "1.0.0",
+			baseline_id: "state-projection-v1",
+			pack_id: "state-projection",
+			calibration_status: "pending",
+			calibration_reason: "public-source-checkout-requires-project-fixture",
+		} satisfies Baseline;
+
+		expect(
+			collectProfileCompatibilityNotes(scenario, baseline, undefined, null),
+		).toEqual([
+			"baseline-incompatible:calibration-pending:public-source-checkout-requires-project-fixture",
+		]);
 	});
 });
