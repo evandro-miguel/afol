@@ -1388,7 +1388,10 @@ export function validateBenchmarkProvenance(
 	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
 	const measurement = scenario.measurement;
 	if (measurement === undefined) {
-		if (scenario.pack_id === "evolution-core") {
+		if (
+			scenario.pack_id === "evolution-core" &&
+			baseline.calibration_status !== "pending"
+		) {
 			return [`benchmark-provenance-missing:${prefix}:measurement`];
 		}
 		return [];

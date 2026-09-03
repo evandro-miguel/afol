@@ -339,9 +339,10 @@ function validateContractIssues(
 	const isAllowed = (issue: string): boolean =>
 		allowMissingBaseline
 			? issue === "missing-baseline:evolution-core"
-			: issue.startsWith(
+			: [
 					"benchmark-provenance-commit-not-ancestor:evolution-core:evolution-status-contract:",
-				);
+					"benchmark-provenance-commit-not-found:evolution-core:evolution-status-contract:",
+				].some((prefix) => issue.startsWith(prefix));
 	if (issues.some((issue) => !isAllowed(issue))) {
 		throw new Error("Benchmark input contains unrelated contract issues");
 	}

@@ -64,14 +64,5 @@
     "tool_call_count": 1,
     "tool_success_rate": 1
   },
-  "measurement": {
-    "status": "observed",
-    "source": "fresh-local-runnable-smoke",
-    "sample_count": 3,
-    "warmup_count": 1,
-    "git_commit": "1ded1e7a0b3dd135ae9db6a1f07a366a056d172e",
-    "source_repository": "github.com/evandro-miguel/afol",
-    "timestamp": "2026-09-03T16:52:37.642Z"
-  },
   "implementation_status": "implemented"
 }
