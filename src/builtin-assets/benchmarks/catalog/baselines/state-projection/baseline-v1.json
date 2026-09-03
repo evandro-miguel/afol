@@ -3,5 +3,5 @@
   "baseline_id": "state-projection-v1",
   "pack_id": "state-projection",
   "calibration_status": "pending",
-  "calibration_reason": "public-source-checkout-requires-project-fixture"
+  "calibration_reason": "public-source-checkout-requires-runtime-project"
 }

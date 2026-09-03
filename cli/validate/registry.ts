@@ -1395,14 +1395,11 @@ export function validateBenchmarkProvenance(
 	}
 	const measurement = scenario.measurement;
 	if (measurement === undefined) {
-		if (scenario.pack_id === "evolution-core") {
-			if (baseline.calibration_status === "pending") {
-				issues.push(
-					...validatePendingBaselineContract(baseline, "evolution-baseline"),
-				);
-			} else {
-				issues.push(`benchmark-provenance-missing:${prefix}:measurement`);
-			}
+		if (
+			scenario.pack_id === "evolution-core" &&
+			baseline.calibration_status !== "pending"
+		) {
+			issues.push(`benchmark-provenance-missing:${prefix}:measurement`);
 		}
 		return issues;
 	}
@@ -1593,7 +1590,7 @@ const PENDING_BASELINE_OBSERVED_FIELDS = [
 	"scenarios",
 ] as const;
 
-function validatePendingBaselineContract(
+export function validatePendingBaselineContract(
 	baseline: Baseline,
 	issuePrefix: string,
 ): string[] {
@@ -1848,6 +1845,10 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 					scenarios,
 					baseline,
 				),
+			);
+		} else if (baseline.calibration_status === "pending") {
+			issues.push(
+				...validatePendingBaselineContract(baseline, `${packId}-baseline`),
 			);
 		}
 		for (const scenario of scenarios) {

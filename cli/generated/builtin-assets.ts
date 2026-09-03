@@ -14,7 +14,7 @@ export const BUILTIN_ASSET_METADATA = Object.freeze({
 	includedFileCount: 121,
 	generatedAt: "1970-01-01T00:00:00.000Z",
 	assetsHash:
-		"f0dacc73660e8565bbada67c113a0a56baa2e36bc92996c0782b2178f2feeaf9",
+		"6c0c61937654a13710768e15352164d341c8871564120ec01f906e40ef607ad9",
 });
 
 export const BUILTIN_ASSET_FILES: Readonly<
@@ -121,8 +121,8 @@ export const BUILTIN_ASSET_FILES: Readonly<
 	"benchmarks/catalog/baselines/state-projection/baseline-v1.json": {
 		path: "benchmarks/catalog/baselines/state-projection/baseline-v1.json",
 		contentBase64:
-			"ewogICJzY2hlbWFfdmVyc2lvbiI6ICIxLjAuMCIsCiAgImJhc2VsaW5lX2lkIjogInN0YXRlLXByb2plY3Rpb24tdjEiLAogICJwYWNrX2lkIjogInN0YXRlLXByb2plY3Rpb24iLAogICJjYWxpYnJhdGlvbl9zdGF0dXMiOiAicGVuZGluZyIsCiAgImNhbGlicmF0aW9uX3JlYXNvbiI6ICJwdWJsaWMtc291cmNlLWNoZWNrb3V0LXJlcXVpcmVzLXByb2plY3QtZml4dHVyZSIKfQo=",
-		sha256: "01119f89ae0408980674df4db76b0d589030ea99ea0a0c3a8bf86ab47d9397d3",
+			"ewogICJzY2hlbWFfdmVyc2lvbiI6ICIxLjAuMCIsCiAgImJhc2VsaW5lX2lkIjogInN0YXRlLXByb2plY3Rpb24tdjEiLAogICJwYWNrX2lkIjogInN0YXRlLXByb2plY3Rpb24iLAogICJjYWxpYnJhdGlvbl9zdGF0dXMiOiAicGVuZGluZyIsCiAgImNhbGlicmF0aW9uX3JlYXNvbiI6ICJwdWJsaWMtc291cmNlLWNoZWNrb3V0LXJlcXVpcmVzLXJ1bnRpbWUtcHJvamVjdCIKfQo=",
+		sha256: "7eee1a6bf970bece179607930e0d778715373f4d14368f44e884cff30c469030",
 		bytes: 215,
 	},
 	"benchmarks/catalog/baselines/token-economy/baseline-v1.json": {

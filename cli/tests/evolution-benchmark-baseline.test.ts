@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { evolutionBaselineWriterTestApi } from "../dev/update-evolution-benchmark-baseline";
 import { collectProfileCompatibilityNotes } from "../validate/command";
-import { validateBenchmarkProvenance } from "../validate/registry";
+import {
+	validateBenchmarkProvenance,
+	validatePendingBaselineContract,
+} from "../validate/registry";
 import type { Baseline, Scenario } from "../validate/types";
 
 describe("evolution benchmark baseline refresh", () => {
@@ -45,6 +48,26 @@ describe("evolution benchmark baseline refresh", () => {
 		).toThrow("Benchmark input contains unrelated contract issues");
 	});
 
+	test("accepts only the exact pending-calibration incompatibility shape", () => {
+		const valid = {
+			status: "incompatible",
+			pass: false,
+			notes: [
+				"expected-exit-honored:0",
+				"baseline-incompatible:calibration-pending:calibrate-from-a-commit-already-on-main",
+			],
+		};
+		expect(
+			evolutionBaselineWriterTestApi.isPendingCalibrationResult(valid),
+		).toBe(true);
+		expect(
+			evolutionBaselineWriterTestApi.isPendingCalibrationResult({
+				...valid,
+				notes: [...valid.notes, "profile-incompatible:os"],
+			}),
+		).toBe(false);
+	});
+
 	test("allows an explicit pending evolution calibration without measurement", () => {
 		const scenario: Scenario = {
 			schema_version: "1.0.0",
@@ -82,26 +105,29 @@ describe("evolution benchmark baseline refresh", () => {
 		const { calibration_reason: _calibrationReason, ...baselineWithoutReason } =
 			baseline;
 		expect(
-			validateBenchmarkProvenance(undefined, scenario, baselineWithoutReason),
-		).toEqual(["evolution-baseline-calibration-reason-required"]);
+			validatePendingBaselineContract(
+				baselineWithoutReason,
+				"evolution-core-baseline",
+			),
+		).toEqual(["evolution-core-baseline-calibration-reason-required"]);
 		expect(
-			validateBenchmarkProvenance(undefined, scenario, {
-				...baseline,
-				calibration_reason: "pending-calibration",
-			}),
-		).toEqual(["evolution-baseline-calibration-reason-placeholder"]);
+			validatePendingBaselineContract(
+				{ ...baseline, calibration_reason: "pending-calibration" },
+				"evolution-core-baseline",
+			),
+		).toEqual(["evolution-core-baseline-calibration-reason-placeholder"]);
 		expect(
-			validateBenchmarkProvenance(undefined, scenario, {
-				...baseline,
-				calibration_reason: "invalid reason",
-			}),
-		).toEqual(["evolution-baseline-calibration-reason-format-invalid"]);
+			validatePendingBaselineContract(
+				{ ...baseline, calibration_reason: "invalid reason" },
+				"evolution-core-baseline",
+			),
+		).toEqual(["evolution-core-baseline-calibration-reason-format-invalid"]);
 		expect(
-			validateBenchmarkProvenance(undefined, scenario, {
-				...baseline,
-				git_commit: "0123456789ab",
-			}),
-		).toEqual(["evolution-baseline-pending-observed-field:git_commit"]);
+			validatePendingBaselineContract(
+				{ ...baseline, git_commit: "0123456789ab" },
+				"evolution-core-baseline",
+			),
+		).toEqual(["evolution-core-baseline-pending-observed-field:git_commit"]);
 	});
 
 	test("reports pending non-mutation baselines as incompatible", () => {
@@ -121,13 +147,13 @@ describe("evolution benchmark baseline refresh", () => {
 			baseline_id: "state-projection-v1",
 			pack_id: "state-projection",
 			calibration_status: "pending",
-			calibration_reason: "public-source-checkout-requires-project-fixture",
+			calibration_reason: "public-source-checkout-requires-runtime-project",
 		} satisfies Baseline;
 
 		expect(
 			collectProfileCompatibilityNotes(scenario, baseline, undefined, null),
 		).toEqual([
-			"baseline-incompatible:calibration-pending:public-source-checkout-requires-project-fixture",
+			"baseline-incompatible:calibration-pending:public-source-checkout-requires-runtime-project",
 		]);
 	});
 });

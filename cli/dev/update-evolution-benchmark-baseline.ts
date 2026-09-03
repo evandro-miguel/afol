@@ -356,6 +356,22 @@ function isPriorProvenanceOnlyFailure(payload: JsonObject): boolean {
 	);
 }
 
+function isPendingCalibrationResult(result: JsonObject): boolean {
+	const notes = result.notes;
+	return (
+		result.status === "incompatible" &&
+		result.pass === false &&
+		Array.isArray(notes) &&
+		notes.length === 2 &&
+		notes.includes(RUNNER_EVIDENCE) &&
+		notes.some(
+			(note) =>
+				typeof note === "string" &&
+				note.startsWith("baseline-incompatible:calibration-pending:"),
+		)
+	);
+}
+
 function validateInput(
 	payload: JsonObject,
 	head: string,
@@ -461,6 +477,17 @@ function validateInput(
 			throw new Error("Baseline-missing bootstrap must fail the benchmark run");
 		}
 		validateContractIssues(payload, true);
+		validateBootstrapMetrics(result);
+		return result;
+	}
+	if (isPendingCalibrationResult(result)) {
+		if (!baselinePresent) {
+			throw new Error("Pending calibration requires an existing baseline");
+		}
+		if (payload.status !== "failed" || payload.pass !== false) {
+			throw new Error("Pending calibration must fail the benchmark run");
+		}
+		validateContractIssues(payload, false);
 		validateBootstrapMetrics(result);
 		return result;
 	}
@@ -614,6 +641,7 @@ export function updateEvolutionBenchmarkBaseline(
 			: undefined;
 	const validExit =
 		(status === "baseline-missing" && benchmark.exitCode === 2) ||
+		(status === "incompatible" && benchmark.exitCode === 2) ||
 		(status === "passed" &&
 			(benchmark.exitCode === 0 || benchmark.exitCode === 2));
 	if (!validExit) {
@@ -638,6 +666,7 @@ function assertNoExternalInput(args: string[]): void {
 
 export const evolutionBaselineWriterTestApi = {
 	isPriorProvenanceOnlyFailure,
+	isPendingCalibrationResult,
 	writeFixture(
 		repoRoot: string,
 		inputPath: string,
