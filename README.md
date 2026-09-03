@@ -13,7 +13,18 @@ Project intent -> Task -> Work -> Evidence -> Handoff
 AFOL does not host your project, call a model, or require a cloud account. It
 runs locally and leaves its state as readable project files.
 
-## Why use it?
+## Why I built it
+
+I originally built AFOL for my own day-to-day work with different coding-agent
+harnesses. It grew organically for at least twelve months, changing as I found
+new friction in real projects and as provider behavior, capabilities, and
+workflows evolved.
+
+I made it public to help other people who face the same continuity problems:
+repeating context, losing decisions between sessions, reconciling different
+harness conventions, and proving what an agent actually completed.
+
+## The problem it solves
 
 Coding-agent sessions are temporary. Project context should not be.
 
