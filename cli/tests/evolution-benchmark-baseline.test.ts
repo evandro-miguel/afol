@@ -82,6 +82,12 @@ describe("evolution benchmark baseline refresh", () => {
 		expect(
 			validateBenchmarkProvenance(undefined, scenario, {
 				...baseline,
+				calibration_reason: "invalid reason",
+			}),
+		).toEqual(["evolution-baseline-calibration-reason-format-invalid"]);
+		expect(
+			validateBenchmarkProvenance(undefined, scenario, {
+				...baseline,
 				git_commit: "0123456789ab",
 			}),
 		).toEqual(["evolution-baseline-pending-observed-field:git_commit"]);
