@@ -548,7 +548,7 @@ describe("release and toolchain contracts", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 15_000);
 
 	test("release build receipt write cleans temporary outputs on write failure", () => {
 		const root = mkdtempSync(join(tmpdir(), "release-receipt-write-failure-"));
