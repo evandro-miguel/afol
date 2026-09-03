@@ -110,6 +110,8 @@ jobs:
         run: bun run coverage:check
       - name: Verify the deterministic build
         run: bun run build:deterministic
+      - name: Bind distribution provenance
+        run: bun run release:provenance
       - name: Smoke the compiled distribution
         run: bun run smoke:dist
       - name: Smoke a clean project

@@ -13,7 +13,7 @@ The only approved workflow is `.github/workflows/ci.yml`.
 | `quality` | Every pull request and push to `main` | Generated drift, lint, public audit, types, template | Yes |
 | `tests` | Every pull request and push to `main` | Serial-by-file fail-fast test suite | Yes |
 | `core-smoke` | Every pull request and push to `main` | Bootstrap, provenance-bound build, public example | Yes |
-| `deep-validation` | Push to `main` | Full suite, coverage, deterministic build, distribution and clean-project smokes | No |
+| `deep-validation` | Push to `main` | Full suite, coverage, deterministic build, provenance, distribution and clean-project smokes | No |
 
 All jobs use `ubuntu-24.04` and Bun 1.3.14. External Actions are pinned by
 full commit SHA. The workflow has read-only repository contents permission,

@@ -167,6 +167,7 @@ describe("hosted CI contract", () => {
 			"bun run test:full",
 			"bun run coverage:check",
 			"bun run build:deterministic",
+			"bun run release:provenance",
 			"bun run smoke:dist",
 			"bun run smoke:clean",
 		]);
