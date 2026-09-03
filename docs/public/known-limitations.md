@@ -7,8 +7,8 @@
 - macOS and ARM release assets are not provided.
 - The alpha is source-only. A source tag does not promise a standalone binary
   or registry package.
-- The repository has no hosted CI workflow; local exact-SHA validation is the
-  release gate.
+- Hosted CI covers Linux x64 regression paths only; local exact-SHA validation
+  remains the source-release gate.
 - Binary publication, attestations, hosted updates, and global installation
   are outside the documented alpha contract.
 - AFOL is not a multi-user authentication or sandbox boundary.

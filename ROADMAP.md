@@ -14,9 +14,9 @@
 | Evolution and fleet | Experimental |
 | Memory and library adoption | Experimental or planned |
 
-Validation is local and exact-SHA. This repository ships no hosted CI workflow,
-so an absent hosted run has no product status. This roadmap does not claim
-publication, attestation, or global installation.
+Hosted CI provides regression evidence. Local exact-SHA validation remains the
+source-release authority. This roadmap does not claim binary publication,
+attestation, or global installation.
 
 ## After the first public alpha
 

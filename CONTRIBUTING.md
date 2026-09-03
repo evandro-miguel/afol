@@ -34,8 +34,9 @@ Security checks include Gitleaks and OSV Scanner. Do not commit generated drift.
 Documentation changes should preserve working relative links and valid Markdown
 structure. Release evidence is produced locally against the exact candidate
 SHA. The alpha is source-only: a source tag does not imply a standalone binary
-or registry package. This repository has no hosted CI workflow, so no hosted
-status is claimed.
+or registry package. Hosted CI supplies regression evidence but not release
+authorization; see the [continuous integration contract](docs/public/ci.md)
+and ADR-007.
 
 ## Security and privacy
 

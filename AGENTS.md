@@ -18,9 +18,10 @@ documentation, and local release tooling.
 
 ## Local validation
 
-Local exact-SHA validation is canonical. This repository has no hosted
-workflow. Run the narrowest relevant checks, then the full gate when release
-readiness is in scope:
+ADR-007 separates hosted regression evidence from exact-SHA local release
+validation. Pull requests receive `quality`, `tests`, and `core-smoke`; pushes
+to `main` also receive `deep-validation`. Run the narrowest relevant checks,
+then the full local gate when release readiness is in scope:
 
 ```bash
 bun install --frozen-lockfile
@@ -37,8 +38,9 @@ bun run validate:release
 Linux x64 is the supported source-execution target; WSL2 has observed local
 smoke. Native Windows is experimental; macOS and ARM are unsupported. The
 alpha is source-only: no standalone binary or registry package is promised.
-Do not claim hosted green status, attestations, or global installation. Those
-actions require explicit authorization and separate observed proof.
+Do not treat hosted green status as release authorization or claim
+attestations or global installation. Those actions require explicit
+authorization and separate observed proof.
 
 Keep secrets and credentials out of source and docs. Public examples must be
 runnable from a clean checkout and must not depend on private governance.

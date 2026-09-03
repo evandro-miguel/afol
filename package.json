@@ -37,7 +37,7 @@
 		"test": "bun test",
 		"test:full": "bun run cli/dev/full-test.ts",
 		"test:unit": "bun test cli/tests",
-		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
+		"test:ci": "AGENT=1 bun test --max-concurrency 4 --bail=1",
 		"coverage": "bun test --coverage --coverage-reporter=text",
 		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/release-provenance.ts --include cli/commands/bootstrap.ts --include cli/commands/validate.ts --isolate --timeout 30000 cli/tests/bootstrap-cleanup.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/coverage-check.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/registry.test.ts cli/tests/release-toolchain.test.ts cli/tests/validate-command.test.ts cli/tests/version-metadata.test.ts",
 		"validate": "bun run typecheck && bun test",

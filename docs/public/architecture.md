@@ -29,7 +29,8 @@ published downloads.
 
 The first alpha advertises Linux x64 from local exact-SHA validation. WSL2 has
 observed local smoke; native Windows is experimental, and macOS and ARM are
-unsupported. The repository ships no hosted CI workflow. Codex consumes the
-canonical root `AGENTS.md`; the optional Antigravity rule is managed only at
-`.agents/rules/afol.md`. See [Architecture decision records](adr/README.md) for
-the public contract choices.
+unsupported. Hosted CI supplies pull-request and `main` regression evidence;
+local exact-SHA validation remains the source-release authority. Codex consumes
+the canonical root `AGENTS.md`; the optional Antigravity rule is managed only
+at `.agents/rules/afol.md`. See [Architecture decision records](adr/README.md)
+for the public contract choices.

@@ -38,4 +38,13 @@ bun run validate:release
 
 Do not use results from another commit as release evidence. The alpha is
 source-only, and local build outputs are validation evidence rather than
-published downloads. This repository has no hosted CI workflow.
+published downloads.
+
+## Hosted CI fails
+
+Open the failed `quality`, `tests`, `core-smoke`, or `deep-validation` job and
+rerun its exact command locally with Bun 1.3.14 after
+`bun install --frozen-lockfile`. The first three jobs run for pull requests;
+`deep-validation` runs only after a push to `main`. A green rerun is regression
+evidence, not a replacement for `bun run validate:release` on a release
+candidate.

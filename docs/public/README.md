@@ -6,6 +6,7 @@ Public product docs for AFOL. Start at the root [README](../../README.md).
 | --- | --- |
 | [Getting started](getting-started.md) | Run the source alpha, init, and record an evidenced task |
 | [Command reference](command-reference.md) | Lifecycle, updates, stability |
+| [Continuous integration](ci.md) | Hosted regression checks and local release boundary |
 | [Architecture](architecture.md) | CLI, template, and project-state boundaries |
 | [Architecture decisions](adr/README.md) | Public ADRs |
 | [Security model](security-model.md) | What AFOL does and does not protect |

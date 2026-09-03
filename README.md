@@ -127,12 +127,15 @@ uploads these files; you decide which project files are versioned or shared.
 This alpha currently runs from source on Linux x64. No standalone binary or
 package-manager installation is published. See
 [Known limitations](docs/public/known-limitations.md) for other platforms.
+Hosted CI provides pull-request and `main` regression evidence; local
+exact-SHA validation remains the source-release authority.
 
 ## Learn more
 
 - [Getting started](docs/public/getting-started.md)
 - [Command reference](docs/public/command-reference.md)
 - [Codex and Antigravity integration](docs/public/provider-integrations.md)
+- [Continuous integration](docs/public/ci.md)
 - [Known limitations](docs/public/known-limitations.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

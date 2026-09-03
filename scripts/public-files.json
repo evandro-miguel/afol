@@ -25,5 +25,8 @@
     "bun.lock",
     "package.json",
     "tsconfig.json"
+  ],
+  "allowed_workflows": [
+    ".github/workflows/ci.yml"
   ]
 }
