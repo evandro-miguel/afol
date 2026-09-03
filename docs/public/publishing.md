@@ -52,9 +52,10 @@ Before tagging, confirm that:
   known limitations;
 - root `AGENTS.md` remains canonical for Codex, and the exact Antigravity rule
   `.agents/rules/afol.md` is the only optional integration.
+- hosted `quality`, `tests`, and `core-smoke` checks pass on the reviewed SHA.
 
-This repository has no hosted CI workflow. Local exact-SHA checks are the
-release evidence, not a substitute for a hosted run that does not exist.
+Hosted CI is regression evidence. Local exact-SHA checks remain the release
+evidence and a green hosted run does not authorize publication.
 
 ## 4. Publish the source release
 

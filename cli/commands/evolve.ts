@@ -792,7 +792,6 @@ function resolveCommitRange(
 		const result = runLocalGit(canonicalRoot, [
 			"--no-pager",
 			"--no-optional-locks",
-			"--no-lazy-fetch",
 			"--no-replace-objects",
 			"cat-file",
 			"-e",
@@ -804,7 +803,6 @@ function resolveCommitRange(
 	const rangeResult = runLocalGit(canonicalRoot, [
 		"--no-pager",
 		"--no-optional-locks",
-		"--no-lazy-fetch",
 		"--no-replace-objects",
 		"rev-list",
 		"--max-count=1001",

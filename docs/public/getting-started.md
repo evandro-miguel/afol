@@ -59,5 +59,6 @@ optional adapter and activate the workspace rule in the IDE when needed. See
 [Codex and Antigravity integration](provider-integrations.md) for the exact
 file and conflict rules.
 
-The repository ships no hosted CI workflow. Local exact-SHA checks are the
-validation evidence for this source-only alpha.
+Hosted CI provides pull-request and `main` regression evidence. Local
+exact-SHA checks remain the source-release authority for this source-only
+alpha. See [Continuous integration](ci.md).

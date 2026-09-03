@@ -11,6 +11,7 @@ downstream users. Internal development history stays out of this tree.
 | [004](004-binary-first-distribution.md) | Binary-first distribution | Superseded |
 | [005](005-optional-provider-mirrors.md) | Optional Antigravity workspace rule | Accepted |
 | [006](006-source-only-alpha.md) | The alpha is source-only | Accepted |
+| [007](007-hosted-ci.md) | Hosted CI provides regression evidence | Accepted |
 
 New design changes that affect the public contract should add or update an ADR
 here.

@@ -246,7 +246,6 @@ function assertCleanBenchmarkInputs(repoRoot: string): void {
 	const result = runLocalGit(repoRoot, [
 		"--no-pager",
 		"--no-optional-locks",
-		"--no-lazy-fetch",
 		"status",
 		"--porcelain=v1",
 		"--untracked-files=all",
@@ -273,7 +272,6 @@ function currentCommit(repoRoot: string): string {
 	const result = runLocalGit(repoRoot, [
 		"--no-pager",
 		"--no-optional-locks",
-		"--no-lazy-fetch",
 		"rev-parse",
 		"--short=12",
 		"HEAD",
@@ -328,7 +326,7 @@ function validateBootstrapMetrics(result: JsonObject): void {
 function validateContractIssues(
 	payload: JsonObject,
 	allowMissingBaseline: boolean,
-): void {
+): string[] {
 	const issues = payload.contract_issues;
 	if (
 		!Array.isArray(issues) ||
@@ -336,12 +334,40 @@ function validateContractIssues(
 	) {
 		throw new Error("Benchmark input contract_issues must be a string array");
 	}
-	const allowed = allowMissingBaseline
-		? ["missing-baseline:evolution-core"]
-		: [];
-	if (issues.some((issue) => !allowed.includes(issue))) {
+	const isAllowed = (issue: string): boolean =>
+		allowMissingBaseline
+			? issue === "missing-baseline:evolution-core"
+			: [
+					"benchmark-provenance-commit-not-ancestor:evolution-core:evolution-status-contract:",
+					"benchmark-provenance-commit-not-found:evolution-core:evolution-status-contract:",
+				].some((prefix) => issue.startsWith(prefix));
+	if (issues.some((issue) => !isAllowed(issue))) {
 		throw new Error("Benchmark input contains unrelated contract issues");
 	}
+	return issues;
+}
+
+function isPriorProvenanceOnlyFailure(payload: JsonObject): boolean {
+	const issues = validateContractIssues(payload, false);
+	return (
+		payload.status === "failed" && payload.pass === false && issues.length > 0
+	);
+}
+
+function isPendingCalibrationResult(result: JsonObject): boolean {
+	const notes = result.notes;
+	return (
+		result.status === "incompatible" &&
+		result.pass === false &&
+		Array.isArray(notes) &&
+		notes.length === 2 &&
+		notes.includes(RUNNER_EVIDENCE) &&
+		notes.some(
+			(note) =>
+				typeof note === "string" &&
+				note.startsWith("baseline-incompatible:calibration-pending:"),
+		)
+	);
 }
 
 function validateInput(
@@ -452,6 +478,17 @@ function validateInput(
 		validateBootstrapMetrics(result);
 		return result;
 	}
+	if (isPendingCalibrationResult(result)) {
+		if (!baselinePresent) {
+			throw new Error("Pending calibration requires an existing baseline");
+		}
+		if (payload.status !== "failed" || payload.pass !== false) {
+			throw new Error("Pending calibration must fail the benchmark run");
+		}
+		validateContractIssues(payload, false);
+		validateBootstrapMetrics(result);
+		return result;
+	}
 	if (result.status !== "passed" || result.pass !== true) {
 		throw new Error(
 			"Benchmark scenario must pass or be a valid baseline-missing bootstrap",
@@ -462,10 +499,14 @@ function validateInput(
 			"Cannot refresh a missing baseline without baseline-missing status",
 		);
 	}
-	if (payload.status !== "passed" || payload.pass !== true) {
-		throw new Error("Passed benchmark result must pass the benchmark run");
+	const runPassed = payload.status === "passed" && payload.pass === true;
+	const refreshBlockedOnlyByPriorProvenance =
+		isPriorProvenanceOnlyFailure(payload);
+	if (!runPassed && !refreshBlockedOnlyByPriorProvenance) {
+		throw new Error(
+			"Passed benchmark result must pass or be blocked only by its prior provenance",
+		);
 	}
-	validateContractIssues(payload, false);
 	validateBootstrapMetrics(result);
 	return result;
 }
@@ -596,8 +637,12 @@ export function updateEvolutionBenchmarkBaseline(
 		Array.isArray(results) && isObject(results[0])
 			? results[0].status
 			: undefined;
-	const expectedExit = status === "baseline-missing" ? 2 : 0;
-	if (benchmark.exitCode !== expectedExit) {
+	const validExit =
+		(status === "baseline-missing" && benchmark.exitCode === 2) ||
+		(status === "incompatible" && benchmark.exitCode === 2) ||
+		(status === "passed" &&
+			(benchmark.exitCode === 0 || benchmark.exitCode === 2));
+	if (!validExit) {
 		throw new Error(
 			`Controlled evolution benchmark exit ${benchmark.exitCode} does not match result status`,
 		);
@@ -618,6 +663,8 @@ function assertNoExternalInput(args: string[]): void {
 }
 
 export const evolutionBaselineWriterTestApi = {
+	isPriorProvenanceOnlyFailure,
+	isPendingCalibrationResult,
 	writeFixture(
 		repoRoot: string,
 		inputPath: string,

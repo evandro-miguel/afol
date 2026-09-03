@@ -14,8 +14,8 @@ threat-model changes. -->
 <!-- Exact commands and observed outcomes. -->
 
 - [ ] This short-lived branch starts from `main` and this PR targets `main`.
-- [ ] Local exact-SHA checks were run; this repository has no hosted CI
-      workflow.
+- [ ] Required local checks were run; hosted green is not release
+      authorization.
 
 ## Documentation and rollback
 
@@ -24,6 +24,7 @@ threat-model changes. -->
 ## Checklist
 
 - [ ] Tests cover changed behavior.
+- [ ] Hosted `quality`, `tests`, and `core-smoke` checks pass.
 - [ ] Generated files are synchronized.
 - [ ] No private paths, credentials, raw sessions, or unrelated state were added.
 - [ ] New commands declare stability and side effects.
@@ -33,3 +34,5 @@ threat-model changes. -->
       release path.
 - [ ] Any Codex/Antigravity integration change keeps root `AGENTS.md` canonical
       and limits the optional adapter to `.agents/rules/afol.md`.
+- [ ] Release-affecting changes include local exact-SHA `validate:release`
+      evidence.

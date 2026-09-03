@@ -46,6 +46,7 @@ const DEFAULT_ALLOWED_ROOT_FILES = new Set([
 type PublicFilesPolicy = {
 	allowed_root_directories?: unknown;
 	allowed_root_files?: unknown;
+	allowed_workflows?: unknown;
 };
 
 function stringSet(value: unknown, fallback: Set<string>): Set<string> {
@@ -69,6 +70,10 @@ const allowedRootDirectories = stringSet(
 const allowedRootFiles = stringSet(
 	publicFilesPolicy.allowed_root_files,
 	DEFAULT_ALLOWED_ROOT_FILES,
+);
+const allowedWorkflows = stringSet(
+	publicFilesPolicy.allowed_workflows,
+	new Set(),
 );
 const SKIPPED_TOP_LEVEL_DIRECTORIES = new Set([
 	".git",
@@ -188,7 +193,10 @@ function scopedPathFinding(name: string): string | null {
 			return "non-public-docs-path";
 		}
 	}
-	if (name === ".github/workflows" || name.startsWith(".github/workflows/")) {
+	if (
+		name.startsWith(".github/workflows/") &&
+		!allowedWorkflows.has(name)
+	) {
 		return "hosted-workflow-path";
 	}
 	return null;
