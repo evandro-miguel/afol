@@ -246,7 +246,6 @@ function assertCleanBenchmarkInputs(repoRoot: string): void {
 	const result = runLocalGit(repoRoot, [
 		"--no-pager",
 		"--no-optional-locks",
-		"--no-lazy-fetch",
 		"status",
 		"--porcelain=v1",
 		"--untracked-files=all",
@@ -273,7 +272,6 @@ function currentCommit(repoRoot: string): string {
 	const result = runLocalGit(repoRoot, [
 		"--no-pager",
 		"--no-optional-locks",
-		"--no-lazy-fetch",
 		"rev-parse",
 		"--short=12",
 		"HEAD",

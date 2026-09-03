@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { evolutionBaselineWriterTestApi } from "../dev/update-evolution-benchmark-baseline";
 import { collectProfileCompatibilityNotes } from "../validate/command";
 import {
@@ -8,6 +12,22 @@ import {
 import type { Baseline, Scenario } from "../validate/types";
 
 describe("evolution benchmark baseline refresh", () => {
+	test("checks clean inputs with the supported Git CLI", () => {
+		const repoRoot = mkdtempSync(join(tmpdir(), "afol-evolution-git-"));
+		try {
+			const initialized = spawnSync("git", ["init", "--quiet"], {
+				cwd: repoRoot,
+				shell: false,
+			});
+			expect(initialized.status).toBe(0);
+			expect(() =>
+				evolutionBaselineWriterTestApi.assertCleanInputs(repoRoot),
+			).not.toThrow();
+		} finally {
+			rmSync(repoRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("requires an exact prior-provenance issue for a failed refresh run", () => {
 		expect(
 			evolutionBaselineWriterTestApi.isPriorProvenanceOnlyFailure({
