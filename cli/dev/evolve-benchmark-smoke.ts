@@ -55,9 +55,10 @@ const CONTRACT_PATH = [
 if (CONTRACT_PATH === undefined) {
 	throw new Error("Evolution benchmark contract is missing");
 }
-const CONTRACT = JSON.parse(
-	readFileSync(CONTRACT_PATH, "utf8"),
-) as Record<string, unknown>;
+const CONTRACT = JSON.parse(readFileSync(CONTRACT_PATH, "utf8")) as Record<
+	string,
+	unknown
+>;
 
 type StatusPayload = { data?: { state?: string } };
 
