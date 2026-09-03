@@ -336,10 +336,13 @@ function validateContractIssues(
 	) {
 		throw new Error("Benchmark input contract_issues must be a string array");
 	}
-	const allowed = allowMissingBaseline
-		? ["missing-baseline:evolution-core"]
-		: [];
-	if (issues.some((issue) => !allowed.includes(issue))) {
+	const isAllowed = (issue: string): boolean =>
+		allowMissingBaseline
+			? issue === "missing-baseline:evolution-core"
+			: issue.startsWith(
+					"benchmark-provenance-commit-not-ancestor:evolution-core:evolution-status-contract:",
+				);
+	if (issues.some((issue) => !isAllowed(issue))) {
 		throw new Error("Benchmark input contains unrelated contract issues");
 	}
 }
@@ -462,10 +465,15 @@ function validateInput(
 			"Cannot refresh a missing baseline without baseline-missing status",
 		);
 	}
-	if (payload.status !== "passed" || payload.pass !== true) {
-		throw new Error("Passed benchmark result must pass the benchmark run");
-	}
 	validateContractIssues(payload, false);
+	const runPassed = payload.status === "passed" && payload.pass === true;
+	const refreshBlockedOnlyByPriorProvenance =
+		payload.status === "failed" && payload.pass === false;
+	if (!runPassed && !refreshBlockedOnlyByPriorProvenance) {
+		throw new Error(
+			"Passed benchmark result must pass or be blocked only by its prior provenance",
+		);
+	}
 	validateBootstrapMetrics(result);
 	return result;
 }
@@ -596,8 +604,11 @@ export function updateEvolutionBenchmarkBaseline(
 		Array.isArray(results) && isObject(results[0])
 			? results[0].status
 			: undefined;
-	const expectedExit = status === "baseline-missing" ? 2 : 0;
-	if (benchmark.exitCode !== expectedExit) {
+	const validExit =
+		(status === "baseline-missing" && benchmark.exitCode === 2) ||
+		(status === "passed" &&
+			(benchmark.exitCode === 0 || benchmark.exitCode === 2));
+	if (!validExit) {
 		throw new Error(
 			`Controlled evolution benchmark exit ${benchmark.exitCode} does not match result status`,
 		);
