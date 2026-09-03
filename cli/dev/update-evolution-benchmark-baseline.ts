@@ -328,7 +328,7 @@ function validateBootstrapMetrics(result: JsonObject): void {
 function validateContractIssues(
 	payload: JsonObject,
 	allowMissingBaseline: boolean,
-): void {
+): string[] {
 	const issues = payload.contract_issues;
 	if (
 		!Array.isArray(issues) ||
@@ -345,6 +345,14 @@ function validateContractIssues(
 	if (issues.some((issue) => !isAllowed(issue))) {
 		throw new Error("Benchmark input contains unrelated contract issues");
 	}
+	return issues;
+}
+
+function isPriorProvenanceOnlyFailure(payload: JsonObject): boolean {
+	const issues = validateContractIssues(payload, false);
+	return (
+		payload.status === "failed" && payload.pass === false && issues.length > 0
+	);
 }
 
 function validateInput(
@@ -465,10 +473,9 @@ function validateInput(
 			"Cannot refresh a missing baseline without baseline-missing status",
 		);
 	}
-	validateContractIssues(payload, false);
 	const runPassed = payload.status === "passed" && payload.pass === true;
 	const refreshBlockedOnlyByPriorProvenance =
-		payload.status === "failed" && payload.pass === false;
+		isPriorProvenanceOnlyFailure(payload);
 	if (!runPassed && !refreshBlockedOnlyByPriorProvenance) {
 		throw new Error(
 			"Passed benchmark result must pass or be blocked only by its prior provenance",
@@ -629,6 +636,7 @@ function assertNoExternalInput(args: string[]): void {
 }
 
 export const evolutionBaselineWriterTestApi = {
+	isPriorProvenanceOnlyFailure,
 	writeFixture(
 		repoRoot: string,
 		inputPath: string,

@@ -46,13 +46,12 @@ const TEMPLATE_MANIFEST = readFileSync(
 	),
 	"utf8",
 );
-const CONTRACT_PATH = [
-	".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+const CONTRACT_PATH = resolve(
+	import.meta.dir,
+	"../..",
 	"src/builtin-assets/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
-]
-	.map((path) => resolve(import.meta.dir, "../..", path))
-	.find((path) => existsSync(path));
-if (CONTRACT_PATH === undefined) {
+);
+if (!existsSync(CONTRACT_PATH)) {
 	throw new Error("Evolution benchmark contract is missing");
 }
 const CONTRACT = JSON.parse(readFileSync(CONTRACT_PATH, "utf8")) as Record<
