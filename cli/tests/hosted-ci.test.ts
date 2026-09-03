@@ -36,9 +36,9 @@ const repoRoot = join(import.meta.dir, "..", "..");
 const workflowDirectory = join(repoRoot, ".github", "workflows");
 const workflowPath = join(workflowDirectory, "ci.yml");
 
-const checkoutRef = "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd";
+const checkoutRef = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1";
 const setupBunRef =
-	"oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5";
+	"oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6";
 
 function commands(job: WorkflowJob | undefined): string[] {
 	return (job?.steps ?? []).flatMap((step) =>
