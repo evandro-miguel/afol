@@ -58,6 +58,19 @@ interface ReplaceAfterReclaimWorkerData {
 	signals: SharedArrayBuffer;
 }
 
+const SESSION_LOCK_CHILD = "--afol-session-lock-child";
+
+if (process.argv[2] === SESSION_LOCK_CHILD) {
+	if (process.argv[3] !== "release-lock") {
+		throw new Error("unknown session-lock child mode");
+	}
+	const lockPath = process.argv[4];
+	if (!lockPath) throw new Error("session-lock child requires a lock path");
+	Bun.sleepSync(25);
+	rmSync(lockPath, { force: true });
+	process.exit(0);
+}
+
 if (!isMainThread && workerData?.kind === "stale-reclaim") {
 	const {
 		participants,
@@ -391,8 +404,10 @@ describe("session-lock", () => {
 			const release = Bun.spawn({
 				cmd: [
 					process.execPath,
-					"-e",
-					`import { rmSync } from "node:fs"; setTimeout(() => rmSync(${JSON.stringify(lockPath)}, { force: true }), 25);`,
+					import.meta.filename,
+					SESSION_LOCK_CHILD,
+					"release-lock",
+					lockPath,
 				],
 				stdout: "ignore",
 				stderr: "ignore",

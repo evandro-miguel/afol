@@ -78,6 +78,62 @@ import {
 import { appendVerificationRunTerminal } from "../services/workbench/verification-runs";
 import { verifyWorkbenchTasks } from "../services/workbench/verify";
 
+type WorkbenchChildMode =
+	| "diagnostic"
+	| "preflight"
+	| "skipped"
+	| "signal"
+	| "sequence"
+	| "fencing"
+	| "stale"
+	| "batch-fencing";
+const WORKBENCH_CHILD = "--afol-workbench-child";
+
+if (process.argv[2] === WORKBENCH_CHILD) {
+	const root = process.cwd();
+	switch (process.argv[3] as WorkbenchChildMode) {
+		case "diagnostic": {
+			const diagnostic = `I008_CHILD_DIAGNOSTIC_${"secret".repeat(120)}`;
+			process.stdout.write(diagnostic);
+			process.stderr.write(diagnostic);
+			process.exit(7);
+			break;
+		}
+		case "preflight":
+			writeFileSync(join(root, "should-not-run"), "bad");
+			break;
+		case "skipped":
+			writeFileSync(join(root, "skipped-step.txt"), "bad");
+			break;
+		case "signal": {
+			const output = "RAW_CHILD_OUTPUT_SHOULD_NOT_PERSIST";
+			process.stdout.write(output);
+			process.stderr.write(output);
+			process.kill(process.pid, "SIGTERM");
+			break;
+		}
+		case "sequence":
+			writeFileSync(join(root, "first-verification-started"), "started");
+			Bun.sleepSync(300);
+			break;
+		case "fencing":
+			writeFileSync(join(root, "fenced-child.pid"), String(process.pid));
+			Bun.sleepSync(5_000);
+			break;
+		case "stale":
+			writeFileSync(join(root, "stale-verification-started"), "started");
+			Bun.sleepSync(300);
+			break;
+		case "batch-fencing":
+			writeFileSync(join(root, "batch-fenced-child.pid"), String(process.pid));
+			Bun.sleepSync(5_000);
+			break;
+		default:
+			throw new Error(`unknown workbench child mode: ${process.argv[3]}`);
+	}
+	process.exit(0);
+}
+
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
 function mkRoot(name: string): string {
@@ -103,10 +159,13 @@ function recordObservedCompletion(root: string, input: RecordEvidenceInput) {
 		`${input.session}_task_01.md`,
 	);
 	const state = (): string => {
-		const match = readFileSync(taskPath, "utf8").match(
-			new RegExp(`^\\|\\s*${input.taskId}\\s*\\|\\s*([^|]+)\\|`, "m"),
-		);
-		return match?.[1]?.trim() ?? "";
+		const row = readFileSync(taskPath, "utf8")
+			.split("\n")
+			.find(
+				(line) =>
+					line.startsWith("|") && line.split("|")[1]?.trim() === input.taskId,
+			);
+		return row?.split("|")[2]?.trim() ?? "";
 	};
 	if (state() === "pending") {
 		startTask(root, input);
@@ -150,6 +209,10 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
 	});
+}
+
+function workbenchChildCommand(mode: WorkbenchChildMode): string {
+	return `${JSON.stringify(process.execPath)} ${JSON.stringify(import.meta.filename)} ${WORKBENCH_CHILD} ${mode}`;
 }
 
 function initGitRepo(root: string): void {
@@ -553,6 +616,32 @@ describe("workbench lifecycle service", () => {
 			expect(result.completed).toBe(2);
 			expect(result.openTasks).toHaveLength(0);
 			expect(result.issues).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recordObservedCompletion ignores non-canonical task-like lines", () => {
+		const root = mkRoot("completion-canonical-row");
+		try {
+			const created = newWorkstream(root, "canonical task row");
+			const taskDoc = readFileSync(created.taskPath, "utf8");
+			writeFileSync(
+				created.taskPath,
+				`not a task row | T-01 | done | misleading |\n${taskDoc}`,
+				"utf8",
+			);
+
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | tested_needs_spec_validation |",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1237,10 +1326,6 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "done child diagnostic");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const rawChildDiagnostic = `I008_CHILD_DIAGNOSTIC_${"secret".repeat(120)}`;
-			const codePoints = Array.from(rawChildDiagnostic, (char) =>
-				char.charCodeAt(0),
-			);
-			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.exit(7)`;
 			const proc = runKernel(root, [
 				"done",
 				"--session",
@@ -1248,7 +1333,7 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				`bun -e ${JSON.stringify(script)}`,
+				workbenchChildCommand("diagnostic"),
 				"--json",
 			]);
 
@@ -4955,7 +5040,7 @@ describe("sequential done verification runs", () => {
 				"-T",
 				"T-01",
 				"-x",
-				`bun -e "require('node:fs').writeFileSync('${marker}', 'bad')"`,
+				workbenchChildCommand("preflight"),
 				"-x",
 				"bun --version",
 				"--json",
@@ -5158,7 +5243,7 @@ describe("sequential done verification runs", () => {
 				"--test",
 				'bun -e "process.exit(3)"',
 				"--test",
-				`bun -e "require('node:fs').writeFileSync('${skippedPath}', 'bad')"`,
+				workbenchChildCommand("skipped"),
 				"--json",
 			]);
 
@@ -5202,8 +5287,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence signal");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const rawOutput = "RAW_CHILD_OUTPUT_SHOULD_NOT_PERSIST";
-			const codePoints = Array.from(rawOutput, (char) => char.charCodeAt(0));
-			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.kill(process.pid, "SIGTERM")`;
 			const proc = runKernel(root, [
 				"done",
 				"-S",
@@ -5211,7 +5294,7 @@ describe("sequential done verification runs", () => {
 				"-T",
 				"T-01",
 				"-x",
-				`bun -e ${JSON.stringify(script)}`,
+				workbenchChildCommand("signal"),
 				"-x",
 				"bun --version",
 				"--json",
@@ -5404,7 +5487,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence process race");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const marker = join(root, "first-verification-started");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "started"); setTimeout(() => {}, 300);`;
 			const baseArgs = [
 				kernelPath,
 				"done",
@@ -5418,7 +5500,7 @@ describe("sequential done verification runs", () => {
 				[
 					...baseArgs,
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("sequence"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -5438,7 +5520,7 @@ describe("sequential done verification runs", () => {
 				[
 					...baseArgs,
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("sequence"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -5491,7 +5573,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence fencing loss");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const marker = join(root, "fenced-child.pid");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setTimeout(() => {}, 5000);`;
 			const child = spawn(
 				"bun",
 				[
@@ -5502,7 +5583,7 @@ describe("sequential done verification runs", () => {
 					"-T",
 					"T-01",
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("fencing"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -5579,7 +5660,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence stale conflict");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const marker = join(root, "stale-verification-started");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "started"); setTimeout(() => {}, 300);`;
 			const child = spawn(
 				"bun",
 				[
@@ -5590,7 +5670,7 @@ describe("sequential done verification runs", () => {
 					"-T",
 					"T-01",
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("stale"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -6690,7 +6770,6 @@ describe("task completion authorization and transitions", () => {
 			startTask(root, { session: created.session, taskId: "T-01" });
 			startTask(root, { session: created.session, taskId: "T-02" });
 			const marker = join(root, "batch-fenced-child.pid");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setTimeout(() => {}, 5000);`;
 			const child = spawn(
 				"bun",
 				[
@@ -6701,7 +6780,7 @@ describe("task completion authorization and transitions", () => {
 					"-T",
 					"T-01..T-02",
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("batch-fencing"),
 					"--json",
 				],
 				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
