@@ -706,6 +706,7 @@ export function loadRegistry(projectRoot: string): RegistrySnapshot {
 	const snapshot: RegistrySnapshot = {
 		schema_version: VALIDATION_SCHEMA_VERSION,
 		projectRoot,
+		source: useProjectCatalog ? "project" : "builtin",
 		packs,
 		scenariosByPack,
 		baselinesByPack,

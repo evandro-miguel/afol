@@ -36,6 +36,7 @@ import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
 import { maxSampleOutputBytes } from "./output-metrics";
 import type {
+	BenchmarkCatalogSource,
 	BenchmarkExecutionProfile,
 	PreparedCompiledReleaseArtifact,
 	Scenario,
@@ -152,6 +153,7 @@ function argvCharCount(command: string): number {
 
 export interface ScenarioExecutionOptions {
 	artifact?: PreparedCompiledReleaseArtifact;
+	catalogSource?: BenchmarkCatalogSource;
 	sampleCount?: number;
 	warmupCount?: number;
 	seams?: ScenarioExecutionSeams;
@@ -285,6 +287,7 @@ function resolveScenarioInvocation(
 	command: string,
 	preferLocalWrapper = true,
 	trustedAfolBinary?: string,
+	catalogSource: BenchmarkCatalogSource = "builtin",
 ): CommandInvocation {
 	const tokens = tokenizeCommand(command);
 	if (tokens.length === 0) {
@@ -296,7 +299,33 @@ function resolveScenarioInvocation(
 		tokens,
 		preferLocalWrapper,
 		trustedAfolBinary,
+		catalogSource,
 	);
+}
+
+function assertTrustedCatalogProgram(
+	program: string,
+	catalogSource: BenchmarkCatalogSource,
+): void {
+	if (catalogSource === "project" && program !== "afol" && program !== "a") {
+		throw new Error(
+			"Project benchmark catalogs may only execute afol/a commands",
+		);
+	}
+}
+
+function validateProjectScenarioCommands(
+	command: string,
+	setup: string[][] | undefined,
+): void {
+	const commandTokens = tokenizeCommand(command);
+	assertTrustedCatalogProgram(commandTokens[0] ?? "", "project");
+	for (const setupCommand of setup ?? []) {
+		if (setupCommand.length === 0) {
+			throw new Error("Empty setup command");
+		}
+		assertTrustedCatalogProgram(setupCommand[0] ?? "", "project");
+	}
 }
 
 function resolveCommandInvocation(
@@ -305,18 +334,20 @@ function resolveCommandInvocation(
 	tokens: string[],
 	preferLocalWrapper: boolean,
 	trustedAfolBinary?: string,
+	catalogSource: BenchmarkCatalogSource = "builtin",
 ): CommandInvocation {
 	const program = tokens[0];
 	if (program === undefined) {
 		throw new Error("Empty command tokens");
 	}
 	const args = tokens.slice(1);
+	assertTrustedCatalogProgram(program, catalogSource);
 	if (program === "afol" || program === "a") {
 		const executable = resolveAfolExecutable(trustedAfolBinary);
 		if (executable) {
 			return { command: executable, args };
 		}
-		if (!preferLocalWrapper) {
+		if (!preferLocalWrapper || catalogSource === "project") {
 			return {
 				command: "bun",
 				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
@@ -1609,6 +1640,7 @@ function runSandboxScenarioSample(
 	command: string,
 	phase: Exclude<ScenarioSamplePhase, "setup">,
 	trustedAfolBinary?: string,
+	catalogSource: BenchmarkCatalogSource = "builtin",
 	seams?: ScenarioExecutionSeams,
 ): SandboxScenarioSampleResult {
 	let sandboxRoot: string | null = null;
@@ -1632,6 +1664,7 @@ function runSandboxScenarioSample(
 				setupCommand,
 				false,
 				trustedAfolBinary,
+				catalogSource,
 			);
 			const setupSample = runScenarioSample(
 				sandboxRoot,
@@ -1664,6 +1697,7 @@ function runSandboxScenarioSample(
 					command,
 					false,
 					trustedAfolBinary,
+					catalogSource,
 				);
 				result = {
 					sample: runScenarioSample(sandboxRoot, invocation, phase, seams),
@@ -1726,6 +1760,7 @@ function runSandboxScenarioCommand(
 	projectRoot: string,
 	scenario: Scenario,
 	command: string,
+	catalogSource: BenchmarkCatalogSource,
 	options: Required<
 		Pick<ScenarioExecutionOptions, "sampleCount" | "warmupCount">
 	> & { artifact?: PreparedCompiledReleaseArtifact },
@@ -1739,6 +1774,7 @@ function runSandboxScenarioCommand(
 			command,
 			"warmup",
 			options.artifact?.binaryPath,
+			catalogSource,
 			seams,
 		),
 	);
@@ -1749,6 +1785,7 @@ function runSandboxScenarioCommand(
 			command,
 			"sample",
 			options.artifact?.binaryPath,
+			catalogSource,
 			seams,
 		),
 	);
@@ -1883,11 +1920,16 @@ export function runScenarioCommand(
 	if (command.length === 0) {
 		throw new Error("Scenario command is required for execution");
 	}
+	const catalogSource = options.catalogSource ?? "builtin";
+	if (catalogSource === "project") {
+		validateProjectScenarioCommands(command, scenario.setup);
+	}
 	if (scenario.sandbox) {
 		return runSandboxScenarioCommand(
 			projectRoot,
 			scenario,
 			command,
+			catalogSource,
 			{
 				...(options.artifact ? { artifact: options.artifact } : {}),
 				sampleCount,
@@ -1903,6 +1945,7 @@ export function runScenarioCommand(
 		command,
 		true,
 		options.artifact?.binaryPath,
+		catalogSource,
 	);
 	const gitStatusBefore = gitStatusPorcelain(projectRoot);
 	const gitStateBefore = gitStatusBefore.ok

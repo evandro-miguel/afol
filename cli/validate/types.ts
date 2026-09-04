@@ -21,6 +21,7 @@ export const REQUIRED_PACKS = [
 ] as const;
 
 export type PackId = (typeof REQUIRED_PACKS)[number];
+export type BenchmarkCatalogSource = "project" | "builtin";
 
 export type ValidationScope = "default" | "wb" | "tpl" | "update";
 
@@ -154,6 +155,7 @@ export interface ToolCoveragePolicy {
 export interface RegistrySnapshot {
 	schema_version: string;
 	projectRoot?: string;
+	source: BenchmarkCatalogSource;
 	packs: PackMetadata[];
 	coverage?: ToolCoveragePolicy;
 	scenariosByPack: Record<string, Scenario[]>;
