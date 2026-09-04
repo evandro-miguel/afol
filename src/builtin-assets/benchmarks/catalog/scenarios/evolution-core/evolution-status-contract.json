@@ -51,9 +51,9 @@
   },
   "baseline_id": "evolution-core-v2",
   "deterministic_metrics": {
-    "duration_ms": 401,
-    "timing_p50_ms": 401,
-    "timing_p95_ms": 404,
+    "duration_ms": 386,
+    "timing_p50_ms": 386,
+    "timing_p95_ms": 388,
     "error_count": 0,
     "retry_count": 0,
     "context_tokens": 0,
@@ -64,5 +64,14 @@
     "tool_call_count": 1,
     "tool_success_rate": 1
   },
-  "implementation_status": "implemented"
+  "implementation_status": "implemented",
+  "measurement": {
+    "status": "observed",
+    "source": "fresh-local-runnable-smoke",
+    "sample_count": 3,
+    "warmup_count": 1,
+    "git_commit": "a777bb1b94f79581315e5f4ca7f0747a3f67849d",
+    "source_repository": "github.com/evandro-miguel/afol",
+    "timestamp": "2026-09-04T00:23:01.518Z"
+  }
 }
