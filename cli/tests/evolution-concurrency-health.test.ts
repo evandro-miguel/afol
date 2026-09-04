@@ -117,20 +117,6 @@ if (process.argv[2] === EVOLUTION_CHILD) {
 			}
 			break;
 		}
-		case "journal-only-rebuild": {
-			const db = openEvolutionDb(evolutionDbPath(root));
-			try {
-				rebuildProductionDayProjection({
-					root,
-					db,
-					projectId: PROJECT_ID,
-					timezone: TIMEZONE,
-				});
-			} finally {
-				db.close();
-			}
-			break;
-		}
 		case "append-health": {
 			const db = openEvolutionDb(evolutionDbPath(root));
 			try {
@@ -327,9 +313,7 @@ describe("Evolution canonical projection and concurrency", () => {
 		const child = Bun.spawn(
 			[
 				process.execPath,
-				import.meta.filename,
-				EVOLUTION_CHILD,
-				"journal-only-rebuild",
+				join(import.meta.dir, "fixtures/evolution-journal-rebuild-child.ts"),
 			],
 			{ cwd: root, stdout: "pipe", stderr: "pipe" },
 		);
