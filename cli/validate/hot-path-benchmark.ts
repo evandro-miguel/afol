@@ -11,6 +11,7 @@ import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { splitCommandLine } from "../commands/workbench/verify";
 import { boundedSpawn } from "../core/subprocess";
+import { trustedBunInvocation } from "../services/benchmark/trusted-bun";
 import { sha256 } from "../services/evolution/imports/digest";
 import {
 	HOT_PATH_BENCHMARK_ENV,
@@ -114,9 +115,9 @@ export function resolveHotPathLauncherArgv(
 	sourceMainPath: string,
 	args: string[],
 ): string[] {
-	return compiledRuntime
-		? [execPath, ...args]
-		: [execPath, sourceMainPath, ...args];
+	if (compiledRuntime) return [execPath, ...args];
+	const invocation = trustedBunInvocation([sourceMainPath], execPath);
+	return [invocation.command, ...invocation.args, ...args];
 }
 
 function emptyInstrumentation(): HotPathInstrumentationSnapshot {

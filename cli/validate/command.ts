@@ -31,7 +31,6 @@ import { selectPacks } from "./selector";
 import {
 	type Baseline,
 	BENCHMARK_RESULT_SCHEMA_VERSION,
-	type BenchmarkCatalogSource,
 	type BenchmarkResult,
 	type PackId,
 	type RegistrySnapshot,
@@ -296,7 +295,6 @@ function collectBenchmarkPackResults(
 					baseline,
 					timingMode,
 					artifact,
-					snapshot.source,
 				),
 		),
 		notes: [],
@@ -393,7 +391,6 @@ export function buildResult(
 	baseline: Baseline | undefined,
 	timingMode: TimingMode = "enforce",
 	preparedArtifact?: PreparedCompiledReleaseArtifact,
-	catalogSource: BenchmarkCatalogSource = "builtin",
 ): BenchmarkResult {
 	if (timingMode === "observe" && scenario.pack_id !== "governance-history") {
 		throw new Error(
@@ -409,7 +406,6 @@ export function buildResult(
 		(scenario.sandbox || scenario.implementation_status !== "skipped")
 			? runScenarioCommand(projectRoot, scenario, {
 					...(preparedArtifact ? { artifact: preparedArtifact } : {}),
-					catalogSource,
 					...(scenario.pack_id === "mutation-safety"
 						? {
 								sampleCount: RELEASE_BENCH_SAMPLES,

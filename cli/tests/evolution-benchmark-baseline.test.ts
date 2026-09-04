@@ -99,6 +99,7 @@ describe("evolution benchmark baseline refresh", () => {
 			thresholds: { max_duration_ms: 4000 },
 			baseline_id: "evolution-core-v2",
 			deterministic_metrics: {},
+			execution_source: "builtin",
 		};
 		const baseline: Baseline = {
 			schema_version: "1.0.0",
@@ -161,6 +162,7 @@ describe("evolution benchmark baseline refresh", () => {
 			thresholds: {},
 			baseline_id: "state-projection-v1",
 			deterministic_metrics: {},
+			execution_source: "builtin",
 		} satisfies Scenario;
 		const baseline = {
 			schema_version: "1.0.0",

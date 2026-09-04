@@ -16,6 +16,7 @@ import {
 import {
 	type Baseline,
 	BENCHMARK_RESULT_SCHEMA_VERSION,
+	type BenchmarkScenarioSource,
 	type HotPathDerivedPath,
 	type HotPathScenarioConfig,
 	type HotPathScenarioMode,
@@ -227,6 +228,7 @@ function parseHotPathScenario(
 function parseScenario(
 	data: Record<string, unknown>,
 	sourcePath: string,
+	executionSource: BenchmarkScenarioSource,
 ): Scenario {
 	const scenario: Scenario = {
 		schema_version: asString(
@@ -248,6 +250,7 @@ function parseScenario(
 			data.deterministic_metrics,
 			`${sourcePath}.deterministic_metrics`,
 		),
+		execution_source: executionSource,
 	};
 	const hotPath = parseHotPathScenario(data, sourcePath);
 	if (hotPath !== undefined) {
@@ -628,9 +631,22 @@ function loadRegistryMetadata(registry: Record<string, unknown>): {
 }
 
 const BUILTIN_CATALOG_PREFIX = "benchmarks/catalog/";
+const CATALOG_RELATIVE_PREFIX = ".afol/data/benchmarks/catalog/";
+
+function builtinAssetPath(relativePath: string): string {
+	if (!relativePath.startsWith(CATALOG_RELATIVE_PREFIX)) {
+		throw new Error(`Invalid benchmark catalog path: ${relativePath}`);
+	}
+	return `${BUILTIN_CATALOG_PREFIX}${relativePath.slice(CATALOG_RELATIVE_PREFIX.length)}`;
+}
+
+function builtinAssetBytes(relativePath: string): Buffer | undefined {
+	const entry = BUILTIN_ASSET_FILES[builtinAssetPath(relativePath)];
+	return entry ? Buffer.from(entry.contentBase64, "base64") : undefined;
+}
 
 function loadBuiltinCatalogJson(relativePath: string): Record<string, unknown> {
-	const assetPath = `${BUILTIN_CATALOG_PREFIX}${relativePath.replace(`${REGISTRY_RELATIVE_PATH.slice(0, -"registry.json".length)}`, "")}`;
+	const assetPath = builtinAssetPath(relativePath);
 	const entry = BUILTIN_ASSET_FILES[assetPath];
 	if (!entry) {
 		throw new Error(`Missing builtin benchmark catalog file: ${assetPath}`);
@@ -677,7 +693,33 @@ export function loadRegistry(projectRoot: string): RegistrySnapshot {
 			.sort()
 			.map((entry) => {
 				const relativePath = `${packRelativePath}/${entry}`;
-				return parseScenario(loadCatalogJson(relativePath), relativePath);
+				if (useProjectCatalog) {
+					// Parse and classify from one byte snapshot so a replacement after
+					// validation cannot change the command that gets executed.
+					const scenarioBytes = readFileSync(join(projectRoot, relativePath));
+					const parsed: unknown = JSON.parse(scenarioBytes.toString("utf8"));
+					if (!isObject(parsed)) {
+						throw new Error(
+							`Invalid JSON object: ${join(projectRoot, relativePath)}`,
+						);
+					}
+					const embeddedBytes = builtinAssetBytes(relativePath);
+					const executionSource: BenchmarkScenarioSource =
+						embeddedBytes !== undefined &&
+						Buffer.compare(scenarioBytes, embeddedBytes) === 0
+							? "builtin-copy"
+							: "project";
+					const scenario = parseScenario(parsed, relativePath, executionSource);
+					scenario.execution_source_path = relativePath;
+					return scenario;
+				}
+				const scenario = parseScenario(
+					loadCatalogJson(relativePath),
+					relativePath,
+					"builtin",
+				);
+				scenario.execution_source_path = relativePath;
+				return scenario;
 			});
 		scenariosByPack[pack.pack_id] = scenarios;
 	}
