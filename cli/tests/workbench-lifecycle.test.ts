@@ -3278,12 +3278,10 @@ describe("workbench lifecycle service", () => {
 					tasks: ["T-01: deferred"],
 				},
 			);
-			const source = readFileSync(created.taskPath, "utf8")
-				.replace('status: "open"', 'status: "open"')
-				.replace(
-					/^\| T-01 \|.*$/m,
-					`| T-01 | moved | agent | deferred destination=${continuation.session} reason=dependency pending |`,
-				);
+			const source = readFileSync(created.taskPath, "utf8").replace(
+				/^\| T-01 \|.*$/m,
+				`| T-01 | moved | agent | deferred destination=${continuation.session} reason=dependency pending |`,
+			);
 			writeFileSync(created.taskPath, source, "utf8");
 
 			const result = closeSession(root, created.session, {
