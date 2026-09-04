@@ -7,6 +7,7 @@ import {
 	readFileSync,
 	symlinkSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +22,10 @@ import {
 	validateProductionDayProjection,
 } from "../services/evolution";
 import { rebuildProductionDayProjection } from "../services/evolution/journal";
-import { validateEvolutionProjectionCheckpoint } from "../services/evolution/projection-checkpoint";
+import {
+	validateEvolutionProjectionCheckpoint,
+	writeEvolutionProjectionCheckpoint,
+} from "../services/evolution/projection-checkpoint";
 import { withSessionLock } from "../services/io/session-lock";
 import { removeEvolutionTestRoot } from "./evolution-test-support";
 import { symlinkTestSupport } from "./symlink-test-support";
@@ -29,6 +33,137 @@ import { symlinkTestSupport } from "./symlink-test-support";
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
 const TIMEZONE = "America/Asuncion";
 const JOURNAL_LOCK = "__evolution-journal__";
+const EVOLUTION_CHILD = "--afol-evolution-concurrency-child";
+
+if (process.argv[2] === EVOLUTION_CHILD) {
+	const mode = process.argv[3];
+	const root = process.cwd();
+	switch (mode) {
+		case "checkpoint-writer-1":
+		case "checkpoint-writer-2": {
+			const db = new Database(evolutionDbPath(root));
+			try {
+				writeFileSync(
+					join(
+						root,
+						mode === "checkpoint-writer-1"
+							? "checkpoint-ready-1"
+							: "checkpoint-ready-2",
+					),
+					"ready",
+				);
+				while (!existsSync(join(root, "checkpoint-go"))) Bun.sleepSync(5);
+				writeEvolutionProjectionCheckpoint({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					now: new Date(
+						mode === "checkpoint-writer-1"
+							? "2026-07-18T12:00:00.000Z"
+							: "2026-07-18T12:00:01.000Z",
+					),
+				});
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "checkpoint-writer-block": {
+			const db = new Database(evolutionDbPath(root));
+			try {
+				writeEvolutionProjectionCheckpoint({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					writeBytes: (fd, line) => {
+						writeFileSync(join(root, "checkpoint-writer-ready"), "ready");
+						while (!existsSync(join(root, "checkpoint-writer-go")))
+							Bun.sleepSync(5);
+						return writeSync(fd, line, null, "utf8");
+					},
+				});
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "checkpoint-reader": {
+			const db = new Database(evolutionDbPath(root));
+			try {
+				writeFileSync(join(root, "checkpoint-reader-ready"), "ready");
+				validateEvolutionProjectionCheckpoint({
+					root,
+					db,
+					projectId: PROJECT_ID,
+				});
+				writeFileSync(join(root, "checkpoint-reader-done"), "done");
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "rebuild-lock": {
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				rebuildProductionDayProjection({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					timezone: TIMEZONE,
+				});
+				writeFileSync(join(root, "rebuild.marker"), "done");
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "journal-only-rebuild": {
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				rebuildProductionDayProjection({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					timezone: TIMEZONE,
+				});
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "append-health": {
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				writeFileSync(join(root, "append-ready"), "ready");
+				while (!existsSync(join(root, "append-go"))) Bun.sleepSync(10);
+				appendProductionDayAllocation({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					timezone: TIMEZONE,
+					sessionId: "S-02",
+					evidenceId: "E-02",
+				});
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "health-check": {
+			writeFileSync(join(root, "health-ready"), "ready");
+			const result = checkEvolutionDbHealth(evolutionDbPath(root), PROJECT_ID, {
+				root,
+				projectId: PROJECT_ID,
+				timezone: TIMEZONE,
+			});
+			writeFileSync(join(root, "health-result.json"), JSON.stringify(result));
+			break;
+		}
+		default:
+			throw new Error(`unknown evolution concurrency child mode: ${mode}`);
+	}
+	process.exit(0);
+}
 
 function seedEvidence(
 	root: string,
@@ -83,18 +218,15 @@ describe("Evolution canonical projection and concurrency", () => {
 			join(root, "checkpoint-ready-1"),
 			join(root, "checkpoint-ready-2"),
 		];
-		const modulePath = join(
-			import.meta.dir,
-			"../services/evolution/projection-checkpoint",
-		);
-		const children = ready.map((marker, index) =>
+		const children = ready.map((_, index) =>
 			Bun.spawn(
 				[
-					"bun",
-					"-e",
-					`import { existsSync, writeFileSync } from "node:fs"; import { Database } from "bun:sqlite"; import { writeEvolutionProjectionCheckpoint } from ${JSON.stringify(modulePath)}; const db=new Database(${JSON.stringify(dbPath)}); writeFileSync(${JSON.stringify(marker)},"ready"); while(!existsSync(${JSON.stringify(go)})) Bun.sleepSync(5); writeEvolutionProjectionCheckpoint({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},now:new Date(${JSON.stringify(`2026-07-18T12:00:0${index}.000Z`)})}); db.close();`,
+					process.execPath,
+					import.meta.filename,
+					EVOLUTION_CHILD,
+					index === 0 ? "checkpoint-writer-1" : "checkpoint-writer-2",
 				],
-				{ stdout: "pipe", stderr: "pipe" },
+				{ cwd: root, stdout: "pipe", stderr: "pipe" },
 			),
 		);
 		try {
@@ -122,27 +254,25 @@ describe("Evolution canonical projection and concurrency", () => {
 		const writerGo = join(root, "checkpoint-writer-go");
 		const readerReady = join(root, "checkpoint-reader-ready");
 		const readerDone = join(root, "checkpoint-reader-done");
-		const modulePath = join(
-			import.meta.dir,
-			"../services/evolution/projection-checkpoint",
-		);
 		try {
 			const writer = Bun.spawn(
 				[
-					"bun",
-					"-e",
-					`import { existsSync, writeFileSync, writeSync } from "node:fs"; import { Database } from "bun:sqlite"; import { writeEvolutionProjectionCheckpoint } from ${JSON.stringify(modulePath)}; const db=new Database(${JSON.stringify(dbPath)}); try { writeEvolutionProjectionCheckpoint({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},writeBytes:(fd,line)=>{writeFileSync(${JSON.stringify(writerReady)},"ready"); while(!existsSync(${JSON.stringify(writerGo)})) Bun.sleepSync(5); return writeSync(fd,line,null,"utf8");}}); } finally { db.close(); }`,
+					process.execPath,
+					import.meta.filename,
+					EVOLUTION_CHILD,
+					"checkpoint-writer-block",
 				],
-				{ stdout: "pipe", stderr: "pipe" },
+				{ cwd: root, stdout: "pipe", stderr: "pipe" },
 			);
 			waitForFile(writerReady);
 			const reader = Bun.spawn(
 				[
-					"bun",
-					"-e",
-					`import { writeFileSync } from "node:fs"; import { Database } from "bun:sqlite"; import { validateEvolutionProjectionCheckpoint } from ${JSON.stringify(modulePath)}; const db=new Database(${JSON.stringify(dbPath)}); try { writeFileSync(${JSON.stringify(readerReady)},"ready"); validateEvolutionProjectionCheckpoint({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)}}); writeFileSync(${JSON.stringify(readerDone)},"done"); } finally { db.close(); }`,
+					process.execPath,
+					import.meta.filename,
+					EVOLUTION_CHILD,
+					"checkpoint-reader",
 				],
-				{ stdout: "pipe", stderr: "pipe" },
+				{ cwd: root, stdout: "pipe", stderr: "pipe" },
 			);
 			waitForFile(readerReady);
 			Bun.sleepSync(100);
@@ -164,18 +294,9 @@ describe("Evolution canonical projection and concurrency", () => {
 		seedEvidence(root, "S-01", "E-01");
 		append(root, db, "S-01", "E-01");
 		const marker = join(root, "rebuild.marker");
-		const journalModulePath = join(
-			import.meta.dir,
-			"../services/evolution/journal",
-		);
-		const dbModulePath = join(import.meta.dir, "../services/evolution");
 		const child = Bun.spawn(
-			[
-				"bun",
-				"-e",
-				`import { openEvolutionDb } from ${JSON.stringify(dbModulePath)}; import { rebuildProductionDayProjection } from ${JSON.stringify(journalModulePath)}; import { writeFileSync } from "node:fs"; const db=openEvolutionDb(${JSON.stringify(dbPath)}); rebuildProductionDayProjection({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)}}); writeFileSync(${JSON.stringify(marker)},"done"); db.close();`,
-			],
-			{ stdout: "pipe", stderr: "pipe" },
+			[process.execPath, import.meta.filename, EVOLUTION_CHILD, "rebuild-lock"],
+			{ cwd: root, stdout: "pipe", stderr: "pipe" },
 		);
 		try {
 			withSessionLock(root, JOURNAL_LOCK, () => {
@@ -203,18 +324,14 @@ describe("Evolution canonical projection and concurrency", () => {
 		seedEvidence(root, "S-journal-only", "E-journal-only");
 		append(root, db, "S-journal-only", "E-journal-only");
 		db.close();
-		const journalModulePath = join(
-			import.meta.dir,
-			"../services/evolution/journal",
-		);
-		const dbModulePath = join(import.meta.dir, "../services/evolution/db");
 		const child = Bun.spawn(
 			[
-				"bun",
-				"-e",
-				`import { openEvolutionDb } from ${JSON.stringify(dbModulePath)}; import { rebuildProductionDayProjection } from ${JSON.stringify(journalModulePath)}; const db=openEvolutionDb(${JSON.stringify(dbPath)}); try { rebuildProductionDayProjection({root:${JSON.stringify(root)},db,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)}}); } finally { db.close(); }`,
+				process.execPath,
+				import.meta.filename,
+				EVOLUTION_CHILD,
+				"journal-only-rebuild",
 			],
-			{ stdout: "pipe", stderr: "pipe" },
+			{ cwd: root, stdout: "pipe", stderr: "pipe" },
 		);
 		try {
 			const exitCode = await child.exited;
@@ -402,14 +519,14 @@ describe("Evolution canonical projection and concurrency", () => {
 		const appendGo = join(root, "append-go");
 		const healthReady = join(root, "health-ready");
 		const healthResult = join(root, "health-result.json");
-		const modulePath = join(import.meta.dir, "../services/evolution");
 		const appendChild = Bun.spawn(
 			[
-				"bun",
-				"-e",
-				`import { appendProductionDayAllocation, evolutionDbPath, openEvolutionDb } from ${JSON.stringify(modulePath)}; import { existsSync, writeFileSync } from "node:fs"; const root=${JSON.stringify(root)}; const db=openEvolutionDb(evolutionDbPath(root)); writeFileSync(${JSON.stringify(appendReady)},"ready"); while (!existsSync(${JSON.stringify(appendGo)})) Bun.sleepSync(10); try { appendProductionDayAllocation({root,db,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)},sessionId:"S-02",evidenceId:"E-02"}); } finally { db.close(); }`,
+				process.execPath,
+				import.meta.filename,
+				EVOLUTION_CHILD,
+				"append-health",
 			],
-			{ stdout: "pipe", stderr: "pipe" },
+			{ cwd: root, stdout: "pipe", stderr: "pipe" },
 		);
 		try {
 			waitForFile(appendReady);
@@ -419,11 +536,12 @@ describe("Evolution canonical projection and concurrency", () => {
 			waitForFile(productionDayJournalPath(root));
 			const healthChild = Bun.spawn(
 				[
-					"bun",
-					"-e",
-					`import { checkEvolutionDbHealth, evolutionDbPath } from ${JSON.stringify(modulePath)}; import { writeFileSync } from "node:fs"; const root=${JSON.stringify(root)}; writeFileSync(${JSON.stringify(healthReady)},"ready"); const result=checkEvolutionDbHealth(evolutionDbPath(root),${JSON.stringify(PROJECT_ID)},{root,projectId:${JSON.stringify(PROJECT_ID)},timezone:${JSON.stringify(TIMEZONE)}}); writeFileSync(${JSON.stringify(healthResult)},JSON.stringify(result));`,
+					process.execPath,
+					import.meta.filename,
+					EVOLUTION_CHILD,
+					"health-check",
 				],
-				{ stdout: "pipe", stderr: "pipe" },
+				{ cwd: root, stdout: "pipe", stderr: "pipe" },
 			);
 			waitForFile(healthReady);
 			Bun.sleepSync(100);
