@@ -21,6 +21,8 @@ export const REQUIRED_PACKS = [
 ] as const;
 
 export type PackId = (typeof REQUIRED_PACKS)[number];
+export type BenchmarkCatalogSource = "project" | "builtin";
+export type BenchmarkScenarioSource = "builtin" | "builtin-copy" | "project";
 
 export type ValidationScope = "default" | "wb" | "tpl" | "update";
 
@@ -133,6 +135,9 @@ export interface Scenario {
 	measurement?: ScenarioMeasurement;
 	runner?: "hot-path";
 	hot_path?: HotPathScenarioConfig;
+	/** Provenance assigned while loading the scenario; never read from catalog JSON. */
+	execution_source: BenchmarkScenarioSource;
+	execution_source_path?: string;
 }
 
 export interface ToolCoverageExemption {
@@ -154,6 +159,7 @@ export interface ToolCoveragePolicy {
 export interface RegistrySnapshot {
 	schema_version: string;
 	projectRoot?: string;
+	source: BenchmarkCatalogSource;
 	packs: PackMetadata[];
 	coverage?: ToolCoveragePolicy;
 	scenariosByPack: Record<string, Scenario[]>;

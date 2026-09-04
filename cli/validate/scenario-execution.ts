@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
 import {
-	accessSync,
 	chmodSync,
 	closeSync,
 	copyFileSync,
@@ -32,6 +31,7 @@ import {
 	writeCompiledReleaseBuildReceipt,
 } from "../dev/build-release";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { trustedBunInvocation } from "../services/benchmark/trusted-bun";
 import { runHotPathScenario } from "./hot-path-benchmark";
 import { outputTail } from "./output";
 import { maxSampleOutputBytes } from "./output-metrics";
@@ -281,29 +281,48 @@ function tokenizeCommand(command: string): string[] {
 
 function resolveScenarioInvocation(
 	repoRoot: string,
-	projectRoot: string,
 	command: string,
-	preferLocalWrapper = true,
 	trustedAfolBinary?: string,
 ): CommandInvocation {
 	const tokens = tokenizeCommand(command);
 	if (tokens.length === 0) {
 		throw new Error("Empty scenario command");
 	}
-	return resolveCommandInvocation(
-		repoRoot,
-		projectRoot,
-		tokens,
-		preferLocalWrapper,
-		trustedAfolBinary,
-	);
+	return resolveCommandInvocation(repoRoot, tokens, trustedAfolBinary);
+}
+
+function validateProjectScenarioPolicy(
+	scenario: Scenario,
+	command: string,
+): void {
+	const sourcePath = scenario.execution_source_path ?? "unknown path";
+	const context = `Project benchmark scenario ${scenario.scenario_id} (${sourcePath})`;
+	if (scenario.setup !== undefined) {
+		throw new Error(
+			`${context} may not define setup; remove or refresh the local benchmark catalog, or reduce authored scenarios to afol status --json`,
+		);
+	}
+	if (scenario.runner !== undefined) {
+		throw new Error(
+			`${context} may not define a runner; remove or refresh the local benchmark catalog, or reduce authored scenarios to afol status --json`,
+		);
+	}
+	const tokens = tokenizeCommand(command);
+	if (
+		tokens.length !== 3 ||
+		tokens[0] !== "afol" ||
+		tokens[1] !== "status" ||
+		tokens[2] !== "--json"
+	) {
+		throw new Error(
+			`${context} may only execute the exact afol status --json command; remove or refresh the local benchmark catalog, or reduce authored scenarios to afol status --json`,
+		);
+	}
 }
 
 function resolveCommandInvocation(
 	repoRoot: string,
-	projectRoot: string,
 	tokens: string[],
-	preferLocalWrapper: boolean,
 	trustedAfolBinary?: string,
 ): CommandInvocation {
 	const program = tokens[0];
@@ -316,32 +335,13 @@ function resolveCommandInvocation(
 		if (executable) {
 			return { command: executable, args };
 		}
-		if (!preferLocalWrapper) {
-			return {
-				command: "bun",
-				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
-			};
-		}
-		// The repository wrapper is a POSIX shell script. Windows cannot spawn an
-		// extensionless shell wrapper, so source benchmarks must invoke Bun
-		// directly. Compiled runs return above through `resolveAfolExecutable`.
-		if (process.platform === "win32") {
-			return {
-				command: "bun",
-				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
-			};
-		}
-		const afolPath = join(projectRoot, "afol");
-		try {
-			accessSync(afolPath, fsConstants.X_OK);
-			return { command: afolPath, args };
-		} catch {
-			return {
-				command: "bun",
-				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
-			};
-		}
+		return trustedBunInvocation([
+			"run",
+			join(repoRoot, "cli", "main.ts"),
+			...args,
+		]);
 	}
+	if (program === "bun") return trustedBunInvocation(args);
 	return { command: program, args };
 }
 
@@ -1628,9 +1628,7 @@ function runSandboxScenarioSample(
 			}
 			const setupInvocation = resolveCommandInvocation(
 				REAL_REPO_ROOT,
-				sandboxRoot,
 				setupCommand,
-				false,
 				trustedAfolBinary,
 			);
 			const setupSample = runScenarioSample(
@@ -1660,9 +1658,7 @@ function runSandboxScenarioSample(
 			} else {
 				const invocation = resolveScenarioInvocation(
 					REAL_REPO_ROOT,
-					sandboxRoot,
 					command,
-					false,
 					trustedAfolBinary,
 				);
 				result = {
@@ -1853,6 +1849,22 @@ export function runScenarioCommand(
 	scenario: Scenario,
 	options: ScenarioExecutionOptions = {},
 ): ScenarioExecutionResult {
+	const catalogSource = scenario.execution_source;
+	if (
+		catalogSource !== "builtin" &&
+		catalogSource !== "builtin-copy" &&
+		catalogSource !== "project"
+	) {
+		throw new Error("Benchmark scenario execution provenance is required");
+	}
+	const command =
+		typeof scenario.command === "string" ? scenario.command.trim() : "";
+	if (command.length === 0) {
+		throw new Error("Scenario command is required for execution");
+	}
+	if (catalogSource === "project") {
+		validateProjectScenarioPolicy(scenario, command);
+	}
 	if (scenario.compiled_binary === true && options.artifact === undefined) {
 		const artifact = prepareCompiledReleaseArtifact(projectRoot);
 		try {
@@ -1878,11 +1890,6 @@ export function runScenarioCommand(
 	}
 	const sampleCount = resolveScenarioSampleCount(scenario, options.sampleCount);
 	const warmupCount = options.warmupCount ?? RELEASE_BENCH_WARMUP_SAMPLES;
-	const command =
-		typeof scenario.command === "string" ? scenario.command.trim() : "";
-	if (command.length === 0) {
-		throw new Error("Scenario command is required for execution");
-	}
 	if (scenario.sandbox) {
 		return runSandboxScenarioCommand(
 			projectRoot,
@@ -1899,9 +1906,7 @@ export function runScenarioCommand(
 	const expectedExit = scenario.expected_exit;
 	const invocation = resolveScenarioInvocation(
 		REAL_REPO_ROOT,
-		projectRoot,
 		command,
-		true,
 		options.artifact?.binaryPath,
 	);
 	const gitStatusBefore = gitStatusPorcelain(projectRoot);

@@ -8,6 +8,7 @@ import {
 	resolveCliMicroInvocation,
 	runCliMicroBenchmark,
 } from "../services/benchmark/cli-micro";
+import { TRUSTED_BUN_CONFIG_PATH } from "../services/benchmark/trusted-bun";
 
 describe("CLI micro benchmark thresholds", () => {
 	test("reports output and duration threshold breaches", () => {
@@ -51,7 +52,7 @@ describe("CLI micro benchmark thresholds", () => {
 		const invocation = resolveCliMicroInvocation(mainPath, "/fixture/bun");
 		expect(invocation).toEqual({
 			command: "/fixture/bun",
-			args: [mainPath],
+			args: ["--no-env-file", `--config=${TRUSTED_BUN_CONFIG_PATH}`, mainPath],
 		});
 	});
 

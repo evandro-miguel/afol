@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { boundedSpawn, spawnFailureDetail } from "../../core/subprocess";
 import { resolveAfolExecutable } from "../../validate/scenario-execution";
+import { trustedBunInvocation } from "./trusted-bun";
 import { DEFAULT_CLI_PACK_ID } from "./types";
 
 export type CliMicroResult = {
@@ -52,10 +53,10 @@ export function resolveCliMicroInvocation(
 ): CliMicroInvocation {
 	const executable = resolveAfolExecutable(undefined, mainPath, execPath);
 	if (executable) return { command: executable, args: [] };
-	return {
-		command: execPath,
-		args: [resolve(import.meta.dir, "..", "..", "main.ts")],
-	};
+	return trustedBunInvocation(
+		[resolve(import.meta.dir, "..", "..", "main.ts")],
+		execPath,
+	);
 }
 
 export function collectCliMicroThresholdNotes(
