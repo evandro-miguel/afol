@@ -15,8 +15,7 @@ function resolveCatchupContext(ctx?: OperationContext): OperationContext {
 	if (ctx) {
 		return ctx;
 	}
-	// main currently does not thread operationCtx into catchup; re-resolve from
-	// env/TTY so AFOL_AGENT / non-interactive callers still hit approval gates.
+	// Direct library callers may omit context; CLI dispatch passes its admitted context.
 	return resolveOperationContext(
 		[],
 		process.env,

@@ -107,7 +107,7 @@
 			"skill list [--json] [--verbose]",
 			"skill show <name> [--json]",
 			"skill search <query> [--json]",
-			"close --session <session-id> [-m|--summary <text>]",
+			"close [--session <session-id>] [-m|--summary <text>]",
 			"close --allow-no-report --reason <text>",
 			"close --carry-open --reason <text>",
 			"close --admit-legacy-baseline",

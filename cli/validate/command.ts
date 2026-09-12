@@ -171,7 +171,7 @@ function applyProjectTokenRule(result: BenchmarkResult): BenchmarkResult {
 	return result;
 }
 
-export function combinedProjectTokenRuleNote(
+function combinedProjectTokenRuleNote(
 	results: Array<Pick<BenchmarkResult, "status" | "output_tokens">>,
 ): string | null {
 	const outputTokens = results
@@ -323,7 +323,7 @@ function resolveBenchmarkScenario(
 	throw new Error(`Unknown --scenario-id value: ${scenarioId}`);
 }
 
-export function collectProfileCompatibilityNotes(
+function collectProfileCompatibilityNotes(
 	scenario: Scenario,
 	baseline: Baseline | undefined,
 	scenarioBaseline: ScenarioBaseline | undefined,
@@ -381,7 +381,7 @@ export function collectProfileCompatibilityNotes(
 	return notes;
 }
 
-export function buildResult(
+function buildResult(
 	projectRoot: string,
 	scenario: Scenario,
 	baselinePath: string,

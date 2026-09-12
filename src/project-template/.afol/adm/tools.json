@@ -802,7 +802,7 @@
       "description": "Close the active session",
       "subcommands": [
         {
-          "usage": "--session <session-id> [-m|--summary <text>]",
+          "usage": "[--session <session-id>] [-m|--summary <text>]",
           "side_effect": "write",
           "description": "Close a specific session after its tasks are complete"
         },

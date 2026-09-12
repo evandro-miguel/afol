@@ -43,6 +43,17 @@ import {
 } from "../project/legacy-evidence-baseline";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
+import {
+	canonicalizeLogSummary,
+	closeMarkdownText,
+	readLogSummary,
+	renderCloseReport,
+} from "./close-report";
+import {
+	carriedContinuationSession,
+	carryOpenMetadata,
+	carryOpenTransitionChain,
+} from "./continuation";
 import { readArchivedSessionState } from "./session-archive-state";
 import {
 	isSessionClosed,
@@ -406,7 +417,7 @@ export type NewWorkstreamResult = {
 	warnings: string[];
 };
 
-type TaskRow = {
+export type TaskRow = {
 	line: string;
 	taskId: string;
 	state: string;
@@ -534,99 +545,6 @@ function evaluateCloseWarnings(session: string, sessionDir: string): string[] {
 		warnings.push("log summary section is missing");
 	}
 	return warnings;
-}
-
-function readLogSummary(content: string): string | null {
-	const lines = content.split(/\r?\n/);
-	const start = lines.findIndex((line) => /^##\s+Summary\s*$/.test(line));
-	if (start < 0) {
-		return null;
-	}
-	const rest = lines.slice(start + 1);
-	const end = rest.findIndex((line) => /^##\s+/.test(line));
-	const summary = rest
-		.slice(0, end < 0 ? undefined : end)
-		.join("\n")
-		.trim();
-	return summary || null;
-}
-
-function closeMarkdownText(value: string): string {
-	return value.replace(/\r?\n/g, " ").replace(/^##\s+/gm, "### ");
-}
-
-function canonicalizeLogSummary(content: string, summary: string): string {
-	const lines = content.split(/\r?\n/);
-	const output: string[] = [];
-	let found = false;
-	let skipping = false;
-	for (const line of lines) {
-		if (/^##\s+Summary\s*$/.test(line)) {
-			if (!found) {
-				while (output.at(-1) === "") {
-					output.pop();
-				}
-				output.push("## Summary", "", summary);
-				found = true;
-			}
-			skipping = true;
-			continue;
-		}
-		if (skipping) {
-			if (!/^##\s+/.test(line)) {
-				continue;
-			}
-			skipping = false;
-			if (output.at(-1) !== "") {
-				output.push("");
-			}
-		}
-		output.push(line);
-	}
-	if (!found) {
-		while (output.at(-1) === "") {
-			output.pop();
-		}
-		output.push("", "## Summary", "", summary);
-	}
-	return `${output.join("\n").replace(/\n+$/g, "")}\n`;
-}
-
-function renderCloseReport(
-	session: string,
-	taskRows: TaskRow[],
-	evidence: EvidenceEntry[],
-	summary: string,
-): string {
-	const authorizingEvidenceIds = new Set<string>();
-	for (const row of taskRows) {
-		const authorization = evidenceCompletionAuthorization(
-			evidence.filter(
-				(entry) =>
-					entry.task_id === row.taskId && (entry.attempt ?? 0) === row.attempt,
-			),
-			completionPolicyFromNotes(row.notes),
-		);
-		if (authorization.status === "passed" && authorization.evidenceId) {
-			authorizingEvidenceIds.add(authorization.evidenceId);
-		}
-	}
-	const lines = [
-		`# Report: ${session}`,
-		"",
-		"## Summary",
-		closeMarkdownText(summary),
-		"",
-		"## Tasks",
-		...taskRows.map((row) => `- ${row.taskId}: ${row.state}`),
-		"",
-		"## Evidence",
-		...evidence.map(
-			(entry) =>
-				`- ${entry.task_id} attempt=${entry.attempt ?? 0} evidence_id=${entry.id}${authorizingEvidenceIds.has(entry.id) ? " authorizing" : ""}: ${entry.provenance === "observed" ? "" : "declared "}${closeMarkdownText(entry.result)} (${closeMarkdownText(entry.command)}; exit_code=${entry.exit_code ?? "n/a"})`,
-		),
-	];
-	return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
 }
 
 function isDuplicateDeclaredEvidence(
@@ -927,132 +845,11 @@ function markPlanMetadataClosed(
 	countHotPathOperation("workbench.canonical_write");
 }
 
-function carryOpenMetadata(
-	session: string,
-	document: ReturnType<typeof readTaskLifecycleState>["document"],
-	taskRows: readonly TaskRow[],
-	reason: string,
-): { theme: string; metadata: NewWorkstreamMetadata } {
-	if (document.kind !== "frontmatter") {
-		throw new Error(`Session ${session} must be governed to carry open tasks.`);
-	}
-	const value = (key: string) =>
-		document.lines
-			.map((line) => scalarValue(line, key))
-			.find((candidate) => candidate !== undefined)
-			?.trim() ?? "";
-	const featureId = value("feature_id") || value("roadmap_feature");
-	const parentSpec = value("parent_spec");
-	if (value("governance_status") !== "governed" || !featureId || !parentSpec) {
-		throw new Error(`Session ${session} must be governed to carry open tasks.`);
-	}
-	const theme = value("theme") || "workstream";
-	return {
-		theme: `${theme} continuation`,
-		metadata: {
-			continuationOf: session,
-			carryOpenTasks: taskRows.map((row) => row.taskId),
-			intent: `Carry open from ${session}: ${reason}`,
-			featureId,
-			parentSpec,
-			tasks: taskRows.map((row) =>
-				`${row.taskId}: ${row.notes || `Carry open: ${reason}`}`.trim(),
-			),
-		},
-	};
-}
-
 function sanitizeCarryOpenReason(reason: string): string {
 	return sanitizeEvidenceText(reason)
 		.replaceAll("|", "/")
 		.replace(/\s+/g, " ")
 		.trim();
-}
-
-function carryOpenTransitionChain(state: string): readonly TaskState[] {
-	if (state === "pending" || state === "problem") return ["moved"];
-	if (state === "in_progress") return ["problem", "moved"];
-	if (
-		state === "implemented_untested" ||
-		state === "tested_needs_spec_validation"
-	) {
-		return ["problem", "moved"];
-	}
-	throw new Error(`Cannot carry open task in state ${state}.`);
-}
-
-function continuationFrontmatterValue(
-	document: ReturnType<typeof readTaskLifecycleState>["document"],
-	key: string,
-): string | null {
-	if (document.kind !== "frontmatter") return null;
-	const values = document.lines
-		.map((line) => scalarValue(line, key))
-		.filter((value): value is string => value !== undefined && value !== null);
-	return values.length === 1 ? (values[0]?.trim() ?? null) : null;
-}
-
-function carriedContinuationSession(
-	root: string,
-	source: ReturnType<typeof readTaskLifecycleState>["document"],
-	taskRows: readonly TaskRow[],
-): string | null {
-	const carriedRows = taskRows.filter((row) => row.state === "moved");
-	if (carriedRows.length === 0) return null;
-	const destinations = new Set(
-		carriedRows.map(
-			(row) => /(?:^|\s)destination=([^\s|]+)/.exec(row.notes)?.[1] ?? "",
-		),
-	);
-	if (destinations.size !== 1 || destinations.has("")) {
-		throw new Error(
-			"Carry-open recovery has an invalid source destination mapping.",
-		);
-	}
-	const continuation = [...destinations][0];
-	if (
-		!continuation ||
-		!existsSync(sessionPaths(root, continuation).sessionDir)
-	) {
-		throw new Error("Carry-open recovery continuation is missing.");
-	}
-	const continuationState = readTaskLifecycleState(
-		sessionPaths(root, continuation).taskPath,
-		continuation,
-	);
-	const expectedFeature = continuationFrontmatterValue(source, "feature_id");
-	const expectedParentSpec = continuationFrontmatterValue(
-		source,
-		"parent_spec",
-	);
-	const sourceSession = continuationFrontmatterValue(source, "session_id");
-	const expectedTasks = carriedRows
-		.map((row) => row.taskId)
-		.sort()
-		.join(",");
-	if (
-		continuationFrontmatterValue(
-			continuationState.document,
-			"continuation_of",
-		) !== sourceSession ||
-		continuationFrontmatterValue(continuationState.document, "feature_id") !==
-			expectedFeature ||
-		continuationFrontmatterValue(continuationState.document, "parent_spec") !==
-			expectedParentSpec ||
-		continuationFrontmatterValue(
-			continuationState.document,
-			"governance_status",
-		) !== "governed" ||
-		continuationFrontmatterValue(
-			continuationState.document,
-			"carry_open_tasks",
-		) !== expectedTasks
-	) {
-		throw new Error(
-			"Carry-open recovery continuation linkage does not match source.",
-		);
-	}
-	return continuation;
 }
 
 function ensureSessionOpenForMutation(root: string, session: string): void {

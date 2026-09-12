@@ -19,6 +19,14 @@ an agent or remote/provider execution.
 Pass the session explicitly or run `afol catchup --fix` after inspecting the
 reported binding issue.
 
+## Evolution analysis is blocked
+
+`afol evolve` compact analysis returns exit 1 when evolution input state is
+unavailable. Use `afol evolve status --json` to distinguish invalid canonical
+journal or evidence from a missing derived database. Do not rebuild the
+database to repair source data; see
+[Evolution journal recovery](evolution-journal-recovery.md).
+
 ## Update conflict
 
 Run `afol update check`, then `afol update preview`. AFOL will not silently

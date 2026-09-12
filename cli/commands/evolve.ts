@@ -79,6 +79,7 @@ import {
 	readActiveSession,
 } from "../services/workbench/lifecycle";
 import { verifyWorkbenchTasks } from "../services/workbench/verify";
+import { parseFlagSpec } from "./flag-spec";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
@@ -103,36 +104,39 @@ export function parseObserveArgs(
 ):
 	| { session: string; feedbackId: string; json: boolean }
 	| { session: string; json: boolean } {
-	let session = "";
-	let feedbackId: string | undefined;
-	let json = false;
-	for (let i = 0; i < args.length; i++) {
-		const arg = args[i];
-		if (!arg) continue;
-		if (arg === "--session" || arg === "-S") {
-			i++;
-			const value = args[i];
-			if (!value || value.startsWith("-"))
-				throw new Error("--session requires a value");
-			assertObserveIdentifier(value, "session identifier");
-			session = value;
-			continue;
-		}
-		if (arg === "--feedback-id" || arg === "-F") {
-			i++;
-			const value = args[i];
-			if (!value || value.startsWith("-"))
-				throw new Error("--feedback-id requires a value");
-			assertObserveIdentifier(value, "feedback identifier");
-			feedbackId = value;
-			continue;
-		}
-		if (arg === "--json" || arg === "-j") {
-			json = true;
-			continue;
-		}
-		throw new Error(`Unknown evolve observe argument: ${arg}`);
-	}
+	const { session, feedbackId, json } = parseFlagSpec<{
+		session: string;
+		feedbackId?: string;
+		json: boolean;
+	}>(
+		args,
+		{
+			context: "evolve observe",
+			skipFalsyArgs: true,
+			flags: [
+				{
+					names: ["--session", "-S"],
+					kind: "value",
+					key: "session",
+					rejectDashValue: true,
+					missingValueError: "--session requires a value",
+					validate: (_state, value) =>
+						assertObserveIdentifier(value, "session identifier"),
+				},
+				{
+					names: ["--feedback-id", "-F"],
+					kind: "value",
+					key: "feedbackId",
+					rejectDashValue: true,
+					missingValueError: "--feedback-id requires a value",
+					validate: (_state, value) =>
+						assertObserveIdentifier(value, "feedback identifier"),
+				},
+				{ names: ["--json", "-j"], kind: "flag", key: "json" },
+			],
+		},
+		{ session: "", json: false },
+	);
 	if (!session) throw new Error("evolve observe requires --session <id>");
 	return {
 		session,
@@ -264,31 +268,31 @@ function parseImportArgs(args: readonly string[]): {
 	const provider = args[0];
 	if (provider !== "codex" && provider !== "pi")
 		throw new Error("evolve import requires codex or pi");
-	let source = "";
-	let confirm = false;
-	let json = false;
-	for (let index = 1; index < args.length; index += 1) {
-		const arg = args[index];
-		if (arg === "--json" || arg === "-j") json = true;
-		else if (arg === "--confirm") confirm = true;
-		else if (arg === "--source") {
-			source = args[++index] ?? "";
-			if (!source || source.startsWith("-"))
-				throw new Error("evolve import --source requires a value");
-		} else throw new Error(`Unknown evolve import argument: ${arg}`);
-	}
+	const { source, confirm, json } = parseFlagSpec(
+		args.slice(1),
+		{
+			context: "evolve import",
+			flags: [
+				{ names: ["--json", "-j"], kind: "flag", key: "json" },
+				{ names: ["--confirm"], kind: "flag", key: "confirm" },
+				{
+					names: ["--source"],
+					kind: "value",
+					key: "source",
+					rejectDashValue: true,
+					missingValueError: "evolve import --source requires a value",
+				},
+			],
+		},
+		{ source: "", confirm: false, json: false },
+	);
 	if (!source) throw new Error("evolve import requires --source <path>");
 	return { provider, source, confirm, json };
 }
 
 function parseExternalArgs(args: readonly string[]): { json: boolean } {
 	if (args[0] !== "list") throw new Error("evolve external requires list");
-	let json = false;
-	for (const arg of args.slice(1)) {
-		if (arg === "--json" || arg === "-j") json = true;
-		else throw new Error(`Unknown evolve external argument: ${arg}`);
-	}
-	return { json };
+	return parseJsonArgs(args.slice(1), "evolve external");
 }
 
 function importPreviewPayload(
@@ -414,20 +418,27 @@ function parseSuggestArgs(args: readonly string[]): {
 	firstSession: boolean;
 	claimedBy: string;
 } {
-	let json = false;
-	let firstSession = false;
-	let claimedBy = "afol";
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
-		if (arg === "--json" || arg === "-j") json = true;
-		else if (arg === "--first-session") firstSession = true;
-		else if (arg === "--claimed-by") {
-			claimedBy = args[++index] ?? "";
-			if (!claimedBy) throw new Error("--claimed-by requires a value");
-			if (!SUGGESTION_CLAIM_PROVIDERS.has(claimedBy))
-				throw new Error(`Unsupported suggestion provider: ${claimedBy}`);
-		} else throw new Error(`Unknown evolve suggest argument: ${arg}`);
-	}
+	const { json, firstSession, claimedBy } = parseFlagSpec(
+		args,
+		{
+			context: "evolve suggest",
+			flags: [
+				{ names: ["--json", "-j"], kind: "flag", key: "json" },
+				{ names: ["--first-session"], kind: "flag", key: "firstSession" },
+				{
+					names: ["--claimed-by"],
+					kind: "value",
+					key: "claimedBy",
+					missingValueError: "--claimed-by requires a value",
+					validate: (_state, value) => {
+						if (!SUGGESTION_CLAIM_PROVIDERS.has(value))
+							throw new Error(`Unsupported suggestion provider: ${value}`);
+					},
+				},
+			],
+		},
+		{ json: false, firstSession: false, claimedBy: "afol" },
+	);
 	if (!firstSession) throw new Error("evolve suggest requires --first-session");
 	return { json, firstSession, claimedBy };
 }
@@ -437,19 +448,32 @@ function parseDecisionArgs(args: readonly string[]): {
 	suggestionId: string;
 	reason?: string;
 } {
-	let json = false;
-	let suggestionId = "";
-	let reason: string | undefined;
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
-		if (arg === "--json" || arg === "-j") json = true;
-		else if (arg === "--reason") {
-			reason = args[++index];
-			if (!reason || reason.startsWith("-"))
-				throw new Error("--reason requires a value");
-		} else if (!suggestionId && arg) suggestionId = arg;
-		else throw new Error(`Unknown evolve decision argument: ${arg}`);
-	}
+	const { json, suggestionId, reason } = parseFlagSpec<{
+		json: boolean;
+		suggestionId: string;
+		reason?: string;
+	}>(
+		args,
+		{
+			context: "evolve decision",
+			flags: [
+				{ names: ["--json", "-j"], kind: "flag", key: "json" },
+				{
+					names: ["--reason"],
+					kind: "value",
+					key: "reason",
+					rejectDashValue: true,
+					missingValueError: "--reason requires a value",
+				},
+			],
+			positional: (state, arg) => {
+				if (state.suggestionId || !arg) return false;
+				state.suggestionId = arg;
+				return true;
+			},
+		},
+		{ json: false, suggestionId: "" },
+	);
 	if (!suggestionId)
 		throw new Error("suggestion decision requires a suggestion id");
 	return { json, suggestionId, ...(reason === undefined ? {} : { reason }) };
@@ -1350,7 +1374,18 @@ export function writeAnalysisPayload(
 		!isTrustedLocalInteractive(operationContext),
 	);
 	const output = json
-		? stringifyEnvelope(envelopeOk(dto, { action }))
+		? stringifyEnvelope(
+				dto.status === "blocked"
+					? {
+							...envelopeErr(
+								"EVOLUTION_ANALYSIS_BLOCKED",
+								"analysis unavailable",
+								{ action, exitCode: 1 },
+							),
+							data: dto,
+						}
+					: envelopeOk(dto, { action }),
+			)
 		: JSON.stringify(dto);
 	if (Buffer.byteLength(output, "utf8") > MAX_ANALYSIS_OUTPUT_BYTES)
 		throw new Error("evolution analysis output exceeds the bounded limit");
@@ -1440,7 +1475,7 @@ async function runAnalysis(
 		payload,
 		operationContext,
 	);
-	return 0;
+	return analysis.status === "blocked" ? 1 : 0;
 }
 
 async function runSuggest(
@@ -1745,16 +1780,18 @@ const SUGGESTION_CLAIM_PROVIDERS = new Set([
 	"pi",
 ]);
 
-function parseArgs(args: readonly string[]): { json: boolean } {
-	let json = false;
-	for (const arg of args) {
-		if (arg === "--json" || arg === "-j") {
-			json = true;
-			continue;
-		}
-		throw new Error(`Unknown evolve argument: ${arg}`);
-	}
-	return { json };
+function parseJsonArgs(
+	args: readonly string[],
+	context: string,
+): { json: boolean } {
+	return parseFlagSpec(
+		args,
+		{
+			context,
+			flags: [{ names: ["--json", "-j"], kind: "flag", key: "json" }],
+		},
+		{ json: false },
+	);
 }
 
 function parseCandidatesArgs(args: readonly string[]): {
@@ -2010,7 +2047,14 @@ function statusState(
 	return dbHealthy ? "healthy" : "unhealthy";
 }
 
-function statusRecoveryAction(state: EvolutionStatusState): string | null {
+function statusRecoveryAction(
+	state: EvolutionStatusState,
+	journalValid: boolean | null,
+): string | null {
+	if (journalValid === false)
+		return "inspect canonical journal and evidence; restore verified source data before rebuilding the database";
+	if (state === "unhealthy")
+		return "inspect evolution database and journal diagnostics before repair";
 	return state === "rebuild_required" ? REBUILD_RECOVERY_ACTION : null;
 }
 
@@ -2148,7 +2192,7 @@ function buildStatus(projectRoot: string): EvolutionStatusData {
 		configured: resolved.configured,
 		enabled: resolved.enabled,
 		state,
-		recovery_action: statusRecoveryAction(state),
+		recovery_action: statusRecoveryAction(state, journalValid),
 		project_id: resolved.projectId,
 		timezone: resolved.timezone,
 		db_path: dbPath,
@@ -2182,9 +2226,7 @@ function formatStatus(data: EvolutionStatusData, restricted = false): string {
 		`db=${data.db_health?.db_exists ?? false} migration=${data.db_health?.migration_version ?? 0}/${data.db_health?.expected_migration_version ?? 1} production_days=${data.db_status?.production_day_count ?? 0}`,
 		`journal=${data.journal_health.exists ? (data.journal_health.valid ? "valid" : "invalid") : "absent"}`,
 		`suggestion=${data.suggestion_queue.daily_status} +${data.suggestion_queue.pending_count} pending critical_alerts=${data.suggestion_queue.critical_alerts.length}`,
-		data.analysis_available
-			? "analysis=available"
-			: "analysis=planned-for-slice-5",
+		data.analysis_available ? "analysis=available" : "analysis=unavailable",
 	].join("\n");
 }
 
@@ -2282,7 +2324,7 @@ export async function runEvolveCommand(
 		if (action && action !== "status") {
 			throw new Error(`Unknown evolve action: ${action}`);
 		}
-		const parsed = parseArgs(args);
+		const parsed = parseJsonArgs(args, "evolve");
 		const data = buildStatus(projectRoot);
 		const outputData = publicValue(
 			data,

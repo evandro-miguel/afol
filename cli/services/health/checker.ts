@@ -540,7 +540,11 @@ function checkEvolutionHealth(root: string, deep: boolean): HealthFinding[] {
 				finding.severity === "fail" ? "warn" : finding.severity,
 				finding.message,
 				finding.severity === "fail"
-					? "rebuild the derived evolution database from canonical journal events"
+					? /projection differs|checkpoint is missing|schema is stale|missing evolution db/i.test(
+							finding.message,
+						)
+						? "rebuild the derived evolution database from canonical journal events"
+						: "inspect canonical journal and evidence; restore verified source data before rebuilding the database"
 					: undefined,
 			),
 		);

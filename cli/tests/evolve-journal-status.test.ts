@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -16,7 +17,10 @@ import {
 	evolutionDbPath,
 	openEvolutionDb,
 	productionDayJournalPath,
+	readProductionDayJournal,
 } from "../services/evolution";
+import { productionDayValidationDependencies } from "../services/evolution/journal";
+import { checkAreaHealth } from "../services/health/checker";
 import {
 	releaseEvolutionTestHandles,
 	removeEvolutionTestRoot,
@@ -103,7 +107,11 @@ function captureIo() {
 	};
 }
 
-function createJournal(root: string, projectId = PROJECT_ID): void {
+function createJournal(
+	root: string,
+	projectId = PROJECT_ID,
+	createdAt = "2026-07-16T12:00:00.000Z",
+): void {
 	const sessionId = "S-journal-status";
 	const evidenceId = "E-journal-status";
 	const sessionDir = join(root, ".afol", "wb", sessionId);
@@ -114,7 +122,7 @@ function createJournal(root: string, projectId = PROJECT_ID): void {
 			id: evidenceId,
 			project_id: projectId,
 			session_id: sessionId,
-			created_at: "2026-07-16T12:00:00.000Z",
+			created_at: createdAt,
 			result: "passed",
 			provenance: "observed",
 			exit_code: 0,
@@ -141,6 +149,63 @@ function removeDb(root: string): void {
 }
 
 describe("evolve status canonical journal integrity", () => {
+	test("health separates invalid journal recovery from derived projection repair", () => {
+		const root = fixture();
+		try {
+			createJournal(root);
+			const path = productionDayJournalPath(root);
+			const original = readFileSync(path, "utf8");
+			writeFileSync(path, "not-json\n");
+			expect(
+				checkAreaHealth(root, "evolution").some((finding) =>
+					finding.hint?.startsWith("inspect canonical journal and evidence"),
+				),
+			).toBe(true);
+			writeFileSync(path, original);
+			const db = openEvolutionDb(evolutionDbPath(root));
+			db.exec("UPDATE production_days SET ordinal_sequence = 99, ordinal = 99");
+			db.close();
+			const finding = checkAreaHealth(root, "evolution").find((finding) =>
+				finding.message.includes("projection differs from canonical"),
+			);
+			expect(finding?.hint).toBe(
+				"rebuild the derived evolution database from canonical journal events",
+			);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+	test("replays legacy Asuncion dates without rewriting the journal and rejects tampering", () => {
+		const root = fixture();
+		try {
+			createJournal(root, PROJECT_ID, "2026-08-07T03:05:05.930Z");
+			const path = productionDayJournalPath(root);
+			const event = JSON.parse(readFileSync(path, "utf8"));
+			expect(typeof event.payload.utc_offset_seconds).toBe("number");
+			delete event.payload.utc_offset_seconds;
+			event.payload.local_date = "2026-08-06";
+			event.subject_id = "2026-08-06";
+			event.payload_digest = productionDayValidationDependencies.digest(
+				event.payload,
+			);
+			const { event_digest: _, ...base } = event;
+			event.event_digest = productionDayValidationDependencies.digest(base);
+			const legacy = `${JSON.stringify(event)}\n`;
+			writeFileSync(path, legacy);
+			expect(
+				readProductionDayJournal(root, PROJECT_ID, "America/Asuncion")[0]
+					?.payload.local_date,
+			).toBe("2026-08-06");
+			expect(readFileSync(path, "utf8")).toBe(legacy);
+			event.payload.local_date = "2026-08-05";
+			writeFileSync(path, `${JSON.stringify(event)}\n`);
+			expect(() =>
+				readProductionDayJournal(root, PROJECT_ID, "America/Asuncion"),
+			).toThrow("event-date mismatch");
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
 	test("reports the safe recovery action in restricted output when projection is absent", async () => {
 		const root = fixture();
 		try {
@@ -235,6 +300,20 @@ describe("evolve status canonical journal integrity", () => {
 				journal_health: { exists: true, valid: false },
 			});
 			expect(payload.data.journal_health.error).toContain("JSON");
+			expect(payload.data.recovery_action).toContain(
+				"inspect canonical journal and evidence",
+			);
+			for (const action of ["", "analyze", "weekly"]) {
+				const analysis = captureIo();
+				expect(
+					await runEvolveCommand(action, ["--json"], root, analysis.io),
+				).toBe(1);
+				expect(JSON.parse(analysis.stdout[0] ?? "{}")).toMatchObject({
+					ok: false,
+					exit_code: 1,
+					data: { status: "blocked" },
+				});
+			}
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
 		} finally {
 			removeEvolutionTestRoot(root);

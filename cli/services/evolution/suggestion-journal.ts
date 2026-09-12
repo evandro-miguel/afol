@@ -400,21 +400,17 @@ function hydrateBoundedReceiptProjection(
 	path: string,
 	events = readBoundedReceiptEvents(path, projectId),
 ): ReceiptJournalTail | null {
-	db.exec("BEGIN IMMEDIATE");
-	try {
+	// Keep the former BEGIN IMMEDIATE contract: native SQLite rejection prevents
+	// a nested savepoint when callers already own this connection's transaction.
+	if (db.inTransaction) db.exec("BEGIN IMMEDIATE");
+	db.transaction(() => {
 		db.query("DELETE FROM daily_suggestion_receipts WHERE project_id = ?").run(
 			projectId,
 		);
 		for (const receipt of projectSuggestionReceipts(events).values())
 			insertReceipt(db, receipt);
 		if (events.length > 0) writeProjectionWatermark(db, "receipt", path);
-		db.exec("COMMIT");
-	} catch (error) {
-		try {
-			db.exec("ROLLBACK");
-		} catch {}
-		throw error;
-	}
+	}).immediate();
 	return readJournalTail(path);
 }
 

@@ -144,7 +144,7 @@ export async function runLegacyCommand(
 	return 2;
 }
 
-export async function runLegacyReconcileCommand(
+async function runLegacyReconcileCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),

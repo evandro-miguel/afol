@@ -1,7 +1,4 @@
 import { existsSync, lstatSync, readFileSync, rmSync } from "node:fs";
-import { runPatchMutation } from "../../commands/file/mutations/patch";
-import { runUndoMutation } from "../../commands/file/mutations/undo";
-import { normalizeHash } from "../../commands/file/shared";
 import { withResourceLocks } from "../io/session-lock";
 import {
 	appendMutationRecord,
@@ -10,6 +7,9 @@ import {
 	type MutationRecord,
 	withMutationJournalLock,
 } from "../mutations/journal";
+import { runPatchMutation } from "../mutations/patch";
+import { normalizeHash } from "../mutations/shared";
+import { runUndoMutation } from "../mutations/undo";
 import { readProjectConfig } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 import {

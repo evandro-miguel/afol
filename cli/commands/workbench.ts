@@ -409,7 +409,7 @@ function requiredEvidenceOption(
 	return value;
 }
 
-export async function runEvidenceReverifyCommand(
+async function runEvidenceReverifyCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
@@ -483,7 +483,7 @@ export async function runEvidenceReverifyCommand(
 	}
 }
 
-export async function runEvidenceTransitionAdmitCommand(
+async function runEvidenceTransitionAdmitCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
@@ -726,7 +726,7 @@ function parseEvidenceAdmitArgs(
 	};
 }
 
-export async function runEvidenceAdmitCommand(
+async function runEvidenceAdmitCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),

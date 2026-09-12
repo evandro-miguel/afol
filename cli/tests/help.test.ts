@@ -14,7 +14,7 @@ import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
-const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 610;
+const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 550;
 
 function estimateOutputTokens(output: string): number {
 	return Math.ceil(Buffer.byteLength(output, "utf8") / 4);
@@ -45,7 +45,7 @@ describe("help formatter", () => {
 		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
-		expect(help).toContain("evolve[read] - evolution status");
+		expect(help).toContain("evolve[read] - analyze evolution");
 		expect(help).toContain(
 			"pb/project-benchmark[generated] - compare references",
 		);
@@ -240,15 +240,11 @@ describe("help formatter", () => {
 				const spec = kernelRegistry.commands.find(
 					(entry) => entry.kind === kind,
 				);
-				if (
-					spec &&
-					spec.kind !== "verifyTasks" &&
-					!["new", "start", "close"].includes(spec.command)
-				) {
+				if (spec) {
 					directHelpCommands.push(spec);
 				}
 			}
-			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length - 4);
+			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length);
 			for (const spec of directHelpCommands) {
 				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
 					cwd: tempRoot,
@@ -259,6 +255,9 @@ describe("help formatter", () => {
 				expect(result.status).toBe(0);
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain(`Command: ${spec.command}`);
+				expect(result.stdout.trim()).toBe(
+					formatCommandHelp(spec.command)?.trim() ?? "",
+				);
 			}
 			const shortStartHelp = spawnSync("bun", [cliPath, "st", "--help"], {
 				cwd: tempRoot,
@@ -267,7 +266,7 @@ describe("help formatter", () => {
 			});
 			expect(shortStartHelp.status).toBe(0);
 			expect(shortStartHelp.stderr).toBe("");
-			expect(shortStartHelp.stdout).toContain("Usage: afol start");
+			expect(shortStartHelp.stdout).toContain("Command: start");
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],

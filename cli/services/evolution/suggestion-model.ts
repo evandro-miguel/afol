@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { digestJson as digest, stableJson } from "./imports/digest";
 import {
 	OBSERVATION_FINGERPRINT_VERSION,
 	type ObservationRecord,
@@ -141,20 +141,6 @@ const SUGGESTION_OBSERVATION_KINDS = new Set([
 ]);
 
 const DEFAULT_REJECTION_PENALTY = 0.1;
-
-function stableJson(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-			.join(",")}}`;
-	return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
-}
 
 export function evaluationContractDigest(
 	contract: EvaluationContractV1,

@@ -55,7 +55,7 @@ function formatTaskId(index: number): string {
 }
 
 /** Task ids T-01..T-n matching newWorkstream summary order. */
-export function deriveQuickTaskIds(metadata: NewWorkstreamMetadata): string[] {
+function deriveQuickTaskIds(metadata: NewWorkstreamMetadata): string[] {
 	const fromList =
 		metadata.tasks
 			?.map((task) => task.trim())

@@ -1,4 +1,5 @@
 import { normalizeScopedFlags, normalizeSubcommandAction } from "./aliases";
+import { SUBCOMMAND_DISPATCH_GROUPS } from "./dispatch";
 import { kernelRegistry } from "./registry";
 
 export type CommandResolution =
@@ -37,33 +38,7 @@ export type SubCommandResolution = {
 	args: string[];
 };
 
-export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
-	"pstr",
-	"ctx",
-	"state",
-	"hydrate",
-	"library",
-	"memory",
-	"evolve",
-	"adm",
-	"governance",
-	"spec",
-	"ux",
-	"adr",
-	"changelog",
-	"health",
-	"db",
-	"doctor",
-	"maintenance",
-	"sweep",
-	"schema",
-	"bench",
-	"projectBenchmark",
-	"adapter",
-	"telemetry",
-	"receipt",
-	"session",
-]);
+export const ROUTED_SUBCOMMAND_GROUPS = SUBCOMMAND_DISPATCH_GROUPS;
 
 const SUBCOMMAND_GROUPS = new Set(ROUTED_SUBCOMMAND_GROUPS);
 

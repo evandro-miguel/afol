@@ -361,6 +361,10 @@ type WorkbenchIndexRebuildOptions = {
 	ledgerValidationCapability?: typeof LEDGER_VALIDATION_CAPABILITY;
 };
 
+type WorkbenchSnapshotBuildOptions = {
+	validatedRecords?: readonly Record<string, unknown>[];
+};
+
 type FileClaimField = keyof ParsedTaskClaims;
 
 function emptyTaskClaims(): ParsedTaskClaims {
@@ -828,6 +832,7 @@ function sortTasks(a: WorkbenchIndexTask, b: WorkbenchIndexTask): number {
 function buildSessionsSnapshot(
 	root: string,
 	sessions: Iterable<string>,
+	options: WorkbenchSnapshotBuildOptions = {},
 ): {
 	sessions: WorkbenchIndexSession[];
 	tasks: WorkbenchIndexTask[];
@@ -835,7 +840,10 @@ function buildSessionsSnapshot(
 	const wbRoot = resolveWorkbenchRoot(root);
 	const allTasks: WorkbenchIndexTask[] = [];
 	const snapshotSessions: WorkbenchIndexSession[] = [];
-	const lifecycle = collectSessionLifecycleEvents(root);
+	const lifecycle = collectSessionLifecycleEvents(
+		root,
+		options.validatedRecords,
+	);
 
 	for (const session of sessions) {
 		const sessionDir = resolve(wbRoot, session);
@@ -888,11 +896,14 @@ function buildSessionsSnapshot(
 	};
 }
 
-function allSessionsSnapshot(root: string): {
+function allSessionsSnapshot(
+	root: string,
+	options: WorkbenchSnapshotBuildOptions = {},
+): {
 	sessions: WorkbenchIndexSession[];
 	tasks: WorkbenchIndexTask[];
 } {
-	return buildSessionsSnapshot(root, collectSessionIds(root));
+	return buildSessionsSnapshot(root, collectSessionIds(root), options);
 }
 
 function emptySnapshot(root: string): WorkbenchIndexSnapshot {
@@ -909,10 +920,11 @@ function emptySnapshot(root: string): WorkbenchIndexSnapshot {
 export function collectWorkBenchSnapshot(
 	root: string,
 	sessionScope?: string,
+	options: WorkbenchSnapshotBuildOptions = {},
 ): WorkbenchIndexSnapshot {
 	const scoped = sessionScope
-		? buildSessionsSnapshot(root, [sessionScope])
-		: allSessionsSnapshot(root);
+		? buildSessionsSnapshot(root, [sessionScope], options)
+		: allSessionsSnapshot(root, options);
 	return {
 		kind: "workbench_index_v1",
 		version: 1,
@@ -1191,32 +1203,53 @@ function normalizedMtime(path: string): number | null {
 	}
 }
 
-function isSessionSnapshotFresh(
-	root: string,
-	session: string,
-	persistedSession: WorkbenchIndexSession | undefined,
-	persistedTasks: readonly WorkbenchIndexTask[],
-	generatedAt: number,
-): boolean {
+type IndexedWorkbenchSnapshot = {
+	sessionsById: Map<string, WorkbenchIndexSession>;
+	tasksBySession: Map<string, WorkbenchIndexTask[]>;
+};
+
+function indexWorkbenchSnapshot(
+	snapshot: WorkbenchIndexSnapshot,
+): IndexedWorkbenchSnapshot {
+	const sessionsById = new Map(
+		snapshot.sessions.map((session) => [session.session, session]),
+	);
+	const tasksBySession = new Map<string, WorkbenchIndexTask[]>();
+	for (const task of snapshot.tasks) {
+		const tasks = tasksBySession.get(task.session) ?? [];
+		tasks.push(task);
+		tasksBySession.set(task.session, tasks);
+	}
+	return { sessionsById, tasksBySession };
+}
+
+function isSessionSnapshotFresh(params: {
+	sessionDir: string;
+	session: string;
+	persistedSession: WorkbenchIndexSession | undefined;
+	persistedTasks: readonly WorkbenchIndexTask[];
+	generatedAt: number;
+	live: IndexedWorkbenchSnapshot;
+}): boolean {
+	const { persistedSession, persistedTasks, generatedAt, live } = params;
 	if (!persistedSession) {
 		return false;
 	}
 	if (persistedSession.task_count !== persistedTasks.length) {
 		return false;
 	}
-	const currentSnapshot = buildSessionsSnapshot(root, [session]);
-	const currentSession = currentSnapshot.sessions[0];
+	const currentSession = live.sessionsById.get(params.session);
+	const currentTasks = live.tasksBySession.get(params.session) ?? [];
 	if (
 		!currentSession ||
 		JSON.stringify(currentSession) !== JSON.stringify(persistedSession) ||
-		JSON.stringify(currentSnapshot.tasks) !==
+		JSON.stringify(currentTasks) !==
 			JSON.stringify([...persistedTasks].sort(sortTasks))
 	) {
 		return false;
 	}
 
-	const sessionDir = resolve(resolveWorkbenchRoot(root), session);
-	const taskFileRead = readSessionTaskFiles(sessionDir);
+	const taskFileRead = readSessionTaskFiles(params.sessionDir);
 	if (taskFileRead.readFailed) {
 		return false;
 	}
@@ -1227,7 +1260,7 @@ function isSessionSnapshotFresh(
 			return false;
 		}
 		const sourceTimes = [
-			normalizedMtime(sessionDir),
+			normalizedMtime(params.sessionDir),
 			...taskFiles.map(normalizedMtime),
 		];
 		return sourceTimes.every(
@@ -1408,33 +1441,34 @@ export function validateWorkBenchIndex(
 	}
 
 	const diskSessions = collectSessionIds(root);
-	const snapshotSessions = new Set(
-		snapshot.sessions.map((session) => session.session),
-	);
-	const sessionById = new Map(
-		snapshot.sessions.map((entry) => [entry.session, entry]),
-	);
-	const tasksBySession = new Map<string, WorkbenchIndexTask[]>();
-	for (const task of snapshot.tasks) {
-		const tasks = tasksBySession.get(task.session) ?? [];
-		tasks.push(task);
-		tasksBySession.set(task.session, tasks);
-	}
+	const indexedSnapshot = indexWorkbenchSnapshot(snapshot);
+	const snapshotSessions = new Set(indexedSnapshot.sessionsById.keys());
+	const sessionById = indexedSnapshot.sessionsById;
+	const tasksBySession = indexedSnapshot.tasksBySession;
 	const generatedAt = Date.parse(snapshot.generated_at);
-	if (
+	let live: IndexedWorkbenchSnapshot | null = null;
+	const stale =
 		diskSessions.length !== snapshotSessions.size ||
 		diskSessions.some((session) => !snapshotSessions.has(session)) ||
-		diskSessions.some(
-			(session) =>
-				!isSessionSnapshotFresh(
-					root,
-					session,
-					sessionById.get(session),
-					tasksBySession.get(session) ?? [],
-					generatedAt,
-				),
-		)
-	) {
+		diskSessions.some((session) => {
+			if (!snapshotSessions.has(session)) {
+				return true;
+			}
+			live ??= indexWorkbenchSnapshot(
+				collectWorkBenchSnapshot(root, undefined, {
+					validatedRecords: ledger.records,
+				}),
+			);
+			return !isSessionSnapshotFresh({
+				sessionDir: resolve(resolveWorkbenchRoot(root), session),
+				session,
+				persistedSession: sessionById.get(session),
+				persistedTasks: tasksBySession.get(session) ?? [],
+				generatedAt,
+				live,
+			});
+		});
+	if (stale) {
 		return {
 			ok: false,
 			message: `stale workbench index snapshot: ${indexPath}`,

@@ -598,7 +598,116 @@ describe("evolution suggestion hardening", () => {
 					.query("SELECT COUNT(*) AS count FROM daily_suggestion_receipts")
 					.get(),
 			).toEqual({ count: 0 });
+			expect(db.inTransaction).toBe(false);
 		} finally {
+			db.close();
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("rolls back receipt hydration when a replayed insert fails", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "evolution-suggestion-hydration-failure-"),
+		);
+		configure(root);
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			claimDailySuggestion({
+				root,
+				projectId: PROJECT_ID,
+				suggestionId: "SUG-hydration",
+				claimedBy: "codex",
+				evidenceDigest: DIGEST,
+				now: new Date("2026-07-17T12:00:00.000Z"),
+			});
+			claimDailySuggestion({
+				root,
+				projectId: PROJECT_ID,
+				suggestionId: "SUG-hydration-second",
+				claimedBy: "codex",
+				evidenceDigest: DIGEST,
+				now: new Date("2026-07-18T12:00:00.000Z"),
+			});
+			db.exec(
+				"CREATE TRIGGER fail_receipt_hydration BEFORE INSERT ON daily_suggestion_receipts WHEN NEW.local_date = '2026-07-18' BEGIN SELECT RAISE(ABORT, 'injected receipt hydration failure'); END;",
+			);
+			const journalBefore = readFileSync(suggestionJournalPath(root));
+
+			expect(() =>
+				claimDailySuggestion({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					suggestionId: "SUG-hydration-next",
+					claimedBy: "codex",
+					evidenceDigest: DIGEST,
+					now: new Date("2026-07-17T12:00:01.000Z"),
+				}),
+			).toThrow("injected receipt hydration failure");
+			expect(db.inTransaction).toBe(false);
+			expect(readFileSync(suggestionJournalPath(root))).toEqual(journalBefore);
+			expect(readSuggestionReceiptJournal(root, PROJECT_ID)).toHaveLength(2);
+			expect(
+				db
+					.query("SELECT COUNT(*) AS count FROM daily_suggestion_receipts")
+					.get(),
+			).toEqual({ count: 0 });
+		} finally {
+			db.close();
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("rejects receipt hydration inside a caller transaction", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "evolution-suggestion-hydration-nested-"),
+		);
+		configure(root);
+		const db = openEvolutionDb(evolutionDbPath(root));
+		try {
+			claimDailySuggestion({
+				root,
+				projectId: PROJECT_ID,
+				suggestionId: "SUG-hydration-nested",
+				claimedBy: "codex",
+				evidenceDigest: DIGEST,
+				now: new Date("2026-07-17T12:00:00.000Z"),
+			});
+			db.exec("BEGIN IMMEDIATE");
+			db.prepare(
+				"INSERT INTO evolution_metadata(key, value) VALUES ('caller_sentinel', 'preserve')",
+			).run();
+
+			let nestedError: unknown;
+			try {
+				claimDailySuggestion({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					suggestionId: "SUG-hydration-nested-next",
+					claimedBy: "codex",
+					evidenceDigest: DIGEST,
+					now: new Date("2026-07-17T12:00:01.000Z"),
+				});
+			} catch (error) {
+				nestedError = error;
+			}
+			expect(nestedError).toMatchObject({
+				name: "SQLiteError",
+				message: "cannot start a transaction within a transaction",
+				errno: 1,
+			});
+			expect(
+				db
+					.query(
+						"SELECT value FROM evolution_metadata WHERE key = 'caller_sentinel'",
+					)
+					.get(),
+			).toEqual({ value: "preserve" });
+		} finally {
+			try {
+				db.exec("ROLLBACK");
+			} catch {}
 			db.close();
 			removeEvolutionTestRoot(root);
 		}

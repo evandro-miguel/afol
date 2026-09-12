@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import type { TelemetryEvent } from "../events/telemetry";
 import type { FeedbackReport } from "../feedback";
+import { digestJson as digest } from "./imports/digest";
 import {
 	type ObservationInput,
 	redactSensitiveText,
@@ -27,20 +27,6 @@ export type EvidenceObservationSource = {
 	workflow_step?: string;
 	stack_digest?: string;
 };
-
-function stableJson(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-			.join(",")}}`;
-	return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
-}
 
 /** Bounded, redacted command identity for recurrence; not a shell replay string. */
 export function commandSignature(value: string | undefined): string {

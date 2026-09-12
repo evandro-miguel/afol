@@ -20,6 +20,7 @@ import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
 } from "./db";
+import { matchesJournalDate, utcOffsetSeconds } from "./journal-date";
 import { applyMigrations } from "./migrations";
 import { refreshPreferenceDecayProjection } from "./preference-decay";
 import { preferenceReinforcementExceedsProductionOrdinal } from "./preference-reinforcement-reader";
@@ -55,6 +56,7 @@ export type ProductionDayJournalPayload = {
 	project_id: string;
 	timezone: string;
 	local_date: string;
+	utc_offset_seconds?: number;
 	qualifying_events: string[];
 	evidence: ObservedProductionEvidence;
 };
@@ -229,11 +231,14 @@ function validateEvent(
 		throw new Error("production-day journal belongs to another project");
 	if (event.payload.timezone !== timezone)
 		throw new Error("production-day journal timezone mismatch");
-	const derivedDate = localDateForTimezone(
-		new Date(event.payload.evidence.created_at),
-		timezone,
-	);
-	if (event.payload.local_date !== derivedDate)
+	if (
+		!matchesJournalDate(
+			event.payload.evidence.created_at,
+			timezone,
+			event.payload.local_date,
+			event.payload.utc_offset_seconds,
+		)
+	)
 		throw new Error("production-day journal event-date mismatch");
 	if (
 		event.payload.evidence.project_id !== projectId ||
@@ -478,6 +483,10 @@ function appendProductionDayAllocationUnlocked(
 		project_id: input.projectId,
 		timezone: input.timezone,
 		local_date: localDate,
+		utc_offset_seconds: utcOffsetSeconds(
+			new Date(evidence.snapshot.created_at),
+			input.timezone,
+		),
 		qualifying_events: [input.evidenceId],
 		evidence: evidence.snapshot,
 	};

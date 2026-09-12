@@ -55,7 +55,7 @@ function errorMessage(error: unknown): string {
 	);
 }
 
-export function diagnosticKind(error: unknown): EnvelopeDiagnostic["kind"] {
+function diagnosticKind(error: unknown): EnvelopeDiagnostic["kind"] {
 	const code =
 		toStringValue(errorProperty(error, "code")) ??
 		toStringValue(errorProperty(error, "statusCode")) ??

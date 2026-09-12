@@ -371,8 +371,13 @@ describe("evolve status", () => {
 					captured.io,
 					agentOperationContext(),
 				),
-			).toBe(0);
+			).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload).toMatchObject({
+				ok: false,
+				exit_code: 1,
+				error: { code: "EVOLUTION_ANALYSIS_BLOCKED" },
+			});
 			expect(payload.data).toMatchObject({
 				status: "blocked",
 				blocked_reason: "evolution state is unavailable",
@@ -773,7 +778,7 @@ describe("evolve status", () => {
 		try {
 			// First analysis call
 			const c1 = captureIo();
-			expect(await runEvolveCommand("", ["--json"], root, c1.io)).toBe(0);
+			expect(await runEvolveCommand("", ["--json"], root, c1.io)).toBe(1);
 			const p1 = JSON.parse(c1.stdout[0] ?? "{}");
 
 			// Set up seeded DB + observation journal

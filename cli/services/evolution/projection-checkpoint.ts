@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
 	closeSync,
 	constants as fsConstants,
@@ -17,6 +17,7 @@ import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
 } from "./db";
+import { digestJson as digest } from "./imports/digest";
 import {
 	journalTailFingerprint,
 	readExactTailBytes,
@@ -55,20 +56,6 @@ type ProjectionCheckpoint = {
 	timestamp: string;
 	event_digest: string;
 };
-
-function stableJson(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-			.join(",")}}`;
-	return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
-}
 
 export function projectionCheckpointPath(
 	root: string,

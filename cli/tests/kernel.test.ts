@@ -380,8 +380,21 @@ describe("kernel front-door", () => {
 				["resolveValidateInvocation", "runValidationCommand"],
 			],
 		] as const;
+		const dispatchSource = readFileSync(
+			join(process.cwd(), "cli/dispatch.ts"),
+			"utf8",
+		);
+		const directDispatchSource = readFileSync(
+			join(process.cwd(), "cli/direct-dispatch.ts"),
+			"utf8",
+		);
+		for (const handlerSource of [dispatchSource, directDispatchSource]) {
+			expect(handlerSource).not.toMatch(
+				/import\s+(?!type\b)[^;]*\bfrom\s+["']\.\/commands\//,
+			);
+		}
 		const lazyModules = [
-			...source.matchAll(
+			...`${source}\n${dispatchSource}\n${directDispatchSource}`.matchAll(
 				/await import\(\s*"(\.\/(?:commands\/[^"]+|validate\/command))"\s*\)/g,
 			),
 		].map((match) => match[1]);
@@ -1796,7 +1809,7 @@ describe("kernel front-door", () => {
 			]) {
 				const proc = runKernel(root, args);
 				expect(proc.status).toBe(0);
-				expect(proc.stdout as string).toContain("Usage: afol verify-tasks");
+				expect(proc.stdout as string).toContain("Command: verify-tasks");
 				expect(proc.stdout as string).not.toContain("LEGACY:");
 			}
 		} finally {
@@ -1845,7 +1858,7 @@ describe("kernel front-door", () => {
 			const proc = runKernel(root, ["new", "--help"]);
 
 			expect(proc.status).toBe(0);
-			expect(proc.stdout as string).toContain("Usage: afol new");
+			expect(proc.stdout as string).toContain("Command: new");
 			expect(proc.stdout as string).toContain("--intent");
 			expect(proc.stderr as string).toBe("");
 			expect(proc.stdout as string).not.toContain("session created:");
@@ -1859,8 +1872,8 @@ describe("kernel front-door", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-lifecycle-help-"));
 		try {
 			for (const [command, expected] of [
-				["start", "Usage: afol start"],
-				["close", "Usage: afol close"],
+				["start", "Command: start"],
+				["close", "Command: close"],
 			] as const) {
 				for (const flag of ["-h", "--help"]) {
 					const proc = runKernel(root, [command, flag]);
@@ -1872,13 +1885,11 @@ describe("kernel front-door", () => {
 				}
 			}
 			const closeHelp = runKernel(root, ["close", "--help"]);
-			expect(closeHelp.stdout as string).toContain(
-				"Usage: afol close [--session <session-id>]",
-			);
-			expect(closeHelp.stdout as string).toContain("-m, --summary <text>");
+			expect(closeHelp.stdout as string).toContain("[--session <session-id>]");
+			expect(closeHelp.stdout as string).toContain("-m|--summary <text>");
 			expect(closeHelp.stdout as string).toContain("--allow-no-report");
 			expect(closeHelp.stdout as string).toContain("--reason <text>");
-			expect(closeHelp.stdout as string).toContain("-j, --json");
+			expect(closeHelp.stdout as string).toContain("--json");
 			expect(closeHelp.stdout as string).toContain("--admit-legacy-baseline");
 			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
 		} finally {

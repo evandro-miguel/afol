@@ -234,5 +234,3 @@ export async function runFeedbackCommand(
 		return 2;
 	}
 }
-
-export const runFeedback = runFeedbackCommand;

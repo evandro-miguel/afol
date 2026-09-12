@@ -51,7 +51,7 @@ const CONTRACT = JSON.parse(
 		resolve(
 			import.meta.dir,
 			"../..",
-			".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+			"src/builtin-assets/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
 		),
 		"utf8",
 	),
@@ -373,6 +373,8 @@ try {
 		healthyStatus.payload.data?.state !== "healthy"
 	)
 		throw new Error("healthy status contract failed");
+	// Match the analysis boundary after prior SQLite handles finish closing.
+	Bun.gc(true);
 	const dbBeforeAnalysis = analysisSnapshot(healthy);
 	const internalAnalysis = analyzeEvolutionProject(healthy);
 	const reviewId = internalAnalysis.proposals[0]?.id;

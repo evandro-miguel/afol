@@ -246,7 +246,10 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
-		guidance: ["Task selectors accept comma lists and ascending ranges."],
+		guidance: [
+			"Fast path: afol st T-01 (active/bound session); use -S only for an explicit session.",
+			"Task selectors accept comma lists and ascending ranges.",
+		],
 		subcommands: [
 			{
 				usage: "--session <session-id> --task-id <task-id>",
@@ -629,9 +632,12 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Close the active session",
 		category: "workflow",
+		guidance: [
+			"Fast path: afol c. Omit --session when an active/bound session resolves.",
+		],
 		subcommands: [
 			{
-				usage: "--session <session-id> [-m|--summary <text>]",
+				usage: "[--session <session-id>] [-m|--summary <text>]",
 				sideEffect: "write",
 				description: "Close a specific session after its tasks are complete",
 			},

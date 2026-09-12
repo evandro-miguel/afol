@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { cpus } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { splitCommandLine } from "../commands/workbench/verify";
+import { splitCommandLine } from "../core/command-line";
 import { boundedSpawn } from "../core/subprocess";
 import { sha256 } from "../services/evolution/imports/digest";
 import {

@@ -10,6 +10,7 @@ Public product docs for AFOL. Start at the root [README](../../README.md).
 | [Architecture decisions](adr/README.md) | Public ADRs |
 | [Security model](security-model.md) | What AFOL does and does not protect |
 | [Troubleshooting](troubleshooting.md) | Common failures |
+| [Evolution journal recovery](evolution-journal-recovery.md) | Canonical journal dates, blocked analysis, and source-vs-derived recovery |
 | [Upgrade and rollback](upgrade-and-rollback.md) | Update or roll back a source checkout and its template |
 | [Release process](release-process.md) | Source-only release and local validation |
 | [Publishing checklist](publishing.md) | Reviewed source release checklist |
