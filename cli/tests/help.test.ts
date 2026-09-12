@@ -240,15 +240,11 @@ describe("help formatter", () => {
 				const spec = kernelRegistry.commands.find(
 					(entry) => entry.kind === kind,
 				);
-				if (
-					spec &&
-					spec.kind !== "verifyTasks" &&
-					!["new", "start", "close"].includes(spec.command)
-				) {
+				if (spec && spec.kind !== "verifyTasks") {
 					directHelpCommands.push(spec);
 				}
 			}
-			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length - 4);
+			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length - 1);
 			for (const spec of directHelpCommands) {
 				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
 					cwd: tempRoot,
@@ -269,6 +265,13 @@ describe("help formatter", () => {
 			expect(shortStartHelp.stderr).toBe("");
 			expect(shortStartHelp.stdout).toContain("Usage: afol st T-01");
 			expect(shortStartHelp.stdout).toContain("Usage: afol start");
+			const catalogStartHelp = spawnSync("bun", [cliPath, "help", "start"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(catalogStartHelp.status).toBe(0);
+			expect(catalogStartHelp.stdout).toBe(shortStartHelp.stdout);
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],

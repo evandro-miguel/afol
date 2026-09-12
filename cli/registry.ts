@@ -364,9 +364,12 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Create a workbench session",
 		category: "core",
+		guidance: [
+			'Prefer: afol n <theme> -t "<task>" or afol n <theme> -F <F-id> -P <spec-id> -t "<task>".',
+		],
 		subcommands: [
 			{
-				usage: "<theme> --task <summary>",
+				usage: "<theme> -t|--task <summary>",
 				sideEffect: "write",
 				description: "Create a session with one or more initial tasks",
 			},
@@ -637,7 +640,13 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Close the active session",
 		category: "workflow",
+		guidance: ["Prefer: afol c when an active or bound session resolves."],
 		subcommands: [
+			{
+				usage: "[-m|--summary <text>]",
+				sideEffect: "write",
+				description: "Close the active or bound session after its tasks are complete",
+			},
 			{
 				usage: "--session <session-id> [-m|--summary <text>]",
 				sideEffect: "write",

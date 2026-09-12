@@ -320,6 +320,20 @@ export function buildCommandHelpJson(
 	return entry;
 }
 
+const SHORT_USAGE: Readonly<Record<string, readonly string[]>> = {
+	new: [
+		'afol n <theme> -t "<task>"',
+		'afol n <theme> -F <F-id> -P <spec-id> -t "<task>"',
+		"afol new <theme> [options]",
+	],
+	start: [
+		"afol st T-01",
+		"afol start T-01",
+		"afol start --session <session-id> --task-id <task-id> [options]",
+	],
+	close: ["afol c", "afol close [--session <session-id>] [options]"],
+};
+
 export function formatCommandHelp(
 	commandOrAlias: string,
 	registry = kernelRegistry,
@@ -329,7 +343,17 @@ export function formatCommandHelp(
 		return null;
 	}
 
+	const usages = SHORT_USAGE[spec.command];
 	return [
+		...(usages
+			? [
+					...usages.map((usage) => `Usage: ${usage}`),
+					"",
+					...(spec.command === "start" || spec.command === "close"
+						? ["Omit --session when an active or bound session resolves.", ""]
+						: []),
+				]
+			: []),
 		`Command: ${spec.command}`,
 		`Aliases: ${spec.aliases.length > 0 ? spec.aliases.join(", ") : "none"}`,
 		`Category: ${spec.category ?? "uncategorized"}`,
