@@ -1959,6 +1959,7 @@ describe("local-state project indexer", () => {
 			expect(await runLocalStateCommand(["freshness"], root, io)).toBe(0);
 			expect(stdout.at(-1)).toContain("local-state freshness: ok");
 			expect(stdout.at(-1)).toContain("ok workbench");
+			expect(stdout.at(-1)).toContain('hint="afol ss"');
 			expect(stderr).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

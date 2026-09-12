@@ -1,0 +1,21 @@
+{
+  "fixture": "A-verify",
+  "mark": "M5",
+  "hops": 2,
+  "retry_count": 2,
+  "argv_chars_max": 38,
+  "output_bytes_max": 576,
+  "duration_ms": 62,
+  "exits": [
+    1,
+    1
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "vt --strict=>1/31ms; vt -S 260912_1312_open-0 --strict=>1/31ms",
+  "commands": [
+    "vt --strict",
+    "vt -S 260912_1312_open-0 --strict"
+  ]
+}

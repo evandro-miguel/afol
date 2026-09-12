@@ -199,7 +199,6 @@ afol qt <theme> -t "<task>" -c "<cmd>"
 afol qt <theme> -t "a" -t "b" -c "<shared-cmd>"
 afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
 afol st T-01
-afol e T-01 -c "<cmd>" -o passed
 afol d T-01 -x "<cmd>"
 afol tr T-01 --state problem -r "<concrete blocker>"
 afol st T-01..T-10

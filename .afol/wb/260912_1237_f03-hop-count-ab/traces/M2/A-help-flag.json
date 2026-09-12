@@ -1,0 +1,21 @@
+{
+  "fixture": "A-help-flag",
+  "mark": "M2",
+  "hops": 2,
+  "retry_count": 0,
+  "argv_chars_max": 17,
+  "output_bytes_max": 413,
+  "duration_ms": 56,
+  "exits": [
+    0,
+    0
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "start --help=>0/14ms; st T-01=>0/42ms",
+  "commands": [
+    "start --help",
+    "st T-01"
+  ]
+}

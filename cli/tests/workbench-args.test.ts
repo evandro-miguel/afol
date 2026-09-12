@@ -207,6 +207,21 @@ describe("workbench parseSessionTaskArgs", () => {
 });
 
 describe("parseDoneArgs", () => {
+	test("rejects argv no-op --test before execution with a copy-paste hint", () => {
+		expect(() =>
+			parseDoneArgs(
+				["--session", "260530_2256_cli-native", "T-01", "--test", "true"],
+				process.cwd(),
+			),
+		).toThrow("shell no-op");
+		expect(() =>
+			parseDoneArgs(
+				["--session", "260530_2256_cli-native", "T-01", "--test", "true"],
+				process.cwd(),
+			),
+		).toThrow('hint="afol d T-01 -x \\"<cmd>\\""');
+	});
+
 	test("preserves Windows paths and quoted argv in --test", () => {
 		const parsed = parseDoneArgs(
 			[

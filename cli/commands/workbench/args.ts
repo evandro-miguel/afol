@@ -1,6 +1,10 @@
 import { resolveProjectPaths } from "../../services/project/paths";
 import type { NewWorkstreamMetadata } from "../../services/workbench/lifecycle";
 import { selectSingleOpenTask } from "../../services/workbench/lifecycle";
+import {
+	defaultAllowGlobalFallback,
+	resolveSession as resolveEffectiveSession,
+} from "../../services/workbench/session-context";
 import { type FlagDef, parseFlagSpec } from "../flag-spec";
 import type {
 	CloseArgs,
@@ -12,6 +16,7 @@ import type {
 	VerificationSpec,
 	VerifyArgs,
 } from "./types";
+import { isNoopExecutionCommand } from "../../services/workbench/verify";
 import {
 	DEFAULT_VERIFICATION_TIMEOUT_MS,
 	resolveSession,
@@ -610,6 +615,21 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			"done requires both --command and --result when recording evidence.",
 		);
 	}
+	const primaryTask = taskIds[0] ?? parsed.taskId;
+	const candidateCommands = [
+		...parsed.testCommands,
+		...parsed.verifications
+			.filter((spec) => spec.mode === "argv")
+			.map((spec) => [spec.executable, ...spec.args].join(" ").trim()),
+	].filter((command) => command.length > 0);
+	const noopCommand = candidateCommands.find((command) =>
+		isNoopExecutionCommand(command),
+	);
+	if (noopCommand) {
+		throw new Error(
+			`--test "${noopCommand}" is a shell no-op and cannot authorize done. hint="afol d ${primaryTask} -x \\"<cmd>\\""`,
+		);
+	}
 	return {
 		session: resolveSession(root, parsed.session, "done"),
 		taskId: taskIds[0] ?? parsed.taskId,
@@ -712,7 +732,16 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 	}
 
 	if (!sessionPath) {
-		sessionPath = resolveProjectPaths(root).abs.wbDir;
+		const bound = resolveEffectiveSession(root, {
+			allowGlobalFallback: defaultAllowGlobalFallback(),
+		});
+		if (bound) {
+			sessionPath = resolveVerifySessionPath(root, bound.session);
+		} else {
+			throw new Error(
+				"Missing --session for verify; omit only when a session is active or bound. Example: afol vt -S <session-id> --strict",
+			);
+		}
 	}
 
 	return { sessionPath, strict, json, verbose };

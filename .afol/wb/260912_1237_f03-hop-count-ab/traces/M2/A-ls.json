@@ -1,0 +1,23 @@
+{
+  "fixture": "A-ls",
+  "mark": "M2",
+  "hops": 3,
+  "retry_count": 1,
+  "argv_chars_max": 9,
+  "output_bytes_max": 2201,
+  "duration_ms": 79,
+  "exits": [
+    1,
+    0,
+    0
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "ls=>1/33ms; help=>0/15ms; ss=>0/31ms",
+  "commands": [
+    "ls",
+    "help",
+    "ss"
+  ]
+}

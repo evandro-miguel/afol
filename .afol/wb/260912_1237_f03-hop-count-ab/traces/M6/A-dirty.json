@@ -1,0 +1,29 @@
+{
+  "fixture": "A-dirty",
+  "mark": "M6",
+  "hops": 6,
+  "retry_count": 0,
+  "argv_chars_max": 60,
+  "output_bytes_max": 1363,
+  "duration_ms": 307,
+  "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "s=>0/27ms; s -j=>0/28ms; n dirty-work -t one --no-spec-required --reason fixture=>0/77ms; st T-01=>0/42ms; d T-01 -x echo hop-ok=>0/62ms; c=>0/71ms",
+  "commands": [
+    "s",
+    "s -j",
+    "n dirty-work -t one --no-spec-required --reason fixture",
+    "st T-01",
+    "d T-01 -x echo hop-ok",
+    "c"
+  ]
+}

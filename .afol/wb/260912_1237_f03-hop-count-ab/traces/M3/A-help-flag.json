@@ -1,0 +1,23 @@
+{
+  "fixture": "A-help-flag",
+  "mark": "M3",
+  "hops": 3,
+  "retry_count": 0,
+  "argv_chars_max": 42,
+  "output_bytes_max": 1733,
+  "duration_ms": 87,
+  "exits": [
+    0,
+    0,
+    0
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "start --help=>0/14ms; s -j=>0/33ms; st -S 260912_1312_a-help-flag -T T-01=>0/40ms",
+  "commands": [
+    "start --help",
+    "s -j",
+    "st -S 260912_1312_a-help-flag -T T-01"
+  ]
+}

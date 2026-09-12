@@ -44,7 +44,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	session: "manage sessions",
 	rule: "inspect rules",
 	skill: "inspect skills",
-	"local-state": "inspect indexes",
+	"local-state": "indexes (ss lists sessions)",
 	pstr: "structure maps",
 	ctx: "context bundles",
 	state: "state snapshot",

@@ -611,6 +611,7 @@ describe("status command", () => {
 			expect(textCode).toBe(0);
 			const text = textCaptured.stdout[0] ?? "";
 			expect(text).toContain("SAFE_NEXT_ACTION: implement validate");
+			expect(text).toContain("SESSION: 260530_2256_cli-native-command-parity");
 			expect(text).not.toContain("PROBLEM_REASON:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1221,6 +1222,23 @@ describe("status command", () => {
 			const code = runStatusCommand(root, [], captured.io);
 			expect(code).toBe(0);
 			expect(captured.stdout[0] ?? "").not.toContain("freshness:");
+			expect(captured.stdout[0] ?? "").toContain(
+				'SAFE_NEXT_ACTION: afol qt <theme> -t "<task>" -c "<cmd>"',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("unbound status with existing sessions points at session list", () => {
+		const root = createFixture();
+		try {
+			const activeSessionFile = join(root, ".afol", "wb", ".active_session");
+			rmSync(activeSessionFile, { force: true });
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			expect(captured.stdout[0] ?? "").toContain("SESSION: none");
+			expect(captured.stdout[0] ?? "").toContain("SAFE_NEXT_ACTION: afol ss");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

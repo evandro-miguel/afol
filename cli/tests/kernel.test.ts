@@ -1846,6 +1846,7 @@ describe("kernel front-door", () => {
 
 			expect(proc.status).toBe(0);
 			expect(proc.stdout as string).toContain("Usage: afol new");
+			expect(proc.stdout as string).toContain('Usage: afol n <theme> -t "<task>"');
 			expect(proc.stdout as string).toContain("--intent");
 			expect(proc.stderr as string).toBe("");
 			expect(proc.stdout as string).not.toContain("session created:");
@@ -1872,6 +1873,7 @@ describe("kernel front-door", () => {
 				}
 			}
 			const closeHelp = runKernel(root, ["close", "--help"]);
+			expect(closeHelp.stdout as string).toContain("Usage: afol c");
 			expect(closeHelp.stdout as string).toContain(
 				"Usage: afol close [--session <session-id>]",
 			);

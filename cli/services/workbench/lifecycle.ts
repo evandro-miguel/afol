@@ -2921,7 +2921,16 @@ export function closeSession(
 					const labels = blockingRows
 						.map((row) => `${row.taskId}:${row.state}`)
 						.join(", ");
-					throw new Error(`Session ${session} has blocking tasks: ${labels}`);
+					const first = blockingRows[0];
+					const next =
+						first?.state === "pending"
+							? `afol st ${first.taskId}`
+							: first
+								? `afol d ${first.taskId} -x "<cmd>"`
+								: "afol s";
+					throw new Error(
+						`Session ${session} has blocking tasks: ${labels}. hint="${next}"`,
+					);
 				}
 			} else if (options.carryOpen) {
 				recoveredContinuation =

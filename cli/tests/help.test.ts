@@ -267,6 +267,7 @@ describe("help formatter", () => {
 			});
 			expect(shortStartHelp.status).toBe(0);
 			expect(shortStartHelp.stderr).toBe("");
+			expect(shortStartHelp.stdout).toContain("Usage: afol st T-01");
 			expect(shortStartHelp.stdout).toContain("Usage: afol start");
 			const intentResult = spawnSync(
 				"bun",
@@ -826,6 +827,7 @@ describe("help formatter", () => {
 			description: "Inspect local project indexes",
 			category: "inspect",
 			guidance: [
+				"ls is local-state, not session list. Use afol ss to list sessions.",
 				"Run rebuild before validation when indexes may be stale.",
 				"Use --verbose only when the full index snapshot is needed.",
 			],

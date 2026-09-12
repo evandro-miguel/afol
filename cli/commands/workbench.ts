@@ -70,7 +70,11 @@ import {
 	parseSessionTaskArgs,
 	parseVerifyArgs,
 } from "./workbench/args";
-import { repairHintForStep } from "./workbench/hints";
+import {
+	formatHintLine,
+	nextCommandHint,
+	repairHintForStep,
+} from "./workbench/hints";
 import { writeJsonError } from "./workbench/shared";
 import type { DoneArgs, VerificationSpec } from "./workbench/types";
 import {
@@ -359,6 +363,7 @@ export async function runEvidenceCommand(
 			provenance: "declared",
 			approvalContext: ctx,
 		});
+		const nextCommand = nextCommandHint("evidence", { taskId: parsed.taskId });
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -372,6 +377,7 @@ export async function runEvidenceCommand(
 								? "committed_with_warnings"
 								: "committed",
 							warnings: record.warnings ?? [],
+							next_command: nextCommand,
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.evidence" },
@@ -384,6 +390,7 @@ export async function runEvidenceCommand(
 				...(record.warnings ?? []).map((warning) => `warning: ${warning}`),
 			);
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			lines.push(formatHintLine(nextCommand));
 			console.log(lines.join("\n"));
 		}
 		return 0;

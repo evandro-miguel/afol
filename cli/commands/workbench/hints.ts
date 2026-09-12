@@ -42,7 +42,7 @@ export function nextCommandHint(
 		case "start":
 			return `afol d ${taskId(ctx)} -x "<cmd>"`;
 		case "evidence":
-			return `afol d ${taskId(ctx)}`;
+			return `afol d ${taskId(ctx)} -x "<cmd>"`;
 		case "done":
 			return "afol c";
 		case "close":
@@ -69,7 +69,7 @@ export function repairHintForStep(
 		case "done":
 			return `afol d ${taskId(ctx)} -x "<cmd>"`;
 		case "close":
-			return `afol session show --session ${sessionId(ctx)}`;
+			return "afol c";
 		case "log":
 			return `afol l -m "<text>"`;
 		case "quick-task":

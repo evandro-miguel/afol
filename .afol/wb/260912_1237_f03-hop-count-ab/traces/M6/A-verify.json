@@ -1,0 +1,23 @@
+{
+  "fixture": "A-verify",
+  "mark": "M6",
+  "hops": 3,
+  "retry_count": 2,
+  "argv_chars_max": 38,
+  "output_bytes_max": 576,
+  "duration_ms": 131,
+  "exits": [
+    1,
+    0,
+    1
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "vt --strict=>1/53ms; help verify=>0/30ms; vt -S 260912_1312_open-0 --strict=>1/48ms",
+  "commands": [
+    "vt --strict",
+    "help verify",
+    "vt -S 260912_1312_open-0 --strict"
+  ]
+}

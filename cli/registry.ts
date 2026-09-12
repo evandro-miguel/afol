@@ -246,17 +246,25 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
-		guidance: ["Task selectors accept comma lists and ascending ranges."],
+		guidance: [
+			"Prefer: afol st T-01 when an active or bound session resolves.",
+			"Task selectors accept comma lists and ascending ranges.",
+		],
 		subcommands: [
 			{
-				usage: "--session <session-id> --task-id <task-id>",
+				usage: "T-01",
 				sideEffect: "write",
-				description: "Start a specific task in a specific session",
+				description: "Start a task in the active or bound session",
 			},
 			{
 				usage: "--task-id <task-id>",
 				sideEffect: "write",
 				description: "Start a task in the active or context session",
+			},
+			{
+				usage: "--session <session-id> --task-id <task-id>",
+				sideEffect: "write",
+				description: "Start a specific task in a specific session",
 			},
 			{
 				usage: "--json",
@@ -837,6 +845,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		description: "Inspect local project indexes",
 		category: "inspect",
 		guidance: [
+			"ls is local-state, not session list. Use afol ss to list sessions.",
 			"Run rebuild before validation when indexes may be stale.",
 			"Use --verbose only when the full index snapshot is needed.",
 		],

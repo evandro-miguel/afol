@@ -1,0 +1,23 @@
+{
+  "fixture": "A-evidence",
+  "mark": "M4",
+  "hops": 3,
+  "retry_count": 1,
+  "argv_chars_max": 29,
+  "output_bytes_max": 85,
+  "duration_ms": 157,
+  "exits": [
+    0,
+    2,
+    0
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": true,
+  "notes": "e T-01 -c true -o passed=>0/55ms; d T-01=>2/40ms; d T-01 -x echo hop-ok=>0/62ms",
+  "commands": [
+    "e T-01 -c true -o passed",
+    "d T-01",
+    "d T-01 -x echo hop-ok"
+  ]
+}

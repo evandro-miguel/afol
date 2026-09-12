@@ -1,0 +1,25 @@
+{
+  "fixture": "A-ambiguous",
+  "mark": "M2",
+  "hops": 4,
+  "retry_count": 2,
+  "argv_chars_max": 26,
+  "output_bytes_max": 96,
+  "duration_ms": 171,
+  "exits": [
+    2,
+    0,
+    0,
+    2
+  ],
+  "kill_switch": false,
+  "kill_reasons": [],
+  "success": false,
+  "notes": "st=>2/34ms; st T-01=>0/42ms; d T-01 -x echo hop-ok=>0/60ms; c=>2/35ms",
+  "commands": [
+    "st",
+    "st T-01",
+    "d T-01 -x echo hop-ok",
+    "c"
+  ]
+}

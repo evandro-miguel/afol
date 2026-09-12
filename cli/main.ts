@@ -22,6 +22,8 @@ import { resolveCommand } from "./router";
 import { loadProjectRoot } from "./services/project/root";
 
 const NEW_COMMAND_HELP = [
+	"Usage: afol n <theme> -t \"<task>\"",
+	"Usage: afol n <theme> -F <F-id> -P <spec-id> -t \"<task>\"",
 	"Usage: afol new <theme> [options]",
 	"",
 	"Options",
@@ -34,11 +36,15 @@ const NEW_COMMAND_HELP = [
 ].join("\n");
 
 const START_COMMAND_HELP = [
+	"Usage: afol st T-01",
+	"Usage: afol start T-01",
 	"Usage: afol start --session <session-id> --task-id <task-id> [options]",
 	"",
+	"Omit --session when an active or bound session resolves.",
+	"",
 	"Options",
-	"  --session <session-id>  Workbench session to start from",
-	"  --task-id <task-id>    Task identifier to mark in progress",
+	"  --session <session-id>  Only when session is ambiguous",
+	"  --task-id <task-id>     Task identifier (or positional T-01)",
 	"  --json                 Emit machine-readable start result",
 	"  --brief                Emit concise start briefing",
 	"  --brief full           Emit full start briefing",
@@ -46,10 +52,13 @@ const START_COMMAND_HELP = [
 ].join("\n");
 
 const CLOSE_COMMAND_HELP = [
+	"Usage: afol c",
 	"Usage: afol close [--session <session-id>] [options]",
 	"",
+	"Omit --session when an active or bound session resolves.",
+	"",
 	"Options",
-	"  --session <session-id>      Workbench session; omit when active/bound",
+	"  --session <session-id>      Only when session is ambiguous",
 	"  -m, --summary <text>        Summary for the generated report",
 	"  --allow-no-report           Explicitly waive a missing report",
 	"  --carry-open                Move open tasks to one governed continuation",

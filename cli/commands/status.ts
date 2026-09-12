@@ -51,6 +51,7 @@ type StatusSnapshot = {
 	taskFilePath?: string;
 	problemReason?: string;
 	safeNextAction?: string;
+	sessionId?: string | null;
 	sessionCount?: number | null;
 	sessionHealth?: string[];
 	catchup: CatchupReport | undefined;
@@ -83,6 +84,7 @@ type StatusJsonData = {
 		task_file: string | null;
 	};
 	session: StatusSessionInfo | undefined;
+	session_id?: string | null;
 	warnings: string[];
 	problem_reason?: string;
 	safe_next_action?: string;
@@ -305,6 +307,48 @@ function compactProblemReason(
 
 function compactSafeNextAction(next: string[]): string | undefined {
 	return compactSafeAction(next);
+}
+
+function unboundSessionCount(
+	projectRoot: string,
+	snapshotCount: number | null | undefined,
+): number {
+	if ((snapshotCount ?? 0) > 0) return snapshotCount ?? 0;
+	try {
+		return collectSessionIds(projectRoot).length;
+	} catch {
+		return snapshotCount ?? 0;
+	}
+}
+
+function derivedSafeNextAction(
+	status: string,
+	task: string,
+	sessionId: string | null,
+	sessionCount = 0,
+): string | undefined {
+	if (status === "problem" || status === "corrupt") {
+		return undefined;
+	}
+	if (!sessionId) {
+		return sessionCount > 0
+			? "afol ss"
+			: 'afol qt <theme> -t "<task>" -c "<cmd>"';
+	}
+	if (status === "pending") {
+		return `afol st ${task === "none" ? "T-01" : task}`;
+	}
+	if (
+		status === "in_progress" ||
+		status === "implemented_untested" ||
+		status === "tested_needs_spec_validation"
+	) {
+		return `afol d ${task === "none" ? "T-01" : task} -x "<cmd>"`;
+	}
+	if (status === "done" || status === "none") {
+		return "afol c";
+	}
+	return undefined;
 }
 
 function extractFieldList(
@@ -629,6 +673,12 @@ function readStatusSnapshot(
 		if (taskId) {
 			throw taskNotFoundError(taskId, null);
 		}
+		const unboundNext = derivedSafeNextAction(
+			"none",
+			"none",
+			null,
+			unboundSessionCount(project.root, healthInfo.sessionCount),
+		);
 		return {
 			status: "none",
 			task: "none",
@@ -641,6 +691,8 @@ function readStatusSnapshot(
 			configSource: project.configSource,
 			lockPath,
 			activeSessionPath,
+			sessionId: null,
+			...(unboundNext ? { safeNextAction: unboundNext } : {}),
 			...healthInfo,
 			catchup: catchupReport,
 		};
@@ -656,7 +708,14 @@ function readStatusSnapshot(
 				? "corrupt"
 				: "none";
 		const problemReason = compactProblemReason(status);
-		const safeNextAction = compactSafeNextAction(["none"]);
+		const safeNextAction =
+			compactSafeNextAction(["none"]) ??
+			derivedSafeNextAction(
+				status,
+				"none",
+				selectedSession,
+				healthInfo.sessionCount ?? 0,
+			);
 		return {
 			status,
 			task: "none",
@@ -671,6 +730,7 @@ function readStatusSnapshot(
 			configSource: project.configSource,
 			lockPath,
 			activeSessionPath,
+			sessionId: selectedSession,
 			...healthInfo,
 			catchup: catchupReport,
 		};
@@ -686,9 +746,14 @@ function readStatusSnapshot(
 		(row) => row.taskId === task,
 	)?.notes;
 	const problemReason = compactProblemReason(status, taskRowNotes);
-	const safeNextAction = compactSafeNextAction(
-		extractFieldList(content, "NEXT"),
-	);
+	const safeNextAction =
+		compactSafeNextAction(extractFieldList(content, "NEXT")) ??
+		derivedSafeNextAction(
+			status,
+			task,
+			selectedSession,
+			healthInfo.sessionCount ?? 0,
+		);
 
 	return {
 		status,
@@ -708,6 +773,7 @@ function readStatusSnapshot(
 		lockPath,
 		activeSessionPath,
 		taskFilePath,
+		sessionId: selectedSession,
 		...healthInfo,
 		catchup: catchupReport,
 	};
@@ -717,6 +783,7 @@ function formatCompact(snapshot: StatusSnapshot): string {
 	const lines = [
 		`STATUS: ${snapshot.status}`,
 		`TASK: ${snapshot.task}`,
+		`SESSION: ${snapshot.sessionId ?? "none"}`,
 		"FILES_WRITTEN:",
 		...snapshot.filesWritten.map((entry) => `- ${entry}`),
 		"VALIDATION_OR_CHECKS:",
@@ -836,6 +903,9 @@ export function runStatusCommand(
 		if (snapshot.safeNextAction) {
 			data.safe_next_action = snapshot.safeNextAction;
 		}
+		if (snapshot.sessionId !== undefined) {
+			data.session_id = snapshot.sessionId;
+		}
 
 		const output = stringifyEnvelope(
 			envelopeWithLegacyKeys(resultEnvelope(data, "status", 0), [
@@ -848,6 +918,7 @@ export function runStatusCommand(
 				"next",
 				"problem_reason",
 				"safe_next_action",
+				"session_id",
 				"session_count",
 				"session_health_warnings",
 				"paths",

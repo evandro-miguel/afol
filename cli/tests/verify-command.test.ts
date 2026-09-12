@@ -111,7 +111,7 @@ describe("verify-tasks command", () => {
 				"utf8",
 			);
 
-			const proc = runKernel(root, ["verify-tasks", "--strict"]);
+			const proc = runKernel(root, ["verify-tasks", ".afol/wb", "--strict"]);
 
 			expect(proc.status).toBe(1);
 			expect(proc.stderr as string).toBe("");
@@ -121,6 +121,48 @@ describe("verify-tasks command", () => {
 			expect(proc.stdout as string).toContain("Pending:");
 			expect(proc.stdout as string).not.toContain("/.afol/wb/_archive/");
 			expect(proc.stdout as string).not.toContain("/.agents/wb/");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("omit-session verify fails closed without an active or bound session", () => {
+		const root = mkProjectRoot("verify-unbound");
+		try {
+			const proc = runKernel(root, ["vt", "--strict"]);
+			expect(proc.status).toBe(2);
+			expect(proc.stderr as string).toContain("Missing --session for verify");
+			expect(proc.stderr as string).toContain("afol vt -S <session-id> --strict");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("omit-session verify uses the active session instead of scanning workbench", () => {
+		const root = mkProjectRoot("verify-bound");
+		try {
+			const created = newWorkstream(root, "verify-bound");
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				`${created.session}\n`,
+			);
+			mkdirSync(join(root, ".afol", "wb", "other-open"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "wb", "other-open", "other-open_task_01.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | other |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			const proc = runKernel(root, ["vt", "--strict"]);
+			expect(proc.status).toBe(1);
+			expect(portablePath(proc.stdout as string)).toContain(created.session);
+			expect(proc.stdout as string).not.toContain("other-open");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
