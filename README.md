@@ -74,10 +74,10 @@ afol status
 Multi-step work:
 
 ```bash
-afol new feature-name --task "Implement behavior" --task "Add tests"
-afol start T-01
+afol n feature-name -t "Implement behavior" -t "Add tests"
+afol st T-01
 afol d T-01 -x "git diff --check"
-afol close
+afol c
 ```
 
 `afol` stays outside the project. After `init`, the project owns:

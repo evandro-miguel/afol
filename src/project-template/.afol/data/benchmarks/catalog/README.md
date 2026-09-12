@@ -19,8 +19,8 @@ represented by at least one benchmark scenario or by an explicit temporary
 exemption in `registry.json.coverage`.
 
 - Use `scenario.coverage.commands` when a scenario exercises additional AFOL
-  commands indirectly, such as a live agent journey that runs `afol new`,
-  `afol start`, `afol evidence`, `afol done`, and `afol close`.
+  commands indirectly, such as a live agent journey that runs `afol st`,
+  `afol d -x`, and `afol c`. `e` is diagnostic.
 - Use `scenario.coverage.subcommands` when a scenario proves an exact
   documented subcommand usage.
 - Use `scenario.coverage.journeys` to name the user or agent journey proved by

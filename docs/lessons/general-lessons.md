@@ -150,8 +150,9 @@ templates and direct users/agents to current CLI help or project docs.
 
 **Lesson:** A task state is not complete just because the task file contains completion text. Completion must be tied to task-scoped ledger evidence.
 
-**Prevention rule:** Never create a new task as `done`; record task-scoped
-closure evidence with `afol evidence`, then move to `done` through `afol done`.
+**Prevention rule:** Never create a new task as `done`; close with
+`afol d T-01 -x "<cmd>"` so observed evidence authorizes done. `afol evidence`
+is diagnostic only.
 
 **Guardrail:** Completion commands and strict verification must reject generic evidence labels, missing evidence IDs, unresolved failed evidence, and document-only evidence.
 
@@ -174,7 +175,7 @@ closure evidence with `afol evidence`, then move to `done` through `afol done`.
 13. **Template-first AGENTS** - Keep root AGENTS generic with placeholders and reusable operational rules
 14. **Discovery-first tool docs** - Keep AGENTS tool guidance short and rely on dynamic tools catalog commands
 15. **English by default** - Use English across repo artifacts unless user explicitly requests another language
-16. **Ledger-gated done state** - Never seed tasks as `done`; require task-scoped closure evidence before `afol done`
+16. **Ledger-gated done state** - Never seed tasks as `done`; close with `afol d -x` so observed evidence authorizes done
 
 ## Guardrails
 

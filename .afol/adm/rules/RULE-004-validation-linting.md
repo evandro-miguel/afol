@@ -4,7 +4,7 @@ id: RULE-004
 theme: validation-linting
 version: 2.0
 created: 2026-02-23
-updated_at: '2026-06-16T00:00:00Z'
+updated_at: '2026-09-12T00:00:00Z'
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
@@ -53,12 +53,12 @@ blocks. For static JSON, run `python -m json.tool .afol/adm/tools.json`.
 
 - Start with focused tests for touched code.
 - Broaden to project/release checks when shared behavior changed.
-- Record AFOL evidence before running `afol done` for governed tasks.
+- Complete governed tasks with observed exit-zero evidence (`afol d T-01 -x "<cmd>"`). `e` is diagnostic only.
 - Treat excess command output as a bug in AFOL command design.
 
 **DON'T:**
 
-- Run `afol done` without relevant validation or explicit `N/A` evidence.
+- Run `afol d` without relevant validation or explicit `N/A` evidence.
 - Claim a check passed unless it ran.
 - Hide unresolved task state behind lifecycle closure.
 - Reintroduce retired command surfaces in docs or examples.

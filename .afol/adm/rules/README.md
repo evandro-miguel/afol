@@ -4,7 +4,7 @@ id: readme
 theme: rules
 status: active
 created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-06-27T00:00:00Z'
+updated_at: '2026-09-12T00:00:00Z'
 ---
 
 # Rules
@@ -35,21 +35,21 @@ updated_at: '2026-06-27T00:00:00Z'
 
 ```bash
 # Inspect state
-afol status
+afol s
 
-# Create governed execution
-afol new <theme> --feature-id <feature-id> --parent-spec <spec-id>
-afol start --session <session-id> --task-id T-01
-
-# Record evidence and close
-afol evidence --session <session-id> --task-id T-01 --command "<cmd>" --result passed
-afol done --session <session-id> --task-id T-01
-afol close --session <session-id>
+# Governed execution (omit -S when active/bound session resolves)
+afol n <theme> -F <feature-id> -P <spec-id> -t "<task>"
+afol st T-01
+afol d T-01 -x "<cmd>"
+afol c
 
 # Validate
-afol validate project --json
+afol v project --json
 afol verify-tasks --strict
 ```
+
+`e` is diagnostic only. Long `--session` / `-S` forms remain valid for CI and
+multi-agent work when the session is ambiguous.
 
 ---
 

@@ -2,10 +2,10 @@
 doc_type: rule
 id: RULE-002
 theme: workstream-creation
-version: 1.1
+version: 1.2
 created: 2026-02-23
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
-updated_at: '2026-06-20T00:00:00Z'
+updated_at: '2026-09-12T18:00:00Z'
 ---
 
 # Workstream Creation
@@ -15,14 +15,19 @@ decisions.
 
 ## Artifact Economy
 
-- No workbench session for quick answers, read-only checks, planning-only
+- No workbench session for quick asks, read-only checks, planning-only
   replies, or broad context gathering.
 - No sidecar artifacts by habit. Add research, brainstorm, explorer-check,
   report, spec, spec-lite, or postmortem only when requested, required, or
   blocking.
+- Do not write harness handoff packs (`.tmp/grok-handoff-*.md` or equivalent).
+  When work is governed, the session plan/task/log is the handoff. Put the
+  objective, scope, and done-when in the AFOL task; children read that. Inline
+  spawn prompts may point at the session id. A sidecar pack is allowed only
+  when the user asked for one, or AFOL cannot carry the context.
 - Discover before planning. Plans describe direct execution, not meta-planning.
-- Governed implementation flow: session -> start task -> edit -> verify ->
-  evidence -> done -> close.
+- Governed implementation flow: `n` -> `st` -> edit -> `d -x` -> `c`.
+  `e` is diagnostic and does not authorize done.
 - Use given roadmap feature, parent spec, or child spec directly.
 
 ## Artifact Contract
@@ -33,11 +38,10 @@ Plan/task/report must link primary artifacts, list optional sidecars, and give
 ## Commands
 
 ```bash
-afol new <theme> --feature-id F-01 --parent-spec <spec-id>
-afol start --session <session-id> --task-id T-01
-afol evidence --session <session-id> --task-id T-01 --command "<cmd>" --result passed
-afol done --session <session-id> --task-id T-01
-afol close --session <session-id>
+afol n <theme> -F F-01 -P <spec-id> -t "<task>"
+afol st T-01
+afol d T-01 -x "<cmd>"
+afol c
 ```
 
 Use `afol quick-task "<description>"` only inside an active approved feature.

@@ -2,7 +2,7 @@
 doc_type: telemetry_guide
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-06-15T00:00:00Z'
+updated_at: '2026-09-12T00:00:00Z'
 ---
 
 # Telemetry Guide
@@ -40,7 +40,7 @@ afol telemetry export --format jsonl
 | `session_start` | Creating new workstream | `afol n` |
 | `tool_exec` | Using AFOL commands | `afol` |
 | `session_end` | Closing workstream | `afol c` |
-| `task_complete` | Marking task done | `afol d` |
+| `task_complete` | Marking task done | `afol d -x` |
 | `blocker` | Manual (optional) | User |
 | `error` | Tool failure | Wrapper |
 | `task_start` | Starting task work | `afol st` |
@@ -92,9 +92,9 @@ The following events are captured **automatically** - no manual action needed:
 | Event | Trigger |
 |-------|---------|
 | `tool_exec` | AFOL command execution |
-| `session_start` | Running `afol new <theme>` |
-| `session_end` | Running `afol close --session <session-id>` |
-| `task_complete` | Running `afol done --session <session-id> --task-id <task-id>` |
+| `session_start` | Running `afol n <theme>` |
+| `session_end` | Running `afol c` |
+| `task_complete` | Running `afol d <task-id> -x "<cmd>"` |
 
 ## Manual Events (Optional)
 
