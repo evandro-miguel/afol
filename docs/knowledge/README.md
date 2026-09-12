@@ -20,6 +20,11 @@ This folder supports low-token discovery of prior AFOL workbench knowledge.
 
 ## Current Lookup
 
+Active sessions live under `.afol/wb/<session>/`; closed sessions are archived
+under `.afol/wb/_archive/<session>/`. Both remain beneath `.afol/wb`, so a
+recursive search covers active and archived knowledge. `INDEX.md` points at
+`_archive` paths for closed work.
+
 ```bash
 rg -n "<topic>" docs/knowledge .afol/wb
 rg -n "_research_|_report_|_postmortem_" .afol/wb

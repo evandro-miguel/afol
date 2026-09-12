@@ -11,22 +11,21 @@ Everyday aliases: `s` status, `n` new, `st` start, `d` done, `c` close,
 
 ```text
 afol init
-afol status
+afol s
 afol qt <theme> -t "<task>" -c "<check>"
-afol new <theme> --task <text>
-afol start --task-id <task-id>
-afol evidence --task-id <task-id> --command "<check>" --result passed
-afol done <task-id> --test "<argv-only-check>"
-afol done <task-id> --test-shell "<shell-check>"
-afol close
+afol n <theme> -t <text>
+afol st T-01
+afol e T-01 -c "<check>" -o passed
+afol d T-01 -x "<argv-only-check>"
+afol c
 ```
 
-`done --test` (alias `-x`) is the agent-facing default: it runs argv-only
-verification and records observed evidence without shell parsing.
+Long forms remain valid. `d -x` / `done --test` is the agent-facing default: it
+runs argv-only verification and records observed evidence without shell parsing.
 `done --test-shell` runs one shell command for a local operator only; never use
 it for agent or remote/provider execution. Completion without observed evidence
-is rejected. Use `evidence --result passed` when recording a separate evidence
-receipt.
+is rejected. Use `e T-01 -c "<check>" -o passed` when recording a separate
+evidence receipt.
 
 ## Materialized state
 

@@ -2,13 +2,13 @@
 doc_type: spec-child
 id: 260818_public-architecture-code-quality_spec-child_01
 theme: public-architecture-code-quality
-status: active
+status: final
 owners:
 - orchestrator
 workstream_intent: Measure and reduce proven architectural risk without speculative refactoring.
 artifact_purpose: Define public engineering-quality evidence and hotspot boundaries.
 created_at: '2026-08-18T00:00:00Z'
-updated_at: '2026-08-18T00:00:00Z'
+updated_at: '2026-09-12T00:00:00Z'
 roadmap_feature: F-34
 spec_role: child
 parent_spec: 260818_public-product-and-portfolio-readiness_spec_01
@@ -55,3 +55,7 @@ risk_level: medium
   typecheck, Knip, and full source suite pass.
 - High-complexity functions remain documented refactor candidates rather than
   being changed speculatively.
+- Closeout (2026-09-12): public-root `docs/public/architecture-quality.md` still
+  records the 2026-08-18 baseline, the `output-metrics.ts` cycle extraction,
+  zero remaining cycles, coverage-scope distinction, and remaining complexity
+  candidates. Architecture-docs evidence only; not exact-SHA release proof.

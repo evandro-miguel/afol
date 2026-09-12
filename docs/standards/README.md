@@ -19,6 +19,9 @@ execution state to `.afol/**`.
 - `workflow.md`: roadmap, spec, plan, task, execution, and closure flow.
 - `checkbox-protocol.md`: checklist and task-state conventions.
 - `verification.md`: evidence and validation expectations.
+- `evidence-compatibility.md`: how `validate project` may admit pre-cutoff
+  evidence debt through the versioned baseline while `verify-tasks --strict`
+  stays raw.
 - `decision-intake.md`: intake contract for ambiguous or product-shaped work.
 
 ## Runtime And Scaffold

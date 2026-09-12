@@ -45,12 +45,17 @@ those maps are rebuilt, and stale or missing maps are not authoritative.
 
 - `docs/standards/README.md`: reusable workflow, bootstrap, runtime,
   verification, and process standards.
-- `docs/templates/`: starter artifact templates.
+- `docs/templates/`: starter artifact templates. Some files are symlinks into
+  `src/project-template/docs/templates/**`; the rest are project-owned. Symlink
+  inventory may report `PROJECT_INDEX_SCOPE_DRIFT` even when content is already
+  indexed via the template tree.
 - `docs/patterns/`: success and anti-pattern examples.
 - `docs/knowledge/`: low-token lookup index for prior workbench knowledge.
 - `docs/lessons/`: durable lessons extracted from completed work.
 - `docs/telemetry/`: telemetry notes and reports.
 - `docs/audits/`: repository hygiene and documentation alignment audits.
+- `docs/public/`: factory copy of public engine documentation. Canonical
+  engine docs live in the public-root checkout.
 
 ## Retired Surfaces
 
@@ -65,7 +70,7 @@ Do not use, document as current, restore, or extend:
 - `docs/map/**` as a root current-state map surface
 - `docs/arc/**` as the frozen transitional archive
 
-`.agents/**` remains only static scaffold metadata (`config.json`,
-`lock.json`, `manifest.json`) and provider skill content under
-`.agents/skills/**`. Hooks, rules, source seeds, and mutable state belong under
-`.afol/**`.
+`.agents/**` remains only provider metadata (`lock.json`, `manifest.json`) and
+optional project-local skills under `.agents/skills/**`. Project configuration
+lives at `.afol/config.json`; `.agents/config.json` is a legacy fallback only.
+Hooks, rules, source seeds, and mutable state belong under `.afol/**`.

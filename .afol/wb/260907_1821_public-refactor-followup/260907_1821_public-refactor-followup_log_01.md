@@ -1,0 +1,12 @@
+# Log
+
+## Timeline
+
+- 2026-09-07T23:21:16.419Z - session created 260907_1821_public-refactor-followup
+- 2026-09-07T23:27:14.944Z - Plan council approved bounded parser, receipt hydration, direct dispatch, and continuation slices. Valibot migration declined: ordered cross-field identity/digest/redaction validation would not simplify. Expanded Knip found 254 exports, 241 types and 6 duplicate exports; eight module-private helper exports selected after exact source usage checks. Public engine owns source; private workbench owns governance. Baseline prior round: 2168 pass, 5 skip, no failures on Bun 1.3.14.
+- 2026-09-07T23:40:59.870Z - Final council GO: parser/export peer review and continuation/dispatch/receipt review have no remaining material findings. Continuation preserves 166 total scenarios and 882 assertions (160 + 6 tests). Root strengthened hydration rollback with a second-insert fault, native SQLiteError nesting metadata, exact journal bytes and transaction-state assertions; dispatcher ignores inherited keys. RAG refresh reused project 2684 afol-public-root and cli,src,docs,scripts scope, cap 700: 5 adds, 12 updates, 907 embeddings, 0 errors, build 163. GPU visibility failed in sandbox (exit 5), then authorized read-only preflight proved PID351 with29/29 layers and real1024 vector.
+- 2026-09-07T23:43:00.457Z - Integrated delivery passed on Bun 1.3.14: typecheck, validate:toolchain, test:full (2194 pass, 5 skip, 0 fail, 133 files), public:audit, git diff --check, local build, non-release provenance, and dist smoke. Final Project RAG verify is ready/fresh/covered at build163 with596 files and covered embeddings; real hybrid search returned cli/direct-dispatch.ts from the canonical root, no warnings. Skills: reducao-segura-complexidade-ciclomatica, agentic-orchestrator, evandro-rag-system. Remaining bounded backlog: ordered domain import validation retained, 246 candidate exports need individual review, full evidence/close orchestration remains in lifecycle. Source changes remain uncommitted on refactor/audit-corrections-20260907; no publish or global install.
+
+## Summary
+
+Completed six evolve parser migrations, native receipt hydration transaction with rollback and nesting parity, single direct-dispatch table, continuation responsibility and test split, and eight internal export removals. Final council and local gates passed (2194 tests, 5 skips); refreshed and verified canonical Project RAG with596 files. Changes remain local and uncommitted.

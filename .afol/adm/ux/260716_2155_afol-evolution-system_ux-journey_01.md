@@ -8,7 +8,7 @@ owners:
 - maintenance-agent
 - memory/library maintainers
 created_at: '2026-07-16T21:55:00-03:00'
-updated_at: '2026-07-16T21:55:00-03:00'
+updated_at: '2026-09-12T00:00:00Z'
 roadmap_feature: F-30
 parent_spec: 260716_2155_afol-evolution-system_spec_01
 source_spec: 260716_2155_afol-evolution-system_spec_01
@@ -20,7 +20,8 @@ source_spec: 260716_2155_afol-evolution-system_spec_01
 
 This journey is owned by the F-30 parent. The F-18.S10 adoption child is a
 related dependency for the Memory/Library candidate-review path, not the owner
-of the full Evolution experience.
+of the full Evolution experience. F-34 freeze: this journey does not expand
+stable-alpha scope. F-30 remains active; F-18.S10 remains planned.
 
 - User or agent: project operator, orchestrator, reviewer, and delegated AFOL
   worker.
@@ -166,14 +167,14 @@ button/command mutates canonical knowledge.
 
 ## Acceptance
 
-- [ ] Daily and intentional entry/exit paths are explicit.
-- [ ] One normal suggestion is shown per project/configured local calendar date;
+- [x] Daily and intentional entry/exit paths are explicit.
+- [x] One normal suggestion is shown per project/configured local calendar date;
       production-day ordinals remain a separate evidence metric.
-- [ ] Skip, reject, empty, blocked, canary, regression, and recovery states are
+- [x] Skip, reject, empty, blocked, canary, regression, and recovery states are
       distinguishable in compact and JSON output.
-- [ ] Preview and failure do not mutate canonical knowledge or critical
+- [x] Preview and failure do not mutate canonical knowledge or critical
       surfaces.
-- [ ] Every proposal shows source evidence, impact, risk, validation, baseline,
+- [x] Every proposal shows source evidence, impact, risk, validation, baseline,
       target metrics, and approval policy.
-- [ ] First-release apply remains explicit; later low-risk automation requires
+- [x] First-release apply remains explicit; later low-risk automation requires
       a separately approved canary slice.

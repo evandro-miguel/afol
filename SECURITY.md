@@ -32,3 +32,12 @@ produce checksum-bound provenance, and complete the clean-checkout Linux x64
 smoke. These are local exact-SHA gates; no hosted workflow or publication
 status is implied. Missing scanners or unresolved findings block the
 candidate.
+
+Release scans require `AFOL_OSV_SCANNER_PATH` and `AFOL_GITLEAKS_PATH` to name
+absolute paths to operator-approved readable regular scanner files; AFOL rejects
+path components reported as symbolic links, non-absolute/missing/non-regular
+files, and identity changes during read/revalidation, then executes an
+immutable verified byte copy. Release has no PATH fallback. Informative scans
+use PATH and may skip absent scanners. Direct `"$AFOL_*_PATH" --version` only
+checks availability/version; `bun run security:scan:release` validates
+path/identity constraints and owns `dist/security-scan.release.json`.

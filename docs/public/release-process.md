@@ -89,9 +89,9 @@ published URLs before attaching or promoting the binary.
 
 ## Local release evidence
 
-Per ADR-009, this repository ships no hosted CI workflow. Local validation
-against the exact candidate SHA is the canonical engineering evidence. An
-absent hosted run is not a pass, failure, or product-status signal.
+This repository ships no hosted CI workflow. Local validation against the exact
+candidate SHA is the canonical engineering evidence. An absent hosted run is
+not a pass, failure, or product-status signal.
 
 Run this from a clean Linux x64 checkout of the public `afol.public` repository:
 
@@ -106,8 +106,31 @@ and dependency scans, artifact smoke, checksums, and provenance. It does not
 replace the separate publication, repository-visibility, or license-compliance
 checks above.
 
+Release scans require `AFOL_OSV_SCANNER_PATH` and `AFOL_GITLEAKS_PATH` to name
+absolute paths to operator-approved readable regular scanner files; AFOL rejects
+path components reported as symbolic links, non-absolute/missing/non-regular
+files, and identity changes during read/revalidation, then executes an
+immutable verified byte copy. Release has no PATH fallback. Informative scans
+use PATH and may skip absent scanners. Direct `"$AFOL_*_PATH" --version` only
+checks availability/version and does not validate AFOL path/identity
+constraints; `bun run security:scan:release` is the validating command and owns
+`dist/security-scan.release.json`.
+
 When run from a Git checkout, `public:audit` also checks reachable history
 blobs. Run it after cloning the exact public `afol.public` candidate.
 
 Linux x64 is the supported alpha target. WSL2 has observed local smoke. Native
 Windows remains experimental, and macOS/ARM are unsupported.
+
+### Recovery
+
+If `bun run validate:release` fails, rerun the failing step from its output,
+fix drift, lint, type, test, or coverage failures, run
+`bun install --frozen-lockfile` when lockfile or toolchain drift is reported,
+and re-run the full gate on the exact candidate SHA. For scanner failures,
+confirm both variables name absolute paths to operator-approved readable regular
+scanner files; direct `"$AFOL_OSV_SCANNER_PATH" --version` and
+`"$AFOL_GITLEAKS_PATH" --version` only check availability/version and do not
+validate AFOL path/identity constraints. Rerun `bun run security:scan:release`
+(validating command, report owner) or `bun run validate:security:release`, and
+inspect `dist/security-scan.release.json` for the recorded reason.

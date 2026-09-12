@@ -28,12 +28,21 @@ bun run kernel -- health --release --json
 bun run validate:release
 ```
 
-Security checks include Gitleaks and OSV Scanner. Do not commit generated drift.
-Documentation changes should preserve working relative links and valid Markdown
-structure. All release evidence is produced locally against the exact public
-`afol.public` candidate SHA; a private factory checkout is only the governance
-and export-factory surface. This repository has no hosted CI workflow under
-ADR-009.
+Security checks include Gitleaks and OSV Scanner. Release scans require
+`AFOL_OSV_SCANNER_PATH` and `AFOL_GITLEAKS_PATH` to name absolute paths to
+operator-approved readable regular scanner files; AFOL rejects path components
+reported as symbolic links, non-absolute/missing/non-regular files, and
+identity changes during read/revalidation, then executes an immutable verified
+byte copy. Release has no PATH fallback; informative scans use PATH and may
+skip absent scanners. Direct `"$AFOL_*_PATH" --version` only checks
+availability/version and does not validate AFOL path/identity constraints;
+`bun run security:scan:release` is the validating command and owns
+`dist/security-scan.release.json`. Do not commit generated
+drift. Documentation changes should preserve working relative links and valid
+Markdown structure. All release evidence is produced locally against the exact
+public `afol.public` candidate SHA; a private factory checkout is only the
+governance and export-factory surface. This repository has no hosted CI
+workflow.
 
 ## Security and privacy
 

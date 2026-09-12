@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-08-21T14:00:20+00:00"
+updated_at: "2026-09-12T00:00:00+00:00"
 ---
 
 # SPECS INDEX
@@ -16,10 +16,10 @@ updated_at: "2026-08-21T14:00:20+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 90 |
+| Total | 98 |
 | Draft | 0 |
-| Active | 9 |
-| Final | 63 |
+| Active | 14 |
+| Final | 66 |
 | Superseded | 18 |
 
 ## Index
@@ -94,7 +94,7 @@ updated_at: "2026-08-21T14:00:20+00:00"
 | 260627_1655_canonical-afol-configuration-rehome_spec_01 | canonical-afol-configuration-rehome | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md |
 | 260710_1256_typescript-7-toolchain-adoption_spec_01 | typescript-7-toolchain-adoption | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260710_core-integrity-and-transaction-safety_spec_01 | core-integrity-and-transaction-safety | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260711_c01-action-policy-and-protected-resources_spec-child_01 | c01-action-policy-and-protected-resources | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
+| 260711_c01-action-policy-and-protected-resources_spec-child_01 | c01-action-policy-and-protected-resources | final | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
 | 260711_c01-authorization-red-reproducers_spec-child_01 | c01-authorization-red-reproducers | active | f22-governance-owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md |
 | 260712_agent-cli-extreme-ease-latency-write-tokens_spec-child_01 | agent-cli-extreme-ease-latency-write-tokens | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md |
 | 260715_afol-1-0-linux-wsl-finalization_spec_01 | afol-1-0-linux-wsl-finalization | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: 260521_0000_total-reformulation-strategy_spec_01 |
@@ -116,6 +116,14 @@ updated_at: "2026-08-21T14:00:20+00:00"
 | 260716_2155_afol-evolution-system_spec_01 | afol-evolution-system | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, adr: .afol/adm/decisions/ADR-008-afol-evolution-autonomy-and-evidence-boundary.md |
 | 260716_2155_f18-s10-memory-library-adoption-loop_spec-child_01 | memory-library-adoption-loop | active | F-30 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260716_2155_afol-evolution-system_spec_01.md, related: F-18.S10 |
 | 260731_hot-path-observability-and-derived-state-separation_spec_01 | hot-path-observability-and-derived-state-separation | final | F-32 governance owner | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md, f03_latency: .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md, f07_state: .afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md |
+| 260818_public-architecture-code-quality_spec-child_01 | public-architecture-code-quality | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md |
+| 260818_public-docs-community-portfolio-release_spec-child_01 | public-docs-community-portfolio-release | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md |
+| 260818_public-engine-boundary-cutover_spec-child_01 | public-engine-boundary-cutover | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md |
+| 260818_public-legal-third-party-licensing_spec-child_01 | public-legal-third-party-licensing | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md |
+| 260818_public-product-and-portfolio-readiness_spec_01 | public-product-and-portfolio-readiness | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260818_public-release-windows-ci-readiness_spec-child_01 | public-release-windows-ci-readiness | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md |
+| 260818_public-security-governance-reconciliation_spec-child_01 | public-security-governance-reconciliation | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260818_public-product-and-portfolio-readiness_spec_01.md |
+| 260822_2023_warn-vs-block-advisory-gates_spec-child_01 | warn-vs-block-advisory-gates | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent: .afol/adm/specs/260521_0110_validation-ci-and-benchmarks_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

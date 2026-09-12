@@ -20,9 +20,9 @@ documentation, and local release tooling.
 
 ## Local validation
 
-ADR-009 makes exact-SHA local validation canonical. This repository has no
-hosted workflow. Run the narrowest relevant checks, then the full gate when
-release readiness is in scope:
+Local exact-SHA validation is canonical. This repository has no hosted
+workflow. Run the narrowest relevant checks, then the full gate when release
+readiness is in scope:
 
 ```bash
 bun install --frozen-lockfile

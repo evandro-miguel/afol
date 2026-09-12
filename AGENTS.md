@@ -6,7 +6,7 @@
   keep mutable state in `.afol/**`, especially `.afol/wb/**`; do not reopen a
   general migration track.
 - The canonical engine checkout is
-  `/home/ozy/01_projects/dev/afol/afol.public`. New engine code, product tests,
+  `/home/ozy/01_projects/dev/afol.public-root`. New engine code, product tests,
   public documentation, and release tooling start there. This private
   repository retains governance, workbench history, and the export factory;
   do not create a divergent private engine or release from it.
@@ -140,6 +140,7 @@ archive when present, and never reactivate it as an operational route.
   : "${PROJECT_SLUG:?set PROJECT_SLUG to its registered RAG slug}"
   cd "${RAG_REPO_ROOT:?set RAG_REPO_ROOT to the rag-v2 checkout}"
   bun run ingest-project \
+    --project "$PROJECT_SLUG" \
     --root "$PROJECT_ROOT" \
     --include cli,src,docs --max-files 100
   ragctl project verify --project "$PROJECT_SLUG" --json

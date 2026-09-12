@@ -8,7 +8,7 @@ owners:
 workstream_intent: Establish a clean, reproducible, evidence-backed public AFOL product and portfolio boundary.
 artifact_purpose: Govern the public source cutover, alpha scope, release readiness, legal review, engineering hardening, and public presentation.
 created_at: '2026-08-18T00:00:00Z'
-updated_at: '2026-08-19T00:00:00Z'
+updated_at: '2026-09-12T00:00:00Z'
 roadmap_feature: F-34
 spec_role: parent
 parent_spec: ''
@@ -108,6 +108,17 @@ Readiness evidence must be rerun against the exact candidate SHA in the public
 checkout. Prior candidate snapshots are not current release proof. Hosted CI,
 publication, attestations, visibility changes, and global installation are
 outside the local release contract and remain unclaimed.
+
+## Child status (2026-09-12)
+
+- Architecture child `260818_public-architecture-code-quality_spec-child_01` is
+  final on public-root `docs/public/architecture-quality.md` snapshot evidence
+  only. That is not exact-SHA release proof.
+- Engine-boundary child remains final; do not recut.
+- Legal, docs/community, security, and windows-ci children stay active until a
+  clean public-root SHA and `validate:release` exist.
+- This parent stays active. Alpha is not expanded. F-29, F-30, and F-33 stay
+  active; F-18.S10 stays planned.
 
 ## Non-Goals
 

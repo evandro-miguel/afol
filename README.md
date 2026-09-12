@@ -54,9 +54,9 @@ actions. Do not assume a source tag includes a promoted binary.
 The release claim is intentionally limited to the observed Linux x64 path.
 Platform evidence for this alpha comes from local validation and
 `bun run smoke:wsl2` in a Linux x64 WSL2 shell. It does not establish
-Windows-native, macOS, or ARM support. Per ADR-009, this repository ships no
-hosted CI workflow; local exact-SHA validation is the release evidence. Hosted
-service support is not claimed.
+Windows-native, macOS, or ARM support. This repository ships no hosted CI
+workflow; local exact-SHA validation is the release evidence. Hosted service
+support is not claimed.
 
 Standalone builds disable Bun's `.env` and `bunfig.toml` autoloading so
 repository-local configuration cannot change binary behavior.
