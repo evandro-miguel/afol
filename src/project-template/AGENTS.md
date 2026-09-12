@@ -44,12 +44,15 @@ Replace this section after bootstrap with real product purpose and constraints.
   3. Edit and run named verification.
   4. `afol d T-01 -x "<verification command>"`
   5. `afol c`
+- Micro one-shot: `afol qt {theme} -t "<task>" -c "<verification command>"`.
+  Repeat `-t` for a shared `-c`. Do not use `true` as the check.
 - When execution-policy tasks share one verification, batch them with
   `afol st T-01..T-10`, then
   `afol d T-01..T-10 -x "<shared verification command>"`.
 - Explicit multi-agent/CI path when session is ambiguous:
   `afol st -S {session-id} -T T-01`, then `afol d -S {session-id} -T T-01 -x "…"`,
   then `afol c -S {session-id}`.
+- `e` is diagnostic only (receipt without completing). Happy path is `d -x`.
 - Prefer short commands; long forms remain valid for humans/audits.
 - Use `afol` as the only downstream front door.
 - Resolve guidance in this order: target `AGENTS.md`, accepted ADRs and active
@@ -90,8 +93,8 @@ afol local-state rebuild --json
 - Workbench sessions must carry `roadmap_feature` and `parent_spec`.
 - `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings
   (allowed); open pending specs do not block other new sessions.
-- A `pending_spec` session may continue lifecycle (`start`, `evidence`,
-  `done`, `close`) with warnings, and close is allowed; `afol status` and
+- A `pending_spec` session may continue lifecycle (`st`, `d -x`, `c`) with
+  warnings, and close is allowed; `afol status` and
   `afol validate project` warn while pending specs are open.
 - Prefer `afol qt` for micro one-shot work; hygiene warnings (health,
   maintenance, open pending) do not stop mid-delivery lifecycle. Repair corrupt
@@ -218,10 +221,10 @@ afol local-state rebuild --json
   state.
 - `afol n` without `-F`/`-P` creates with `pending_spec` plus warnings; open
   pending specs do not block other new sessions, and a `pending_spec` session
-  may continue lifecycle (`start`, `evidence`, `done`, `close`) with warnings
-  until the spec is resolved or waived.
-- Use `afol start`, `afol evidence`, `afol done`, and `afol close`; `done`
-  requires valid task-scoped evidence.
+  may continue lifecycle (`st`, `d -x`, `c`) with warnings until the spec is
+  resolved or waived.
+- Use `afol st`, `afol d -x`, and `afol c`. `d -x` requires a real argv check
+  and records observed evidence. `e` is diagnostic only.
 - Finalize optional artifacts before closure.
 
 ## Verification

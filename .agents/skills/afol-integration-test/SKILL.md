@@ -6,8 +6,8 @@ metadata:
   tags: "integration-test, afol, lifecycle, receipts, evidence, recovery, telemetry, token-measurement"
   triggers: "AFOL integration test, AFOL live test, lifecycle smoke, external receipt test, evidence projection, catchup recovery, telemetry test, token measurement"
   references: "lifecycle, receipts, evidence, telemetry, recovery, token-economy"
-  version: "1.1.0"
-  updated_at: "2026-08-10T00:00:00Z"
+  version: "1.1.1"
+  updated_at: "2026-09-12T19:22:00Z"
   target_provider: universal
   tier: 1
 ---
@@ -34,7 +34,13 @@ observed evidence explicit.
 ## Lifecycle Fixture
 
 Use the shortest route that proves the behavior. Replace `<afol-dev>` with the
-repo-local command selected above.
+repo-local command selected above. Omit `-S` when one session is bound; use
+`-S`/`-T` only for concurrent agents or CI.
+
+Happy path (3 hops): `st T-01` → `d T-01 -x "<real>"` → `c`.
+Micro (1 hop): `qt <theme> -t "…" -c "<real>"`.
+Use `echo hop-ok`, never `true`. `e` is diagnostic only; `d -x` records
+observed evidence and completes the task.
 
 For one task and one verification:
 
@@ -54,12 +60,32 @@ For a staged or multi-task fixture:
 
 Repeat `-t` for multi-task `qt`. When several tasks share one verification,
 start and complete the range so the command runs once and evidence remains
-task-specific. Use explicit `-S` and `-T` only when session context is
-ambiguous, such as concurrent agents or CI.
+task-specific.
 
 Missing governance metadata creates `pending_spec` with warnings. It does not
 freeze the lifecycle. Test resolution or waiver through `afol gov rs`; test a
 corrupt binding through `afol catchup --fix` rather than editing workbench files.
+
+## How to test lifecycle
+
+Do not drive lifecycle tests against this repository's workbench (hundreds of
+sessions). Seed an isolated tmp project from the template config:
+
+```bash
+root=$(mktemp -d)
+mkdir -p "$root/.afol" "$root/.agents"
+cp src/project-template/.afol/config.json "$root/.afol/config.json"
+cp src/project-template/.agents/lock.json "$root/.agents/lock.json"
+# git init, one commit, then run <afol-dev> with cwd="$root"
+```
+
+Assert, in that fixture (omit `-S` while bound):
+
+- `n` stdout contains `afol st T-01`
+- `st T-01` stdout contains `afol d T-01 -x`
+- `d T-01 -x "echo hop-ok"` stdout contains `afol c`
+- `d T-01 -x true` and `qt … -c true` fail as shell no-ops
+- State Board remains the lifecycle source of truth
 
 ## External Receipt Fixture
 
@@ -74,8 +100,8 @@ corrupt binding through `afol catchup --fix` rather than editing workbench files
    ```
 
 4. Verify idempotency and observed evidence projection.
-5. Verify separately that task state did not advance. Complete lifecycle state
-   only through the normal `st`, `e`, `d`, and `c` commands.
+5. Verify separately that task state did not advance. Complete lifecycle
+   only through `st` → `d -x` → `c` (or `qt`).
 
 ## Telemetry Capture
 

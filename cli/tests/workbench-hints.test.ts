@@ -6,6 +6,7 @@ import {
 
 describe("workbench hints", () => {
 	test("nextCommandHint prefers d -x after start and c after done", () => {
+		expect(nextCommandHint("new", { taskId: "T-01" })).toBe("afol st T-01");
 		expect(nextCommandHint("start", { taskId: "T-02" })).toBe(
 			'afol d T-02 -x "<cmd>"',
 		);

@@ -626,7 +626,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		isNoopExecutionCommand(command),
 	);
 	if (noopCommand) {
-		throw new Error(
+		throw new DoneArgumentError(
 			`--test "${noopCommand}" is a shell no-op and cannot authorize done. hint="afol d ${primaryTask} -x \\"<cmd>\\""`,
 		);
 	}
@@ -645,6 +645,49 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		requireSpecCheck: parsed.requireSpecCheck,
 		json: parsed.json,
 	};
+}
+
+const DONE_VALUE_FLAGS = new Set([
+	"--session",
+	"--task-id",
+	"--test",
+	"--test-shell",
+	"--command",
+	"--result",
+	"--artifact",
+	"--note",
+	"--verification-timeout-ms",
+]);
+
+function tryPrimaryDoneTaskId(value: string | undefined): string | null {
+	if (!value) return null;
+	try {
+		return parseTaskSelector(value)[0] ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/** Best-effort task id from argv when parseDoneArgs throws before returning. */
+export function peekDoneTaskIdFromArgv(args: readonly string[]): string | null {
+	let positional: string | null = null;
+	let flagged: string | null = null;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (!arg || arg === "--") break;
+		if (arg === "--task-id") {
+			flagged = tryPrimaryDoneTaskId(args[index + 1]);
+			index += 1;
+			continue;
+		}
+		if (DONE_VALUE_FLAGS.has(arg)) {
+			index += 1;
+			continue;
+		}
+		if (arg.startsWith("-")) continue;
+		positional ??= tryPrimaryDoneTaskId(arg);
+	}
+	return flagged ?? positional;
 }
 
 export function parseLogArgs(args: string[], root: string): LogArgs {

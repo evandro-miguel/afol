@@ -9,23 +9,28 @@ Everyday aliases: `s` status, `n` new, `st` start, `d` done, `c` close,
 
 ## Lifecycle
 
+Happy path (omit `--session`/`-S` when an active or bound session resolves):
+
 ```text
 afol init
 afol s
 afol qt <theme> -t "<task>" -c "<check>"
-afol n <theme> -t <text>
+afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
 afol st T-01
-afol e T-01 -c "<check>" -o passed
-afol d T-01 -x "<argv-only-check>"
+afol d T-01 -x "<check>"
 afol c
 ```
 
-Long forms remain valid. `d -x` / `done --test` is the agent-facing default: it
-runs argv-only verification and records observed evidence without shell parsing.
-`done --test-shell` runs one shell command for a local operator only; never use
-it for agent or remote/provider execution. Completion without observed evidence
-is rejected. Use `e T-01 -c "<check>" -o passed` when recording a separate
-evidence receipt.
+`qt` is the 1-hop micro path (create → start → one verify → done → close).
+`n` → `st` → `d -x` → `c` is the governed path. `d -x` / `done --test` is the
+agent-facing default: argv-only verification plus observed evidence, no shell
+parsing. `true`, `:`, and other shell no-ops cannot authorize done. Missing
+`-x` is rejected. `done --test-shell` is local-operator-only; never use it for
+agent or remote/provider execution.
+
+`e` is diagnostic only (a separate evidence receipt without completing). Do not
+teach `e` on the happy path. Pass `-S <session-id>` only for CI or multi-agent
+when the session is ambiguous.
 
 ## Materialized state
 

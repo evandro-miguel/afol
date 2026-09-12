@@ -17,15 +17,21 @@ Replace this section after bootstrap with real product context.
 
 - Use the configured plan path for implementation, validation, and delivery
   work. It defaults to `.afol/wb/`.
-- Start task before product edits.
-- Close task with evidence.
-- Canonical path:
-  1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol start --session {session-id} --task-id T-01`
+- Start the task before product edits.
+- Complete with observed evidence from a real check (`d -x`), then close.
+- Canonical path (omit `-S`/`--session` when active/bound session resolves):
+  1. `afol n {theme} -F {F-id} -P {spec-id} -t "<task>"`
+  2. `afol st T-01`
   3. Edit and run named verification.
-  4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
-  5. `afol done --session {session-id} --task-id T-01`
-  6. `afol close --session {session-id}`
+  4. `afol d T-01 -x "<verification command>"`
+  5. `afol c`
+- Micro one-shot: `afol qt {theme} -t "<task>" -c "<verification command>"`.
+  Repeat `-t` for a shared `-c`. Do not use `true` as the check.
+- `e` is diagnostic only. Do not require evidence then done as two hops.
+- Explicit multi-agent/CI path when session is ambiguous:
+  `afol st -S {session-id} -T T-01`, then
+  `afol d -S {session-id} -T T-01 -x "<verification command>"`, then
+  `afol c -S {session-id}`.
 
 ## Delivery Rules
 
@@ -114,7 +120,8 @@ work and keep this template focused on the stored data and docs contract.
 
 - Keep plans executable.
 - Default artifact pair: `plan + task`.
-- Workbench task state lives in the `State Board` plus AFOL lifecycle commands.
+- Workbench task state lives in the `State Board` plus AFOL lifecycle commands
+  (`n` / `st` / `d -x` / `c`, or `qt`).
 - Do not add parallel `T-xx` checklist state for workbench lifecycle.
 - Optional artifacts only when requested or blocking.
 

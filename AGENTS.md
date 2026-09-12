@@ -222,7 +222,6 @@ is disabled):
 
 ```bash
 afol st -S <session-id> -T T-01
-afol e -S <session-id> -T T-01 -c "<cmd>" -o passed
 afol d -S <session-id> -T T-01 -x "<cmd>"
 afol c -S <session-id>
 ```
@@ -257,8 +256,9 @@ Task state source of truth:
 - Do not add parallel `Task List` checkboxes for `T-xx` tasks in workbench task
   files. They are legacy-compatible input and can create duplicate/stale task
   state.
-- Use `afol start`, `afol evidence`, `afol done`, `afol close`, and
+- Use `afol start`, `afol done`, `afol close`, and
   `afol verify-tasks --strict` to mutate or verify lifecycle state.
+  `afol evidence` is diagnostic; it does not authorize `done`.
 - If a task file contains both `State Board` rows and `- [ ] T-xx` checklist
   rows, treat that as drift: reconcile back to the canonical `State Board`
   before closing.

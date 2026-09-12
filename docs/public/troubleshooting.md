@@ -7,16 +7,46 @@ that `.afol/config.json` exists and is valid JSON.
 
 ## Task cannot complete
 
-Use `afol status --task-id <id> --json`. Completion requires observed evidence;
-run `afol d T-01 -x "<cmd>"`, or record a separate evidence receipt with
-`afol e T-01 -c "<check>" -o passed`.
-`--test-shell "<real check>"` is local-operator-only and must never be used by
-an agent or remote/provider execution.
+Use `afol s` or `afol status --task-id <id> --json`. Completion requires
+observed evidence from a real check:
+
+```bash
+afol d T-01 -x "<cmd>"
+```
+
+`true` / `:` are shell no-ops and cannot authorize done. Missing `-x` is
+rejected. `e` is diagnostic only (receipt without completing); do not use it as
+the happy path. `--test-shell "<real check>"` is local-operator-only and must
+never be used by an agent or remote/provider execution.
+
+## Close blocked by open tasks
+
+Complete remaining work, then close:
+
+```bash
+afol st T-02
+afol d T-02 -x "<cmd>"
+afol c
+```
+
+## Session is pending_spec
+
+That warning does not block start, done, or close. Resolve later with
+`afol gov rs -F <F-id> -P <spec-id>` or waive
+`afol gov rs --no-spec-required -r "<reason>"`.
 
 ## Session context is ambiguous
 
-Pass the session explicitly or run `afol catchup --fix` after inspecting the
-reported binding issue.
+Omit `-S` on the happy path when an active or bound session resolves. If the
+command reports a missing or ambiguous session, pass it explicitly or repair
+binding:
+
+```bash
+afol st -S <session-id> -T T-01
+afol d -S <session-id> -T T-01 -x "<cmd>"
+afol c -S <session-id>
+afol catchup --fix
+```
 
 ## Update conflict
 

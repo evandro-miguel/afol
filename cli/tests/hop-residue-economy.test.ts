@@ -1,9 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseDoneArgs } from "../commands/workbench/args";
+import {
+	DoneArgumentError,
+	parseDoneArgs,
+	peekDoneTaskIdFromArgv,
+} from "../commands/workbench/args";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const kernel = join(repoRoot, "cli/main.ts");
@@ -58,6 +70,12 @@ describe("hop residue economy", () => {
 				["--session", "260530_2256_cli-native", "T-01", "--test", "true"],
 				process.cwd(),
 			),
+		).toThrow(DoneArgumentError);
+		expect(() =>
+			parseDoneArgs(
+				["--session", "260530_2256_cli-native", "T-01", "--test", "true"],
+				process.cwd(),
+			),
 		).toThrow("shell no-op");
 		const root = seedProject();
 		try {
@@ -71,7 +89,10 @@ describe("hop residue economy", () => {
 				"fixture",
 			]);
 			expect(created.status).toBe(0);
-			runAfol(root, ["st", "T-01"]);
+			expect(created.stdout).toContain("afol st T-01");
+			const started = runAfol(root, ["st", "T-01"]);
+			expect(started.status).toBe(0);
+			expect(started.stdout).toContain("afol d T-01 -x");
 			const failed = runAfol(root, ["d", "T-01", "-x", "true"]);
 			expect(failed.status).toBe(2);
 			const text = `${failed.stdout}\n${failed.stderr}`;
@@ -80,6 +101,164 @@ describe("hop residue economy", () => {
 			expect(failed.ms).toBeLessThan(300);
 			const recovered = runAfol(root, ["d", "T-01", "-x", "echo hop-ok"]);
 			expect(recovered.status).toBe(0);
+			expect(recovered.stdout).toContain("afol c");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("n/st/d json success emit next_command without dumping briefing", () => {
+		const root = seedProject();
+		try {
+			const created = runAfol(root, [
+				"n",
+				"jsonhint",
+				"-t",
+				"one",
+				"--no-spec-required",
+				"--reason",
+				"fixture",
+				"-j",
+			]);
+			expect(created.status).toBe(0);
+			const createdPayload = JSON.parse(created.stdout) as {
+				data?: { next_command?: string };
+			};
+			expect(createdPayload.data?.next_command).toBe("afol st T-01");
+			const started = runAfol(root, ["st", "T-01", "-j"]);
+			expect(started.status).toBe(0);
+			const startedPayload = JSON.parse(started.stdout) as {
+				data?: { next_command?: string; briefing?: unknown };
+			};
+			expect(startedPayload.data?.next_command).toBe('afol d T-01 -x "<cmd>"');
+			expect(startedPayload.data?.briefing).toBeUndefined();
+			const done = runAfol(root, ["d", "T-01", "-x", "echo hop-ok", "-j"]);
+			expect(done.status).toBe(0);
+			const donePayload = JSON.parse(done.stdout) as {
+				data?: { next_command?: string };
+			};
+			expect(donePayload.data?.next_command).toBe("afol c");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done json parse recovery keeps the no-op message and peeked task id", () => {
+		expect(peekDoneTaskIdFromArgv(["T-02", "--test", "true", "--json"])).toBe(
+			"T-02",
+		);
+		expect(
+			peekDoneTaskIdFromArgv(["--task-id", "T-03", "--test", "true"]),
+		).toBe("T-03");
+		const root = seedProject();
+		try {
+			expect(
+				runAfol(root, [
+					"n",
+					"jsonnoop",
+					"-t",
+					"one",
+					"-t",
+					"two",
+					"--no-spec-required",
+					"--reason",
+					"fixture",
+				]).status,
+			).toBe(0);
+			expect(runAfol(root, ["st", "T-01"]).status).toBe(0);
+			const first = runAfol(root, ["d", "T-01", "-x", "true", "-j"]);
+			expect(first.status).toBe(2);
+			const firstPayload = JSON.parse(first.stdout) as {
+				error?: { message?: string };
+				data?: { task_id?: string; next_command?: string };
+			};
+			expect(firstPayload.error?.message).toContain("shell no-op");
+			expect(firstPayload.data?.task_id).toBe("T-01");
+			expect(firstPayload.data?.next_command).toContain("afol d T-01 -x");
+			expect(runAfol(root, ["st", "T-02"]).status).toBe(0);
+			const second = runAfol(root, ["d", "T-02", "-x", "true", "-j"]);
+			expect(second.status).toBe(2);
+			const secondPayload = JSON.parse(second.stdout) as {
+				error?: { message?: string };
+				data?: { task_id?: string; next_command?: string };
+			};
+			expect(secondPayload.error?.message).toContain("shell no-op");
+			expect(secondPayload.data?.task_id).toBe("T-02");
+			expect(secondPayload.data?.next_command).toContain("afol d T-02 -x");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("qt no-op fails before session close and does not silently succeed", () => {
+		const root = seedProject();
+		try {
+			const failed = runAfol(root, ["qt", "micro", "-c", "true"]);
+			expect(failed.status).toBe(2);
+			const text = `${failed.stdout}\n${failed.stderr}`;
+			expect(text).toContain("shell no-op");
+			expect(text).not.toContain("quick-task complete");
+			expect(failed.stdout).not.toMatch(/session created:/);
+			const wb = join(root, ".afol", "wb");
+			if (existsSync(wb)) {
+				expect(readdirSync(wb).filter((name) => !name.startsWith("."))).toEqual(
+					[],
+				);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("one pending auto-starts; two pending st fail-closed; leftover c hints st T-02", () => {
+		const root = seedProject();
+		try {
+			expect(
+				runAfol(root, [
+					"n",
+					"autostart",
+					"-t",
+					"one",
+					"--no-spec-required",
+					"--reason",
+					"fixture",
+				]).status,
+			).toBe(0);
+			const auto = runAfol(root, ["st"]);
+			expect(auto.status).toBe(0);
+			expect(auto.stdout).toContain("task started: T-01");
+			expect(auto.stdout).toContain("afol d T-01 -x");
+
+			const multi = seedProject();
+			try {
+				expect(
+					runAfol(multi, [
+						"n",
+						"multipending",
+						"-t",
+						"one",
+						"-t",
+						"two",
+						"--no-spec-required",
+						"--reason",
+						"fixture",
+					]).status,
+				).toBe(0);
+				const blocked = runAfol(multi, ["st"]);
+				expect(blocked.status).toBe(2);
+				expect(`${blocked.stdout}\n${blocked.stderr}`).toContain(
+					"multiple pending tasks",
+				);
+				expect(runAfol(multi, ["st", "T-01"]).status).toBe(0);
+				expect(runAfol(multi, ["d", "T-01", "-x", "echo hop-ok"]).status).toBe(
+					0,
+				);
+				const close = runAfol(multi, ["c"]);
+				expect(close.status).toBe(2);
+				expect(`${close.stdout}\n${close.stderr}`).toContain("afol st T-02");
+			} finally {
+				rmSync(multi, { recursive: true, force: true });
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -88,9 +267,26 @@ describe("hop residue economy", () => {
 	test("evidence hint plus compact status keep the short path", () => {
 		const root = seedProject();
 		try {
-			expect(runAfol(root, ["n", "hint", "-t", "one", "--no-spec-required", "--reason", "fixture"]).status).toBe(0);
+			expect(
+				runAfol(root, [
+					"n",
+					"hint",
+					"-t",
+					"one",
+					"--no-spec-required",
+					"--reason",
+					"fixture",
+				]).status,
+			).toBe(0);
 			expect(runAfol(root, ["st", "T-01"]).status).toBe(0);
-			const evidence = runAfol(root, ["e", "T-01", "-c", "echo hop-ok", "-o", "passed"]);
+			const evidence = runAfol(root, [
+				"e",
+				"T-01",
+				"-c",
+				"echo hop-ok",
+				"-o",
+				"passed",
+			]);
 			expect(evidence.status).toBe(0);
 			expect(evidence.stdout).toContain("afol d T-01 -x");
 			const status = runAfol(root, ["s"]);

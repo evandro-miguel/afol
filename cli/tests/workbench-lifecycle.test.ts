@@ -2008,7 +2008,8 @@ describe("workbench lifecycle service", () => {
 			const proc = runKernel(root, ["start", "--session", created.session]);
 
 			expect(proc.status).toBe(0);
-			expect((proc.stdout as string).trim()).toBe("task started: T-01");
+			expect(proc.stdout as string).toContain("task started: T-01");
+			expect(proc.stdout as string).toContain('hint="afol d T-01 -x');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2133,7 +2134,8 @@ describe("workbench lifecycle service", () => {
 			const proc = runKernel(root, ["st", "-S", created.session]);
 
 			expect(proc.status).toBe(0);
-			expect((proc.stdout as string).trim()).toBe("task started: T-01");
+			expect(proc.stdout as string).toContain("task started: T-01");
+			expect(proc.stdout as string).toContain('hint="afol d T-01 -x');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

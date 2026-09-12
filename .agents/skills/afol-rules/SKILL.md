@@ -6,8 +6,8 @@ metadata:
   tags: "afol, rules, governance, hooks, context-budget, lifecycle, token-economy"
   triggers: "afol rules, create rule, update rule, rule drift, stale rule, rule budget, hook context, lifecycle rule, .afol/adm/rules"
   references: "rules, hooks, governance, token-economy"
-  version: "1.1.0"
-  updated_at: "2026-08-10T00:00:00Z"
+  version: "1.1.1"
+  updated_at: "2026-09-12T19:22:00Z"
   target_provider: universal
   tier: 1
 ---
@@ -50,7 +50,8 @@ Reject or fix rules that conflict with:
 
 - live AFOL commands or tests;
 - retired `.agents` runtime surfaces;
-- lifecycle through State Board plus `afol start/evidence/done/close`;
+- lifecycle through State Board plus `afol st` / `afol d -x` / `afol c`
+  (or `qt`); `e` is diagnostic only, not a required hop;
 - the ban on parallel `T-xx` checkbox lifecycle rows;
 - token-budget, hook, or skill-path contracts;
 - project-local skills under `.agents/skills/**`, not `.afol/skills/**`.

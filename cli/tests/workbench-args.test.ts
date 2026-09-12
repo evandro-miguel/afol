@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+	DoneArgumentError,
 	parseCloseArgs,
 	parseDoneArgs,
 	parseNewArgs,
 	parseSessionTaskArgs,
+	peekDoneTaskIdFromArgv,
 } from "../commands/workbench/args";
 import {
 	DEFAULT_VERIFICATION_TIMEOUT_MS,
@@ -213,6 +215,12 @@ describe("parseDoneArgs", () => {
 				["--session", "260530_2256_cli-native", "T-01", "--test", "true"],
 				process.cwd(),
 			),
+		).toThrow(DoneArgumentError);
+		expect(() =>
+			parseDoneArgs(
+				["--session", "260530_2256_cli-native", "T-01", "--test", "true"],
+				process.cwd(),
+			),
 		).toThrow("shell no-op");
 		expect(() =>
 			parseDoneArgs(
@@ -220,6 +228,18 @@ describe("parseDoneArgs", () => {
 				process.cwd(),
 			),
 		).toThrow('hint="afol d T-01 -x \\"<cmd>\\""');
+	});
+
+	test("peekDoneTaskIdFromArgv prefers --task-id over positional T-xx", () => {
+		expect(peekDoneTaskIdFromArgv(["T-02", "--test", "true", "--json"])).toBe(
+			"T-02",
+		);
+		expect(
+			peekDoneTaskIdFromArgv(["--task-id", "T-03", "--test", "true"]),
+		).toBe("T-03");
+		expect(
+			peekDoneTaskIdFromArgv(["T-01", "--task-id", "T-04", "--test", "true"]),
+		).toBe("T-04");
 	});
 
 	test("preserves Windows paths and quoted argv in --test", () => {

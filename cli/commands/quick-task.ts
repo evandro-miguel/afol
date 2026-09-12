@@ -18,6 +18,7 @@ import {
 	newWorkstream,
 	startTasks,
 } from "../services/workbench/lifecycle";
+import { isNoopExecutionCommand } from "../services/workbench/verify";
 import { type FlagDef, parseFlagSpec } from "./flag-spec";
 import {
 	formatHintLine,
@@ -145,6 +146,11 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 		throw new Error("Missing theme for quick-task.");
 	}
 	if (!parsed.command.trim()) throw new Error("quick-task requires --command.");
+	if (isNoopExecutionCommand(parsed.command)) {
+		throw new Error(
+			`--command "${parsed.command}" is a shell no-op and cannot authorize quick-task.`,
+		);
+	}
 	if (parsed.metadata.noSpecRequiredReason && !parsed.noSpecRequired) {
 		throw new Error("Missing --no-spec-required for quick-task reason.");
 	}

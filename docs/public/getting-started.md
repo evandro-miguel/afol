@@ -38,21 +38,24 @@ afol init
 afol status
 ```
 
-One evidenced task:
+One evidenced task (1 hop). Use a real check, not `true`:
 
 ```bash
 afol qt first-proof -t "Create the first verified change" -c "git diff --check"
 ```
 
-Several tasks:
+Several tasks (omit `-S` when the new session is bound):
 
 ```bash
-afol new feature-name --task "Implement behavior" --task "Add tests"
-afol start T-01
+afol n feature-name -t "Implement behavior" -t "Add tests"
+afol st T-01..T-02
 # edit the project
-afol d T-01 -x "git diff --check"
-afol close
+afol d T-01..T-02 -x "git diff --check"
+afol c
 ```
+
+`e` is diagnostic only. Prefer `d -x` so verification and completion are one
+step.
 
 AFOL writes mutable state under `.afol/` and provider metadata under
 `.agents/`. The `afol` executable must stay outside the project.

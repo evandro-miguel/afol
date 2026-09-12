@@ -29,7 +29,7 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"alpha",
 			"--json",
 			"--command",
-			"true",
+			"echo hop-ok",
 			"--no-spec-required",
 			"--reason",
 			"test",
@@ -43,7 +43,7 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"alpha",
 			"-j",
 			"--command",
-			"true",
+			"echo hop-ok",
 			"--no-spec-required",
 			"--reason",
 			"test",
@@ -62,7 +62,7 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"--task",
 			"implement foo",
 			"--command",
-			"true",
+			"echo hop-ok",
 		]);
 		expect(parsed.theme).toBe("alpha");
 		expect(parsed.metadata.featureId).toBe("F-01");
@@ -81,7 +81,7 @@ describe("quick-task parseQuickTaskArgs", () => {
 			"--task",
 			"third",
 			"--command",
-			"true",
+			"echo hop-ok",
 		]);
 		expect(parsed.metadata.task).toBe("first");
 		expect(parsed.metadata.tasks).toEqual(["first", "second", "third"]);
@@ -96,12 +96,18 @@ describe("quick-task parseQuickTaskArgs", () => {
 				"-t",
 				"two",
 				"-c",
-				"true",
+				"echo hop-ok",
 			]),
 		);
 		expect(parsed.metadata.task).toBe("one");
 		expect(parsed.metadata.tasks).toEqual(["one", "two"]);
-		expect(parsed.command).toBe("true");
+		expect(parsed.command).toBe("echo hop-ok");
+	});
+
+	test("rejects a shell no-op --command before any session can be created", () => {
+		expect(() => parseQuickTaskArgs(["alpha", "--command", "true"])).toThrow(
+			"shell no-op",
+		);
 	});
 
 	test("caps repeated --task at 100", () => {
@@ -165,7 +171,7 @@ describe("quick-task parseQuickTaskArgs", () => {
 	});
 
 	test("allows omitted governance as a pending-spec quick task", () => {
-		const parsed = parseQuickTaskArgs(["alpha", "--command", "true"]);
+		const parsed = parseQuickTaskArgs(["alpha", "--command", "echo hop-ok"]);
 		expect(parsed.metadata.featureId).toBeUndefined();
 		expect(parsed.metadata.parentSpec).toBeUndefined();
 	});
