@@ -2,16 +2,19 @@
 
 AFOL is the only public downstream CLI path.
 
-Telemetry should be emitted by AFOL-native lifecycle and validation commands:
+Telemetry should be emitted by AFOL-native lifecycle and validation commands.
+Happy path (omit `-S` when the session resolves); `e` is diagnostic only:
 
 ```bash
-afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
-afol start --session <session-id> --task-id <task-id>
-afol evidence --session <session-id> --task-id <task-id> --command "<verification command>" --result passed
-afol done --session <session-id> --task-id <task-id>
-afol close --session <session-id>
-afol validate project --json
+afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
+afol st T-01
+afol d T-01 -x "<verification command>"
+afol c
+afol v project --json
 ```
+
+Long `--session` / `-S` forms remain valid for CI and multi-agent work when
+the session is ambiguous.
 
 Pending public work:
 

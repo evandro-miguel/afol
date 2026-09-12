@@ -16,7 +16,7 @@ tracking.
 Workbench `T-xx` lifecycle state is not stored in parallel Task List
 checkboxes. In workbench task files, the source of truth is the `State Board`
 table, and lifecycle changes must go through AFOL commands such as
-`afol start`, `afol evidence`, `afol done`, `afol close`, and
+`afol st`, `afol d -x`, `afol c` (`e` diagnostic only), and
 `afol verify-tasks --strict`.
 
 ### State Markers

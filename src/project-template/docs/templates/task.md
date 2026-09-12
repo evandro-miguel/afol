@@ -46,6 +46,9 @@ ledger evidence and an explicit evidence id.
   valid `evidence_id`, and no unresolved blocking failed evidence. Use explicit
   `N/A` only when validation truly does not apply.
 
+Open-task happy path: `afol st T-01` then `afol d T-01 -x "<command>"`.
+`e` is diagnostic only. Do not require `evidence` then `done` as two hops.
+
 For a closed task missing observed evidence, append a real check with
 `afol evidence reverify -S <session> -T <task> -x "<command>"`; do not edit
 the ledger or State Board manually.
@@ -114,8 +117,9 @@ Before starting work, consult relevant resources:
 
 - Move to `implemented_untested` only after the implementation checkpoint.
 - Move to `tested_needs_spec_validation` only when runtime validation passed but spec/UX validation is still pending.
-- Complete with observed exit-zero evidence through `afol done --test-shell`
-  or `afol d -x`; declared evidence alone does not authorize `done`.
+- Complete with observed exit-zero evidence through `afol d T-01 -x "<cmd>"`.
+  Declared evidence alone does not authorize `done`. Long
+  `afol done --session ...` remains valid for CI/multi-agent.
 
 ### Test Evidence
 

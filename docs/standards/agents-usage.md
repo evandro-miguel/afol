@@ -20,22 +20,22 @@ under `.afol/**`. It is not the operational command system.
 
 ## Quick Start
 
+Happy path (omit `-S`/`--session` when an active or bound session resolves):
+
 ```bash
 afol --help
-afol status
-afol validate project
-afol new auth-refactor --feature-id F-01 --parent-spec <spec-id>
-afol start --session <session-id> --task-id T-01
-afol done --session <session-id> --task-id T-01 --test-shell "afol validate project"
-afol close --session <session-id> --summary "Validation passed"
+afol s
+afol v project
+afol n auth-refactor -F F-01 -P <spec-id> -t "<task>"
+afol st T-01
+afol d T-01 -x "afol v project"
+afol c -m "Validation passed"
 ```
 
-When the active/bound session is unambiguous, use the low-token path:
+Micro one-shot:
 
 ```bash
-afol st T-01
-afol d T-01 -x "afol validate project"
-afol c -m "Validation passed"
+afol qt auth-refactor -t "<task>" -c "afol v project"
 ```
 
 For multiple execution-policy tasks covered by the same observed check, use a
@@ -44,12 +44,14 @@ each task:
 
 ```bash
 afol st T-01..T-10
-afol d T-01..T-10 -x "afol validate project"
+afol d T-01..T-10 -x "afol v project"
 ```
 
+`e` is diagnostic only. Do not require `evidence` then `done` as two hops.
 `d -x` executes an argv command without shell parsing. Use
 `afol done --test-shell "<shell expression>"` explicitly for `&&`, pipes,
-redirection, or other shell syntax.
+redirection, or other shell syntax. Long `--session` / `-S` forms remain
+valid for CI and multi-agent work when the session is ambiguous.
 
 ## Command Reference
 
@@ -60,8 +62,8 @@ command surface.
 
 - Create or target a session before product edits.
 - Move the executable task to `in_progress` before editing.
-- Complete tasks with observed exit-zero evidence (`done --test-shell` or
-  `d -x`). Declared `evidence --result passed` alone cannot authorize `done`.
+- Complete tasks with observed exit-zero evidence (`d -x`). Declared
+  `evidence --result passed` alone cannot authorize `done`.
 - Close sessions only after validation evidence exists.
 - Keep factory workbench state out of downstream template payloads.
 - Store mutable execution state under `.afol/wb/**`, not `.agents/wb/**`.

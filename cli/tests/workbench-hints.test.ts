@@ -14,6 +14,8 @@ describe("workbench hints", () => {
 			'afol d T-02 -x "<cmd>"',
 		);
 		expect(nextCommandHint("done", { session: "s1" })).toBe("afol c");
+		expect(nextCommandHint("close")).toBe("afol s");
+		expect(nextCommandHint("quick-task")).toBe("afol s");
 		expect(nextCommandHint("log", { taskId: "T-03" })).toBe(
 			'afol d T-03 -x "<cmd>"',
 		);

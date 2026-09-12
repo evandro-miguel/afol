@@ -2030,7 +2030,9 @@ describe("workbench lifecycle service", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const lines = (proc.stdout as string).trim().split("\n");
+			const stdout = proc.stdout as string;
+			expect(stdout).toContain('hint="afol d T-01 -x');
+			const lines = stdout.trim().split("\n");
 			expect(lines[0]).toBe("task started: T-01");
 			expect(lines.some((line) => line.startsWith("briefing:"))).toBe(true);
 			expect(lines.some((line) => line.startsWith("resume:"))).toBe(true);
@@ -2058,9 +2060,11 @@ describe("workbench lifecycle service", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const lines = (proc.stdout as string).trim().split("\n");
+			const stdout = proc.stdout as string;
+			expect(stdout).toContain('hint="afol d T-01 -x');
+			const lines = stdout.trim().split("\n");
 			expect(lines[0]).toBe("task started: T-01");
-			const briefing = JSON.parse(lines.slice(1).join("\n")) as {
+			const briefing = JSON.parse(lines.slice(1, -1).join("\n")) as {
 				schema: string;
 				warnings: unknown[];
 				questions: unknown[];

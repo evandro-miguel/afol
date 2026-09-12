@@ -22,31 +22,22 @@ scaffold factory. `afol` is the supported public interface.
 
 ## Command Groups
 
-Core:
+Happy path (omit `-S`/`--session` when an active or bound session resolves):
 
 ```bash
-afol status
-afol catchup [--session <session-id>]
-afol validate project
 afol init
-afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
-```
-
-Workflow:
-
-```bash
-afol start --session <session-id> --task-id <task-id>
-afol done --session <session-id> --task-id <task-id> --test-shell "<cmd>"
-afol close --session <session-id> --summary "<summary>"
-afol verify-tasks .afol/wb/<session-id> --strict
-```
-
-Compact single-session agent path:
-
-```bash
+afol s
+afol v project
+afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
 afol st T-01
 afol d T-01 -x "<cmd>"
-afol c -m "<summary>"
+afol c
+```
+
+Micro one-shot (`qt` creates, starts, verifies, completes, and closes):
+
+```bash
+afol qt <theme> -t "<task>" -c "<cmd>"
 ```
 
 Shared-check batch path:
@@ -57,7 +48,19 @@ afol d T-01..T-10 -x "<shared-cmd>"
 ```
 
 The batch path runs one observed check and records one evidence entry per
-selected execution-policy task.
+selected execution-policy task. `e` is diagnostic only; do not require
+`evidence` then `done` as two hops.
+
+Long `--session` / `-S` forms remain valid for CI and multi-agent work when
+the session is ambiguous:
+
+```bash
+afol start --session <session-id> --task-id <task-id>
+afol done --session <session-id> --task-id <task-id> -x "<cmd>"
+afol close --session <session-id>
+afol catchup [--session <session-id>]
+afol verify-tasks .afol/wb/<session-id> --strict
+```
 
 `afol status` has an optional `--catchup` flag to include the same session
 freshness checks as `afol catchup`.

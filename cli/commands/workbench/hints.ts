@@ -47,7 +47,7 @@ export function nextCommandHint(
 			return "afol c";
 		case "close":
 		case "quick-task":
-			return "afol status";
+			return "afol s";
 		case "log":
 			return `afol d ${taskId(ctx)} -x "<cmd>"`;
 		case "session-show":

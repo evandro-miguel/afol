@@ -19,10 +19,13 @@ Runtime benchmark packs stay separate from project-benchmark catalogs:
 Heat scoring and dashboard commands are still not public AFOL features. Do not
 document retired compatibility command runners as downstream workflows.
 
-For governed delivery evidence, use:
+For governed delivery evidence, use `d -x` (omit `-S` when the session
+resolves). `e` is diagnostic only:
 
 ```bash
-afol evidence --session <session-id> --task-id <task-id> --command "<verification command>" --result passed
-afol done --session <session-id> --task-id <task-id>
-afol close --session <session-id>
+afol d T-01 -x "<verification command>"
+afol c
 ```
+
+Long `--session` / `-S` forms remain valid for CI and multi-agent work when
+the session is ambiguous.

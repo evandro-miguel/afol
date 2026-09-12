@@ -17,18 +17,28 @@ Managing multiple tasks or workstreams with AFOL.
 
 ## Pattern
 
-1. Check current focus with `afol status`.
+1. Check current focus with `afol s`.
 2. Prefer completing or extending the current session before creating another.
-3. Create a new session with `afol new` only when the work is materially separate.
-4. Target explicit sessions with `--session` in parallel work.
+3. Create a new session with `afol n` only when the work is materially separate.
+4. Pass `-S` / `--session` only for CI or multi-agent work when the session is
+   ambiguous.
 
 ## Example
 
 ```bash
-afol status
-afol new oauth-integration --feature-id F-02 --parent-spec .afol/adm/specs/oauth.md
-afol evidence --session 260224_1200_feature-a --task-id T-01 --command "bun test" --result passed
-afol done --session 260224_1200_feature-a --task-id T-01
+afol s
+afol n oauth-integration -F F-02 -P .afol/adm/specs/oauth.md -t "Implement OAuth"
+afol st T-01
+afol d T-01 -x "bun test"
+afol c
+```
+
+`e` is diagnostic only. Do not require `evidence` then `done` as two hops.
+Long `--session` / `-S` forms remain valid for CI and parallel sessions:
+
+```bash
+afol st -S 260224_1200_feature-a -T T-01
+afol d -S 260224_1200_feature-a -T T-01 -x "bun test"
 ```
 
 AFOL allows multiple sessions, but uncontrolled session sprawl still makes

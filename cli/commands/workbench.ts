@@ -339,6 +339,7 @@ export async function runStartCommand(
 			} else {
 				lines.push(...formatStartBriefing(briefing));
 			}
+			lines.push(formatHintLine(nextCommand));
 			console.log(lines.join("\n"));
 		}
 		return 0;
