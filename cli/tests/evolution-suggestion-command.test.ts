@@ -485,9 +485,7 @@ describe("evolve suggestion command boundary", () => {
 				});
 				stdout.length = 0;
 				stderr.length = 0;
-				expect(await runEvolveCommand("repair", [], root, io, context)).toBe(
-					2,
-				);
+				expect(await runEvolveCommand("repair", [], root, io, context)).toBe(2);
 				expect(stderr.join("\n")).toBe(`approval-required: ${message}`);
 				expect(existsSync(evolutionDbPath(root))).toBe(false);
 			}
@@ -510,6 +508,102 @@ describe("evolve suggestion command boundary", () => {
 				exit_code: 0,
 			});
 			expect(existsSync(evolutionDbPath(root))).toBe(true);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("real CLI refuses a non-TTY repair without creating the database", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "evolution-command-repair-nontty-"),
+		);
+		try {
+			configure(root);
+			const proc = spawnSync(
+				"bun",
+				[KERNEL_PATH, "evolve", "repair", "--json"],
+				{ cwd: root, encoding: "utf8" },
+			);
+			expect(proc.status).toBe(2);
+			const payload = JSON.parse(proc.stdout as string) as {
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				error: { code: string; message: string };
+			};
+			expect(payload).toMatchObject({
+				ok: false,
+				action: "evolve.repair",
+				exit_code: 2,
+				error: { code: "approval-required" },
+			});
+			expect(payload.error.message).toContain("afol evolve repair --json");
+			expect(payload.error.message).toContain("afol evolve status --json");
+			expect(payload.error.message).toContain("afol evolve analyze --json");
+			expect(existsSync(evolutionDbPath(root))).toBe(false);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("real PTY repair succeeds and status plus analyze stay readable", () => {
+		const root = mkdtempSync(join(tmpdir(), "evolution-command-repair-pty-"));
+		try {
+			configure(root);
+			const repair = spawnSync(
+				"script",
+				[
+					"-q",
+					"-e",
+					"-c",
+					`bun ${KERNEL_PATH} evolve repair --json`,
+					"/dev/null",
+				],
+				{ cwd: root, encoding: "utf8" },
+			);
+			expect(repair.status).toBe(0);
+			expect(JSON.parse(repair.stdout as string)).toMatchObject({
+				ok: true,
+				action: "evolve.repair",
+				exit_code: 0,
+			});
+			expect(existsSync(evolutionDbPath(root))).toBe(true);
+
+			const status = spawnSync(
+				"bun",
+				[KERNEL_PATH, "evolve", "status", "--json"],
+				{ cwd: root, encoding: "utf8" },
+			);
+			expect(status.status).toBe(0);
+			const statusPayload = JSON.parse(status.stdout as string) as {
+				ok: boolean;
+				action: string;
+				data: { state: string };
+			};
+			expect(statusPayload).toMatchObject({
+				ok: true,
+				action: "evolve.status",
+			});
+			expect(statusPayload.data.state).toBe("healthy");
+
+			const analyze = spawnSync(
+				"bun",
+				[KERNEL_PATH, "evolve", "analyze", "--json"],
+				{ cwd: root, encoding: "utf8" },
+			);
+			expect(analyze.status).toBe(0);
+			const analyzePayload = JSON.parse(analyze.stdout as string) as {
+				ok: boolean;
+				action: string;
+				data: { status: string };
+			};
+			expect(analyzePayload).toMatchObject({
+				ok: true,
+				action: "evolve.analyze",
+			});
+			expect(["available", "empty", "blocked"]).toContain(
+				analyzePayload.data.status,
+			);
 		} finally {
 			removeEvolutionTestRoot(root);
 		}
