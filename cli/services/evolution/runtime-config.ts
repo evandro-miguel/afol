@@ -1,10 +1,20 @@
+import { readProjectConfig } from "../project/paths";
 import {
 	DEFAULT_EVOLUTION_PATHS,
 	DEFAULT_EVOLUTION_SETTINGS,
+	DEFAULT_EVOLUTION_TIMEZONE,
 	type ResolvedEvolutionConfig,
 	resolveEvolutionIdentity,
 } from "./config";
+import { evolutionDbPath } from "./db";
 import { validateEvolutionConfigExtension } from "./validation";
+
+export type ResolvedEvolutionRuntime = {
+	projectId: string | null;
+	timezone: string;
+	dbPath: string;
+	eventsDir: string;
+};
 
 function record(value: unknown): Record<string, unknown> | null {
 	return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -44,5 +54,23 @@ export function resolveEvolutionConfig(
 					: DEFAULT_EVOLUTION_PATHS.evolutionEventsDir,
 		},
 		settings: evolution ? { ...evolution } : { ...DEFAULT_EVOLUTION_SETTINGS },
+	};
+}
+
+/**
+ * Single resolution of the configured evolution paths. Ingest, repair, and
+ * checkpoint writers must all derive their targets from this one helper so
+ * a custom paths.evolution_db / evolution_events_dir cannot split readers
+ * from writers.
+ */
+export function resolveEvolutionRuntime(
+	root: string,
+): ResolvedEvolutionRuntime {
+	const config = resolveEvolutionConfig(readProjectConfig(root));
+	return {
+		projectId: config.projectId,
+		timezone: config.timezone ?? DEFAULT_EVOLUTION_TIMEZONE,
+		dbPath: evolutionDbPath(root, config.paths.evolutionDb),
+		eventsDir: config.paths.evolutionEventsDir,
 	};
 }
