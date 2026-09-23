@@ -13,6 +13,7 @@ import {
 import {
 	MAX_SESSION_IDENTIFIER_LENGTH,
 	parseEvidenceEntries,
+	type SessionLocation,
 	sessionPaths,
 } from "../workbench/session-reader";
 import type { EvidenceEntry } from "../workbench/types";
@@ -68,6 +69,7 @@ export type IngestObservationsInput = {
 	projectId: string;
 	session: string;
 	feedbackId?: string;
+	location?: SessionLocation;
 	mode?: "full" | "production-day";
 	now?: Date;
 };
@@ -200,6 +202,72 @@ function telemetryMatchesEvidence(
 }
 
 /**
+ * Owned, observed, failed completion evidence for one session. Declared
+ * evidence (provenance not `observed`) and successes never qualify.
+ */
+export function ownedFailedEvidenceEntries(
+	entries: readonly EvidenceEntry[],
+	projectId: string,
+	session: string,
+): EvidenceEntry[] {
+	return entries.filter(
+		(entry) =>
+			isOwnedObservedCompletion(entry, projectId, session) &&
+			(entry.result === "failed" || (entry.exit_code ?? 0) !== 0),
+	);
+}
+
+/** Observation candidates derived from observed failed completion evidence. */
+export function evidenceObservationCandidates(
+	entries: readonly EvidenceEntry[],
+	projectId: string,
+	session: string,
+): ObservationInput[] {
+	const candidates: ObservationInput[] = [];
+	for (const entry of entries) {
+		const source: EvidenceObservationSource = {
+			id: entry.id,
+			created_at: entry.created_at,
+			result: entry.result,
+			exit_code: entry.exit_code ?? 0,
+			command: entry.command,
+			...(entry.verification_run_id ? { test: entry.task_id } : {}),
+		};
+		const observation = observationFromEvidence(source, {
+			projectId,
+			sessionId: session,
+			taskType: entry.task_id,
+			productionDaySequence: 0,
+		});
+		if (observation) candidates.push(observation);
+	}
+	return candidates;
+}
+
+/** Observation candidates for one bounded page of telemetry failure events. */
+export function telemetryObservationCandidates(
+	events: readonly TelemetryEvent[],
+	failedEvidence: readonly EvidenceEntry[],
+	projectId: string,
+	session: string,
+): ObservationInput[] {
+	const candidates: ObservationInput[] = [];
+	for (const event of events) {
+		if (event.event_type !== "error" && event.event_type !== "blocker")
+			continue;
+		if (telemetryMatchesEvidence(event, failedEvidence)) continue;
+		const observation = observationFromTelemetry(event, {
+			projectId,
+			sessionId: session,
+			taskType: event.task_id || "unknown",
+			productionDaySequence: 0,
+		});
+		if (observation) candidates.push(observation);
+	}
+	return candidates;
+}
+
+/**
  * Read a named workbench session and derive observations from canonical
  * evidence, telemetry, and an optional explicitly associated feedback report.
  */
@@ -238,7 +306,7 @@ function prepareObservationIngestForSession(
 		(previewContext.root !== root || previewContext.projectId !== projectId)
 	)
 		throw new Error("observation preview context does not match input");
-	const paths = sessionPaths(root, session);
+	const paths = sessionPaths(root, session, input.location ?? "live");
 	if (!existsSync(paths.sessionDir))
 		throw new Error(`Session folder not found: ${session}`);
 	let feedback: FeedbackReport | null = null;
@@ -353,43 +421,23 @@ function prepareObservationIngestForSession(
 			);
 	const journalDigest =
 		previewContext?.journalDigest ?? sourceDigest(journalText);
-	const failedEvidenceEntries = evidenceEntries.filter(
-		(entry) =>
-			ownsCompletion(entry) &&
-			(entry.result === "failed" || (entry.exit_code ?? 0) !== 0),
+	const failedEvidenceEntries = ownedFailedEvidenceEntries(
+		evidenceEntries,
+		projectId,
+		session,
 	);
-	const evidenceCandidates: ObservationInput[] = [];
-	for (const entry of failedEvidenceEntries) {
-		const source: EvidenceObservationSource = {
-			id: entry.id,
-			created_at: entry.created_at,
-			result: entry.result,
-			exit_code: entry.exit_code ?? 0,
-			command: entry.command,
-			...(entry.verification_run_id ? { test: entry.task_id } : {}),
-		};
-		const observation = observationFromEvidence(source, {
-			projectId,
-			sessionId: session,
-			taskType: entry.task_id,
-			productionDaySequence: 0,
-		});
-		if (observation) evidenceCandidates.push(observation);
-	}
+	const evidenceCandidates = evidenceObservationCandidates(
+		failedEvidenceEntries,
+		projectId,
+		session,
+	);
 
-	const telemetryCandidates: ObservationInput[] = [];
-	for (const event of sessionTelemetryEvents) {
-		if (event.event_type !== "error" && event.event_type !== "blocker")
-			continue;
-		if (telemetryMatchesEvidence(event, failedEvidenceEntries)) continue;
-		const observation = observationFromTelemetry(event, {
-			projectId,
-			sessionId: session,
-			taskType: event.task_id || "unknown",
-			productionDaySequence: 0,
-		});
-		if (observation) telemetryCandidates.push(observation);
-	}
+	const telemetryCandidates = telemetryObservationCandidates(
+		sessionTelemetryEvents,
+		failedEvidenceEntries,
+		projectId,
+		session,
+	);
 
 	const feedbackCandidates: ObservationInput[] = [];
 	if (feedback) {
