@@ -15,6 +15,7 @@ import {
 	agentOperationContext,
 	defaultOperationContext,
 	isActionAllowed,
+	localNonInteractiveOperationContext,
 	remoteOperationContext,
 	resolveCanonicalAction,
 } from "../core/operation-context";
@@ -442,9 +443,73 @@ describe("evolve suggestion command boundary", () => {
 			).toBe(2);
 			expect(JSON.parse(repair.output.join("\n"))).toMatchObject({
 				action: "evolve.repair",
-				error: { code: "approval-required" },
+				error: {
+					code: "approval-required",
+					message:
+						"evolve.repair requires a trusted local interactive terminal; run `afol evolve repair --json` there, then verify with `afol evolve status --json` and `afol evolve analyze --json`",
+				},
 			});
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("repair names the interactive next step and succeeds for a trusted terminal", async () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "evolution-command-repair-next-step-"),
+		);
+		const message =
+			"evolve.repair requires a trusted local interactive terminal; run `afol evolve repair --json` there, then verify with `afol evolve status --json` and `afol evolve analyze --json`";
+		try {
+			configure(root);
+			for (const context of [
+				agentOperationContext(),
+				localNonInteractiveOperationContext(),
+				remoteOperationContext(),
+			]) {
+				const stdout: string[] = [];
+				const stderr: string[] = [];
+				const io = {
+					stdout: (value: string) => stdout.push(value),
+					stderr: (value: string) => stderr.push(value),
+				};
+				expect(
+					await runEvolveCommand("repair", ["--json"], root, io, context),
+				).toBe(2);
+				expect(JSON.parse(stdout.join("\n"))).toMatchObject({
+					ok: false,
+					action: "evolve.repair",
+					exit_code: 2,
+					error: { code: "approval-required", message },
+				});
+				stdout.length = 0;
+				stderr.length = 0;
+				expect(await runEvolveCommand("repair", [], root, io, context)).toBe(
+					2,
+				);
+				expect(stderr.join("\n")).toBe(`approval-required: ${message}`);
+				expect(existsSync(evolutionDbPath(root))).toBe(false);
+			}
+			const allowed: string[] = [];
+			expect(
+				await runEvolveCommand(
+					"repair",
+					["--json"],
+					root,
+					{
+						stdout: (value) => allowed.push(value),
+						stderr: () => {},
+					},
+					defaultOperationContext(),
+				),
+			).toBe(0);
+			expect(JSON.parse(allowed.join("\n"))).toMatchObject({
+				ok: true,
+				action: "evolve.repair",
+				exit_code: 0,
+			});
+			expect(existsSync(evolutionDbPath(root))).toBe(true);
 		} finally {
 			removeEvolutionTestRoot(root);
 		}

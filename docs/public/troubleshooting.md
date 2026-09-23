@@ -19,6 +19,33 @@ an agent or remote/provider execution.
 Pass the session explicitly or run `afol catchup --fix` after inspecting the
 reported binding issue.
 
+## Evolution projection needs repair
+
+When `afol evolve status --json` reports `rebuild_required` and the canonical
+journal is valid, rebuild the derived projection from a trusted local
+interactive terminal:
+
+```bash
+afol evolve repair --json
+```
+
+A non-interactive caller exits 2 with `approval-required`. The refusal is
+intentional. Run that command in a trusted local terminal. Change the evolution
+database and the canonical journal only through this command.
+
+After the command exits 0, verify the projection:
+
+```bash
+afol evolve status --json
+afol evolve analyze --json
+```
+
+Status reports `state` `healthy`, `journal_health.valid` true, and
+`analysis_available` true when the rebuild succeeded. Analyze reports `status`
+`available` when it produced at least one proposal, `empty` when the projection
+is readable and produced none, and `blocked` when analysis cannot run. A
+blocked result points back to `afol evolve status --json`.
+
 ## Update conflict
 
 Run `afol update check`, then `afol update preview`. AFOL will not silently

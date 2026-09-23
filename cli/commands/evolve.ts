@@ -1355,6 +1355,9 @@ export function writeAnalysisPayload(
 	io.stdout(output);
 }
 
+const EVOLVE_REPAIR_APPROVAL_MESSAGE =
+	"evolve.repair requires a trusted local interactive terminal; run `afol evolve repair --json` there, then verify with `afol evolve status --json` and `afol evolve analyze --json`";
+
 function writeEvolutionError(
 	io: CommandIo,
 	json: boolean,
@@ -1371,13 +1374,15 @@ function writeEvolutionError(
 		? "analysis unavailable"
 		: trusted
 			? message
-			: code === "approval-required"
-				? `${action} is not allowed; local interactive approval required`
-				: code === "EVOLUTION_REBUILD_REQUIRED"
-					? `${action} requires local interactive rebuild; no mutation was performed`
-					: code === "EVOLVE_REPAIR_DISABLED"
-						? `${action} is disabled; no mutation was performed`
-						: `${action} failed; local interactive diagnostics required`;
+			: code === "approval-required" && action === "evolve.repair"
+				? EVOLVE_REPAIR_APPROVAL_MESSAGE
+				: code === "approval-required"
+					? `${action} is not allowed; local interactive approval required`
+					: code === "EVOLUTION_REBUILD_REQUIRED"
+						? `${action} requires local interactive rebuild; no mutation was performed`
+						: code === "EVOLVE_REPAIR_DISABLED"
+							? `${action} is disabled; no mutation was performed`
+							: `${action} failed; local interactive diagnostics required`;
 	if (json)
 		io.stdout(
 			stringifyEnvelope(
@@ -1683,7 +1688,7 @@ function runRepair(
 			io,
 			json,
 			"approval-required",
-			"evolve.repair requires a trusted local interactive context",
+			EVOLVE_REPAIR_APPROVAL_MESSAGE,
 			"evolve.repair",
 			operationContext,
 		);
