@@ -1,3 +1,5 @@
+import type { ContextLessonSection } from "../evolution/lesson-records";
+
 export type ContextRef = {
 	domain: string;
 	path: string;
@@ -77,6 +79,8 @@ export type ContextBundle = {
 	do_not_load: string[];
 	rule_injection: ContextRuleInjection;
 	expanded_sections?: ContextExpandedSection[];
+	/** Bounded lesson section; omitted entirely when no lesson applies. */
+	lessons?: ContextLessonSection;
 };
 
 export type SectionEntry = {

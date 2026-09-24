@@ -14,6 +14,8 @@
     "subcommands": [
       "evolve candidates [--session <id>] [--limit <1-10>] [--json]",
       "evolve candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
+      "evolve lessons --session <id> [--json]",
+      "evolve lessons apply --session <id> --id <lesson-id> --evidence <evidence-id> [--json]",
       "evolve status [--json]",
       "evolve backfill [--offset <n>] [--limit <1-10>] [--json]",
       "evolve analyze [--json]",
