@@ -17,7 +17,7 @@
       "evolve lessons --session <id> [--json]",
       "evolve lessons apply --session <id> --id <lesson-id> --evidence <evidence-id> [--json]",
       "evolve status [--json]",
-      "evolve backfill [--offset <n>] [--limit <1-10>] [--json]",
+      "evolve backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",
       "evolve analyze [--json]",
       "evolve weekly [--json]",
       "evolve after-merge <base>..<head> [--json]",

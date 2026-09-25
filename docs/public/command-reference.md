@@ -55,6 +55,30 @@ afol update apply --dry-run
 afol catchup --fix
 ```
 
+## Evolution history
+
+```text
+afol evolve backfill [--offset <n>] [--limit <1-10>] [--json]
+afol evolve backfill --run [--offset <n>] [--limit <1-10>] [--json]
+```
+
+Backfill previews one bounded page by default. `--run` ingests that page of
+history into evolution state; repeat the command to resume oversized
+telemetry pages. It reads open, closed, and archived session artifacts without
+changing task state or completing sessions. Production days still require a
+complete workbench session and observed passing completion evidence; failure
+evidence alone never allocates one. AFOL does not execute models.
+
+Assisted changes use an explicit version-bound review cycle. Prepare an
+external-authored packet with `evolve proposal prepare --packet <path>
+--dry-run`, inspect the exact stored operations with `evolve proposal show`,
+then approve the displayed version before `evolve proposal apply`. Daily
+suggestion acceptance only acknowledges its receipt; it does not approve a
+scoped mutation. `evolve proposal evaluate <id> --version <sha256>` is
+read-only; `--record` writes an evaluation receipt and requires a trusted local
+interactive active task. `evolve proposal revoke` retires the exact version's
+adopted context guidance. It does not undo code or skill file changes.
+
 ## Stability
 
 - **stable**: init, bootstrap, status, health, new/start/done/close, evidence,
