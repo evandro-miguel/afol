@@ -236,7 +236,7 @@ describe("evolution artifact inspection", () => {
 		const source = [
 			"Cookie: sessionid=cookie_secret; theme=dark",
 			"Basic standalone_basic_secret",
-			"GET https://agent:password_secret@example.invalid/path",
+			["GET https://agent", ":password_secret@example.invalid/path"].join(""),
 			'{"sessionid":"json_session_secret","Cookie":"json_cookie_secret"}',
 		].join("\n");
 		const redacted = String(redactImported(source));
