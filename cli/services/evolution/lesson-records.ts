@@ -704,6 +704,35 @@ export function readLessonRecords(root: string): LessonView[] {
 	);
 }
 
+/** Resolve an exact current lesson version for an explicitly approved adoption.
+ * Superseded, contradicted, or changed versions cannot be activated. */
+export function resolveLessonVersionForAdoption(
+	root: string,
+	lessonId: string,
+	versionId: string,
+	fieldSetDigest: string,
+): LessonVersionView {
+	if (!LESSON_ID.test(lessonId) || !VERSION_ID.test(versionId))
+		throw new Error("lesson adoption identity is invalid");
+	if (!HEX_64.test(fieldSetDigest))
+		throw new Error("lesson adoption field digest is invalid");
+	const view = readLessonRecords(root).find(
+		(candidate) => candidate.lesson_id === lessonId,
+	);
+	const current = view?.current.find(
+		(version) => version.version_id === versionId,
+	);
+	if (
+		!current ||
+		current.contradicted ||
+		current.field_set_digest !== fieldSetDigest
+	)
+		throw new Error(
+			"lesson adoption version is missing, stale, or contradicted",
+		);
+	return current;
+}
+
 function lessonRecordRow(input: {
 	projectId: string;
 	session: string;

@@ -1174,14 +1174,75 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		],
 		category: "inspect",
 		guidance: [
-			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",
+			"Daily suggestion accept acknowledges a receipt; it does not approve a scoped proposal mutation.",
+			"Inspect evidence with artifacts; validate external packets with proposal prepare.",
+			"Inspect exact operations with proposal show; evaluate is read-only unless --record.",
+			"Proposal revocation retires adopted context guidance and never rolls back code or skill file changes.",
 		],
 		subcommands: [
 			{
-				usage: "backfill [--offset <n>] [--limit <1-10>] [--json]",
+				usage:
+					"artifacts [--session <id>]... [--cursor <token>] [--limit <1-10>] [--artifact <canonical-name>]... [--byte-offset <n>] [--json]",
 				sideEffect: "read",
 				description:
-					"Preview bounded historical observation and adoption coverage without writes",
+					"Inspect bounded session artifacts; target omitted or oversized files by name and byte range",
+			},
+			{
+				usage: "backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",
+				sideEffect: "write",
+				description:
+					"Preview bounded historical coverage; --run ingests one authorized bounded page",
+			},
+			{
+				usage: "proposal schema [--json]",
+				sideEffect: "read",
+				description: "Print the assisted proposal packet schema and example",
+			},
+			{
+				usage: "proposal prepare --packet <path> --dry-run [--json]",
+				sideEffect: "preview",
+				description:
+					"Validate packet evidence, bounded operations, and target baselines without writing or executing checks",
+			},
+			{
+				usage:
+					"proposal show <proposal-id> [--operation <1-8>] [--field <before|after|content|rationale|statement> --offset <bytes> --bytes <1-12000>] [--json]",
+				sideEffect: "read",
+				description:
+					"Inspect the exact persisted operations and current decision/application state",
+			},
+			{
+				usage:
+					"proposal decide <proposal-id> --version <sha256> --decision <approve|defer|reject> [--reason <text>] [--resume-when <condition>] [--reconsider-rejection] [--json]",
+				sideEffect: "write",
+				description:
+					"Record a trusted local exact-version decision; rejection reconsideration requires explicit approval and a reason",
+			},
+			{
+				usage: "proposal apply <proposal-id> --version <sha256> [--json]",
+				sideEffect: "write",
+				description:
+					"Apply only the exact approved proposal operations after rechecking evidence and target baselines",
+			},
+			{
+				usage: "proposal evaluate <proposal-id> --version <sha256> [--json]",
+				sideEffect: "read",
+				description:
+					"Preview the existing canonical evaluator for the frozen proposal baseline and later comparable observations",
+			},
+			{
+				usage:
+					"proposal evaluate <proposal-id> --version <sha256> --record [--json]",
+				sideEffect: "write",
+				description:
+					"Record a read-only evaluation receipt from a trusted local interactive active task",
+			},
+			{
+				usage:
+					"proposal revoke <proposal-id> --version <sha256> --reason <text> [--json]",
+				sideEffect: "write",
+				description:
+					"Retire exact applied context guidance; previously written code and skill bytes remain unchanged",
 			},
 			{
 				usage: "candidates [--session <id>] [--limit <1-10>] [--json]",

@@ -182,6 +182,52 @@ const CANONICAL_ACTION_RULES: Readonly<
 			action: "evolve.observe",
 			sideEffect: "write",
 		},
+		"evolve/artifacts": {
+			mode: "static",
+			action: "evolve.artifacts",
+			sideEffect: "read",
+		},
+		"evolve/proposal+schema": {
+			mode: "static",
+			action: "evolve.proposal.schema",
+			sideEffect: "read",
+		},
+		"evolve/proposal+show": {
+			mode: "static",
+			action: "evolve.proposal.show",
+			sideEffect: "read",
+		},
+		"evolve/proposal+--record": {
+			mode: "static",
+			action: "evolve.proposal.evaluation.record",
+			sideEffect: "write",
+		},
+		"evolve/proposal+evaluate": {
+			mode: "static",
+			action: "evolve.proposal.evaluate",
+			sideEffect: "read",
+		},
+		"evolve/proposal+revoke": {
+			mode: "static",
+			action: "evolve.proposal.revoke",
+			sideEffect: "write",
+		},
+		"evolve/proposal+decide": {
+			mode: "static",
+			action: "evolve.proposal.decide",
+			sideEffect: "write",
+		},
+		"evolve/proposal+apply": {
+			mode: "static",
+			action: "evolve.proposal.apply",
+			sideEffect: "write",
+		},
+		"evolve/proposal+prepare": {
+			mode: "dry-run",
+			action: "evolve.proposal.prepare",
+			previewSideEffect: "preview",
+			applySideEffect: "write",
+		},
 		"evolve/evaluate+--record": {
 			mode: "static",
 			action: "evolve.evaluate",
@@ -226,6 +272,11 @@ const CANONICAL_ACTION_RULES: Readonly<
 			mode: "static",
 			action: "evolve.backfill",
 			sideEffect: "read",
+		},
+		"evolve/backfill+--run": {
+			mode: "static",
+			action: "evolve.backfill.run",
+			sideEffect: "write",
 		},
 		"session/archive": { mode: "dry-run", action: "session.archive" },
 		"session/restore": { mode: "dry-run", action: "session.restore" },
@@ -460,7 +511,11 @@ export function isActionAllowed(
 		policy &&
 		(policy.action === "evolve.apply" ||
 			policy.action === "evolve.rollback" ||
-			policy.action === "evolve.evaluate")
+			policy.action === "evolve.evaluate" ||
+			policy.action === "evolve.proposal.decide" ||
+			policy.action === "evolve.proposal.apply" ||
+			policy.action === "evolve.proposal.evaluation.record" ||
+			policy.action === "evolve.proposal.revoke")
 	) {
 		return (
 			ctx.callerType === "local" &&

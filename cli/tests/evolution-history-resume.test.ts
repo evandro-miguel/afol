@@ -19,6 +19,11 @@ import {
 import { readHistoryBackfillCursor } from "../services/evolution/history-cursor";
 import { enumerateEvolutionHistorySessions } from "../services/evolution/history-sessions";
 import {
+	productionDayJournalPath,
+	readProductionDayJournal,
+	resolveProductionDayReceipt,
+} from "../services/evolution/journal";
+import {
 	observationJournalPath,
 	readObservationJournal,
 } from "../services/evolution/observation-journal";
@@ -182,6 +187,7 @@ type ObservationView = {
 	id: string;
 	session_id: string;
 	source_ids: string[];
+	production_day_sequence: number;
 };
 
 function observationViews(root: string): ObservationView[] {
@@ -193,6 +199,9 @@ function observationViews(root: string): ObservationView[] {
 			return {
 				id: String(observation.id),
 				session_id: String(observation.session_id),
+				production_day_sequence: Number(
+					observation.production_day_sequence ?? 0,
+				),
 				source_ids: (
 					observation.source_refs as Array<Record<string, string>>
 				).map((ref) => ref.id as string),
@@ -279,6 +288,46 @@ describe("evolution history enumerator", () => {
 });
 
 describe("evolution history backfill resume", () => {
+	test("ingests observed failures from an open session without changing workbench state or allocating a production day", () => {
+		const root = fixtureRoot();
+		try {
+			const sessionDir = writeSession(root, "S-open", {
+				closed: false,
+				evidence: [
+					{
+						id: "E-open-pass",
+						session: "S-open",
+						result: "passed",
+						exit_code: 0,
+					},
+					{ id: "E-open-fail", session: "S-open" },
+				],
+			});
+			const taskPath = join(sessionDir, "S-open_task_01.md");
+			const originalTask = readFileSync(taskPath, "utf8");
+			const first = runHistoryBackfill({ root, now: T1 });
+			expect(first.coverage).toMatchObject({ open: 1, eligible: 1 });
+			expect(first.sessions[0]).toMatchObject({
+				session_id: "S-open",
+				outcome: "ingested",
+				appended: 1,
+				cursor: { status: "complete" },
+			});
+			expect(observationViews(root)).toMatchObject([
+				{ session_id: "S-open", source_ids: ["E-open-fail"] },
+			]);
+			expect(existsSync(productionDayJournalPath(root))).toBe(false);
+			expect(readFileSync(taskPath, "utf8")).toBe(originalTask);
+
+			const second = runHistoryBackfill({ root, now: T2 });
+			expect(second.sessions[0]).toMatchObject({ outcome: "unchanged" });
+			expect(observationViews(root)).toHaveLength(1);
+			expect(readFileSync(taskPath, "utf8")).toBe(originalTask);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
 	test("ingests an archived session and an unchanged rerun writes nothing", () => {
 		const root = fixtureRoot();
 		try {
@@ -316,6 +365,7 @@ describe("evolution history backfill resume", () => {
 					id: expect.stringMatching(/^O-/),
 					session_id: "S-arch",
 					source_ids: ["E-arch"],
+					production_day_sequence: 0,
 				},
 			]);
 			const journalAfterFirst = journalText(root);
@@ -468,7 +518,9 @@ describe("evolution history backfill resume", () => {
 	test("an oversized telemetry source stays pending and resumes by page without duplicate ids", () => {
 		const root = fixtureRoot();
 		try {
-			writeSession(root, "S-big");
+			const sessionDir = writeSession(root, "S-big", { closed: false });
+			const taskPath = join(sessionDir, "S-big_task_01.md");
+			const originalTask = readFileSync(taskPath, "utf8");
 			// 110 matched lines of ~10.4KB exceed the 1MB telemetry byte limit,
 			// so each call may only drain one bounded page.
 			const eventCount = 110;
@@ -515,6 +567,8 @@ describe("evolution history backfill resume", () => {
 			expect(views).toHaveLength(eventCount);
 			expect(new Set(views.map((view) => view.id)).size).toBe(eventCount);
 			expect(views.every((view) => view.session_id === "S-big")).toBe(true);
+			expect(existsSync(productionDayJournalPath(root))).toBe(false);
+			expect(readFileSync(taskPath, "utf8")).toBe(originalTask);
 			const third = runHistoryBackfill({ root, now: T3 });
 			expect(third.sessions[0]).toMatchObject({
 				outcome: "unchanged",
@@ -524,6 +578,172 @@ describe("evolution history backfill resume", () => {
 		} finally {
 			removeEvolutionTestRoot(root);
 		}
+	});
+
+	test("does not complete a cursor after an observation projection warning and retries the failed append", () => {
+		const root = fixtureRoot();
+		try {
+			writeSession(root, "S-retry", {
+				evidence: [{ id: "E-retry", session: "S-retry" }],
+			});
+			const db = openEvolutionDb(resolveEvolutionRuntime(root).dbPath);
+			try {
+				db.exec(
+					"CREATE TRIGGER retry_projection_failure BEFORE INSERT ON observations BEGIN SELECT RAISE(ABORT, 'transient projection failure'); END",
+				);
+			} finally {
+				db.close();
+			}
+
+			const first = runHistoryBackfill({ root, now: T1 });
+			expect(first.sessions[0]).toMatchObject({
+				outcome: "error",
+				cursor: null,
+			});
+			expect(cursorFor(root, "S-retry")).toBeNull();
+			expect(observationViews(root)).toEqual([]);
+
+			const recoveredDb = openEvolutionDb(resolveEvolutionRuntime(root).dbPath);
+			try {
+				recoveredDb.exec("DROP TRIGGER retry_projection_failure");
+			} finally {
+				recoveredDb.close();
+			}
+			const second = runHistoryBackfill({ root, now: T2 });
+			expect(second.sessions[0]).toMatchObject({
+				outcome: "ingested",
+				appended: 1,
+				cursor: { status: "complete" },
+			});
+			expect(cursorFor(root, "S-retry")?.status).toBe("complete");
+			expect(observationViews(root)).toHaveLength(1);
+			const third = runHistoryBackfill({ root, now: T3 });
+			expect(third.sessions[0]).toMatchObject({ outcome: "unchanged" });
+			expect(observationViews(root)).toHaveLength(1);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("rejects mixed-owner duplicate evidence before normal or paged writes", () => {
+		for (const oversized of [false, true]) {
+			const root = fixtureRoot();
+			try {
+				const session = "S-mixed-owner";
+				const sessionDir = writeSession(root, session, {
+					closed: false,
+				});
+				writeFileSync(
+					join(sessionDir, ".evidence.jsonl"),
+					[
+						evidenceLine({ id: "E-mixed-owner", session }),
+						evidenceLine({ id: "E-mixed-owner", session: "S-foreign" }),
+					].join(""),
+				);
+				if (oversized) {
+					const note = "x".repeat(10_200);
+					writeTelemetry(
+						root,
+						Array.from({ length: 110 }, (_, index) =>
+							telemetryLine({
+								id: `E-mixed-telemetry-${index}`,
+								session,
+								note,
+							}),
+						),
+					);
+				}
+
+				const result = runHistoryBackfill({ root, now: T1 });
+				expect(result.sessions[0]).toMatchObject({
+					outcome: "error",
+					reason: "evidence id has conflicting ownership",
+					cursor: null,
+				});
+				expect(cursorFor(root, session)).toBeNull();
+				expect(observationViews(root)).toEqual([]);
+				expect(existsSync(observationJournalPath(root))).toBe(false);
+				expect(existsSync(productionDayJournalPath(root))).toBe(false);
+			} finally {
+				removeEvolutionTestRoot(root);
+			}
+		}
+	});
+
+	test("normal and oversized ingestion allocate the same production day and observation ordinal", () => {
+		const sequenceFor = (oversized: boolean) => {
+			const root = fixtureRoot();
+			try {
+				const session = oversized ? "S-large-complete" : "S-small-complete";
+				const sessionDir = writeSession(root, session, {
+					closed: false,
+					evidence: [
+						{
+							id: `E-pass-${session}`,
+							session,
+							result: "passed",
+							exit_code: 0,
+						},
+					],
+				});
+				const taskPath = join(sessionDir, `${session}_task_01.md`);
+				writeFileSync(
+					taskPath,
+					readFileSync(taskPath, "utf8").replace(
+						"| T-01 | in_progress |",
+						"| T-01 | done |",
+					),
+				);
+				if (oversized) {
+					const note = "x".repeat(10_200);
+					writeTelemetry(
+						root,
+						Array.from({ length: 110 }, (_, index) =>
+							telemetryLine({
+								id: `E-large-complete-${index}`,
+								session,
+								note,
+							}),
+						),
+					);
+				} else {
+					writeTelemetry(root, [
+						telemetryLine({ id: "E-small-complete", session }),
+					]);
+				}
+				const result = runHistoryBackfill({ root, now: T1 });
+				expect(result.coverage.legacy_terminal).toBe(1);
+				expect(result.sessions[0]?.outcome).toBe(
+					oversized ? "pending" : "ingested",
+				);
+				const productionDays = readProductionDayJournal(
+					root,
+					PROJECT_ID,
+					"UTC",
+				);
+				expect(productionDays).toHaveLength(1);
+				const receipt = resolveProductionDayReceipt({
+					root,
+					projectId: PROJECT_ID,
+					timezone: "UTC",
+					evidenceId: `E-pass-${session}`,
+				});
+				expect(receipt?.ordinal_sequence).toBe(1);
+				const observations = observationViews(root);
+				expect(observations.length).toBeGreaterThan(0);
+				expect(
+					observations.every(
+						(observation) =>
+							observation.production_day_sequence === receipt?.ordinal_sequence,
+					),
+				).toBe(true);
+				return observations[0]?.production_day_sequence;
+			} finally {
+				removeEvolutionTestRoot(root);
+			}
+		};
+
+		expect(sequenceFor(false)).toBe(sequenceFor(true));
 	});
 
 	test("declared successes and declared failures never become observations", () => {

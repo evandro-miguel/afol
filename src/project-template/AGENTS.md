@@ -27,9 +27,8 @@ credentials, raw private transcripts, production data, or secrets in AFOL.
 Start by reading this file and the repository's own documentation. Then use:
 
 ```bash
-afol status
-afol session status
-afol work list
+afol s         # project status (read)
+afol ss list   # active session, bindings, and open sessions (read)
 afol help <command>
 ```
 
@@ -38,14 +37,17 @@ Use `afol preflight` before operations that depend on project integrity.
 
 ## Work lifecycle
 
-Create or select a spec before substantial implementation:
+Select the governing spec before substantial implementation (specs are durable
+files under `.afol/adm/specs/`), then run the lifecycle:
 
 ```bash
-afol spec list
-afol spec create <id> --title "..."
-afol session start --spec <id>
-afol work start <work-id>
+afol sp list                       # inspect specs (read)
+afol n <theme> --task "<summary>"  # open a session with an initial task
 ```
+
+Link a governed session to its feature and spec with
+`afol n <theme> --feature-id <F-id> --parent-spec <spec-id>`; an explicit
+waiver is `afol n <theme> --no-spec-required --reason "<text>"`.
 
 During work, record only decisions and evidence that another agent needs to
 continue safely. Keep implementation details in code, tests, and focused docs.
@@ -53,10 +55,26 @@ continue safely. Keep implementation details in code, tests, and focused docs.
 Before completion:
 
 ```bash
-afol validate
-afol work done <work-id> --evidence "<command and observed result>"
-afol session close
+afol v                      # validation gates
+afol st T-01                # start a task
+afol d T-01 -x "<check>"    # run the check and complete the task in one step
+afol c                      # close the session after its tasks are complete
 ```
+
+`-x` names the command that proves the task; it must pass for `done` to
+complete it. Batch a shared check with
+`afol d T-01..T-n -x "<check>"`, and use `afol help st`, `afol help d`, and
+`afol help c` for session-scoped forms. Evolution learnings follow a
+proposal-before-apply cycle: inspect with `afol evolve` (read) and see
+`afol help evolve` for the subcommands your installed build supports; a
+daily suggestion receipt is an acknowledgment, not approval for a scoped
+change. Prepare external-authored packets read-only, inspect their exact
+operations with `afol evolve proposal show`, then record approval for that
+exact version with `afol evolve proposal decide` before applying it. Use
+`afol evolve proposal evaluate` to preview later comparable outcomes;
+`--record` requires a trusted local interactive active task. `proposal revoke`
+retires exact adopted context guidance and does not undo code or skill file
+changes. AFOL does not execute the packet's validation commands or call models.
 
 Do not mark work complete from intention alone. Evidence must name the command,
 artifact, or observed behavior that proves the acceptance criteria.
@@ -98,5 +116,4 @@ Read `.afol/adm/rules/README.md` to resolve applicable detailed rules. Common
 topics include folder structure, workstream creation, documentation, validation,
 maintenance, benchmark quality, and user-journey coverage.
 
-Repository-specific contributor and release procedures belong in `CONTRIBUTING.md`
-and project documentation, not in this automatically loaded guide.
+Repository-specific contributor and release procedures belong in `CONTRIBUTING.md` and project documentation, not in this automatically loaded guide.

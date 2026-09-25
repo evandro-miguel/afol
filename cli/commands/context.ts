@@ -256,6 +256,11 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 					`lessons: ${bundle.lessons.shown_lesson_ids.join(",")} bytes=${bundle.lessons.bytes}${bundle.lessons.truncated ? " truncated" : ""}`,
 				]
 			: []),
+		...(bundle.approved_guidance
+			? [
+					`approved_guidance: ${bundle.approved_guidance.items.map((item) => `${item.kind}:${item.proposal_id}@${item.version_digest.slice(0, 12)}`).join(",") || "none"} preferences=${bundle.approved_guidance.contextual_preference_health}`,
+				]
+			: []),
 		`budget: ${bundle.budget.used_tokens}/${bundle.budget.total_tokens}`,
 	].join("\n");
 }
@@ -339,11 +344,13 @@ function formatExplanation(
 			pstr_refs: bundle.pstr_refs.length,
 			memory_refs: bundle.memory_refs.length,
 			library_refs: bundle.library_refs.length,
+			approved_guidance: bundle.approved_guidance?.items.length ?? 0,
 			expanded_sections: bundle.expanded_sections?.length ?? 0,
 			injected_rules: bundle.rule_injection.injected.length,
 			omitted_rules: bundle.rule_injection.omitted.length,
 		},
 		evidence_tags: evidenceTags,
+		approved_guidance: bundle.approved_guidance,
 		create_safety_hints: [
 			"load only cited refs",
 			"avoid whole-tree loads",
@@ -585,6 +592,9 @@ export async function runContextCommand(
 						library_refs: bundle.library_refs,
 						rule_injection: bundle.rule_injection,
 						...(bundle.lessons ? { lessons: bundle.lessons } : {}),
+						...(bundle.approved_guidance
+							? { approved_guidance: bundle.approved_guidance }
+							: {}),
 						budget: bundle.budget,
 						gaps: bundle.gaps,
 					};

@@ -13,11 +13,9 @@ import {
 import { readProjectConfig } from "../project/paths";
 import { sessionLifecycleState } from "../workbench/session-lifecycle-state";
 import {
-	parseEvidenceEntries,
 	type SessionLocation,
 	sessionPaths,
 } from "../workbench/session-reader";
-import type { EvidenceEntry } from "../workbench/types";
 import { verifyTaskText, verifyWorkbenchTasks } from "../workbench/verify";
 import { discoverAdoptionCandidates } from "./adoption-candidates";
 import { openEvolutionDb } from "./db";
@@ -32,20 +30,14 @@ import {
 } from "./history-sessions";
 import {
 	createObservationIngestPreviewContext,
-	evidenceObservationCandidates,
+	ingestFailureObservationPage,
 	ingestObservationsForSession,
 	OBSERVE_EVIDENCE_LIMITS,
 	OBSERVE_TASK_LIMITS,
 	OBSERVE_TELEMETRY_LIMITS,
-	ownedFailedEvidenceEntries,
+	prepareFailureObservationEvidence,
 	previewObservationIngestForSession,
-	telemetryObservationCandidates,
 } from "./observation-ingest";
-import { appendObservationJournalEventWithStatus } from "./observation-journal";
-import {
-	normalizeObservationRecord,
-	type ObservationInput,
-} from "./observation-model";
 import {
 	type ResolvedEvolutionRuntime,
 	resolveEvolutionConfig,
@@ -59,7 +51,7 @@ const DEFAULT_PAGE_LIMIT = 5;
  * Durable extractor identity for the history backfill cursor. Bump this when
  * derivation logic changes so completed cursors reprocess once.
  */
-export const HISTORY_BACKFILL_EXTRACTOR_VERSION = "history-backfill/1";
+export const HISTORY_BACKFILL_EXTRACTOR_VERSION = "history-backfill/3";
 
 export type HistoryBackfillCoverage = {
 	session_dirs: number;
@@ -239,7 +231,8 @@ function classifiedHistorySessions(root: string): {
 		else coverage.corrupt++;
 		if (
 			classified.state === "canonical_closed" ||
-			classified.state === "legacy_terminal"
+			classified.state === "legacy_terminal" ||
+			classified.state === "open"
 		)
 			eligible.push(classified);
 	}
@@ -251,7 +244,7 @@ function classifiedHistorySessions(root: string): {
 }
 
 /**
- * Read-only, journal-canonical preview for a stable page of closed sessions.
+ * Read-only, journal-canonical preview for a stable page of historical sessions.
  * It deliberately does not open the derived evolution database.
  */
 export function previewHistoryBackfill(input: {
@@ -349,6 +342,7 @@ export function previewHistoryBackfill(input: {
 						root: input.root,
 						projectId: resolved.projectId,
 						session: session.session_id,
+						allowIncompleteFailures: true,
 						...(session.location === "archived"
 							? { location: session.location }
 							: {}),
@@ -370,6 +364,9 @@ export function previewHistoryBackfill(input: {
 		if (legacyTerminal) {
 			if (legacyEvidenceUnverified)
 				increment(skipReasons, "legacy_evidence_unverified");
+			adoption.blocked++;
+		} else if (session.state === "open") {
+			increment(skipReasons, "open_session");
 			adoption.blocked++;
 		} else
 			try {
@@ -397,6 +394,7 @@ export function previewHistoryBackfill(input: {
 		const sessionSkipReasons = [
 			...(preview?.skip_reasons ?? []),
 			...(previewFailure ? [previewFailure] : []),
+			...(session.state === "open" ? ["open_session"] : []),
 			...(legacyEvidenceUnverified ? ["legacy_evidence_unverified"] : []),
 			...(adoptionState === "blocked" ? ["adoption_blocked"] : []),
 		];
@@ -580,65 +578,11 @@ function sessionSourceHash(input: {
 }
 
 /**
- * Append one page of observation candidates. Observed failures may come from
- * an open or incomplete session; declared evidence and successful runs never
- * become observations because the shared candidate derivation keeps that
- * invariant. Journal occurrence-identity dedup makes page resume idempotent.
+ * Append one page of observed failure candidates after shared evidence
+ * ownership and production-day qualification. An open or incomplete session
+ * may contribute failures, but cannot qualify a production day. Journal
+ * occurrence-identity dedup makes page resume idempotent.
  */
-function appendTelemetryPage(input: {
-	root: string;
-	projectId: string;
-	session: string;
-	runtime: ResolvedEvolutionRuntime;
-	db: Database;
-	now: Date;
-	events: TelemetryEvent[];
-	failedEvidence: readonly EvidenceEntry[];
-}): { appended: number; duplicates: number } {
-	const candidates: ObservationInput[] = [
-		...evidenceObservationCandidates(
-			input.failedEvidence,
-			input.projectId,
-			input.session,
-		),
-		...telemetryObservationCandidates(
-			input.events,
-			input.failedEvidence,
-			input.projectId,
-			input.session,
-		),
-	];
-	const deduped = new Map<string, ObservationInput>();
-	for (const candidate of candidates) {
-		const key = normalizeObservationRecord(candidate).occurrence_identity;
-		const existing = deduped.get(key);
-		if (!existing) {
-			deduped.set(key, candidate);
-			continue;
-		}
-		const existingKind = existing.observationKind ?? existing.kind ?? "";
-		const newKind = candidate.observationKind ?? candidate.kind ?? "";
-		if (newKind === "tool_failure" && existingKind !== "tool_failure")
-			deduped.set(key, candidate);
-	}
-	let appended = 0;
-	let duplicates = 0;
-	for (const candidate of deduped.values()) {
-		const result = appendObservationJournalEventWithStatus({
-			root: input.root,
-			db: input.db,
-			projectId: input.projectId,
-			timezone: input.runtime.timezone,
-			evolutionEventsDir: input.runtime.eventsDir,
-			observation: normalizeObservationRecord(candidate),
-			now: input.now,
-		});
-		if (result.appended) appended++;
-		else duplicates++;
-	}
-	return { appended, duplicates };
-}
-
 function processHistorySession(input: {
 	root: string;
 	session: ClassifiedHistorySession;
@@ -719,9 +663,20 @@ function processHistorySession(input: {
 				root,
 				projectId,
 				session: session.session_id,
+				allowIncompleteFailures: true,
 				...(session.location === "archived" ? { location: "archived" } : {}),
 				now,
 			});
+			if (result.skipped > 0 || result.warnings.length > 0)
+				return {
+					session_id: session.session_id,
+					location: session.location,
+					outcome: "error",
+					appended: result.appended,
+					duplicates: result.duplicates,
+					reason: "observation_ingest_incomplete",
+					cursor: cursorView,
+				};
 			const endOffset = scan.matches.at(-1)?.end ?? 0;
 			writeHistoryBackfillCursor(db, {
 				project_id: projectId,
@@ -758,12 +713,15 @@ function processHistorySession(input: {
 	let page: TelemetryPage;
 	try {
 		page = telemetryPageFrom(scan, byteOffset, OBSERVE_TELEMETRY_LIMITS);
-		const failedEvidence = ownedFailedEvidenceEntries(
-			evidenceText === null ? [] : parseEvidenceEntries(evidenceText),
+		const failureEvidence = prepareFailureObservationEvidence({
+			sessionComplete:
+				taskText !== null &&
+				verifyTaskText(taskText, paths.taskPath).allCompleted,
+			evidenceText,
 			projectId,
-			session.session_id,
-		);
-		const counts = appendTelemetryPage({
+			session: session.session_id,
+		});
+		const result = ingestFailureObservationPage({
 			root,
 			projectId,
 			session: session.session_id,
@@ -771,8 +729,21 @@ function processHistorySession(input: {
 			db,
 			now,
 			events: page.events,
-			failedEvidence,
+			evidenceEntries: failureEvidence.evidenceEntries,
+			...(failureEvidence.qualifyingEvidenceId
+				? { qualifyingEvidenceId: failureEvidence.qualifyingEvidenceId }
+				: {}),
 		});
+		if (result.skipped > 0 || result.warnings.length > 0)
+			return {
+				session_id: session.session_id,
+				location: session.location,
+				outcome: "error",
+				appended: result.appended,
+				duplicates: result.duplicates,
+				reason: "observation_ingest_incomplete",
+				cursor: cursorView,
+			};
 		const complete = page.remaining === 0;
 		const row: HistoryBackfillCursorRow = {
 			project_id: projectId,
@@ -788,8 +759,8 @@ function processHistorySession(input: {
 			session_id: session.session_id,
 			location: session.location,
 			outcome: complete ? "ingested" : "pending",
-			appended: counts.appended,
-			duplicates: counts.duplicates,
+			appended: result.appended,
+			duplicates: result.duplicates,
 			cursor: { status: row.status, byte_offset: row.byte_offset },
 		};
 	} catch (error) {

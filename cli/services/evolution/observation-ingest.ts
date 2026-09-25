@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import {
@@ -39,7 +40,10 @@ import {
 	observationFromFeedback,
 	observationFromTelemetry,
 } from "./observation-sources";
-import { resolveEvolutionRuntime } from "./runtime-config";
+import {
+	type ResolvedEvolutionRuntime,
+	resolveEvolutionRuntime,
+} from "./runtime-config";
 
 export const OBSERVE_EVIDENCE_LIMITS: BoundedSourceLimits = {
 	maxBytes: 1_048_576,
@@ -71,6 +75,7 @@ export type IngestObservationsInput = {
 	feedbackId?: string;
 	location?: SessionLocation;
 	mode?: "full" | "production-day";
+	allowIncompleteFailures?: boolean;
 	now?: Date;
 };
 
@@ -171,6 +176,43 @@ function isOwnedObservedCompletion(
 	);
 }
 
+export type PreparedFailureObservationEvidence = {
+	evidenceEntries: EvidenceEntry[];
+	qualifyingEvidenceId?: string;
+};
+
+/** Validate evidence identity and derive completion qualification for every ingest path. */
+export function prepareFailureObservationEvidence(input: {
+	sessionComplete: boolean;
+	evidenceText: string | null;
+	projectId: string;
+	session: string;
+}): PreparedFailureObservationEvidence {
+	const evidenceEntries =
+		input.evidenceText === null ? [] : parseEvidenceEntries(input.evidenceText);
+	const ownershipByEvidenceId = new Map<string, string>();
+	for (const entry of evidenceEntries) {
+		const ownership = `${entry.project_id ?? ""}/${entry.session_id ?? ""}`;
+		const previous = ownershipByEvidenceId.get(entry.id);
+		if (previous && previous !== ownership)
+			throw new Error("evidence id has conflicting ownership");
+		ownershipByEvidenceId.set(entry.id, ownership);
+	}
+	const qualifyingEvidence = evidenceEntries.find(
+		(entry) =>
+			input.sessionComplete &&
+			isOwnedObservedCompletion(entry, input.projectId, input.session) &&
+			entry.result === "passed" &&
+			entry.exit_code === 0,
+	);
+	return {
+		evidenceEntries,
+		...(qualifyingEvidence
+			? { qualifyingEvidenceId: qualifyingEvidence.id }
+			: {}),
+	};
+}
+
 /**
  * Deterministic telemetry–evidence equivalence using the strongest shared
  * identifiers and normalized failure semantics.
@@ -267,6 +309,59 @@ export function telemetryObservationCandidates(
 	return candidates;
 }
 
+/** Derive the same observed-failure candidates for full and paged ingestion. */
+export function deriveFailureObservationCandidates(input: {
+	events: readonly TelemetryEvent[];
+	evidenceEntries: readonly EvidenceEntry[];
+	projectId: string;
+	session: string;
+}): ObservationInput[] {
+	const failedEvidence = ownedFailedEvidenceEntries(
+		input.evidenceEntries,
+		input.projectId,
+		input.session,
+	);
+	return [
+		...evidenceObservationCandidates(
+			failedEvidence,
+			input.projectId,
+			input.session,
+		),
+		...telemetryObservationCandidates(
+			input.events,
+			failedEvidence,
+			input.projectId,
+			input.session,
+		),
+	];
+}
+
+function deduplicateObservationCandidates(
+	candidates: readonly ObservationInput[],
+	existingOccurrenceIds: ReadonlySet<string> = new Set(),
+): { candidates: ObservationInput[]; duplicates: number } {
+	const deduped = new Map<string, ObservationInput>();
+	let duplicates = 0;
+	for (const candidate of candidates) {
+		const key = normalizeObservationRecord(candidate).occurrence_identity;
+		if (existingOccurrenceIds.has(key)) {
+			duplicates++;
+			continue;
+		}
+		const existing = deduped.get(key);
+		if (existing) {
+			duplicates++;
+			const existingKind = existing.observationKind ?? existing.kind ?? "";
+			const newKind = candidate.observationKind ?? candidate.kind ?? "";
+			if (newKind === "tool_failure" && existingKind !== "tool_failure")
+				deduped.set(key, candidate);
+			continue;
+		}
+		deduped.set(key, candidate);
+	}
+	return { candidates: [...deduped.values()], duplicates };
+}
+
 /**
  * Read a named workbench session and derive observations from canonical
  * evidence, telemetry, and an optional explicitly associated feedback report.
@@ -333,8 +428,8 @@ function prepareObservationIngestForSession(
 	const sessionComplete =
 		taskText !== null && verifyTaskText(taskText, paths.taskPath).allCompleted;
 	// Missing task state is incomplete. No other source needs to be opened
-	// because this path cannot allocate or append anything.
-	if (!sessionComplete) {
+	// unless bounded history ingestion explicitly requests failure evidence.
+	if (!sessionComplete && !input.allowIncompleteFailures) {
 		return {
 			preview: {
 				eligible: false,
@@ -360,25 +455,14 @@ function prepareObservationIngestForSession(
 		"session evidence ledger",
 		OBSERVE_EVIDENCE_LIMITS,
 	);
-	const evidenceEntries =
-		evidenceText === null ? [] : parseEvidenceEntries(evidenceText);
-	const ownershipByEvidenceId = new Map<string, string>();
-	for (const entry of evidenceEntries) {
-		const ownership = `${entry.project_id ?? ""}/${entry.session_id ?? ""}`;
-		const previous = ownershipByEvidenceId.get(entry.id);
-		if (previous && previous !== ownership)
-			throw new Error("evidence id has conflicting ownership");
-		ownershipByEvidenceId.set(entry.id, ownership);
-	}
-
-	const ownsCompletion = (entry: EvidenceEntry): boolean =>
-		isOwnedObservedCompletion(entry, projectId, session);
-	const qualifyingEvidence = evidenceEntries.find(
-		(entry) =>
-			ownsCompletion(entry) &&
-			entry.result === "passed" &&
-			entry.exit_code === 0,
-	);
+	const preparedEvidence = prepareFailureObservationEvidence({
+		sessionComplete,
+		evidenceText,
+		projectId,
+		session,
+	});
+	const evidenceEntries = preparedEvidence.evidenceEntries;
+	const qualifyingEvidenceId = preparedEvidence.qualifyingEvidenceId;
 	if (input.mode === "production-day") {
 		return {
 			preview: {
@@ -399,9 +483,7 @@ function prepareObservationIngestForSession(
 			dbPath: resolved.dbPath,
 			eventsDir: resolved.eventsDir,
 			now,
-			...(qualifyingEvidence
-				? { qualifyingEvidenceId: qualifyingEvidence.id }
-				: {}),
+			...(qualifyingEvidenceId ? { qualifyingEvidenceId } : {}),
 			candidates: [],
 		};
 	}
@@ -421,26 +503,8 @@ function prepareObservationIngestForSession(
 			);
 	const journalDigest =
 		previewContext?.journalDigest ?? sourceDigest(journalText);
-	const failedEvidenceEntries = ownedFailedEvidenceEntries(
-		evidenceEntries,
-		projectId,
-		session,
-	);
-	const evidenceCandidates = evidenceObservationCandidates(
-		failedEvidenceEntries,
-		projectId,
-		session,
-	);
-
-	const telemetryCandidates = telemetryObservationCandidates(
-		sessionTelemetryEvents,
-		failedEvidenceEntries,
-		projectId,
-		session,
-	);
-
 	const feedbackCandidates: ObservationInput[] = [];
-	if (feedback) {
+	if (feedback && (sessionComplete || !input.allowIncompleteFailures)) {
 		feedbackCandidates.push(
 			observationFromFeedback(feedback, {
 				projectId,
@@ -452,8 +516,12 @@ function prepareObservationIngestForSession(
 	}
 
 	const allCandidates = [
-		...evidenceCandidates,
-		...telemetryCandidates,
+		...deriveFailureObservationCandidates({
+			events: sessionTelemetryEvents,
+			evidenceEntries,
+			projectId,
+			session,
+		}),
 		...feedbackCandidates,
 	];
 	// Normalize before any allocation so malformed source data cannot leave a
@@ -490,9 +558,7 @@ function prepareObservationIngestForSession(
 			dbPath: resolved.dbPath,
 			eventsDir: resolved.eventsDir,
 			now,
-			...(qualifyingEvidence
-				? { qualifyingEvidenceId: qualifyingEvidence.id }
-				: {}),
+			...(qualifyingEvidenceId ? { qualifyingEvidenceId } : {}),
 			candidates: [],
 		};
 	}
@@ -514,25 +580,10 @@ function prepareObservationIngestForSession(
 					.filter(Boolean),
 			);
 
-	let duplicates = 0;
-	const deduped = new Map<string, ObservationInput>();
-	for (const candidate of allCandidates) {
-		const key = normalizeObservationRecord(candidate).occurrence_identity;
-		if (existingOccurrenceIds.has(key)) {
-			duplicates++;
-			continue;
-		}
-		if (deduped.has(key)) {
-			duplicates++;
-			const existing = deduped.get(key) as ObservationInput;
-			const existingKind = existing.observationKind ?? existing.kind ?? "";
-			const newKind = candidate.observationKind ?? candidate.kind ?? "";
-			if (newKind === "tool_failure" && existingKind !== "tool_failure")
-				deduped.set(key, candidate);
-			continue;
-		}
-		deduped.set(key, candidate);
-	}
+	const deduped = deduplicateObservationCandidates(
+		allCandidates,
+		existingOccurrenceIds,
+	);
 	return {
 		preview: {
 			eligible: true,
@@ -552,13 +603,16 @@ function prepareObservationIngestForSession(
 						}
 					: {}),
 			},
-			candidate_count: deduped.size,
-			candidate_occurrence_identities: [...deduped.keys()],
-			duplicate_count: duplicates,
+			candidate_count: deduped.candidates.length,
+			candidate_occurrence_identities: deduped.candidates.map(
+				(candidate) =>
+					normalizeObservationRecord(candidate).occurrence_identity,
+			),
+			duplicate_count: deduped.duplicates,
 			skip_reasons:
 				allCandidates.length === 0
 					? ["no_candidates"]
-					: deduped.size === 0
+					: deduped.candidates.length === 0
 						? ["all_candidates_duplicate"]
 						: [],
 		},
@@ -568,10 +622,8 @@ function prepareObservationIngestForSession(
 		dbPath: resolved.dbPath,
 		eventsDir: resolved.eventsDir,
 		now,
-		...(qualifyingEvidence
-			? { qualifyingEvidenceId: qualifyingEvidence.id }
-			: {}),
-		candidates: [...deduped.values()],
+		...(qualifyingEvidenceId ? { qualifyingEvidenceId } : {}),
+		candidates: deduped.candidates,
 	};
 }
 
@@ -581,6 +633,133 @@ export function previewObservationIngestForSession(
 	previewContext?: ObservationIngestPreviewContext,
 ): ObservationIngestPreview {
 	return prepareObservationIngestForSession(input, previewContext).preview;
+}
+
+function appendObservationCandidates(input: {
+	root: string;
+	projectId: string;
+	timezone: string;
+	eventsDir: string;
+	db: Database;
+	now: Date;
+	candidates: readonly ObservationInput[];
+	initialDuplicates: number;
+	productionDaySequence: number;
+}): IngestObservationsResult {
+	let appended = 0;
+	let duplicates = input.initialDuplicates;
+	let skipped = 0;
+	const warnings: string[] = [];
+	const observationIds: string[] = [];
+	for (const candidate of input.candidates) {
+		try {
+			const record = normalizeObservationRecord({
+				...candidate,
+				productionDaySequence: input.productionDaySequence,
+			});
+			const result = appendObservationJournalEventWithStatus({
+				root: input.root,
+				db: input.db,
+				projectId: input.projectId,
+				timezone: input.timezone,
+				evolutionEventsDir: input.eventsDir,
+				observation: record,
+				now: input.now,
+			});
+			if (result.appended) {
+				appended++;
+				observationIds.push(record.id);
+			} else duplicates++;
+		} catch (error) {
+			warnings.push(
+				`observer failed for candidate ${candidate.id ?? "unknown"}: ${(error as Error).message}`,
+			);
+			skipped++;
+		}
+	}
+	return {
+		appended,
+		duplicates,
+		skipped,
+		warnings,
+		observation_ids: observationIds,
+	};
+}
+
+function ensureProductionDaySequence(input: {
+	root: string;
+	db: Database;
+	projectId: string;
+	timezone: string;
+	eventsDir: string;
+	session: string;
+	evidenceId?: string;
+	now: Date;
+}): number {
+	if (!input.evidenceId) return 0;
+	const receipt = resolveProductionDayReceipt({
+		root: input.root,
+		projectId: input.projectId,
+		timezone: input.timezone,
+		evolutionEventsDir: input.eventsDir,
+		evidenceId: input.evidenceId,
+	});
+	const sequence =
+		receipt?.ordinal_sequence ??
+		appendProductionDayAllocation({
+			root: input.root,
+			db: input.db,
+			projectId: input.projectId,
+			timezone: input.timezone,
+			sessionId: input.session,
+			evidenceId: input.evidenceId,
+			evolutionEventsDir: input.eventsDir,
+			now: input.now,
+		}).ordinal_sequence;
+	if (sequence <= 0)
+		throw new Error("qualifying evidence did not produce a production day");
+	return sequence;
+}
+
+/** Persist one bounded telemetry page using the shared failure derivation. */
+export function ingestFailureObservationPage(input: {
+	root: string;
+	projectId: string;
+	session: string;
+	runtime: ResolvedEvolutionRuntime;
+	db: Database;
+	now: Date;
+	events: readonly TelemetryEvent[];
+	evidenceEntries: readonly EvidenceEntry[];
+	qualifyingEvidenceId?: string;
+}): IngestObservationsResult {
+	const derived = deriveFailureObservationCandidates(input);
+	const deduped = deduplicateObservationCandidates(derived);
+	for (const candidate of deduped.candidates)
+		normalizeObservationRecord(candidate);
+	const productionDaySequence = ensureProductionDaySequence({
+		root: input.root,
+		db: input.db,
+		projectId: input.projectId,
+		timezone: input.runtime.timezone,
+		eventsDir: input.runtime.eventsDir,
+		session: input.session,
+		...(input.qualifyingEvidenceId
+			? { evidenceId: input.qualifyingEvidenceId }
+			: {}),
+		now: input.now,
+	});
+	return appendObservationCandidates({
+		root: input.root,
+		projectId: input.projectId,
+		timezone: input.runtime.timezone,
+		eventsDir: input.runtime.eventsDir,
+		db: input.db,
+		now: input.now,
+		candidates: deduped.candidates,
+		initialDuplicates: deduped.duplicates,
+		productionDaySequence,
+	});
 }
 
 /** Persist the exact candidates established by the shared read-only preparation. */
@@ -601,14 +780,14 @@ export function ingestObservationsForSession(
 		if (prepared.qualifyingEvidenceId) {
 			const db = openEvolutionDb(prepared.dbPath);
 			try {
-				appendProductionDayAllocation({
+				ensureProductionDaySequence({
 					root: input.root,
 					db,
 					projectId: prepared.projectId,
 					timezone: prepared.timezone,
-					sessionId: prepared.session,
+					eventsDir: prepared.eventsDir,
+					session: prepared.session,
 					evidenceId: prepared.qualifyingEvidenceId,
-					evolutionEventsDir: prepared.eventsDir,
 					now: prepared.now,
 				});
 			} finally {
@@ -623,37 +802,7 @@ export function ingestObservationsForSession(
 			observation_ids: [],
 		};
 	}
-	let productionDaySequence = 0;
-	if (prepared.qualifyingEvidenceId) {
-		const receipt = resolveProductionDayReceipt({
-			root: input.root,
-			projectId: prepared.projectId,
-			timezone: prepared.timezone,
-			evolutionEventsDir: prepared.eventsDir,
-			evidenceId: prepared.qualifyingEvidenceId,
-		});
-		if (receipt) productionDaySequence = receipt.ordinal_sequence;
-		else {
-			const db = openEvolutionDb(prepared.dbPath);
-			try {
-				productionDaySequence = appendProductionDayAllocation({
-					root: input.root,
-					db,
-					projectId: prepared.projectId,
-					timezone: prepared.timezone,
-					sessionId: prepared.session,
-					evidenceId: prepared.qualifyingEvidenceId,
-					evolutionEventsDir: prepared.eventsDir,
-					now: prepared.now,
-				}).ordinal_sequence;
-			} finally {
-				db.close();
-			}
-		}
-		if (productionDaySequence <= 0)
-			throw new Error("qualifying evidence did not produce a production day");
-	}
-	if (prepared.candidates.length === 0) {
+	if (prepared.candidates.length === 0 && !prepared.qualifyingEvidenceId) {
 		return {
 			appended: 0,
 			duplicates: prepared.preview.duplicate_count,
@@ -662,47 +811,41 @@ export function ingestObservationsForSession(
 			observation_ids: [],
 		};
 	}
-	let appended = 0;
-	let duplicates = prepared.preview.duplicate_count;
-	let skipped = 0;
-	const warnings: string[] = [];
-	const observationIds: string[] = [];
 	const db = openEvolutionDb(prepared.dbPath);
 	try {
-		for (const candidate of prepared.candidates) {
-			try {
-				const record = normalizeObservationRecord({
-					...candidate,
-					productionDaySequence,
-				});
-				const result = appendObservationJournalEventWithStatus({
-					root: input.root,
-					db,
-					projectId: prepared.projectId,
-					timezone: prepared.timezone,
-					evolutionEventsDir: prepared.eventsDir,
-					observation: record,
-					now: prepared.now,
-				});
-				if (result.appended) {
-					appended++;
-					observationIds.push(record.id);
-				} else duplicates++;
-			} catch (error) {
-				warnings.push(
-					`observer failed for candidate ${candidate.id ?? "unknown"}: ${(error as Error).message}`,
-				);
-				skipped++;
-			}
+		const productionDaySequence = ensureProductionDaySequence({
+			root: input.root,
+			db,
+			projectId: prepared.projectId,
+			timezone: prepared.timezone,
+			eventsDir: prepared.eventsDir,
+			session: prepared.session,
+			...(prepared.qualifyingEvidenceId
+				? { evidenceId: prepared.qualifyingEvidenceId }
+				: {}),
+			now: prepared.now,
+		});
+		if (prepared.candidates.length === 0) {
+			return {
+				appended: 0,
+				duplicates: prepared.preview.duplicate_count,
+				skipped: 0,
+				warnings: [],
+				observation_ids: [],
+			};
 		}
+		return appendObservationCandidates({
+			root: input.root,
+			projectId: prepared.projectId,
+			timezone: prepared.timezone,
+			eventsDir: prepared.eventsDir,
+			db,
+			now: prepared.now,
+			candidates: prepared.candidates,
+			initialDuplicates: prepared.preview.duplicate_count,
+			productionDaySequence,
+		});
 	} finally {
 		db.close();
 	}
-	return {
-		appended,
-		duplicates,
-		skipped,
-		warnings,
-		observation_ids: observationIds,
-	};
 }

@@ -1,24 +1,30 @@
 const SECRET_KEY =
-	/(?:authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|cookie|set-cookie|private[_-]?key)/i;
+	/(?:authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|cookie|set-cookie|sessionid|private[_-]?key)/i;
 
 function redactText(value: string): string {
 	return value
+		.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/@\s:]+:[^/@\s]+@/gi, "$1<redacted>@")
+		.replace(
+			/("|')(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|cookie|set-cookie|sessionid|private[_-]?key)\1\s*:\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\]\s]+)/gi,
+			'$1$2$1:"<redacted>"',
+		)
+		.replace(/\b(cookie|set-cookie)\s*[:=]\s*[^\r\n]+/gi, "$1=<redacted>")
 		.replace(
 			/\b(authorization)\s*[:=]\s*(?:bearer\s+)?[^\s,;]+/gi,
 			"$1=<redacted>",
 		)
 		.replace(/\b(bearer)\s+[^\s,;]+/gi, "$1 <redacted>")
-		.replace(/\b( basic|digest)\s+[^\s,;]+/gi, "$1 <redacted>")
+		.replace(/\b(basic|digest)\s+[^\s,;]+/gi, "$1 <redacted>")
 		.replace(
 			/(--(?:api[_-]?key|access[_-]?token|authorization|password|secret|token))\s+[^\s,;]+/gi,
 			"$1 <redacted>",
 		)
 		.replace(
-			/([?&](?:api[_-]?key|access[_-]?token|authorization|password|secret|token)=)[^&#\s]+/gi,
+			/([?&](?:api[_-]?key|access[_-]?token|authorization|password|secret|token|cookie|sessionid)=)[^&#\s]+/gi,
 			"$1<redacted>",
 		)
 		.replace(
-			/\b(api[_ -]?key|access[_-]?token|authorization|password|secret|token)\s*[:=]\s*[^\s,;]+/gi,
+			/\b(api[_ -]?key|access[_-]?token|authorization|password|secret|token|sessionid)\s*[:=]\s*[^\s,;]+/gi,
 			"$1=<redacted>",
 		)
 		.replace(/\b(sk-[A-Za-z0-9_-]{12,})\b/g, "<redacted>");

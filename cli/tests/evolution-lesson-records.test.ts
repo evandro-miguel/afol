@@ -16,6 +16,7 @@ import {
 	lessonJournalPath,
 	readLessonRecords,
 	recordLessonApplication,
+	resolveLessonVersionForAdoption,
 	selectContextLessons,
 } from "../services/evolution/lesson-records";
 
@@ -363,6 +364,54 @@ describe("evolve lessons", () => {
 		}
 	});
 
+	test("lesson adoption binds the exact current version and field digest", () => {
+		const root = fixture();
+		try {
+			writeSession(
+				root,
+				"S-adopt",
+				statement({
+					problem: "A path calculation omitted a nested directory.",
+					appliesWhen: "cli/services/path.ts",
+					action: "Resolve paths against the configured project root.",
+					evidence: "E-ADOPT",
+					verify: "bun test cli/tests/path.test.ts",
+				}),
+				[evidenceRow({ id: "E-ADOPT" })],
+			);
+			ingestLessonStatements({
+				root,
+				session: "S-adopt",
+				now: new Date("2026-08-11T13:00:00.000Z"),
+			});
+			const lesson = readLessonRecords(root)[0]?.current[0];
+			expect(lesson).toBeDefined();
+			if (!lesson) return;
+			expect(
+				resolveLessonVersionForAdoption(
+					root,
+					lesson.lesson_id,
+					lesson.version_id,
+					lesson.field_set_digest,
+				),
+			).toMatchObject({
+				lesson_id: lesson.lesson_id,
+				version_id: lesson.version_id,
+				field_set_digest: lesson.field_set_digest,
+			});
+			expect(() =>
+				resolveLessonVersionForAdoption(
+					root,
+					lesson.lesson_id,
+					lesson.version_id,
+					"f".repeat(64),
+				),
+			).toThrow("missing, stale, or contradicted");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("a same-session correction replaces the previous version and keeps the origin row", () => {
 		const root = fixture();
 		try {
@@ -672,7 +721,7 @@ describe("evolve lessons", () => {
 		}
 	});
 
-	test("loads at most two relevant lessons into the next context bundle", () => {
+	test("keeps ingested lesson candidates out of context until adopted", () => {
 		const root = fixture(true);
 		try {
 			const statements = [1, 2, 3].map((index) =>
@@ -706,17 +755,10 @@ describe("evolve lessons", () => {
 				surface: "general",
 				mode: "balanced",
 			});
-			expect(bundle.lessons).toBeDefined();
-			expect(bundle.lessons?.lessons).toHaveLength(2);
-			expect(bundle.lessons?.bytes).toBeLessThanOrEqual(800);
-			expect(bundle.lessons?.truncated).toBe(true);
-			expect(bundle.lessons?.shown_lesson_ids).toEqual(
-				lessons.slice(0, 2).map((lesson) => lesson.lesson_id),
-			);
-			expect(bundle.lessons?.lessons[0]?.preventive_action).toBe(
-				"take the shared lock before the durable write 3.",
-			);
-			// Shown ids are recorded without marking any lesson applied.
+			expect(bundle.lessons).toBeUndefined();
+			expect(bundle.approved_guidance).toBeUndefined();
+			expect(JSON.stringify(bundle)).not.toContain("durable writer raced");
+			// A candidate can still be inspected without entering active context.
 			expect(
 				lessons.every((lesson) => lesson.current[0]?.application_count === 0),
 			).toBe(true);
@@ -767,7 +809,7 @@ describe("evolve lessons", () => {
 		}
 	});
 
-	test("keeps the lesson section within the 800-byte cap", () => {
+	test("keeps the candidate lesson selector within the 800-byte cap", () => {
 		const root = fixture(true);
 		try {
 			writeSession(
@@ -797,16 +839,14 @@ describe("evolve lessons", () => {
 				session: "S-01",
 				now: new Date("2026-08-11T13:00:00.000Z"),
 			});
-			const bundle = buildContextBundle(root, {
-				filePath: "cli/services/io/writer.ts",
-				surface: "general",
-				mode: "balanced",
-			});
-			expect(bundle.lessons?.lessons).toHaveLength(1);
-			expect(bundle.lessons?.bytes).toBeLessThanOrEqual(800);
-			expect(bundle.lessons?.bytes).toBeGreaterThan(0);
-			expect(bundle.lessons?.truncated).toBe(true);
-			expect(bundle.lessons?.lessons[0]?.problem).toBe(
+			const lessons = selectContextLessons(readLessonRecords(root), [
+				"cli/services/io/writer.ts",
+			]);
+			expect(lessons?.lessons).toHaveLength(1);
+			expect(lessons?.bytes).toBeLessThanOrEqual(800);
+			expect(lessons?.bytes).toBeGreaterThan(0);
+			expect(lessons?.truncated).toBe(true);
+			expect(lessons?.lessons[0]?.problem).toBe(
 				"the durable writer raced with the shared reader.",
 			);
 		} finally {

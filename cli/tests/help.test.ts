@@ -144,6 +144,18 @@ describe("help formatter", () => {
 		expect(unknown).toBeNull();
 	});
 
+	test("evolve help describes read-only evaluation and exact context revocation", () => {
+		const help = formatCommandHelp("evolve", kernelRegistry);
+		expect(help).toContain(
+			"proposal evaluate <proposal-id> --version <sha256> [--json] [read]",
+		);
+		expect(help).toContain(
+			"proposal evaluate <proposal-id> --version <sha256> --record [--json] [write]",
+		);
+		expect(help).toContain("Retire exact applied context guidance");
+		expect(help).toContain("never rolls back code or skill file changes");
+	});
+
 	test("formats fleet command help", () => {
 		const help = formatCommandHelp("fleet", kernelRegistry);
 

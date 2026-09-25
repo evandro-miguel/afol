@@ -229,7 +229,16 @@
 			"feedback purge --confirm",
 			"feedback last -m <text>",
 			"evolve status [--json]",
-			"evolve backfill [--offset <n>] [--limit <1-10>] [--json]",
+			"evolve artifacts [--session <id>]... [--cursor <token>] [--limit <1-10>] [--artifact <canonical-name>]... [--byte-offset <n>] [--json]",
+			"evolve backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",
+			"evolve proposal schema [--json]",
+			"evolve proposal prepare --packet <path> --dry-run [--json]",
+			"evolve proposal show <proposal-id> [--operation <1-8>] [--field <before|after|content|rationale|statement> --offset <bytes> --bytes <1-12000>] [--json]",
+			"evolve proposal decide <proposal-id> --version <sha256> --decision <approve|defer|reject> [--reason <text>] [--resume-when <condition>] [--reconsider-rejection] [--json]",
+			"evolve proposal apply <proposal-id> --version <sha256> [--json]",
+			"evolve proposal evaluate <proposal-id> --version <sha256> [--json]",
+			"evolve proposal evaluate <proposal-id> --version <sha256> --record [--json]",
+			"evolve proposal revoke <proposal-id> --version <sha256> --reason <text> [--json]",
 			"done -- <argv...>"
 		],
 		"journeys": [

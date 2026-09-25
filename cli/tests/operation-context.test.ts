@@ -101,6 +101,31 @@ describe("operation-context", () => {
 		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
 	});
 
+	test("evolve backfill --run resolves as a write action and is denied when restricted", () => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "backfill",
+			args: ["--run", "--limit", "1"],
+		});
+		expect(policy).toEqual({
+			action: "evolve.backfill.run",
+			sideEffect: "write",
+		});
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
+		expect(
+			isActionAllowed(
+				agentOperationContext(),
+				resolveCanonicalAction({
+					kind: "subcommand",
+					group: "evolve",
+					action: "backfill",
+					args: [],
+				}),
+			),
+		).toBe(true);
+	});
+
 	test("closed evidence repair keeps preview readable and mutations approval-gated", () => {
 		const reverify = resolveCanonicalAction({
 			kind: "evidence",
@@ -260,6 +285,43 @@ describe("operation-context", () => {
 		).toBe(true);
 		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
 		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(false);
+	});
+
+	test("assisted proposal evaluation preview is readable while recording is local-interactive only", () => {
+		const versionArgs = [
+			"evaluate",
+			"EP-0123456789abcdef01234567",
+			"--version",
+			"a".repeat(64),
+			"--json",
+		];
+		const preview = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "proposal",
+			args: versionArgs,
+		});
+		const record = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action: "proposal",
+			args: [...versionArgs, "--record"],
+		});
+		expect(preview).toEqual({
+			action: "evolve.proposal.evaluate",
+			sideEffect: "read",
+		});
+		expect(isActionAllowed(agentOperationContext(), preview)).toBe(true);
+		expect(isActionAllowed(remoteOperationContext(), preview)).toBe(true);
+		expect(record).toEqual({
+			action: "evolve.proposal.evaluation.record",
+			sideEffect: "write",
+		});
+		expect(isActionAllowed(agentOperationContext(), record)).toBe(false);
+		expect(isActionAllowed(remoteOperationContext(), record)).toBe(false);
+		expect(
+			isActionAllowed(resolveOperationContext([], {}, true).ctx, record),
+		).toBe(true);
 	});
 
 	test("resolveOperationContext defaults to local", () => {
