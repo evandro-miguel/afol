@@ -248,7 +248,7 @@
     ".afol/adm/hooks/coordination-radar.md": "21cab4fc371cf183d6ef67e96ace30f1bad2352c1c589b2cc6c532bdad076ca3",
     ".afol/adm/hooks/index.json": "f090d9113eded29a33d58b8d6f04ed2a288a60e51483ef247713c4e6f0ff46bc",
     ".afol/adm/rules/README.md": "82c484842d42fe25d2a9405b191646d359a7b5c40bcdd974d8c3b382286f69db",
-    ".afol/adm/rules/RULE-002-workstream-creation.md": "2095193efd1a8ac84b37219ef2bb9c99d20b2f920800c72309548365146b717c",
+    ".afol/adm/rules/RULE-002-workstream-creation.md": "881a1938fad0b49615193402d04edfaf6bf4ccdc9fa1db944aa04c8b51361b8f",
     ".afol/adm/rules/RULE-003-documentation-standards.md": "9336f98a2e7d0ee31fd4dadf50b4bca6f1a47c3b419ba1b1e1e0cfffe91ada97",
     ".afol/adm/rules/RULE-004-validation-linting.md": "f220c365a8e80b4b2688b368d4b3c5c75d9d7c8678c2ba6b4ae072f0ffd632bc",
     ".afol/adm/rules/RULE-005-folder-structure.md": "9c2e055888b8a111fcabf59848e48bd2f4cddbca8632e26e4b353d6dfebdd7df",
@@ -267,7 +267,7 @@
     ".afol/data/events/README.md": "3187e3fb4bbeee880e01d1df6e1f564993ea6370ddde4bd81e16a7bc02b62103",
     ".afol/data/index/README.md": "5e9866eda19943dbd5f99e7974f33aaf7d42df6e333530b15379c9cacdfc12cf",
     ".afol/data/telemetry/schemas/event.json": "72f24c2ef94c4007587abc4c54b98baa64926690ca2187c7763a74b74e24d0bf",
-    ".afol/tmp/README.md": "d3a7ca98c510d9f8177a51b193d4dc4d74e8fc07da39aa7de5b901f7348e1b66",
+    ".afol/tmp/README.md": "d464ef7b8d3573dec73471ada5a88ecb3c8b4451eae94b5e8e701d40393b86dd",
     ".agents/skills/README.md": "74aa643c7627790039afcf572704f2486b558061de0edd8cf9a56b567d88f4a5"
   },
   "command_stability": {
