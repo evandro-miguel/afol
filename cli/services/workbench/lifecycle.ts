@@ -6,11 +6,10 @@ import {
 	mkdirSync,
 	openSync,
 	readFileSync,
-	rmSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import type { OperationContext } from "../../core/operation-context";
 import {
 	appendEventLedgerRecords,
@@ -32,8 +31,10 @@ import {
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
+import type { StateBoardTableColumns } from "../local-state/workbench-index";
 import {
 	appendEventsAndRebuildWorkBenchIndex,
+	parseCanonicalStateBoardTasks,
 	rebuildWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { admitsEvidenceTransitionIssue } from "../project/evidence-transition-admission";
@@ -51,7 +52,6 @@ import {
 	scalarValue,
 } from "./session-lifecycle-state";
 import { loadEvidenceEntries, sessionPaths } from "./session-reader";
-import { parseStateBoardTaskRow } from "./state-board";
 import type { EvidenceEntry, EvidenceProvenance, TaskState } from "./types";
 
 export type { SessionLifecycleState } from "./session-lifecycle-state";
@@ -413,6 +413,12 @@ type TaskRow = {
 	owner: string;
 	notes: string;
 	attempt: number;
+};
+
+type IndexedTaskRow = TaskRow & {
+	lineNumber: number;
+	cells: string[];
+	columns: StateBoardTableColumns;
 };
 
 const TASK_STATE_TRANSITIONS: Readonly<
@@ -803,40 +809,69 @@ function assertTaskInProgressLocked(
 	}
 }
 
-function parseTaskRow(line: string): TaskRow | null {
-	const parsed = parseStateBoardTaskRow(line);
-	if (!parsed) {
-		return null;
+function parseTaskRowsFromContent(
+	taskPath: string,
+	content: string,
+): IndexedTaskRow[] {
+	const lines = content.split(/\r?\n/);
+	const parsed = parseCanonicalStateBoardTasks(
+		basename(dirname(taskPath)),
+		taskPath,
+		content,
+	);
+	const seenTaskIds = new Set<string>();
+	const rows: IndexedTaskRow[] = [];
+	for (const task of parsed.tasks) {
+		if (task.columns.notesColumn === null) {
+			throw new Error(
+				`State Board requires a Notes column for lifecycle changes in ${taskPath}`,
+			);
+		}
+		if (seenTaskIds.has(task.task_id)) {
+			throw new Error(`Duplicate task id ${task.task_id} in ${taskPath}`);
+		}
+		seenTaskIds.add(task.task_id);
+		const line = lines[task.line - 1];
+		if (line === undefined) {
+			throw new Error(
+				`Task ${task.task_id} has an invalid source line in ${taskPath}`,
+			);
+		}
+		const attemptMatch = task.notes.match(/(?:^|\s)attempt=(\d+)(?=\s|$)/);
+		rows.push({
+			line,
+			taskId: task.task_id,
+			state: task.state,
+			owner: task.owner,
+			notes: task.notes,
+			attempt: Number.parseInt(attemptMatch?.[1] ?? "0", 10),
+			lineNumber: task.line,
+			cells: task.cells,
+			columns: task.columns,
+		});
 	}
-	const notes = parsed.notes;
-	const attemptMatch = notes.match(/(?:^|\s)attempt=(\d+)(?=\s|$)/);
-	return {
-		line,
-		taskId: parsed.taskId,
-		state: parsed.state,
-		owner: parsed.owner,
-		notes,
-		attempt: Number.parseInt(attemptMatch?.[1] ?? "0", 10),
-	};
+	return rows;
 }
 
-function renderTaskRow(row: Omit<TaskRow, "line">): string {
-	return `| ${row.taskId} | ${row.state} | ${row.owner} | ${row.notes} |`;
-}
-
-function readTaskRows(taskPath: string): TaskRow[] {
+function readTaskRows(taskPath: string): IndexedTaskRow[] {
 	if (!existsSync(taskPath)) {
 		throw new Error(`Task file not found: ${taskPath}`);
 	}
-	const lines = readFileSync(taskPath, "utf8").split("\n");
-	const rows: TaskRow[] = [];
-	for (const line of lines) {
-		const row = parseTaskRow(line);
-		if (row) {
-			rows.push(row);
-		}
+	return parseTaskRowsFromContent(taskPath, readFileSync(taskPath, "utf8"));
+}
+
+function renderTaskRow(
+	row: Omit<TaskRow, "line">,
+	original: IndexedTaskRow,
+): string {
+	const cells = [...original.cells];
+	cells[original.columns.taskColumn] = row.taskId;
+	cells[original.columns.stateColumn] = row.state;
+	cells[original.columns.ownerColumn] = row.owner;
+	if (original.columns.notesColumn !== null) {
+		cells[original.columns.notesColumn] = row.notes;
 	}
-	return rows;
+	return `| ${cells.join(" | ")} |`;
 }
 
 function setFrontmatterValue(
@@ -1144,10 +1179,17 @@ function transitionTaskStateChains(
 			.map((change) => [change.taskId, change]),
 	);
 	if (pending.size === 0) return;
-	const lines = readFileSync(taskPath, "utf8").split("\n");
+	const content = readFileSync(taskPath, "utf8");
+	const lines = content.split(/\r?\n/);
+	const rowsByLine = new Map(
+		parseTaskRowsFromContent(taskPath, content).map((row) => [
+			row.lineNumber - 1,
+			row,
+		]),
+	);
 	const found = new Set<string>();
-	const nextLines = lines.map((line) => {
-		const parsedRow = parseTaskRow(line);
+	const nextLines = lines.map((line, index) => {
+		const parsedRow = rowsByLine.get(index);
 		const change = parsedRow ? pending.get(parsedRow.taskId) : undefined;
 		if (!parsedRow || !change) {
 			return line;
@@ -1206,7 +1248,7 @@ function transitionTaskStateChains(
 				notes: [row.notes, change.notesSuffix].filter(Boolean).join(" "),
 			};
 		}
-		return renderTaskRow(row);
+		return renderTaskRow(row, parsedRow);
 	});
 	const missing = [...pending.keys()].filter((taskId) => !found.has(taskId));
 	if (missing.length > 0) {
@@ -2824,6 +2866,7 @@ export function closeSession(
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
+		let taskRows = readTaskRows(paths.taskPath);
 		let closeEventRecorded: boolean;
 		if (state.kind === "closed") {
 			markPlanMetadataClosed(paths.planPath, session, state.closedAt);
@@ -2841,13 +2884,9 @@ export function closeSession(
 			: "missing";
 		let summarySource: CloseSessionReport["summary_source"] = "state";
 		let summary = options.summary?.trim() ?? "";
-		let taskRows = readTaskRows(paths.taskPath);
 		const originalTask = readFileSync(paths.taskPath, "utf8");
 		const originalPlan = existsSync(paths.planPath)
 			? readFileSync(paths.planPath, "utf8")
-			: undefined;
-		const originalActiveSession = existsSync(paths.activeSessionPath)
-			? readFileSync(paths.activeSessionPath, "utf8")
 			: undefined;
 		const hadLog = existsSync(paths.logPath);
 		const originalLog = hadLog
@@ -2857,26 +2896,42 @@ export function closeSession(
 		let continuation: NewWorkstreamResult | undefined;
 		let recoveredContinuation: string | undefined;
 		let continuationTheme = "";
-		const rollbackContinuation = () => {
-			if (!continuation) return;
+		let continuationCarryRows: TaskRow[] = [];
+		let continuationCarryReason = "";
+		let continuationMappedSourceTask: string | undefined;
+		const preserveContinuation = (): string | undefined => {
+			if (!continuation) return undefined;
+			const continuationSession = continuation.session;
+			let mappingStatus = "";
 			try {
-				options.onContinuationRollback?.();
+				const currentTask = readFileSync(paths.taskPath, "utf8");
+				if (currentTask === originalTask && continuationCarryRows.length > 0) {
+					transitionTaskStateChains(
+						paths.taskPath,
+						continuationCarryRows.map((row) => ({
+							taskId: row.taskId,
+							nextStates: carryOpenTransitionChain(row.state),
+							notesSuffix: `destination=${continuationSession} reason=${continuationCarryReason}`,
+						})),
+					);
+					continuationMappedSourceTask = readFileSync(paths.taskPath, "utf8");
+				} else if (
+					continuationMappedSourceTask === undefined ||
+					currentTask !== continuationMappedSourceTask
+				) {
+					mappingStatus =
+						"; source task state changed, so review its continuation mapping manually";
+				}
 			} catch {
-				// The original close failure remains the actionable error.
-			}
-			atomicWriteText(paths.taskPath, originalTask);
-			rmSync(continuation.sessionDir, { recursive: true, force: true });
-			if (originalActiveSession !== undefined) {
-				atomicWriteText(paths.activeSessionPath, originalActiveSession);
-			} else if (existsSync(paths.activeSessionPath)) {
-				unlinkSync(paths.activeSessionPath);
+				mappingStatus =
+					"; source-to-continuation mapping could not be verified, so review the source task file";
 			}
 			try {
 				refreshWorkbenchLocalState(root);
 			} catch {
-				// The original close failure remains the actionable error.
+				// Preserve the close error and linked continuation if index refresh fails.
 			}
-			continuation = undefined;
+			return `preserved continuation ${continuationSession} as an open session; resume it and retry close${mappingStatus}`;
 		};
 		const checklistCloseWarnings: string[] = [];
 		if (state.kind === "open") {
@@ -2897,6 +2952,8 @@ export function closeSession(
 						blockingRows,
 						carryReason,
 					);
+					continuationCarryRows = blockingRows;
+					continuationCarryReason = carryReason;
 					continuation = newWorkstream(root, carry.theme, carry.metadata, {
 						deferNewSessionAuxiliary: true,
 					});
@@ -2913,9 +2970,12 @@ export function closeSession(
 							})),
 						);
 						taskRows = readTaskRows(paths.taskPath);
+						continuationMappedSourceTask = readFileSync(paths.taskPath, "utf8");
 					} catch (error) {
-						rollbackContinuation();
-						throw error;
+						const preservation = preserveContinuation();
+						throw preservation
+							? new Error(`${(error as Error).message}; ${preservation}`)
+							: error;
 					}
 				} else {
 					const labels = blockingRows
@@ -2966,10 +3026,13 @@ export function closeSession(
 				const message =
 					verification.issues.map((issue) => issue.message).join("; ") ||
 					"strict verification failed";
-				rollbackContinuation();
-				throw new Error(
+				const closeError = new Error(
 					`Session ${session} failed strict verification: ${message}`,
 				);
+				const preservation = preserveContinuation();
+				throw preservation
+					? new Error(`${closeError.message}; ${preservation}`)
+					: closeError;
 			}
 			if (reportStatus === "missing") {
 				if (!options.allowNoReport) {
@@ -3049,8 +3112,10 @@ export function closeSession(
 						unlinkSync(paths.logPath);
 					}
 				}
-				rollbackContinuation();
-				throw error;
+				const preservation = preserveContinuation();
+				throw preservation
+					? new Error(`${(error as Error).message}; ${preservation}`)
+					: error;
 			}
 		} else {
 			// An omitted close event can be recovered after an interrupted auxiliary

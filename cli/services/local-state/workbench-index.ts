@@ -76,7 +76,7 @@ type WorkbenchIndexSnapshotInput = Omit<WorkbenchIndexSnapshot, "tasks"> & {
 };
 
 const TASK_FILE_RE = /^.+_task_\d+\.md$/;
-const STATE_BOARD_HEADING_RE = /^#{2,6}\s+State Board\b/i;
+const STATE_BOARD_HEADING_RE = /^ {0,3}#{2,6}\s+State Board\b/i;
 const TASK_HEADING_RE = /^#{2,6}\s+(T-\d{2,3})\b/i;
 const CHECKPOINT_HEADING_RE = /^#{2,6}\s+.+checkpoint\b/i;
 const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
@@ -487,7 +487,7 @@ function parseTaskFileClaim(
 	};
 }
 
-type StateBoardTable = {
+export type StateBoardTableColumns = {
 	columnCount: number;
 	taskColumn: number;
 	stateColumn: number;
@@ -495,9 +495,15 @@ type StateBoardTable = {
 	notesColumn: number | null;
 };
 
+type ParsedStateBoardTask = CanonicalStateBoardTask & {
+	cells: string[];
+	columns: StateBoardTableColumns;
+};
+
 type ParsedStateBoardTasks = {
-	tasks: Array<Omit<WorkbenchIndexTask, "planned_files" | "touched_files">>;
+	tasks: ParsedStateBoardTask[];
 	malformed: boolean;
+	hasStateBoardHeading: boolean;
 };
 
 /**
@@ -513,7 +519,7 @@ type ParsedStateBoardTasks = {
 function parseStateBoardTableHeader(
 	line: string,
 	allowExtraColumns: boolean,
-): StateBoardTable | null {
+): StateBoardTableColumns | null {
 	const cells = parseMarkdownTableCells(line);
 	if (!cells) {
 		return null;
@@ -568,7 +574,10 @@ function parseStateBoardTableHeader(
 	};
 }
 
-function isTableSeparator(cells: string[], table: StateBoardTable): boolean {
+function isTableSeparator(
+	cells: string[],
+	table: StateBoardTableColumns,
+): boolean {
 	return (
 		cells.length === table.columnCount &&
 		cells.every((cell) => /^:?-+:?$/.test(cell))
@@ -579,33 +588,57 @@ function parseStateBoardTasks(
 	session: string,
 	file: string,
 	lines: string[],
+	options: {
+		requireStateBoardHeading?: boolean;
+		legacySingleTable?: boolean;
+	} = {},
 ): ParsedStateBoardTasks {
-	const tasks: Array<
-		Omit<WorkbenchIndexTask, "planned_files" | "touched_files">
-	> = [];
+	const tasks: ParsedStateBoardTask[] = [];
 	let afterStateBoard = false;
-	let table: StateBoardTable | null = null;
+	let hasStateBoardHeading = false;
+	let stateBoardTableFound = false;
+	let legacyTableFound = false;
+	let table: StateBoardTableColumns | null = null;
 	let malformed = false;
-	let insideCodeBlock = false;
+	let fence: { marker: "`" | "~"; length: number } | null = null;
 
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index] ?? "";
 		const trimmed = line.trim();
+		if (fence) {
+			const closing = line.match(/^ {0,3}(`+|~+)[\t ]*$/)?.[1];
+			if (
+				closing &&
+				closing[0] === fence.marker &&
+				closing.length >= fence.length
+			) {
+				fence = null;
+			}
+			table = null;
+			continue;
+		}
 		if (!trimmed) {
 			table = null;
 			continue;
 		}
 
-		if (trimmed.startsWith("```")) {
-			insideCodeBlock = !insideCodeBlock;
-			continue;
-		}
-		if (insideCodeBlock) {
+		const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+		if (
+			opening &&
+			!(opening[1]?.[0] === "`" && opening[2]?.includes("`") === true)
+		) {
+			const marker = opening[1]?.[0];
+			if (marker === "`" || marker === "~") {
+				fence = { marker, length: opening[1]?.length ?? 0 };
+			}
+			table = null;
 			continue;
 		}
 
-		if (STATE_BOARD_HEADING_RE.test(trimmed)) {
+		if (STATE_BOARD_HEADING_RE.test(line)) {
+			hasStateBoardHeading = true;
 			afterStateBoard = true;
+			stateBoardTableFound = false;
 			table = null;
 			continue;
 		}
@@ -615,13 +648,21 @@ function parseStateBoardTasks(
 			continue;
 		}
 
-		const header = parseStateBoardTableHeader(trimmed, afterStateBoard);
+		const mayStartTable = afterStateBoard
+			? !stateBoardTableFound
+			: !options.requireStateBoardHeading &&
+				(!options.legacySingleTable || !legacyTableFound);
+		const header = mayStartTable
+			? parseStateBoardTableHeader(trimmed, afterStateBoard)
+			: null;
 		if (header) {
 			table = header;
+			if (afterStateBoard) stateBoardTableFound = true;
+			else legacyTableFound = true;
 			continue;
 		}
 		if (!table) {
-			if (afterStateBoard && trimmed.startsWith("|")) {
+			if (afterStateBoard && !stateBoardTableFound && trimmed.startsWith("|")) {
 				malformed = true;
 			}
 			continue;
@@ -662,11 +703,45 @@ function parseStateBoardTasks(
 			file,
 			line: index + 1,
 			touched_at: parseTouchedAt(file),
+			cells,
+			columns: table,
 		});
 	}
 
-	return { tasks, malformed };
+	return { tasks, malformed, hasStateBoardHeading };
 }
+
+export function parseCanonicalStateBoardTasks(
+	session: string,
+	file: string,
+	content: string,
+): ParsedCanonicalStateBoardTasks {
+	const lines = content.split(/\r?\n/);
+	const canonical = parseStateBoardTasks(session, file, lines, {
+		requireStateBoardHeading: true,
+	});
+	const parsed = canonical.hasStateBoardHeading
+		? canonical
+		: parseStateBoardTasks(session, file, lines, {
+				legacySingleTable: true,
+			});
+	return { tasks: parsed.tasks, malformed: parsed.malformed };
+}
+
+export type CanonicalStateBoardTask = Omit<
+	WorkbenchIndexTask,
+	"planned_files" | "touched_files"
+>;
+
+export type CanonicalStateBoardTaskRow = CanonicalStateBoardTask & {
+	cells: string[];
+	columns: StateBoardTableColumns;
+};
+
+export type ParsedCanonicalStateBoardTasks = {
+	tasks: CanonicalStateBoardTaskRow[];
+	malformed: boolean;
+};
 
 function parseTaskClaims(
 	lines: string[],
@@ -756,8 +831,9 @@ function parseTaskRows(
 	file: string,
 ): { tasks: WorkbenchIndexTask[]; malformed: boolean } {
 	try {
-		const lines = readFileSync(file, "utf8").split("\n");
-		const parsedBoard = parseStateBoardTasks(session, file, lines);
+		const content = readFileSync(file, "utf8");
+		const lines = content.split(/\r?\n/);
+		const parsedBoard = parseCanonicalStateBoardTasks(session, file, content);
 		const parsedClaims = parseTaskClaims(
 			lines,
 			parsedBoard.tasks.map((task) => task.task_id),
@@ -765,8 +841,9 @@ function parseTaskRows(
 		return {
 			tasks: parsedBoard.tasks.map((task) => {
 				const claims = parsedClaims.get(task.task_id) ?? emptyTaskClaims();
+				const { cells: _cells, columns: _columns, ...indexTask } = task;
 				return {
-					...task,
+					...indexTask,
 					planned_files: dedupeClaims(claims.planned_files),
 					touched_files: dedupeClaims(claims.touched_files),
 				};

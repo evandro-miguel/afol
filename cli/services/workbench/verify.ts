@@ -1,9 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { collectSessionIds } from "../local-state/workbench-index";
+import {
+	collectSessionIds,
+	parseCanonicalStateBoardTasks,
+} from "../local-state/workbench-index";
 import { resolveProjectPaths } from "../project/paths";
 import { loadProjectRoot } from "../project/root";
-import { parseStateBoardTaskRow } from "./state-board";
 import {
 	readVerificationRunLedgerAtSessionPath,
 	verificationRunRecordsAuthorize,
@@ -252,10 +254,21 @@ function resolveVerifyScopeRoot(sessionPath: string): string {
 }
 
 function parseTasks(content: string, file: string): VerifyTask[] {
-	const tasks: VerifyTask[] = [];
+	const tasks: VerifyTask[] = parseCanonicalStateBoardTasks(
+		"",
+		file,
+		content,
+	).tasks.map((task) => ({
+		id: task.task_id,
+		state: normalizeState(task.state),
+		description: task.notes,
+		file,
+		line: task.line,
+		completionPolicy: completionPolicyFromNotes(task.notes),
+		attempt: attemptFromNotes(task.notes),
+	}));
 	const lines = content.split(/\r?\n/);
 	let inCodeBlock = false;
-	let inStateBoard = false;
 
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index] ?? "";
@@ -269,35 +282,6 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 		if (inCodeBlock) {
 			continue;
 		}
-		if (/^\|\s*Task\s*\|\s*State\s*\|/i.test(trimmed)) {
-			inStateBoard = true;
-			continue;
-		}
-		if (inStateBoard && trimmed === "") {
-			inStateBoard = false;
-			continue;
-		}
-
-		if (inStateBoard) {
-			if (/^\|\s*-+/.test(trimmed)) {
-				continue;
-			}
-			const stateBoardRow = parseStateBoardTaskRow(line);
-			if (stateBoardRow) {
-				const notes = stateBoardRow.notes;
-				tasks.push({
-					id: stateBoardRow.taskId,
-					state: normalizeState(stateBoardRow.state),
-					description: notes,
-					file,
-					line: lineNumber,
-					completionPolicy: completionPolicyFromNotes(notes),
-					attempt: attemptFromNotes(notes),
-				});
-				continue;
-			}
-		}
-
 		const legacyMatch = line.match(LEGACY_TASK_RE);
 		if (legacyMatch?.[1] && legacyMatch[2]) {
 			tasks.push({
@@ -312,7 +296,7 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 		}
 	}
 
-	return tasks;
+	return tasks.sort((left, right) => left.line - right.line);
 }
 
 function findOpenChecklistItems(content: string, file: string): VerifyIssue[] {
