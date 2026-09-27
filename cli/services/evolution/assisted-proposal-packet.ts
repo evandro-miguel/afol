@@ -341,13 +341,16 @@ function validTargetPath(
 	return { relativePath: canonical, absolutePath };
 }
 
-function targetAllowed(
+export function targetAllowed(
 	root: string,
 	kind: AssistedProposalKind,
 	relativePath: string,
 ): boolean {
 	const paths = resolveProjectPaths(root);
-	const skills = `${paths.agentsDir.replaceAll("\\", "/")}/skills/`;
+	// Derive the skills root from the configured paths.skillsDir (the same
+	// root the catalog and context guidance read), not from agentsDir, so a
+	// customized skills_dir is honored by prepare and apply alike.
+	const skills = `${paths.skillsDir.replaceAll("\\", "/")}/`;
 	const library = `${paths.libraryDir.replaceAll("\\", "/")}/`;
 	switch (kind) {
 		case "code": {

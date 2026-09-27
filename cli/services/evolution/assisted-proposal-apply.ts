@@ -41,6 +41,7 @@ import {
 } from "./assisted-proposal-journal";
 import {
 	literalReplaceOnce,
+	targetAllowed,
 	type AssistedProposalPreview,
 } from "./assisted-proposal-packet";
 import { assertSafeEvolutionTarget } from "./db";
@@ -110,6 +111,20 @@ function safeTargetPath(root: string, target: string): string {
 	return resolved.value.path;
 }
 
+function assertTargetPolicyAllowed(
+	root: string,
+	preview: AssistedProposalPreview,
+	target: string,
+): void {
+	// Re-check the kind target policy at apply time with the configured
+	// paths.skillsDir, so prepare, apply, and context consumption agree on
+	// the valid skills root (R6).
+	if (!targetAllowed(root, preview.kind, target))
+		throw new Error(
+			`approved target is not allowed for ${preview.kind}: ${target}`,
+		);
+}
+
 function preflightOperation(
 	root: string,
 	preview: AssistedProposalPreview,
@@ -122,6 +137,7 @@ function preflightOperation(
 		const expected = operation.expected_sha256;
 		if (typeof target !== "string" || typeof expected !== "string")
 			throw new Error("prepared skill activation is invalid");
+		assertTargetPolicyAllowed(root, preview, target);
 		const absolutePath = safeTargetPath(root, target);
 		assertSafeEvolutionTarget(absolutePath, "skill activation target", false);
 		const content = readBoundedSourceFile(
@@ -171,6 +187,7 @@ function preflightOperation(
 	const target = operation.target;
 	if (typeof target !== "string")
 		throw new Error("prepared proposal target is invalid");
+	assertTargetPolicyAllowed(root, preview, target);
 	const absolutePath = safeTargetPath(root, target);
 	const stat = assertSafeEvolutionTarget(absolutePath, "proposal target");
 	const existing = readBoundedSourceFile(absolutePath, "proposal target", {
