@@ -1,4 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	setSystemTime,
+	test,
+} from "bun:test";
 import {
 	existsSync,
 	mkdirSync,
@@ -482,6 +489,14 @@ describe("project-benchmark service", () => {
 });
 
 describe("project-benchmark command", () => {
+	beforeEach(() => {
+		setSystemTime(new Date("2026-06-20T00:00:00.000Z"));
+	});
+
+	afterEach(() => {
+		setSystemTime();
+	});
+
 	test("list, show, matrix, recommend, validate, and generate support json output", async () => {
 		const root = createProjectRoot();
 		try {

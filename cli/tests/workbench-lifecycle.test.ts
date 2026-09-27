@@ -3108,7 +3108,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("carry-open compensation preserves canonical state when strict close fails", () => {
+	test("failed carry-open close preserves the continuation and retry reuses it", () => {
 		const root = mkRoot("close-carry-open-compensation");
 		try {
 			writeCliProjectContract(root);
@@ -3131,32 +3131,64 @@ describe("workbench lifecycle service", () => {
 				result: "passed",
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
+			const validEvidence = readFileSync(created.evidencePath, "utf8");
 			writeFileSync(created.evidencePath, "{invalid evidence}\n", "utf8");
 			rebuildWorkBenchIndex(root);
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			const eventsBefore = readLocalStateEvents(root);
-			const close = runKernel(root, [
+			const closeArgs = [
 				"close",
 				"--session",
 				created.session,
 				"--carry-open",
 				"--reason",
 				"wait for dependency",
-			]);
+				"--json",
+			];
+			const close = runKernel(root, closeArgs);
 			expect(close.status).toBe(2);
-			expect(readFileSync(created.taskPath, "utf8")).toContain(
-				"| T-02 | pending |",
+			const sourceAfterFailure = readFileSync(created.taskPath, "utf8");
+			const continuationId = sourceAfterFailure.match(
+				/^\| T-02 \| moved \|[^|]*\|[^|]*destination=([^\s|]+)/m,
+			)?.[1];
+			expect(continuationId).toBeTruthy();
+			if (!continuationId) throw new Error("Expected a linked continuation.");
+			const continuation = sessionPaths(root, continuationId);
+			expect(sourceAfterFailure).toContain(
+				`destination=${continuationId} reason=wait for dependency`,
 			);
 			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
-				created.session,
+				continuationId,
+			);
+			expect(readFileSync(continuation.taskPath, "utf8")).toContain(
+				`continuation_of: "${created.session}"`,
+			);
+			expect(readFileSync(continuation.taskPath, "utf8")).toContain(
+				'status: "active"',
 			);
 			expect(readLocalStateEvents(root)).toEqual(eventsBefore);
 			expect(resolveSession(root, {})).toEqual({
-				session: created.session,
+				session: continuationId,
 				source: "context",
 			});
 			const indexValidation = validateWorkBenchIndex(root);
 			if (!indexValidation.ok) throw new Error(indexValidation.message);
+
+			writeFileSync(created.evidencePath, validEvidence, "utf8");
+			const retry = runKernel(root, closeArgs);
+			expect(retry.status).toBe(0);
+			const retryData = parseEnvelope(retry.stdout as string).data as {
+				continuation?: string;
+			};
+			expect(retryData.continuation).toBe(continuationId);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+			expect(existsSync(continuation.sessionDir)).toBe(true);
+			expect(resolveSession(root, {})).toEqual({
+				session: continuationId,
+				source: "context",
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
