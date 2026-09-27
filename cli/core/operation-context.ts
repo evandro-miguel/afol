@@ -358,6 +358,11 @@ const CANONICAL_ACTION_RULES: Readonly<
 			action: "evolve.external.list",
 			sideEffect: "read",
 		},
+		"artifact/save": {
+			mode: "static",
+			action: "artifact.save",
+			sideEffect: "write",
+		},
 		"hydrate/*": { mode: "static", action: "hydrate.run", sideEffect: "write" },
 	},
 };
@@ -527,6 +532,11 @@ export function isActionAllowed(
 	// Daily suggestion claim/show is a fenced derived-state receipt. Agents may
 	// perform this narrow operation; user decisions remain local-only.
 	if (policy.action === "evolve.suggest" && ctx.callerType === "agent")
+		return true;
+	// Durable capture is the sanctioned lightweight retention path: a local or
+	// agent caller may save a non-authorizing artifact without an interactive
+	// terminal. Remote callers keep the existing restrictions.
+	if (policy.action === "artifact.save" && ctx.callerType !== "remote")
 		return true;
 	return policy.sideEffect === "read" || policy.sideEffect === "preview";
 }

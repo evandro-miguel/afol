@@ -47,7 +47,8 @@ export type CommandKind =
 	| "adapter"
 	| "telemetry"
 	| "receipt"
-	| "session";
+	| "session"
+	| "artifact";
 export type CommandSideEffect =
 	| "read"
 	| "preview"
@@ -656,6 +657,24 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 				usage: "--json",
 				sideEffect: "write",
 				description: "Emit machine-readable close result",
+			},
+		],
+	},
+	{
+		command: "artifact",
+		aliases: [],
+		kind: "artifact",
+		sideEffect: "write",
+		description: "Save durable work artifacts without a session",
+		category: "workflow",
+		stability: "experimental",
+		subcommands: [
+			{
+				usage:
+					"save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--json]",
+				sideEffect: "write",
+				description:
+					"Capture a note, research, report, or handoff; standalone without a selector",
 			},
 		],
 	},

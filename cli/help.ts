@@ -73,6 +73,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	schema: "review schema",
 	adapter: "manage adapters",
 	receipt: "ingest receipt",
+	artifact: "save work artifacts",
 };
 
 export type HelpIntent = "planning" | "execution" | "maintenance";
@@ -107,6 +108,7 @@ const HELP_INTENT_COMMANDS: Record<HelpIntent, readonly string[]> = {
 		"file",
 		"validate",
 		"session",
+		"artifact",
 	],
 	maintenance: [
 		"health",

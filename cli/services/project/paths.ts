@@ -28,6 +28,7 @@ type ProjectPathConfig = {
 	pstrDir: string;
 	stateDb: string;
 	libraryDir: string;
+	recordsDir: string;
 	memoryFile: string;
 	rulesDir: string;
 	hooksDir: string;
@@ -192,6 +193,7 @@ function absolute(root: string, paths: ProjectPathConfig): ProjectPathConfig {
 		pstrDir: resolve(projectRoot, paths.pstrDir),
 		stateDb: resolve(projectRoot, paths.stateDb),
 		libraryDir: resolve(projectRoot, paths.libraryDir),
+		recordsDir: resolve(projectRoot, paths.recordsDir),
 		memoryFile: resolve(projectRoot, paths.memoryFile),
 		rulesDir: resolve(projectRoot, paths.rulesDir),
 		hooksDir: resolve(projectRoot, paths.hooksDir),
@@ -241,6 +243,11 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 			config,
 			["paths", "library_dir"],
 			`${mutableDir}/library`,
+		),
+		recordsDir: fromConfig(
+			config,
+			["paths", "records_dir"],
+			`${mutableDir}/records`,
 		),
 		memoryFile: fromConfig(
 			config,

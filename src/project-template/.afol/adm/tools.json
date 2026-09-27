@@ -27,6 +27,7 @@
           "rule",
           "skill",
           "close",
+          "artifact",
           "file",
           "fleet",
           "update",
@@ -122,6 +123,7 @@
           "evidence",
           "legacy",
           "close",
+          "artifact",
           "bootstrap",
           "verify",
           "verify-tasks",
@@ -825,6 +827,26 @@
           "usage": "--json",
           "side_effect": "write",
           "description": "Emit machine-readable close result"
+        }
+      ]
+    },
+    {
+      "id": "artifact",
+      "name": "AFOL Artifact",
+      "tool": "afol",
+      "wrapper_command": "afol artifact",
+      "aliases": [],
+      "stability": "experimental",
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Save durable work artifacts without a session",
+      "subcommands": [
+        {
+          "usage": "save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--json]",
+          "side_effect": "write",
+          "description": "Capture a note, research, report, or handoff; standalone without a selector"
         }
       ]
     },

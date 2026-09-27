@@ -323,6 +323,7 @@ describe("kernel front-door", () => {
 			["./commands/adapter", ["runAdapterCommand"]],
 			["./commands/adm", ["runAdmCommand"]],
 			["./commands/adr", ["runAdrCommand"]],
+			["./commands/artifact", ["runArtifactCommand"]],
 			["./commands/bench", ["runBenchCommand"]],
 			["./commands/bootstrap", ["runBootstrapCommand"]],
 			[

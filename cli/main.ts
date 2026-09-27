@@ -115,6 +115,7 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"telemetry",
 	"receipt",
 	"hydrate",
+	"artifact",
 ]);
 
 function isVerboseHelpArg(arg: string): boolean {
@@ -762,6 +763,16 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+			);
+		}
+		if (resolution.group === "artifact") {
+			const { runArtifactCommand } = await import("./commands/artifact");
+			return runArtifactCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "hydrate") {

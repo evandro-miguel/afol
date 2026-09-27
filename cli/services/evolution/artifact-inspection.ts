@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import {
+	canonicalSessionArtifactKind,
+	enumerateOwnerDirectory,
+	OWNER_ID_RE,
+	readArtifactPage,
+	resolveRecordDirectory,
+	type InventoryFile,
+} from "../artifacts/inventory";
+import type { ArtifactReferenceV2 } from "../artifacts/types";
 import {
 	assertSafeSourceFile,
 	readBoundedSourceFile,
@@ -15,7 +24,6 @@ import { resolveEvolutionConfig } from "./runtime-config";
 const DEFAULT_LIMIT = 3;
 const MAX_LIMIT = 10;
 const MAX_DEFAULT_ARTIFACTS_PER_SESSION = 3;
-const MAX_SESSION_ARTIFACTS = 4_096;
 const MAX_ARTIFACT_BYTES = 256 * 1024;
 const MAX_RANGE_BYTES = 8 * 1024;
 const MAX_TOTAL_READ_BYTES = 512 * 1024;
@@ -23,19 +31,6 @@ const MAX_EXCERPT_CHARS = 450;
 const CURSOR_VERSION = 2;
 const SESSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
-const ARTIFACT_KINDS = new Set([
-	"analysis",
-	"findings",
-	"handoff",
-	"log",
-	"plan",
-	"postmortem",
-	"report",
-	"research",
-	"retrospective",
-	"review",
-	"task",
-]);
 
 export type ArtifactReference = {
 	session_id: string;
@@ -95,14 +90,24 @@ function stableJson(value: unknown): string {
 	return JSON.stringify(value) ?? "null";
 }
 
-function canonicalArtifactKind(name: string, sessionId: string): string | null {
-	if (name === ".evidence.jsonl") return "evidence";
-	const escaped = sessionId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const match = new RegExp(`^${escaped}_(.+)_([0-9]+)\\.md$`, "i").exec(name);
-	const kind = match?.[1]?.toLowerCase();
-	return kind && ARTIFACT_KINDS.has(kind) ? kind : null;
+function sessionArtifactScore(
+	name: string,
+	isCanonical: boolean,
+): number {
+	if (!isCanonical) return 5;
+	if (name === ".evidence.jsonl") return 0;
+	if (name.includes("_task_")) return 1;
+	if (name.includes("_report_")) return 2;
+	if (name.includes("_log_")) return 3;
+	return 4;
 }
 
+/**
+ * Shared inventory enumeration for one session: managed canonical files at
+ * the session root plus supplementary files at the root and anywhere under
+ * `artifacts/`. Files the inventory cannot represent safely are counted as
+ * unsupported instead of disappearing.
+ */
 function artifactFiles(
 	sessionDir: string,
 	sessionId: string,
@@ -110,53 +115,31 @@ function artifactFiles(
 	files: ArtifactFile[];
 	unsupportedCount: number;
 } {
-	const names = readdirSync(sessionDir, { withFileTypes: true });
-	if (names.length > MAX_SESSION_ARTIFACTS)
-		throw new Error(
-			`session ${sessionId} exceeds the bounded artifact inventory; select a specific artifact`,
-		);
-	const files: ArtifactFile[] = [];
-	let unsupportedCount = 0;
-	for (const entry of names) {
-		if (!entry.isFile()) {
-			if (entry.name.endsWith(".md") || entry.name.endsWith(".log"))
-				unsupportedCount += 1;
-			continue;
-		}
-		if (!canonicalArtifactKind(entry.name, sessionId)) {
-			if (/\.(?:md|log|txt|jsonl)$/i.test(entry.name)) unsupportedCount += 1;
-			continue;
-		}
-		const path = join(sessionDir, entry.name);
-		const stat = assertSafeSourceFile(path, "session artifact");
-		if (!stat) continue;
-		files.push({
-			name: entry.name,
-			path,
-			bytes: Number(stat.size),
-			mtime_ms: Number(stat.mtimeMs),
-			ctime_ms: Number(stat.ctimeMs),
-			dev: String(stat.dev),
-			ino: String(stat.ino),
-		});
-	}
+	const enumeration = enumerateOwnerDirectory({
+		dir: sessionDir,
+		sessionId,
+	});
+	const files: ArtifactFile[] = enumeration.files.map((file: InventoryFile) => ({
+		name: file.name,
+		path: file.path,
+		bytes: file.bytes,
+		mtime_ms: file.mtime_ms,
+		ctime_ms: file.ctime_ms,
+		dev: file.dev,
+		ino: file.ino,
+	}));
 	files.sort((left, right) => {
 		const score = (name: string) =>
-			name === ".evidence.jsonl"
-				? 0
-				: name.includes("_task_")
-					? 1
-					: name.includes("_report_")
-						? 2
-						: name.includes("_log_")
-							? 3
-							: 4;
+			sessionArtifactScore(
+				name,
+				Boolean(canonicalSessionArtifactKind(name, sessionId)),
+			);
 		return (
 			score(left.name) - score(right.name) ||
 			left.name.localeCompare(right.name)
 		);
 	});
-	return { files, unsupportedCount };
+	return { files, unsupportedCount: enumeration.unsupportedCount };
 }
 
 function assertSafeArtifactDirectory(path: string): ArtifactDirectory {
@@ -282,6 +265,63 @@ function excerpt(content: string): { anchor: string; excerpt: string } {
 	};
 }
 
+type SessionArtifact = ArtifactReference & {
+	bytes: number;
+	excerpt: string;
+	page?: PageEnvelope;
+};
+
+type PageEnvelope = {
+	content: string;
+	byte_start: number;
+	byte_end: number;
+	source_bytes: number;
+	has_more: boolean;
+	next_offset?: number;
+	cursor?: string;
+	coverage: "complete" | "partial";
+};
+
+function selectorError(
+	sessionId: string,
+	selector: string,
+): Error {
+	return new Error(
+		`unsupported or missing artifact selector for ${sessionId}: ${selector}; supported names are session-prefixed plan, research, handoff, analysis, review, findings, report, log, task, postmortem, retrospective, .evidence.jsonl, or a supplementary file such as artifacts/<name>.md`,
+	);
+}
+
+/**
+ * Resolve one `--artifact` selector against the shared inventory: the exact
+ * owner-relative name wins, then the project-relative path, then a unique
+ * basename. An ambiguous basename is an error, never a silent pick.
+ */
+function selectArtifactFile(input: {
+	root: string;
+	sessionId: string;
+	files: readonly ArtifactFile[];
+	selector: string;
+}): ArtifactFile {
+	const normalized = input.selector.replaceAll("\\", "/");
+	const byName = input.files.filter((file) => file.name === normalized);
+	if (byName.length === 1) return byName[0] as ArtifactFile;
+	const byPath = input.files.filter(
+		(file) =>
+			relative(input.root, file.path).replaceAll("\\", "/") === normalized,
+	);
+	if (byPath.length === 1) return byPath[0] as ArtifactFile;
+	const byBasename = input.files.filter((file) => {
+		const parts = file.name.split("/");
+		return parts[parts.length - 1] === normalized;
+	});
+	if (byBasename.length === 1) return byBasename[0] as ArtifactFile;
+	if (byBasename.length > 1)
+		throw new Error(
+			`ambiguous artifact selector for ${input.sessionId}: ${normalized}; use the owner-relative name such as artifacts/<name>.md`,
+		);
+	throw selectorError(input.sessionId, input.selector);
+}
+
 function artifactListForSession(input: {
 	root: string;
 	session: { session_id: string; location: "live" | "archived" };
@@ -290,7 +330,7 @@ function artifactListForSession(input: {
 	byteOffset?: number;
 	readBudget: { bytes: number };
 }): {
-	artifacts: Array<ArtifactReference & { bytes: number; excerpt: string }>;
+	artifacts: SessionArtifact[];
 	warnings: string[];
 	coverage: {
 		canonical_total: number;
@@ -304,19 +344,14 @@ function artifactListForSession(input: {
 	const selectors = input.artifactSelectors;
 	let candidates = input.files;
 	if (selectors?.length) {
-		candidates = selectors.map((selector) => {
-			const byName = input.files.find((file) => file.name === selector);
-			const byPath = input.files.find(
-				(file) =>
-					relative(input.root, file.path).replaceAll("\\", "/") === selector,
-			);
-			const file = byName ?? byPath;
-			if (!file)
-				throw new Error(
-					`unsupported or missing artifact selector for ${input.session.session_id}: ${selector}; supported names are session-prefixed plan, research, handoff, analysis, review, findings, report, log, task, postmortem, retrospective, or .evidence.jsonl`,
-				);
-			return file;
-		});
+		candidates = selectors.map((selector) =>
+			selectArtifactFile({
+				root: input.root,
+				sessionId: input.session.session_id,
+				files: input.files,
+				selector,
+			}),
+		);
 	}
 	const defaultCandidates = candidates.slice(
 		0,
@@ -325,71 +360,90 @@ function artifactListForSession(input: {
 	const omittedFiles = selectors?.length
 		? []
 		: candidates.slice(defaultCandidates.length);
-	const artifacts: Array<
-		ArtifactReference & { bytes: number; excerpt: string }
-	> = [];
+	const artifacts: SessionArtifact[] = [];
 	const warnings: string[] = [];
 	for (const file of defaultCandidates) {
-		if (file.bytes > MAX_ARTIFACT_BYTES && !selectors?.includes(file.name)) {
+		if (file.bytes > MAX_ARTIFACT_BYTES && !selectors?.length) {
 			warnings.push(
 				`skipped_size_limit:${file.name}; retrieve with --session ${input.session.session_id} --artifact ${file.name}`,
 			);
 			continue;
 		}
-		let content: string;
-		let reference: ArtifactReference;
-		if (
-			selectors?.length &&
-			(input.byteOffset !== undefined || file.bytes > MAX_ARTIFACT_BYTES)
-		) {
-			const offset = input.byteOffset ?? 0;
+		if (selectors?.length) {
+			// Directed read: return the requested page itself with a
+			// continuation cursor, never only the file's first lines.
 			const remaining = input.readBudget.bytes;
 			if (remaining < 1) {
 				warnings.push(`skipped_page_read_budget:${file.name}`);
 				continue;
 			}
-			const range = readBoundedSourceRange(file.path, "session artifact", {
-				offset,
+			const paths = resolveProjectPaths(input.root);
+			const ownerDir =
+				input.session.location === "archived"
+					? join(paths.abs.wbDir, "_archive", input.session.session_id)
+					: join(paths.abs.wbDir, input.session.session_id);
+			const read = readArtifactPage({
+				root: input.root,
+				ownerDir,
+				relativePath: file.name,
+				label: "session artifact",
+				...(input.byteOffset === undefined
+					? {}
+					: { byteOffset: input.byteOffset }),
 				maxBytes: Math.min(MAX_RANGE_BYTES, remaining),
 			});
-			if (range.bytes.byteLength === 0) {
+			if (read.page.byte_end === read.page.byte_start) {
 				warnings.push(`empty_range:${file.name}`);
 				continue;
 			}
-			input.readBudget.bytes -= range.bytes.byteLength;
-			content = range.bytes.toString("utf8");
-			reference = {
-				session_id: input.session.session_id,
-				path: relative(input.root, file.path).replaceAll("\\", "/"),
-				anchor: `bytes:${offset}-${offset + range.bytes.byteLength}`,
-				content_digest: digest(range.bytes),
-				digest_scope: "range",
-				source_identity_digest: digest(stableJson(range.sourceIdentity)),
-			};
-		} else {
-			if (input.readBudget.bytes < file.bytes) {
-				warnings.push(`skipped_page_read_budget:${file.name}`);
-				continue;
-			}
-			content =
-				readBoundedSourceFile(file.path, "session artifact", {
-					maxBytes: MAX_ARTIFACT_BYTES,
-					maxLines: 20_000,
-					maxCandidates: 50_000,
-				}) ?? "";
-			input.readBudget.bytes -= file.bytes;
+			input.readBudget.bytes -= read.rawBytes.byteLength;
+			const content = read.rawBytes.toString("utf8");
 			const displayed = excerpt(content);
-			reference = {
-				session_id: input.session.session_id,
-				path: relative(input.root, file.path).replaceAll("\\", "/"),
-				anchor: displayed.anchor,
-				content_digest: digest(content),
-				digest_scope: "artifact",
-			};
+			const projectPath = relative(input.root, file.path).replaceAll("\\", "/");
+			if (read.wholeSource && file.bytes <= MAX_ARTIFACT_BYTES) {
+				artifacts.push({
+					session_id: input.session.session_id,
+					path: projectPath,
+					anchor: displayed.anchor,
+					content_digest: digest(content),
+					digest_scope: "artifact",
+					bytes: file.bytes,
+					excerpt: displayed.excerpt,
+					page: read.page,
+				});
+			} else {
+				artifacts.push({
+					session_id: input.session.session_id,
+					path: projectPath,
+					anchor: read.anchor,
+					content_digest: read.rawDigest,
+					digest_scope: "range",
+					source_identity_digest: read.sourceIdentityDigest,
+					bytes: file.bytes,
+					excerpt: displayed.excerpt,
+					page: read.page,
+				});
+			}
+			continue;
 		}
+		if (input.readBudget.bytes < file.bytes) {
+			warnings.push(`skipped_page_read_budget:${file.name}`);
+			continue;
+		}
+		const content =
+			readBoundedSourceFile(file.path, "session artifact", {
+				maxBytes: MAX_ARTIFACT_BYTES,
+				maxLines: 20_000,
+				maxCandidates: 50_000,
+			}) ?? "";
+		input.readBudget.bytes -= file.bytes;
 		const displayed = excerpt(content);
 		artifacts.push({
-			...reference,
+			session_id: input.session.session_id,
+			path: relative(input.root, file.path).replaceAll("\\", "/"),
+			anchor: displayed.anchor,
+			content_digest: digest(content),
+			digest_scope: "artifact",
 			bytes: file.bytes,
 			excerpt: displayed.excerpt,
 		});
@@ -437,7 +491,7 @@ export function inspectEvolutionArtifacts(input: {
 		session_id: string;
 		location: "live" | "archived";
 		snapshot_digest: string;
-		artifacts: Array<ArtifactReference & { bytes: number; excerpt: string }>;
+		artifacts: SessionArtifact[];
 		artifact_coverage: {
 			canonical_total: number;
 			returned: number;
@@ -664,13 +718,27 @@ export function inspectEvolutionArtifacts(input: {
 	};
 }
 
-/** Verify an emitted artifact reference without opening the evolution database. */
+/**
+ * Verify an emitted artifact reference without opening the evolution
+ * database. Accepts the legacy v1 session reference and the owner-based v2
+ * reference (session or standalone record). The check is membership in the
+ * shared inventory, so every supplementary file the reader can return is a
+ * verifiable reference, not only canonical session-prefixed names.
+ */
 export function verifyArtifactReference(
 	root: string,
-	reference: ArtifactReference,
+	reference: ArtifactReference | ArtifactReferenceV2,
 ): void {
+	const asV2 = reference as ArtifactReferenceV2;
+	const asV1 = reference as ArtifactReference;
+	const isV2 = asV2.schema_version === 2;
+	const ownerKind: "session" | "record" = isV2 ? asV2.owner.kind : "session";
+	const ownerId = isV2 ? asV2.owner.id : asV1.session_id;
+	const referencePath = isV2 ? asV2.relative_path : asV1.path;
+	const pathBase: "project" | "owner" = isV2 ? "owner" : "project";
 	if (
-		!SESSION_ID_RE.test(reference.session_id) ||
+		(ownerKind === "session" && !SESSION_ID_RE.test(ownerId)) ||
+		(ownerKind === "record" && !OWNER_ID_RE.test(ownerId)) ||
 		!SHA256_RE.test(reference.content_digest)
 	)
 		throw new Error("proposal evidence reference is invalid");
@@ -686,32 +754,50 @@ export function verifyArtifactReference(
 			reference.digest_scope !== "artifact")
 	)
 		throw new Error("proposal evidence scope does not match its anchor");
-	if (reference.path.startsWith("/") || reference.path.includes("\\"))
-		throw new Error("proposal evidence path is not canonical");
-	const location = enumerateEvolutionHistorySessions(root).sessions.find(
-		(entry) => entry.session_id === reference.session_id,
-	);
-	if (!location)
-		throw new Error(
-			`proposal evidence session is missing or conflicted: ${reference.session_id}`,
-		);
-	const paths = resolveProjectPaths(root);
-	const sessionDir =
-		location.location === "archived"
-			? join(paths.abs.wbDir, "_archive", location.session_id)
-			: join(paths.abs.wbDir, location.session_id);
-	const resolved = resolve(root, reference.path);
-	const projectPath = relative(root, resolved).replaceAll("\\", "/");
-	const fromSession = relative(sessionDir, resolved);
 	if (
-		projectPath !== reference.path ||
-		fromSession.startsWith("..") ||
-		!fromSession
+		referencePath.startsWith("/") ||
+		referencePath.includes("\\") ||
+		referencePath.split("/").some((part) => part === ".." || part.length === 0)
 	)
-		throw new Error("proposal evidence path is outside its selected session");
-	if (!canonicalArtifactKind(fromSession, location.session_id))
+		throw new Error("proposal evidence path is not canonical");
+	let ownerDir: string;
+	if (ownerKind === "record") {
+		ownerDir = resolveRecordDirectory(root, ownerId).recordDir;
+	} else {
+		const location = enumerateEvolutionHistorySessions(root).sessions.find(
+			(entry) => entry.session_id === ownerId,
+		);
+		if (!location)
+			throw new Error(
+				`proposal evidence session is missing or conflicted: ${ownerId}`,
+			);
+		const paths = resolveProjectPaths(root);
+		ownerDir =
+			location.location === "archived"
+				? join(paths.abs.wbDir, "_archive", location.session_id)
+				: join(paths.abs.wbDir, location.session_id);
+	}
+	const resolved =
+		pathBase === "owner"
+			? resolve(ownerDir, referencePath)
+			: resolve(root, referencePath);
+	const projectPath = relative(root, resolved).replaceAll("\\", "/");
+	const fromOwner = relative(ownerDir, resolved).replaceAll("\\", "/");
+	if (
+		fromOwner.startsWith("..") ||
+		!fromOwner ||
+		(pathBase === "owner"
+			? fromOwner !== referencePath
+			: projectPath !== referencePath)
+	)
+		throw new Error("proposal evidence path is outside its selected owner");
+	const enumeration = enumerateOwnerDirectory({
+		dir: ownerDir,
+		...(ownerKind === "session" ? { sessionId: ownerId } : {}),
+	});
+	if (!enumeration.files.some((file) => file.name === fromOwner))
 		throw new Error(
-			"proposal evidence path is not a supported canonical artifact",
+			"proposal evidence path is not part of the owner artifact inventory",
 		);
 	if (reference.digest_scope === "range") {
 		const rangeAnchor = /^bytes:(\d+)-(\d+)$/.exec(reference.anchor);
@@ -737,7 +823,7 @@ export function verifyArtifactReference(
 			digest(stableJson(range.sourceIdentity)) !==
 				reference.source_identity_digest
 		)
-			throw new Error(`proposal evidence source changed: ${reference.path}`);
+			throw new Error(`proposal evidence source changed: ${referencePath}`);
 		return;
 	}
 	const text = readBoundedSourceFile(resolved, "proposal evidence artifact", {
@@ -746,12 +832,12 @@ export function verifyArtifactReference(
 		maxCandidates: 50_000,
 	});
 	if (text === null || digest(text) !== reference.content_digest)
-		throw new Error(`proposal evidence source changed: ${reference.path}`);
+		throw new Error(`proposal evidence source changed: ${referencePath}`);
 	const lineAnchor = /^line:(\d+)$/.exec(reference.anchor);
 	if (
 		!lineAnchor ||
 		Number(lineAnchor[1]) < 1 ||
 		Number(lineAnchor[1]) > text.split(/\r?\n/).length
 	)
-		throw new Error(`proposal evidence anchor is invalid: ${reference.path}`);
+		throw new Error(`proposal evidence anchor is invalid: ${referencePath}`);
 }
