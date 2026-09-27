@@ -1902,7 +1902,14 @@ function runBackfill(
 		action: parsed.run ? "evolve.backfill.run" : "evolve.backfill",
 		sideEffect: parsed.run ? ("write" as const) : ("read" as const),
 	};
-	if (!isActionAllowed(operationContext, policy)) {
+	// The writing backfill mutates observations/production days and its
+	// cursors, so it requires a trusted local interactive operator; a trusted
+	// local non-interactive caller (no TTY) stays refused. Preview remains
+	// readable for agents and remote callers.
+	if (
+		!isActionAllowed(operationContext, policy) ||
+		(parsed.run && !isTrustedLocalInteractive(operationContext))
+	) {
 		const message = "evolve.backfill.run requires local interactive approval";
 		if (parsed.json)
 			io.stdout(
