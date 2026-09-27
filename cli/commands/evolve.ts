@@ -57,6 +57,10 @@ import {
 import { localDateForTimezone } from "../services/evolution/config";
 import { previewHistoryBackfill } from "../services/evolution/history-backfill";
 import type { ImportProvider } from "../services/evolution/imports";
+import {
+	ingestLessonStatements,
+	recordLessonApplication,
+} from "../services/evolution/lesson-records";
 import { ingestObservationsForSession } from "../services/evolution/observation-ingest";
 import {
 	dispatchSuggestionDecision,
@@ -1884,6 +1888,113 @@ function runBackfill(
 	return 0;
 }
 
+function parseLessonsArgs(args: readonly string[]): {
+	session?: string;
+	json: boolean;
+	apply?: {
+		id: string;
+		evidence: string;
+	};
+} {
+	let session: string | undefined;
+	let json = false;
+	let apply = false;
+	let id = "";
+	let evidence = "";
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (!arg) continue;
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "apply") apply = true;
+		else if (arg === "--session" || arg === "-S") {
+			session = args[++index];
+			if (!session || session.startsWith("-"))
+				throw new Error("evolve lessons --session requires a value");
+		} else if (arg === "--id") {
+			id = args[++index] ?? "";
+			if (!id || id.startsWith("-"))
+				throw new Error("evolve lessons apply --id requires a lesson id");
+		} else if (arg === "--evidence") {
+			evidence = args[++index] ?? "";
+			if (!evidence || evidence.startsWith("-"))
+				throw new Error(
+					"evolve lessons apply --evidence requires an evidence id",
+				);
+		} else throw new Error(`Unknown evolve lessons argument: ${arg}`);
+	}
+	if (apply && (!id || !evidence))
+		throw new Error(
+			"evolve lessons apply requires --id <lesson-id> --evidence <evidence-id>",
+		);
+	return {
+		...(session ? { session } : {}),
+		json,
+		...(apply ? { apply: { id, evidence } } : {}),
+	};
+}
+
+function runLessons(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	if (
+		!isActionAllowed(operationContext, {
+			action: "evolve.lessons",
+			sideEffect: "write",
+		})
+	)
+		throw new Error("evolve.lessons is not allowed for this caller");
+	if (!isTrustedLocalInteractive(operationContext))
+		throw new Error("evolve lessons requires local interactive approval");
+	const parsed = parseLessonsArgs(args);
+	if (!parsed.session)
+		throw new Error("evolve lessons requires --session <session>");
+	if (parsed.apply) {
+		const application = recordLessonApplication({
+			root,
+			session: parsed.session,
+			lessonId: parsed.apply.id,
+			evidenceId: parsed.apply.evidence,
+			createdAt: new Date().toISOString(),
+		});
+		if (parsed.json)
+			io.stdout(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							lesson_id: application.lesson_id,
+							evidence_id: application.evidence_id,
+							application_id: application.id,
+							applied: false,
+							append_only: true,
+						},
+						{ action: "evolve.lessons.apply" },
+					),
+				),
+			);
+		else
+			io.stdout(
+				`application=${application.id} lesson=${application.lesson_id} evidence=${application.evidence_id} applied=false`,
+			);
+		return 0;
+	}
+	const result = ingestLessonStatements({
+		root,
+		session: parsed.session,
+	});
+	if (parsed.json)
+		io.stdout(
+			stringifyEnvelope(envelopeOk(result, { action: "evolve.lessons" })),
+		);
+	else
+		io.stdout(
+			`lessons=${result.state} appended=${result.appended} duplicates=${result.duplicates} session=${result.session_id}`,
+		);
+	return 0;
+}
+
 function runCandidates(
 	args: string[],
 	root: string,
@@ -2280,6 +2391,8 @@ export async function runEvolveCommand(
 		}
 		if (action === "candidates")
 			return runCandidates(args, projectRoot, io, operationContext);
+		if (action === "lessons")
+			return runLessons(args, projectRoot, io, operationContext);
 		if (action === "backfill")
 			return runBackfill(args, projectRoot, io, operationContext);
 		if (action && action !== "status") {

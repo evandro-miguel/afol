@@ -6,6 +6,11 @@ import {
 	resolveHooks,
 } from "../catalog/hooks";
 import { listSkills, searchSkills } from "../catalog/skills";
+import {
+	finalizeContextLessonSection,
+	readLessonRecords,
+	selectContextLessons,
+} from "../evolution/lesson-records";
 import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
@@ -139,6 +144,26 @@ function findTaskRecord(
 	return null;
 }
 
+/** File paths declared by the task record itself (Files planned / touched). */
+function taskPlannedFiles(task: TaskRecord | null): string[] {
+	if (!task) return [];
+	const files: string[] = [];
+	let inFilesSection = false;
+	for (const line of readFileSync(task.path, "utf8").split(/\r?\n/)) {
+		const heading = /^#{2,6}\s+(.+?)\s*$/.exec(line.trim());
+		if (heading) {
+			inFilesSection = /^(?:files planned|files touched)\b/i.test(
+				heading[1] ?? "",
+			);
+			continue;
+		}
+		if (!inFilesSection) continue;
+		const bullet = /^\s*[-*]\s+`?([^\s`]+)`?/.exec(line);
+		if (bullet?.[1]) files.push(bullet[1]);
+	}
+	return files;
+}
+
 function refFromSection(section: SectionEntry): ContextRef {
 	return {
 		domain: section.ref.startsWith("adr:") ? "adr" : "spec",
@@ -208,6 +233,16 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 			section.source_path,
 			section.snippet,
 		]),
+		...(bundle.lessons
+			? bundle.lessons.lessons.flatMap((lesson) => [
+					lesson.id,
+					lesson.problem,
+					lesson.applies_when ?? "",
+					lesson.preventive_action ?? "",
+					lesson.verify ?? "",
+					lesson.evidence ?? "",
+				])
+			: []),
 	]);
 }
 
@@ -559,6 +594,15 @@ function trimToBudget(
 			next.memory_refs.pop();
 			continue;
 		}
+		if (next.lessons && next.lessons.lessons.length > 0) {
+			next.lessons.lessons.pop();
+			if (next.lessons.lessons.length === 0) {
+				delete next.lessons;
+				continue;
+			}
+			next.lessons = finalizeContextLessonSection(next.lessons.lessons, true);
+			continue;
+		}
 		if (next.refs.length > 4) {
 			next.refs.pop();
 			continue;
@@ -690,6 +734,12 @@ export function buildContextBundle(
 		mode === "deep" || mode === "tokenmax"
 			? selectExpandedSections(sections, mode, selection.verifiedSources)
 			: undefined;
+	const lessonRequestFiles = uniqueStrings(
+		[filePath ?? "", ...taskPlannedFiles(task)].filter(Boolean),
+	);
+	const lessonSection = compact
+		? undefined
+		: selectContextLessons(readLessonRecords(root), lessonRequestFiles);
 	const bundle: ContextBundle = {
 		task_id: taskId,
 		role,
@@ -749,6 +799,7 @@ export function buildContextBundle(
 		do_not_load: uniqueStrings([...doNotLoadList(), ...hookDoNotLoad]),
 		rule_injection: ruleInjection,
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
+		...(lessonSection ? { lessons: lessonSection } : {}),
 	};
 	return trimToBudget(root, bundle, {
 		persistRuleInjection: opts.persistRuleInjection === true && !compact,

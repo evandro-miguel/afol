@@ -1197,6 +1197,19 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 					"Append an explicit approval-gated learning review decision",
 			},
 			{
+				usage: "lessons --session <id> [--json]",
+				sideEffect: "write",
+				description:
+					"Record every explicit lesson statement from a closed session with versioned duplicates and contradictions",
+			},
+			{
+				usage:
+					"lessons apply --session <id> --id <lesson-id> --evidence <evidence-id> [--json]",
+				sideEffect: "write",
+				description:
+					"Record one observed lesson application without marking the lesson applied",
+			},
+			{
 				usage: "evaluate <id> [--record] [--superseded-by <id>] [-j]",
 				sideEffect: "preview",
 				description: "Evaluate one proposal deterministically",

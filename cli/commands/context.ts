@@ -251,6 +251,11 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 		`skills: ${bundle.skills.join(",") || "none"}`,
 		`tools: ${bundle.tools.length}`,
 		`pstr_refs: ${bundle.pstr_refs.join(",") || "none"}`,
+		...(bundle.lessons
+			? [
+					`lessons: ${bundle.lessons.shown_lesson_ids.join(",")} bytes=${bundle.lessons.bytes}${bundle.lessons.truncated ? " truncated" : ""}`,
+				]
+			: []),
 		`budget: ${bundle.budget.used_tokens}/${bundle.budget.total_tokens}`,
 	].join("\n");
 }
@@ -579,6 +584,7 @@ export async function runContextCommand(
 						memory_refs: bundle.memory_refs,
 						library_refs: bundle.library_refs,
 						rule_injection: bundle.rule_injection,
+						...(bundle.lessons ? { lessons: bundle.lessons } : {}),
 						budget: bundle.budget,
 						gaps: bundle.gaps,
 					};
