@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	appendFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -30,11 +32,14 @@ import {
 	storePreparedAssistedProposal,
 } from "../services/evolution/assisted-proposal-journal";
 import { prepareAssistedProposalPreview } from "../services/evolution/assisted-proposal-packet";
+import { productionDayJournalPath } from "../services/evolution/journal";
 import { lessonJournalPath } from "../services/evolution/lesson-records";
+import { observationJournalPath } from "../services/evolution/observation-journal";
 import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "3e1a5f2c-9b44-4d7a-8f21-64c0f0a11b77";
 const NOW = new Date("2026-09-26T12:00:00.000Z");
+const KERNEL_PATH = join(process.cwd(), "cli", "main.ts");
 
 function hash(text: string): string {
 	return createHash("sha256").update(text).digest("hex");
@@ -73,6 +78,108 @@ function fixtureRoot(extraPaths: Record<string, string> = {}): string {
 	writeFileSync(
 		join(sessionDir, `${session}_report_1.md`),
 		"A validation command failed while the task remained open.\n",
+	);
+	return root;
+}
+
+// R1 fixture: a backfill-eligible session whose failed completion evidence
+// would be ingested by `evolve backfill --run` if the caller were allowed.
+function backfillRoot(): string {
+	const root = mkdtempSync(join(tmpdir(), "stage-a-backfill-r1-"));
+	const workbench = join(root, ".afol", "wb");
+	mkdirSync(join(workbench, ".locks"), { recursive: true });
+	mkdirSync(join(workbench, "_archive"), { recursive: true });
+	mkdirSync(join(root, ".agents"), { recursive: true });
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		readFileSync(join(process.cwd(), "src/project-template/.agents/lock.json")),
+	);
+	writeFileSync(
+		join(root, ".agents", "manifest.json"),
+		readFileSync(
+			join(process.cwd(), "src/project-template/.agents/manifest.json"),
+		),
+	);
+	writeFileSync(
+		join(root, ".afol", "config.json"),
+		JSON.stringify({
+			schema_version: 1,
+			project: {
+				id: PROJECT_ID,
+				name: "stage-a-backfill-r1",
+				timezone: "UTC",
+			},
+			paths: {
+				external_dir: ".afol/external",
+				wb_dir: ".afol/wb",
+				agents_dir: ".agents",
+				library_dir: ".afol/library",
+				evolution_db: ".afol/state/evolution.db",
+				evolution_data_dir: ".afol/data/evolution",
+				evolution_events_dir: ".afol/data/events/evolution",
+			},
+			evolution: {
+				enabled: true,
+				suggestions: {
+					first_session_of_day: true,
+					dedupe_scope: "project",
+					max_visible_per_day: 1,
+					remind_skipped_next_day: true,
+					deep_review_after_production_days: 5,
+				},
+				preferences: {
+					soft_decay_after_production_days: 7,
+					stop_guiding_after_production_days: 20,
+					minimum_effective_confidence: 0.65,
+					decay_curve: "linear",
+				},
+				recurrence: {
+					minimum_occurrences: 3,
+					minimum_distinct_sessions: 2,
+					minimum_distinct_production_days: 2,
+				},
+				large_change: {
+					changed_files: 20,
+					changed_lines: 1000,
+					critical_paths_trigger: true,
+				},
+				external: {
+					mode: "explicit_import_only",
+					storage: "normalized_sections",
+					store_raw: false,
+					redact_before_persist: true,
+				},
+				autonomy: {
+					auto_observe: true,
+					auto_refresh_preference_projections: true,
+					auto_clean_derived_state: true,
+					auto_apply_mode: "none",
+				},
+			},
+		}),
+	);
+	const session = "S-backfill-r1";
+	const sessionDir = join(workbench, session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		`---\ndoc_type: "workbench_task"\nid: "${session}_task_01"\nsession_id: "${session}"\nstatus: "open"\ncreated_at: "2026-08-11T12:00:00.000Z"\nupdated_at: "2026-08-11T12:00:00.000Z"\n---\n\n## State Board\n\n| Task | State | Owner | Notes |\n| --- | --- | --- | --- |\n| T-01 | in_progress | agent | interrupted |\n`,
+	);
+	writeFileSync(
+		join(sessionDir, ".evidence.jsonl"),
+		`${JSON.stringify({
+			id: "E-backfill-r1-failure",
+			task_id: "T-01",
+			project_id: PROJECT_ID,
+			session_id: session,
+			created_at: "2026-08-11T12:00:00.000Z",
+			command: "bun test",
+			result: "failed",
+			provenance: "observed",
+			exit_code: 1,
+			purpose: "completion",
+			authorization_type: "execution",
+		})}\n`,
 	);
 	return root;
 }
@@ -312,6 +419,69 @@ function addSameDateProductionEvents(root: string, count: number): void {
 }
 
 describe("stage A regressions for the standalone records and evolve repair contract", () => {
+	test("R1: real no-TTY backfill --run is refused without DB, journal, or cursor writes", async () => {
+		const root = backfillRoot();
+		try {
+			const session = "S-backfill-r1";
+			const taskPath = join(
+				root,
+				".afol",
+				"wb",
+				session,
+				`${session}_task_01.md`,
+			);
+			const taskBefore = readFileSync(taskPath, "utf8");
+
+			// A real CLI process without a TTY resolves to a trusted local
+			// non-interactive caller; it must not run the writing backfill.
+			const proc = spawnSync(
+				"bun",
+				[KERNEL_PATH, "evolve", "backfill", "--run", "--limit", "1", "--json"],
+				{ cwd: root, encoding: "utf8" },
+			);
+			expect(proc.status).toBe(2);
+			const payload = JSON.parse(proc.stdout as string) as {
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				error: { code: string };
+			};
+			expect(payload).toMatchObject({
+				ok: false,
+				action: "evolve.backfill.run",
+				exit_code: 2,
+				error: { code: "approval-required" },
+			});
+
+			// Refusal leaves zero durable writes: no evolution DB (and with it
+			// no backfill cursors), no observation journal, no production-day
+			// journal, and the session files untouched.
+			expect(existsSync(evolutionDbPath(root))).toBe(false);
+			expect(existsSync(observationJournalPath(root))).toBe(false);
+			expect(existsSync(productionDayJournalPath(root))).toBe(false);
+			expect(readFileSync(taskPath, "utf8")).toBe(taskBefore);
+
+			// The authorized interactive path still ingests the same session.
+			const stdout: string[] = [];
+			const exitCode = await runEvolveCommand(
+				"backfill",
+				["--run", "--limit", "1", "--json"],
+				root,
+				{
+					stdout: (message) => stdout.push(message),
+					stderr: () => {},
+				},
+				defaultOperationContext(),
+			);
+			expect(exitCode).toBe(0);
+			expect(readFileSync(observationJournalPath(root), "utf8")).toContain(
+				"E-backfill-r1-failure",
+			);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
 	test("R2: shared inventory lists and reads a supplementary artifact nested under artifacts/", () => {
 		const root = fixtureRoot();
 		try {
