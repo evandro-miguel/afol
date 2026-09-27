@@ -20,6 +20,29 @@ export type SafeSourceReadHooks = {
 	afterOpen?: () => void;
 };
 
+export type BoundedSourceRange = {
+	offset: number;
+	maxBytes: number;
+};
+
+export type SafeSourceIdentity = {
+	dev: string;
+	ino: string;
+	size: string;
+	mtime_ms: string;
+	ctime_ms: string;
+};
+
+function sourceIdentity(stat: Stats): SafeSourceIdentity {
+	return {
+		dev: String(stat.dev),
+		ino: String(stat.ino),
+		size: String(stat.size),
+		mtime_ms: String(stat.mtimeMs),
+		ctime_ms: String(stat.ctimeMs),
+	};
+}
+
 function isMissing(error: unknown): boolean {
 	return (
 		typeof error === "object" &&
@@ -163,6 +186,67 @@ export function readBoundedSourceFile(
 		if (countCandidates(text) > limits.maxCandidates)
 			throw new Error(`${label} exceeds the candidate limit`);
 		return text;
+	} finally {
+		closeSync(fd);
+	}
+}
+
+/** Read one bounded byte range without following the final path component. */
+export function readBoundedSourceRange(
+	path: string,
+	label: string,
+	range: BoundedSourceRange,
+): {
+	bytes: Buffer;
+	totalBytes: number;
+	sourceIdentity: SafeSourceIdentity;
+} {
+	if (
+		!Number.isSafeInteger(range.offset) ||
+		range.offset < 0 ||
+		!Number.isSafeInteger(range.maxBytes) ||
+		range.maxBytes < 1
+	)
+		throw new Error("source range limits are invalid");
+	const before = assertSafeSourceFile(path, label);
+	if (!before) throw new Error(`${label} is unavailable`);
+	const totalBytes = Number(before.size);
+	if (range.offset > totalBytes)
+		throw new Error(`${label} byte offset exceeds the source size`);
+	const length = Math.min(range.maxBytes, totalBytes - range.offset);
+	const flags =
+		fsConstants.O_RDONLY |
+		(process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0));
+	const fd = openSync(path, flags);
+	try {
+		const opened = fstatSync(fd);
+		if (
+			!opened.isFile() ||
+			Number(opened.nlink) !== 1 ||
+			!sameFile(before, opened)
+		)
+			throw new Error(`${label} changed during read`);
+		const buffer = Buffer.allocUnsafe(length);
+		let offset = 0;
+		while (offset < length) {
+			const count = readSync(
+				fd,
+				buffer,
+				offset,
+				length - offset,
+				range.offset + offset,
+			);
+			if (count === 0) break;
+			offset += count;
+		}
+		const after = assertSafeSourceFile(path, label, false);
+		if (!after || !sameFile(before, after))
+			throw new Error(`${label} changed during read`);
+		return {
+			bytes: buffer.subarray(0, offset),
+			totalBytes,
+			sourceIdentity: sourceIdentity(opened),
+		};
 	} finally {
 		closeSync(fd);
 	}

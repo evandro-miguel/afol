@@ -7,13 +7,19 @@ import {
 } from "../catalog/hooks";
 import { listSkills, searchSkills } from "../catalog/skills";
 import {
+	activatedSkillNames,
+	approvedLessonViews,
+	resolveAssistedContextGuidance,
+} from "../evolution/assisted-context-guidance";
+import {
 	finalizeContextLessonSection,
 	readLessonRecords,
 	selectContextLessons,
 } from "../evolution/lesson-records";
+import { resolveEvolutionConfig } from "../evolution/runtime-config";
 import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
-import { resolveProjectPaths } from "../project/paths";
+import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
 import {
 	deriveRuleSelectionContext,
@@ -242,6 +248,9 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 					lesson.verify ?? "",
 					lesson.evidence ?? "",
 				])
+			: []),
+		...(bundle.approved_guidance
+			? [JSON.stringify(bundle.approved_guidance)]
 			: []),
 	]);
 }
@@ -603,6 +612,36 @@ function trimToBudget(
 			next.lessons = finalizeContextLessonSection(next.lessons.lessons, true);
 			continue;
 		}
+		if (next.approved_guidance && next.approved_guidance.items.length > 0) {
+			const removed = next.approved_guidance.items.pop();
+			if (removed?.kind === "lesson_adoption" && removed.lesson) {
+				next.approved_guidance.lesson_versions =
+					next.approved_guidance.lesson_versions.filter(
+						(lesson) =>
+							lesson.proposal_id !== removed.proposal_id ||
+							lesson.version_digest !== removed.version_digest,
+					);
+			}
+			if (removed) {
+				next.approved_guidance.omitted_count += 1;
+				next.approved_guidance.truncated = true;
+				const mandatory =
+					removed.kind === "durable_restriction" ||
+					removed.kind === "durable_decision";
+				if (mandatory) {
+					next.approved_guidance.mandatory_omitted = true;
+					const notice =
+						"Approved durable guidance was omitted by the context budget; review approved_guidance.omitted before proceeding.";
+					if (!next.gaps.includes(notice)) next.gaps.push(notice);
+				}
+				if (next.approved_guidance.omitted.length < 16)
+					next.approved_guidance.omitted.push({
+						proposal_id: removed.proposal_id,
+						reason: "context_budget",
+					});
+			}
+			continue;
+		}
 		if (next.refs.length > 4) {
 			next.refs.pop();
 			continue;
@@ -737,9 +776,30 @@ export function buildContextBundle(
 	const lessonRequestFiles = uniqueStrings(
 		[filePath ?? "", ...taskPlannedFiles(task)].filter(Boolean),
 	);
+	const assistedGuidance = compact
+		? undefined
+		: resolveAssistedContextGuidance({
+				root,
+				projectId:
+					resolveEvolutionConfig(readProjectConfig(root)).projectId ?? "",
+				...(filePath ? { filePath } : {}),
+				requestFiles: lessonRequestFiles,
+				surface,
+				role,
+			});
+	const adoptedLessonViews = assistedGuidance
+		? approvedLessonViews(readLessonRecords(root), assistedGuidance)
+		: [];
 	const lessonSection = compact
 		? undefined
-		: selectContextLessons(readLessonRecords(root), lessonRequestFiles);
+		: selectContextLessons(adoptedLessonViews, lessonRequestFiles);
+	const hasApprovedGuidance = Boolean(
+		assistedGuidance &&
+			(assistedGuidance.items.length > 0 ||
+				assistedGuidance.omitted.length > 0 ||
+				assistedGuidance.contextual_preference_health !== "not_present" ||
+				assistedGuidance.truncated),
+	);
 	const bundle: ContextBundle = {
 		task_id: taskId,
 		role,
@@ -756,7 +816,14 @@ export function buildContextBundle(
 		hooks: hookEntries.map((hook) => hook.id),
 		hook_messages: hookMessages,
 		hook_contributions: hookContributions,
-		skills: compact ? [] : selectSkills(root, surface, role),
+		skills: compact
+			? []
+			: uniqueStrings([
+					...(assistedGuidance
+						? activatedSkillNames(root, assistedGuidance)
+						: []),
+					...selectSkills(root, surface, role),
+				]),
 		tools: compact
 			? []
 			: uniqueStrings([
@@ -800,6 +867,9 @@ export function buildContextBundle(
 		rule_injection: ruleInjection,
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 		...(lessonSection ? { lessons: lessonSection } : {}),
+		...(hasApprovedGuidance && assistedGuidance
+			? { approved_guidance: assistedGuidance }
+			: {}),
 	};
 	return trimToBudget(root, bundle, {
 		persistRuleInjection: opts.persistRuleInjection === true && !compact,

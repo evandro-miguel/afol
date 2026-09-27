@@ -14,7 +14,7 @@ const CATEGORY_ORDER: readonly CommandCategory[] = [
 ];
 
 const HELP_LINE_LIMIT = 120;
-const JSON_OUTPUT_BYTE_LIMIT = 16_000;
+const JSON_OUTPUT_BYTE_LIMIT = 20_000;
 
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
 	core: "Core",
@@ -277,7 +277,8 @@ export function formatCatalogJson(
 		return `${JSON.stringify(catalog.map(compactCatalogEntry))}\n`;
 	}
 	const verbose = JSON.stringify(catalog);
-	return `${Buffer.byteLength(verbose, "utf8") <= JSON_OUTPUT_BYTE_LIMIT ? verbose : JSON.stringify(catalog.map(compactCatalogEntry))}\n`;
+	const outputBytes = Buffer.byteLength(verbose, "utf8") + 1;
+	return `${outputBytes < JSON_OUTPUT_BYTE_LIMIT ? verbose : JSON.stringify(catalog.map(compactCatalogEntry))}\n`;
 }
 
 export function buildCommandHelpJson(

@@ -663,6 +663,82 @@ describe("evolve status", () => {
 		}
 	});
 
+	test("evolve backfill --run writes one bounded page and denies restricted callers", async () => {
+		const root = fixture();
+		try {
+			const workbench = join(root, ".afol", "wb");
+			mkdirSync(join(workbench, ".locks"), { recursive: true });
+			mkdirSync(join(workbench, "_archive"), { recursive: true });
+			const session = "S-backfill";
+			const sessionDir = join(workbench, session);
+			mkdirSync(sessionDir);
+			const taskPath = join(sessionDir, `${session}_task_01.md`);
+			const taskText = `---\ndoc_type: "workbench_task"\nid: "${session}_task_01"\nsession_id: "${session}"\nstatus: "open"\ncreated_at: "2026-08-11T12:00:00.000Z"\nupdated_at: "2026-08-11T12:00:00.000Z"\n---\n\n## State Board\n\n| Task | State | Owner | Notes |\n| --- | --- | --- | --- |\n| T-01 | in_progress | agent | interrupted |\n`;
+			writeFileSync(taskPath, taskText, "utf8");
+			writeFileSync(
+				join(sessionDir, ".evidence.jsonl"),
+				`${JSON.stringify({
+					id: "E-backfill-failure",
+					task_id: "T-01",
+					project_id: PROJECT_ID,
+					session_id: session,
+					created_at: "2026-08-11T12:00:00.000Z",
+					command: "bun test",
+					result: "failed",
+					provenance: "observed",
+					exit_code: 1,
+					purpose: "completion",
+					authorization_type: "execution",
+				})}\n`,
+				"utf8",
+			);
+
+			const denied = captureIo();
+			expect(
+				await runEvolveCommand(
+					"backfill",
+					["--run", "--limit", "1", "--json"],
+					root,
+					denied.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(JSON.parse(denied.stdout[0] ?? "{}")).toMatchObject({
+				ok: false,
+				action: "evolve.backfill.run",
+				error: { code: "approval-required" },
+			});
+			expect(existsSync(evolutionDbPath(root))).toBe(false);
+			expect(existsSync(observationJournalPath(root))).toBe(false);
+
+			const allowed = captureIo();
+			expect(
+				await runEvolveCommand(
+					"backfill",
+					["--run", "--limit", "1", "--json"],
+					root,
+					allowed.io,
+					defaultOperationContext(),
+				),
+			).toBe(0);
+			const payload = JSON.parse(allowed.stdout[0] ?? "{}");
+			expect(payload).toMatchObject({
+				action: "evolve.backfill.run",
+				data: {
+					pagination: { returned: 1, available: 1 },
+					totals: { appended: 1, failed: 0 },
+					sessions: [{ session_id: session, outcome: "ingested", appended: 1 }],
+				},
+			});
+			expect(readFileSync(observationJournalPath(root), "utf8")).toContain(
+				"E-backfill-failure",
+			);
+			expect(readFileSync(taskPath, "utf8")).toBe(taskText);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
 	test("evolve observe missing session returns structured error", async () => {
 		const root = fixture();
 		try {
