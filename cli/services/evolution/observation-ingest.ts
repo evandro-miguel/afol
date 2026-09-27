@@ -10,7 +10,6 @@ import {
 	type BoundedSourceLimits,
 	readBoundedSourceFile,
 } from "../io/safe-source";
-import { readProjectConfig } from "../project/paths";
 import {
 	MAX_SESSION_IDENTIFIER_LENGTH,
 	parseEvidenceEntries,
@@ -19,7 +18,7 @@ import {
 import type { EvidenceEntry } from "../workbench/types";
 import { verifyTaskText } from "../workbench/verify";
 import { validateEvolutionIdentity } from "./config";
-import { evolutionDbPath, openEvolutionDb } from "./db";
+import { openEvolutionDb } from "./db";
 import {
 	appendProductionDayAllocation,
 	resolveProductionDayReceipt,
@@ -39,7 +38,7 @@ import {
 	observationFromFeedback,
 	observationFromTelemetry,
 } from "./observation-sources";
-import { resolveEvolutionConfig } from "./runtime-config";
+import { resolveEvolutionRuntime } from "./runtime-config";
 
 export const OBSERVE_EVIDENCE_LIMITS: BoundedSourceLimits = {
 	maxBytes: 1_048_576,
@@ -107,6 +106,8 @@ type PreparedObservationIngest = {
 	projectId: string;
 	session: string;
 	timezone: string;
+	dbPath: string;
+	eventsDir: string;
 	now: Date;
 	qualifyingEvidenceId?: string;
 	candidates: ObservationInput[];
@@ -227,8 +228,8 @@ function prepareObservationIngestForSession(
 	if (Number.isNaN(now.getTime()))
 		throw new Error("observation ingest date is invalid");
 
-	const resolved = resolveEvolutionConfig(readProjectConfig(root));
-	const timezone = resolved.timezone ?? "UTC";
+	const resolved = resolveEvolutionRuntime(root);
+	const timezone = resolved.timezone;
 	validateEvolutionIdentity({ projectId, timezone });
 	if (!resolved.projectId || resolved.projectId !== projectId)
 		throw new Error("evolution project identity mismatch");
@@ -279,6 +280,8 @@ function prepareObservationIngestForSession(
 			projectId,
 			session,
 			timezone,
+			dbPath: resolved.dbPath,
+			eventsDir: resolved.eventsDir,
 			now,
 			candidates: [],
 		};
@@ -325,6 +328,8 @@ function prepareObservationIngestForSession(
 			projectId,
 			session,
 			timezone,
+			dbPath: resolved.dbPath,
+			eventsDir: resolved.eventsDir,
 			now,
 			...(qualifyingEvidence
 				? { qualifyingEvidenceId: qualifyingEvidence.id }
@@ -434,6 +439,8 @@ function prepareObservationIngestForSession(
 			projectId,
 			session,
 			timezone,
+			dbPath: resolved.dbPath,
+			eventsDir: resolved.eventsDir,
 			now,
 			...(qualifyingEvidence
 				? { qualifyingEvidenceId: qualifyingEvidence.id }
@@ -510,6 +517,8 @@ function prepareObservationIngestForSession(
 		projectId,
 		session,
 		timezone,
+		dbPath: resolved.dbPath,
+		eventsDir: resolved.eventsDir,
 		now,
 		...(qualifyingEvidence
 			? { qualifyingEvidenceId: qualifyingEvidence.id }
@@ -542,7 +551,7 @@ export function ingestObservationsForSession(
 	}
 	if (prepared.preview.mode === "production-day") {
 		if (prepared.qualifyingEvidenceId) {
-			const db = openEvolutionDb(evolutionDbPath(input.root));
+			const db = openEvolutionDb(prepared.dbPath);
 			try {
 				appendProductionDayAllocation({
 					root: input.root,
@@ -551,6 +560,7 @@ export function ingestObservationsForSession(
 					timezone: prepared.timezone,
 					sessionId: prepared.session,
 					evidenceId: prepared.qualifyingEvidenceId,
+					evolutionEventsDir: prepared.eventsDir,
 					now: prepared.now,
 				});
 			} finally {
@@ -571,11 +581,12 @@ export function ingestObservationsForSession(
 			root: input.root,
 			projectId: prepared.projectId,
 			timezone: prepared.timezone,
+			evolutionEventsDir: prepared.eventsDir,
 			evidenceId: prepared.qualifyingEvidenceId,
 		});
 		if (receipt) productionDaySequence = receipt.ordinal_sequence;
 		else {
-			const db = openEvolutionDb(evolutionDbPath(input.root));
+			const db = openEvolutionDb(prepared.dbPath);
 			try {
 				productionDaySequence = appendProductionDayAllocation({
 					root: input.root,
@@ -584,6 +595,7 @@ export function ingestObservationsForSession(
 					timezone: prepared.timezone,
 					sessionId: prepared.session,
 					evidenceId: prepared.qualifyingEvidenceId,
+					evolutionEventsDir: prepared.eventsDir,
 					now: prepared.now,
 				}).ordinal_sequence;
 			} finally {
@@ -607,7 +619,7 @@ export function ingestObservationsForSession(
 	let skipped = 0;
 	const warnings: string[] = [];
 	const observationIds: string[] = [];
-	const db = openEvolutionDb(evolutionDbPath(input.root));
+	const db = openEvolutionDb(prepared.dbPath);
 	try {
 		for (const candidate of prepared.candidates) {
 			try {
@@ -619,6 +631,8 @@ export function ingestObservationsForSession(
 					root: input.root,
 					db,
 					projectId: prepared.projectId,
+					timezone: prepared.timezone,
+					evolutionEventsDir: prepared.eventsDir,
 					observation: record,
 					now: prepared.now,
 				});
