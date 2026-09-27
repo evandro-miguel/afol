@@ -2245,6 +2245,15 @@ function runAssistedProposalShow(
 				type: item.type,
 				target: "target" in item ? item.target : null,
 				sha256: "expected_sha256" in item ? item.expected_sha256 : null,
+				// Lesson adoption identity is exact and short; expose it in the
+				// summary so approval binds a verifiable lesson version (R9).
+				...(item.type === "apply_lesson"
+					? {
+							lesson_id: item.lesson_id,
+							version_id: item.version_id,
+							field_set_digest: item.field_set_digest,
+						}
+					: {}),
 				text_fields: fields,
 			};
 		},
@@ -2623,7 +2632,10 @@ function parseProposalCommand(args: readonly string[]):
 				| "after"
 				| "content"
 				| "rationale"
-				| "statement";
+				| "statement"
+				| "lesson_id"
+				| "version_id"
+				| "field_set_digest";
 			operationOffset: number;
 			operationBytes: number;
 			json: boolean;
@@ -2676,6 +2688,9 @@ function parseProposalCommand(args: readonly string[]):
 			| "content"
 			| "rationale"
 			| "statement"
+			| "lesson_id"
+			| "version_id"
+			| "field_set_digest"
 			| undefined;
 		let operationOffset = 0;
 		let operationBytes = 8_000;
@@ -2692,11 +2707,20 @@ function parseProposalCommand(args: readonly string[]):
 				const value = args[++index] ?? "";
 				if (
 					!(
-						["before", "after", "content", "rationale", "statement"] as string[]
+						[
+							"before",
+							"after",
+							"content",
+							"rationale",
+							"statement",
+							"lesson_id",
+							"version_id",
+							"field_set_digest",
+						] as string[]
 					).includes(value)
 				)
 					throw new Error(
-						"evolve proposal show --field requires before, after, content, rationale, or statement",
+						"evolve proposal show --field requires before, after, content, rationale, statement, lesson_id, version_id, or field_set_digest",
 					);
 				operationField = value as typeof operationField;
 			} else if (arg === "--offset") {
