@@ -52,6 +52,7 @@ export {
 	appendProductionDayAllocation,
 	type EvolutionJournalContext,
 	type ProductionDayJournalEvent,
+	distinctLocalProductionDays,
 	productionDayJournalPath,
 	readProductionDayJournal,
 	resolveProductionDayReceipt,

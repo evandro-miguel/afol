@@ -44,7 +44,10 @@ import {
 	type AssistedProposalPreview,
 } from "./assisted-proposal-packet";
 import { assertSafeEvolutionTarget } from "./db";
-import { readProductionDayJournal } from "./journal";
+import {
+	distinctLocalProductionDays,
+	readProductionDayJournal,
+} from "./journal";
 import { resolveLessonVersionForAdoption } from "./lesson-records";
 import { resolveEvolutionConfig } from "./runtime-config";
 
@@ -718,11 +721,7 @@ function currentProductionDaySequence(
 			config.timezone,
 			config.paths.evolutionEventsDir,
 		);
-		return new Set(
-			days
-				.filter((event) => event.payload.project_id === projectId)
-				.map((event) => event.payload.local_date),
-		).size;
+		return distinctLocalProductionDays(days, projectId);
 	} catch {
 		return undefined;
 	}

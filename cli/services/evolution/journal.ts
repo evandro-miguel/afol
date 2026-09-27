@@ -308,6 +308,24 @@ export function readProductionDayJournal(
 	throw lastError;
 }
 
+/**
+ * Single production-day ordinal shared by proposal decision stamping,
+ * context guidance, and apply receipts: the number of distinct local dates
+ * in the project's journal. Events sharing one local date are one decay
+ * day; counting journal events instead would age a preference by every
+ * same-day evidence record (owner contract R4).
+ */
+export function distinctLocalProductionDays(
+	events: ReadonlyArray<Pick<ProductionDayJournalEvent, "payload">>,
+	projectId: string,
+): number {
+	return new Set(
+		events
+			.filter((event) => event.payload.project_id === projectId)
+			.map((event) => event.payload.local_date),
+	).size;
+}
+
 export function resolveProductionDayReceipt(
 	context: EvolutionJournalContext & { evidenceId: string },
 ): ProductionDayReceipt | null {

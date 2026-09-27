@@ -35,6 +35,7 @@ import {
 	previewProposalEvaluation,
 	productionDayJournalPath,
 	type RecurrenceThresholds,
+	distinctLocalProductionDays,
 	readObservationJournal,
 	readPreferenceJournal,
 	readProductionDayJournal,
@@ -2408,12 +2409,17 @@ function runAssistedProposalDecision(
 		preview.kind === "contextual_preference"
 	) {
 		try {
-			approvalProductionDay = readProductionDayJournal(
-				root,
+			// One ordinal per distinct local production date; same-date
+			// events must not age the preference (R4).
+			approvalProductionDay = distinctLocalProductionDays(
+				readProductionDayJournal(
+					root,
+					resolved.projectId,
+					resolved.timezone,
+					resolved.paths.evolutionEventsDir,
+				),
 				resolved.projectId,
-				resolved.timezone,
-				resolved.paths.evolutionEventsDir,
-			).length;
+			);
 		} catch {
 			// A contextual preference with unknown production-day health will remain inactive.
 		}
@@ -2432,7 +2438,12 @@ function runAssistedProposalDecision(
 			...(resumeWhen ? { resume_when: resumeWhen } : {}),
 			...(approvalProductionDay === undefined
 				? {}
-				: { approval_production_day: approvalProductionDay }),
+				: {
+						approval_production_day: approvalProductionDay,
+						// Marks the ordinal base so legacy receipts written with
+						// event counts are never silently reinterpreted as dates.
+						approval_production_day_base: "distinct_local_dates",
+					}),
 		},
 		now,
 	});

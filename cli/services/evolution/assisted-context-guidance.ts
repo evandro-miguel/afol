@@ -9,7 +9,7 @@ import {
 	proposalVersionEvents,
 	readAssistedProposalJournal,
 } from "./assisted-proposal-journal";
-import { readProductionDayJournal } from "./journal";
+import { distinctLocalProductionDays, readProductionDayJournal } from "./journal";
 import type { ContextLessonEntry } from "./lesson-records";
 import {
 	lessonMatchesRequest,
@@ -192,7 +192,12 @@ export function resolveAssistedContextGuidance(input: {
 				config.timezone,
 				config.paths.evolutionEventsDir,
 			);
-			currentProductionDay = productionDays.length;
+			// One ordinal per distinct local date, matching decision stamping
+			// and apply receipts; same-date events age nothing (R4).
+			currentProductionDay = distinctLocalProductionDays(
+				productionDays,
+				input.projectId,
+			);
 			preferenceHealth = "healthy";
 		} catch {
 			preferenceHealth = "unknown";
