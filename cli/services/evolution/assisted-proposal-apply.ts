@@ -39,7 +39,10 @@ import {
 	readAssistedProposalJournal,
 	withAssistedProposalJournalLock,
 } from "./assisted-proposal-journal";
-import type { AssistedProposalPreview } from "./assisted-proposal-packet";
+import {
+	literalReplaceOnce,
+	type AssistedProposalPreview,
+} from "./assisted-proposal-packet";
 import { assertSafeEvolutionTarget } from "./db";
 import { readProductionDayJournal } from "./journal";
 import { resolveLessonVersionForAdoption } from "./lesson-records";
@@ -182,22 +185,24 @@ function preflightOperation(
 			typeof expected !== "string" ||
 			typeof beforeText !== "string" ||
 			typeof afterText !== "string" ||
-			hash(existing) !== expected ||
-			existing.split(beforeText).length - 1 !== 1
+			hash(existing) !== expected
 		)
 			throw new Error(`approved replace target changed: ${target}`);
-		const after = existing.replace(beforeText, afterText);
-		if (Buffer.byteLength(after, "utf8") > MAX_TARGET_BYTES)
-			throw new Error(`approved target exceeds the safe size limit: ${target}`);
+		const replacement = literalReplaceOnce({
+			content: existing,
+			before: beforeText,
+			after: afterText,
+			target,
+		});
 		sameBaseline(preview, index, operation, "present", expected);
 		return {
 			index,
 			target,
 			type: operation.type,
 			before: existing,
-			after,
+			after: replacement.content,
 			beforeHash: hash(existing),
-			afterHash: hash(after),
+			afterHash: replacement.sha256,
 			absolutePath,
 			metadata: {
 				mode: Number(stat.mode),
@@ -461,17 +466,18 @@ function mutationBeforeFromBackup(
 		);
 	if (
 		typeof spec.beforeText !== "string" ||
-		typeof spec.afterText !== "string" ||
-		before.split(spec.beforeText).length - 1 !== 1
+		typeof spec.afterText !== "string"
 	)
 		throw new Error(
 			"proposal mutation backup does not match the approved operation",
 		);
-	const after = before.replace(spec.beforeText, spec.afterText);
-	if (
-		Buffer.byteLength(after, "utf8") > MAX_TARGET_BYTES ||
-		hash(after) !== record.afterHash
-	)
+	const replacement = literalReplaceOnce({
+		content: before,
+		before: spec.beforeText,
+		after: spec.afterText,
+		target: spec.target,
+	});
+	if (replacement.sha256 !== record.afterHash)
 		throw new Error(
 			"proposal mutation output does not match the approved operation",
 		);
@@ -494,7 +500,7 @@ function mutationBeforeFromBackup(
 		target: spec.target,
 		type: spec.type,
 		before,
-		after,
+		after: replacement.content,
 		beforeHash: spec.beforeHash,
 		afterHash: record.afterHash,
 		absolutePath: spec.absolutePath,

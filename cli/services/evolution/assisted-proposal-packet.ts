@@ -199,6 +199,36 @@ function sha256(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
+export type LiteralReplaceResult = {
+	content: string;
+	sha256: string;
+};
+
+/**
+ * Single literal-substitution seam shared by proposal preparation, apply, and
+ * interrupted-apply recovery. The replacer function form suppresses the
+ * ECMAScript replacement patterns ($&, $$, $`, $'), so the bytes written are
+ * exactly the approved literal text, and the resulting UTF-8 size is bounded
+ * by the same target limit at every stage.
+ */
+export function literalReplaceOnce(input: {
+	content: string;
+	before: string;
+	after: string;
+	target: string;
+}): LiteralReplaceResult {
+	if (input.content.split(input.before).length - 1 !== 1)
+		throw new Error(
+			`replace before text must match exactly once: ${input.target}`,
+		);
+	const replaced = input.content.replace(input.before, () => input.after);
+	if (Buffer.byteLength(replaced, "utf8") > MAX_TARGET_BYTES)
+		throw new Error(
+			`replace target result exceeds the safe size limit: ${input.target}`,
+		);
+	return { content: replaced, sha256: sha256(replaced) };
+}
+
 function canonicalProjectId(root: string): string {
 	const config = readProjectConfig(root);
 	const project = config.project;
@@ -429,10 +459,15 @@ function canonicalOperation(
 			);
 		const before = nonEmpty(raw.before, "replace before", 16_000);
 		const after = nonEmpty(raw.after, "replace after", 16_000);
-		if (content.split(before).length - 1 !== 1)
-			throw new Error(
-				`replace before text must match exactly once: ${target.relativePath}`,
-			);
+		// Compute and validate the resulting file at preparation time so a
+		// replacement that expands past the target limit is refused before
+		// approval, using the same seam apply and recovery run.
+		literalReplaceOnce({
+			content,
+			before,
+			after,
+			target: target.relativePath,
+		});
 		return {
 			operation: {
 				type,
