@@ -2951,6 +2951,23 @@ function runAssistedProposalPacket(
 		return 2;
 	}
 	const compact = compactAssistedProposalPreview(result);
+	const receiptOutput = (dto: Record<string, unknown>) =>
+		parsed.json
+			? stringifyEnvelope(envelopeOk(dto, policy))
+			: `proposal=${result.proposal_id} kind=${result.kind} version=${result.version_digest} operations=${result.intervention.operations.length} persisted=${!parsed.dryRun} approved=false; inspect with evolve proposal show`;
+	// Size the receipt before persisting: an oversized summary degrades to a
+	// minimal persisted receipt instead of failing after a durable write or
+	// hiding the prepared version behind a refusal.
+	const fullDto = {
+		...compact,
+		read_only: parsed.dryRun,
+		persisted: !parsed.dryRun,
+		inspection:
+			"Use evolve proposal show <proposal-id> before deciding; --operation <1-8> displays exact prepared text.",
+	};
+	const oversized =
+		Buffer.byteLength(receiptOutput(fullDto), "utf8") >
+		MAX_ASSISTED_PROPOSAL_OUTPUT_BYTES;
 	let stored: { duplicate: boolean } | undefined;
 	if (!parsed.dryRun) {
 		try {
@@ -2980,36 +2997,24 @@ function runAssistedProposalPacket(
 			return 2;
 		}
 	}
-	const resultDto = {
-		...compact,
-		read_only: parsed.dryRun,
-		persisted: !parsed.dryRun,
-		...(stored ? { duplicate: stored.duplicate } : {}),
-		inspection:
-			"Use evolve proposal show <proposal-id> before deciding; --operation <1-8> displays exact prepared text.",
-	};
-	const output = parsed.json
-		? stringifyEnvelope(envelopeOk(resultDto, policy))
-		: `proposal=${result.proposal_id} kind=${result.kind} version=${result.version_digest} operations=${result.intervention.operations.length} persisted=${!parsed.dryRun} approved=false; inspect with evolve proposal show`;
-	if (Buffer.byteLength(output, "utf8") > MAX_ASSISTED_PROPOSAL_OUTPUT_BYTES) {
-		const message = "proposal preview summary exceeds its bounded output limit";
-		const hint =
-			"Reduce evidence references or packet text lengths, then rerun prepare. No code, skill, or guidance target was changed.";
-		if (parsed.json) {
-			io.stdout(
-				stringifyEnvelope(
-					envelopeErr("EVOLVE_PROPOSAL_OUTPUT_LIMIT", message, {
-						action: policy.action,
-						exitCode: 2,
-						hint,
-					}),
-				),
-			);
-		} else {
-			io.stderr(`EVOLVE_PROPOSAL_OUTPUT_LIMIT: ${message}\n${hint}`);
-		}
-		return 2;
-	}
+	const resultDto = oversized
+		? {
+				read_only: parsed.dryRun,
+				persisted: !parsed.dryRun,
+				...(stored ? { duplicate: stored.duplicate } : {}),
+				kind: result.kind,
+				proposal_id: result.proposal_id,
+				version_digest: result.version_digest,
+				operation_count: result.intervention.operations.length,
+				evidence_ref_count: result.evidence_refs.length,
+				inspection:
+					"Proposal preview summary exceeded its bounded output limit; the prepared version is persisted and inspectable via evolve proposal show.",
+			}
+		: {
+				...fullDto,
+				...(stored ? { duplicate: stored.duplicate } : {}),
+			};
+	const output = receiptOutput(resultDto);
 	io.stdout(output);
 	return 0;
 }
