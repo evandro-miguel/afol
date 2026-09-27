@@ -60,6 +60,14 @@ describe("evolution observation model", () => {
 		});
 	});
 
+	test("pins the release checksum for migration v11", () => {
+		expect(EVOLUTION_MIGRATIONS.find(({ version }) => version === 11)).toEqual({
+			version: 11,
+			checksum:
+				"75e77c016d903571e3841caa2460c962befd0c19f2f848d5df6ecd7039db6a8c",
+		});
+	});
+
 	test("pins v10 projection index definitions and retires superseded indexes", () => {
 		const db = new Database(":memory:");
 		try {
@@ -344,7 +352,7 @@ describe("evolution observation model", () => {
 		const db = new Database(":memory:");
 		try {
 			applyMigrations(db);
-			expect(EVOLUTION_SCHEMA_VERSION).toBe(10);
+			expect(EVOLUTION_SCHEMA_VERSION).toBe(11);
 			expect(
 				db
 					.query(
@@ -356,6 +364,45 @@ describe("evolution observation model", () => {
 				{ name: "observations" },
 				{ name: "recurrence_decisions" },
 			]);
+		} finally {
+			db.close();
+		}
+	});
+
+	test("migration v11 adds the durable history backfill cursor table", () => {
+		const db = new Database(":memory:");
+		try {
+			applyMigrations(db, 10);
+			expect(
+				db
+					.query(
+						"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'history_backfill_cursors'",
+					)
+					.all(),
+			).toEqual([]);
+			applyMigrations(db);
+			expect(
+				(db.query("PRAGMA user_version").get() as { user_version: number })
+					.user_version,
+			).toBe(11);
+			expect(() =>
+				db.exec(
+					"INSERT INTO history_backfill_cursors(project_id,session_id,extractor_version,source_hash,status,byte_offset,updated_at) VALUES ('p','s','history-backfill/1','hash','invalid',0,'now')",
+				),
+			).toThrow();
+			expect(() =>
+				db.exec(
+					"INSERT INTO history_backfill_cursors(project_id,session_id,extractor_version,source_hash,status,byte_offset,updated_at) VALUES ('p','s','history-backfill/1','hash','pending',-1,'now')",
+				),
+			).toThrow();
+			db.exec(
+				"INSERT INTO history_backfill_cursors(project_id,session_id,extractor_version,source_hash,status,byte_offset,updated_at) VALUES ('p','s','history-backfill/1','hash','pending',4096,'now')",
+			);
+			expect(
+				db
+					.query("SELECT status, byte_offset FROM history_backfill_cursors")
+					.all(),
+			).toEqual([{ status: "pending", byte_offset: 4096 }]);
 		} finally {
 			db.close();
 		}
