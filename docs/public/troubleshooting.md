@@ -8,11 +8,23 @@ that `.afol/config.json` exists and is valid JSON.
 ## Task cannot complete
 
 Use `afol status --task-id <id> --json`. Completion requires observed evidence;
-run the agent-facing default `afol done <id> --test "<argv-only-check>"` (or
-`-x`), or record an evidence command with
-`afol evidence --task-id <id> --command "<check>" --result passed`.
+run the agent-facing default `afol d <id> -x "<argv-only-check>"`.
+Shell no-ops such as `true` and `:` cannot authorize completion. `afol e`
+records a diagnostic receipt; it does not complete a task.
 `--test-shell "<real check>"` is local-operator-only and must never be used by
 an agent or remote/provider execution.
+
+## Close blocked by open tasks
+
+Start pending work with `afol st <task-id>`, finish it with
+`afol d <task-id> -x "<check>"`, then run `afol c`.
+
+## Session is pending_spec
+
+The warning does not block start, done, or close. Resolve the active or bound
+session with `afol gov rs -F <F-id> -P <spec-id>`, or waive it with
+`afol gov rs --no-spec-required -r "<reason>"`. Add `-S <session-id>` when
+selecting another session or when binding is ambiguous.
 
 ## Session context is ambiguous
 
@@ -72,6 +84,6 @@ published downloads.
 Open the failed `quality`, `tests`, `core-smoke`, or `deep-validation` job and
 rerun its exact command locally with Bun 1.3.14 after
 `bun install --frozen-lockfile`. The first three jobs run for pull requests;
-`deep-validation` runs only after a push to `main`. A green rerun is regression
+`deep-validation` runs for pull requests into `main` and pushes to `main`. A green rerun is regression
 evidence, not a replacement for `bun run validate:release` on a release
 candidate.

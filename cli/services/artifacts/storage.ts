@@ -8,29 +8,24 @@
  * or closure and never opens the evolution database.
  */
 
+import { isUtf8 } from "node:buffer";
 import { randomUUID } from "node:crypto";
-import {
-	closeSync,
-	existsSync,
-	fsyncSync,
-	linkSync,
-	lstatSync,
-	mkdirSync,
-	openSync,
-	readFileSync,
-	unlinkSync,
-	writeSync,
-} from "node:fs";
-import { join, relative, resolve, dirname } from "node:path";
-import { syncDirectoryDurablyIfSupported } from "../io/durable-sync";
-import { readBoundedSourceFile } from "../io/safe-source";
-import { resolveProjectPaths } from "../project/paths";
+import { existsSync, lstatSync } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
+import { readBoundedSourceRange } from "../io/safe-source";
+import { withResourceLocks } from "../io/session-lock";
+import { resolveArtifactProjectPaths as resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
-import { digestBytes, OWNER_ID_RE, resolveRecordDirectory, stableJson } from "./inventory";
+import { CaptureDirectory } from "./capture-directory";
+import {
+	digestBytes,
+	OWNER_ID_RE,
+	resolveRecordDirectory,
+	stableJson,
+} from "./inventory";
 import {
 	ARTIFACT_SAVE_KINDS,
 	type ArtifactOwner,
-	type ArtifactSaveKind,
 	type ArtifactSaveReceipt,
 } from "./types";
 
@@ -39,6 +34,18 @@ const MAX_TITLE_CHARS = 200;
 const MAX_RECEIPT_BYTES = 4_096;
 const SESSION_TASK_FILE = (session: string) => `${session}_task_01.md`;
 const SAVE_KINDS = new Set<string>(ARTIFACT_SAVE_KINDS);
+const SOURCE_LIMITS = {
+	maxBytes: MAX_CAPTURE_BYTES,
+	maxLines: 20_000,
+	maxCandidates: 50_000,
+};
+
+export type ArtifactSaveHooks = {
+	afterIntent?: () => void;
+	afterPublication?: () => void;
+	afterTempOpen?: (fd: number) => void;
+	beforeCompletion?: () => void;
+};
 
 export type SaveArtifactInput = {
 	root: string;
@@ -47,6 +54,8 @@ export type SaveArtifactInput = {
 	text?: string;
 	/** Project-relative or root-absolute source file from `--file`. */
 	file?: string;
+	/** Confirm an explicit source copy; requires an owner and request id. */
+	expectedSourceDigest?: string;
 	title?: string;
 	session?: string;
 	record?: string;
@@ -55,6 +64,10 @@ export type SaveArtifactInput = {
 	envSession?: string;
 	requestId?: string;
 	now?: Date;
+};
+
+type PreparedSaveInput = SaveArtifactInput & {
+	source?: { path: string; content_digest: string; preserved: true };
 };
 
 export class ArtifactSaveError extends Error {
@@ -146,7 +159,8 @@ function routeOwner(
 			);
 		return replayOwner;
 	}
-	if (input.standalone === true) return { kind: "record", id: `R-${randomUUID()}` };
+	if (input.standalone === true)
+		return { kind: "record", id: `R-${randomUUID()}` };
 	if (input.envSession !== undefined && input.envSession.trim().length > 0)
 		return resolveSessionOwner(input.root, input.envSession);
 	return { kind: "record", id: `R-${randomUUID()}` };
@@ -187,6 +201,7 @@ function buildDocument(input: {
 	title?: string;
 	createdAt: string;
 	body: string;
+	source?: PreparedSaveInput["source"];
 }): string {
 	const frontmatter = [
 		"---",
@@ -201,6 +216,14 @@ function buildDocument(input: {
 			? [`title: ${JSON.stringify(input.title)}`]
 			: []),
 		`created_at: "${input.createdAt}"`,
+		...(input.source
+			? [
+					"source:",
+					`  path: ${JSON.stringify(input.source.path)}`,
+					`  content_digest: "${input.source.content_digest}"`,
+					"  preserved: true",
+				]
+			: []),
 		"---",
 		"",
 	].join("\n");
@@ -210,28 +233,42 @@ function buildDocument(input: {
 
 function readSourceContent(input: SaveArtifactInput): string {
 	if ((input.text !== undefined) === (input.file !== undefined))
-		fail(
-			"invalid-input",
-			"exactly one of --text or --file is required",
-		);
+		fail("invalid-input", "exactly one of --text or --file is required");
 	if (input.text !== undefined) {
 		if (Buffer.byteLength(input.text, "utf8") > MAX_CAPTURE_BYTES)
 			fail("invalid-input", `--text exceeds ${MAX_CAPTURE_BYTES} bytes`);
-		if (input.text.trim().length === 0) fail("invalid-input", "--text is empty");
+		if (input.text.trim().length === 0)
+			fail("invalid-input", "--text is empty");
 		return input.text;
 	}
 	const sourcePath = resolve(input.root, input.file as string);
 	const fromRoot = relative(input.root, sourcePath);
 	if (fromRoot.startsWith("..") || fromRoot === "")
 		fail("invalid-input", "--file must stay inside the project root");
-	const safe = resolveProjectWritePath(input.root, fromRoot.replaceAll("\\", "/"));
+	const safe = resolveProjectWritePath(
+		input.root,
+		fromRoot.replaceAll("\\", "/"),
+	);
 	if (!safe.ok) fail("invalid-input", safe.error);
-	const text = readBoundedSourceFile(safe.value.path, "artifact source", {
+	const source = readBoundedSourceRange(safe.value.path, "artifact source", {
+		offset: 0,
 		maxBytes: MAX_CAPTURE_BYTES,
-		maxLines: 20_000,
-		maxCandidates: 50_000,
 	});
-	if (text === null) fail("invalid-input", "--file is missing or unreadable");
+	if (source.totalBytes > MAX_CAPTURE_BYTES)
+		fail("invalid-input", `--file exceeds ${MAX_CAPTURE_BYTES} bytes`);
+	if (source.bytes.length !== source.totalBytes)
+		fail("source-changed", "source snapshot is incomplete");
+	if (
+		input.expectedSourceDigest !== undefined &&
+		digestBytes(source.bytes) !== input.expectedSourceDigest
+	)
+		fail(
+			"source-changed",
+			"source digest does not match the confirmed file snapshot",
+		);
+	if (!isUtf8(source.bytes))
+		fail("invalid-input", "artifact source must contain valid UTF-8");
+	const text = source.bytes.toString("utf8");
 	if (text.trim().length === 0) fail("invalid-input", "--file is empty");
 	return text;
 }
@@ -239,11 +276,17 @@ function readSourceContent(input: SaveArtifactInput): string {
 function payloadIdentity(input: {
 	kind: string;
 	bodyDigest: string;
+	title?: string;
+	destination: string;
+	source?: PreparedSaveInput["source"];
 }): string {
 	return digestBytes(
 		stableJson({
 			kind: input.kind,
 			body_digest: input.bodyDigest,
+			title: input.title ?? null,
+			destination: input.destination,
+			...(input.source ? { source: input.source } : {}),
 		}),
 	);
 }
@@ -256,12 +299,19 @@ function markerPath(root: string, requestId: string): string {
 	return resolved.value.path;
 }
 
-function readMarker(path: string): Record<string, unknown> | null {
+function readMarker(
+	root: string,
+	path: string,
+): Record<string, unknown> | null {
+	const dir = CaptureDirectory.open(root, relative(root, dirname(path)), false);
+	if (!dir) return null;
 	let raw: string;
 	try {
-		raw = readFileSync(path, "utf8");
-	} catch {
-		return null;
+		const file = dir.read(basename(path), 12_288);
+		if (!file) return null;
+		raw = file.bytes.toString("utf8");
+	} finally {
+		dir.close();
 	}
 	try {
 		const parsed = JSON.parse(raw) as unknown;
@@ -276,134 +326,120 @@ function readMarker(path: string): Record<string, unknown> | null {
 	}
 }
 
-function writeMarkerExclusive(
-	path: string,
-	payload: Record<string, unknown>,
+function validateDocument(document: string): void {
+	const lines = document.split(/\r?\n/);
+	const lineCount = lines.at(-1) === "" ? lines.length - 1 : lines.length;
+	if (
+		Buffer.byteLength(document, "utf8") > MAX_CAPTURE_BYTES ||
+		lineCount > SOURCE_LIMITS.maxLines ||
+		lines.filter((line) => line.trim()).length > SOURCE_LIMITS.maxCandidates
+	)
+		fail(
+			"invalid-input",
+			"final artifact document exceeds the safe source limit",
+		);
+}
+
+function markerReceipt(
+	marker: Record<string, unknown>,
+	requestId: string,
+): ArtifactSaveReceipt {
+	const value = marker.receipt;
+	if (
+		marker.request_id !== requestId ||
+		value === null ||
+		typeof value !== "object" ||
+		Array.isArray(value)
+	)
+		fail("request-marker-corrupt", "request marker has no valid receipt");
+	const receipt = value as ArtifactSaveReceipt;
+	if (
+		!receipt.owner ||
+		!["session", "record"].includes(receipt.owner.kind) ||
+		typeof receipt.owner.id !== "string" ||
+		!OWNER_ID_RE.test(receipt.owner.id) ||
+		typeof receipt.artifact_id !== "string" ||
+		!/^A-[a-f0-9-]{36}$/.test(receipt.artifact_id) ||
+		typeof receipt.path !== "string" ||
+		typeof receipt.content_digest !== "string" ||
+		!/^[a-f0-9]{64}$/.test(receipt.content_digest) ||
+		!Number.isSafeInteger(receipt.bytes) ||
+		typeof receipt.created_at !== "string" ||
+		!Number.isFinite(Date.parse(receipt.created_at))
+	)
+		fail("request-marker-corrupt", "request marker receipt fields are invalid");
+	if (
+		marker.state !== undefined &&
+		marker.state !== "prepared" &&
+		marker.state !== "committed"
+	)
+		fail("request-marker-corrupt", "request marker state is invalid");
+	return receipt;
+}
+
+/** Recover only the exclusive publication temp owned by this verified request. */
+function recoverPublicationTemp(
+	dir: CaptureDirectory,
+	name: string,
+	document: string,
 ): void {
-	mkdirSync(dirname(path), { recursive: true });
-	const buffer = Buffer.from(`${JSON.stringify(payload)}\n`, "utf8");
-	const fd = openSync(path, "wx");
-	try {
-		writeSync(fd, buffer);
-		fsyncSync(fd);
-	} finally {
-		closeSync(fd);
-	}
-}
-
-function writeAll(fd: number, buffer: Buffer): void {
-	let offset = 0;
-	while (offset < buffer.byteLength) {
-		const written = writeSync(fd, buffer, offset, buffer.byteLength - offset);
-		if (written <= 0) throw new Error("artifact write made no progress");
-		offset += written;
-	}
-}
-
-/**
- * Publish the document exclusively: a crash before publication leaves only a
- * dot-prefixed temporary file that the inventory never presents; publication
- * uses link(2), which cannot overwrite another agent's file.
- */
-function publishExclusively(dir: string, fileName: string, content: string) {
-	try {
-		mkdirSync(dir, { recursive: true });
-	} catch (error) {
+	const tempName = `.${name}.tmp`;
+	const stat = dir.stat(tempName);
+	if (!stat) return;
+	const final = dir.stat(name);
+	const paired =
+		stat.nlink === 2 &&
+		final?.isFile() &&
+		stat.dev === final.dev &&
+		stat.ino === final.ino;
+	if (
+		!stat.isFile() ||
+		stat.size > MAX_CAPTURE_BYTES ||
+		(!paired && (stat.nlink !== 1 || final))
+	)
 		fail(
-			"unsafe-destination",
-			`artifact destination directory is unavailable: ${(error as Error).message}`,
+			"integrity-error",
+			"request publication temp integrity cannot be verified",
 		);
-	}
-	const finalPath = join(dir, fileName);
-	const tempPath = join(dir, `.${fileName}.${process.pid}.tmp`);
-	const buffer = Buffer.from(content, "utf8");
-	const fd = openSync(tempPath, "wx");
-	try {
-		writeAll(fd, buffer);
-		fsyncSync(fd);
-	} finally {
-		closeSync(fd);
-	}
-	try {
-		linkSync(tempPath, finalPath);
-	} catch (error) {
-		unlinkSync(tempPath);
-		if (
-			typeof error === "object" &&
-			error !== null &&
-			(error as { code?: unknown }).code === "EEXIST"
-		)
-			fail(
-				"destination-exists",
-				`artifact destination already exists: ${fileName}; retry to publish under a new id`,
-			);
-		throw error;
-	}
-	unlinkSync(tempPath);
-	syncDirectoryDurablyIfSupported(dir);
-	return { finalPath, buffer };
+	const file = dir.read(tempName, MAX_CAPTURE_BYTES, paired ? [2] : [1]);
+	const expected = Buffer.from(document);
+	if (!file) fail("integrity-error", "request publication temp is missing");
+	if (
+		!file.bytes.equals(expected.subarray(0, file.bytes.length)) ||
+		(paired && file.bytes.length !== expected.length)
+	)
+		fail("integrity-error", "request publication temp integrity changed");
+	dir.unlinkOwned(tempName, file.stat);
 }
 
-/** Save one durable artifact and return the bounded receipt. */
-export function saveArtifact(input: SaveArtifactInput): ArtifactSaveReceipt {
-	if (!SAVE_KINDS.has(input.kind))
-		fail(
-			"invalid-kind",
-			`unsupported artifact kind: ${input.kind}; use one of ${ARTIFACT_SAVE_KINDS.join(", ")}`,
-		);
-	const body = readSourceContent(input);
-	const identity = payloadIdentity({
-		kind: input.kind,
-		bodyDigest: digestBytes(body),
-	});
-
-	// Resolve a prior request intention before minting any destination so a
-	// replay returns the original receipt and a different payload conflicts
-	// before any write.
-	const marker =
-		input.requestId !== undefined
-			? readMarker(markerPath(input.root, input.requestId))
-			: null;
-	const replayReceipt =
-		marker !== null && marker.receipt !== null && typeof marker.receipt === "object"
-			? (marker.receipt as ArtifactSaveReceipt)
-			: undefined;
-	const owner = routeOwner(
-		input,
-		marker !== undefined ? replayReceipt?.owner : undefined,
-	);
-	if (marker !== null) {
-		if (marker.payload_identity !== identity)
-			fail(
-				"request-conflict",
-				"--request-id was already used for a different artifact payload",
-			);
-		if (replayReceipt === undefined)
-			fail(
-				"request-marker-corrupt",
-				"saved request marker has no receipt; inspect it before saving again",
-			);
-		if (
-			(input.session !== undefined &&
-				!(owner.kind === "session" && owner.id === input.session.trim())) ||
-			(input.record !== undefined &&
-				!(owner.kind === "record" && owner.id === input.record.trim()))
-		)
-			fail(
-				"request-conflict",
-				"--request-id was already used for a different destination",
-			);
-		return { ...replayReceipt, persisted: true, duplicate: true };
-	}
-
-	const now = input.now ?? new Date();
-	const createdAt = now.toISOString();
-	const artifactId = `A-${randomUUID()}`;
+function saveLocked(
+	input: PreparedSaveInput,
+	body: string,
+	markerFile: string | undefined,
+	hooks: ArtifactSaveHooks,
+): ArtifactSaveReceipt {
+	const marker = markerFile ? readMarker(input.root, markerFile) : null;
+	const prior = marker
+		? markerReceipt(marker, input.requestId as string)
+		: undefined;
+	const owner = routeOwner(input, prior?.owner);
+	const artifactId = prior?.artifact_id ?? `A-${randomUUID()}`;
+	const createdAt =
+		prior?.created_at ?? (input.now ?? new Date()).toISOString();
 	const destination = destinationFor({
 		root: input.root,
 		owner,
 		artifactId,
 		kind: input.kind,
+	});
+	const title =
+		input.title === undefined ? undefined : sanitizeTitle(input.title);
+	const identity = payloadIdentity({
+		kind: input.kind,
+		bodyDigest: digestBytes(body),
+		...(title === undefined ? {} : { title }),
+		destination: destination.relativeDir,
+		...(input.source ? { source: input.source } : {}),
 	});
 	const relativePath = `${destination.relativeDir}/${destination.fileName}`
 		.replaceAll("\\", "/")
@@ -412,12 +448,37 @@ export function saveArtifact(input: SaveArtifactInput): ArtifactSaveReceipt {
 		artifactId,
 		owner,
 		kind: input.kind,
-		...(input.title !== undefined ? { title: sanitizeTitle(input.title) } : {}),
+		...(title === undefined ? {} : { title }),
 		createdAt,
 		body,
+		...(input.source ? { source: input.source } : {}),
 	});
+	validateDocument(document);
 	const contentDigest = digestBytes(document);
-
+	const legacyIdentity = digestBytes(
+		stableJson({ kind: input.kind, body_digest: digestBytes(body) }),
+	);
+	if (
+		marker &&
+		marker.payload_identity !== identity &&
+		!(marker.state === undefined && marker.payload_identity === legacyIdentity)
+	)
+		fail(
+			"request-conflict",
+			"--request-id was already used for a different artifact payload or destination",
+		);
+	if (
+		prior &&
+		(prior.path !== relativePath ||
+			prior.owner.kind !== owner.kind ||
+			prior.owner.id !== owner.id ||
+			prior.content_digest !== contentDigest ||
+			prior.bytes !== Buffer.byteLength(document, "utf8"))
+	)
+		fail(
+			"request-conflict",
+			"--request-id was already used for a different artifact payload or destination",
+		);
 	const receipt: ArtifactSaveReceipt = {
 		persisted: true,
 		duplicate: false,
@@ -427,53 +488,146 @@ export function saveArtifact(input: SaveArtifactInput): ArtifactSaveReceipt {
 		content_digest: contentDigest,
 		bytes: Buffer.byteLength(document, "utf8"),
 		created_at: createdAt,
-		...(input.requestId !== undefined ? { request_id: input.requestId } : {}),
-		index: { status: "ok" },
+		...(input.requestId === undefined ? {} : { request_id: input.requestId }),
+		index: {
+			status: "not_requested",
+			detail:
+				"no secondary indexing is performed; read directly by receipt.path",
+		},
+		...(input.source ? { source: input.source } : {}),
 	};
 	if (Buffer.byteLength(JSON.stringify(receipt), "utf8") > MAX_RECEIPT_BYTES)
-		fail("invalid-input", "artifact receipt exceeds the bounded size");
-
-	publishExclusively(destination.dir, destination.fileName, document);
-
-	// Validate the durable result before reporting success: the published file
-	// must be a safe source whose bytes match exactly what was written.
-	const readBack = readBoundedSourceFile(
-		join(destination.dir, destination.fileName),
-		"saved artifact",
-		{ maxBytes: MAX_CAPTURE_BYTES, maxLines: 20_000, maxCandidates: 50_000 },
+		fail("invalid-input", "artifact receipt exceeds the bounded size limit");
+	const directory = CaptureDirectory.open(
+		input.root,
+		destination.relativeDir,
+		true,
 	);
-	if (readBack === null || digestBytes(readBack) !== contentDigest)
-		fail(
-			"integrity-error",
-			"saved artifact failed read-back validation; inspect it before retrying",
-		);
-
-	if (input.requestId !== undefined) {
-		try {
-			writeMarkerExclusive(markerPath(input.root, input.requestId), {
-				request_id: input.requestId,
-				payload_identity: identity,
-				receipt,
-			});
-		} catch (error) {
-			if (
-				typeof error === "object" &&
-				error !== null &&
-				(error as { code?: unknown }).code === "EEXIST"
-			) {
-				const raced = readMarker(markerPath(input.root, input.requestId));
-				if (raced?.payload_identity === identity)
-					return { ...receipt, duplicate: true };
+	if (!directory)
+		fail("unsafe-destination", "artifact destination unavailable");
+	let markerDirectory: CaptureDirectory | null = null;
+	try {
+		if (markerFile)
+			markerDirectory = CaptureDirectory.open(
+				input.root,
+				relative(input.root, dirname(markerFile)),
+				true,
+			);
+		const writeState = (state: "prepared" | "committed") => {
+			if (markerFile && markerDirectory)
+				markerDirectory.writeAtomic(
+					basename(markerFile),
+					`${JSON.stringify({
+						schema_version: 1,
+						state,
+						request_id: input.requestId,
+						payload_identity: identity,
+						receipt: {
+							...receipt,
+							persisted: state === "committed",
+							request_state: state,
+						},
+					})}\n`,
+				);
+		};
+		const complete = (duplicate: boolean): ArtifactSaveReceipt => {
+			if (!markerFile) return { ...receipt, duplicate };
+			try {
+				hooks.beforeCompletion?.();
+				writeState("committed");
+			} catch {
+				directory.assertAttached();
+				return { ...receipt, duplicate, request_state: "prepared" };
 			}
-			// The durable write stands; only the replay marker is pending.
-			receipt.index = {
-				status: "pending",
-				detail: `request marker unavailable: ${(error as Error).message}`.slice(
-					0,
-					200,
-				),
-			};
+			directory.assertAttached();
+			return { ...receipt, duplicate, request_state: "committed" };
+		};
+		if (prior && marker?.state === "prepared")
+			recoverPublicationTemp(directory, destination.fileName, document);
+		const existing = prior
+			? directory.read(destination.fileName, MAX_CAPTURE_BYTES)
+			: null;
+		if (prior && (existing !== null || marker?.state !== "prepared")) {
+			if (existing === null || digestBytes(existing.bytes) !== contentDigest)
+				fail(
+					"integrity-error",
+					"saved artifact integrity no longer matches the request receipt",
+				);
+			return complete(true);
 		}
+		writeState("prepared");
+		hooks.afterIntent?.();
+		directory.publish(destination.fileName, document, hooks.afterTempOpen);
+		hooks.afterPublication?.();
+		const readBack = directory.read(destination.fileName, MAX_CAPTURE_BYTES);
+		if (readBack === null || digestBytes(readBack.bytes) !== contentDigest)
+			fail(
+				"integrity-error",
+				"saved artifact integrity failed read-back validation",
+			);
+		return complete(false);
+	} finally {
+		markerDirectory?.close();
+		directory.close();
 	}
-	return receipt;
+}
+
+/** Save one durable artifact and return the bounded, verified receipt. */
+export function saveArtifact(
+	input: SaveArtifactInput,
+	hooks: ArtifactSaveHooks = {},
+): ArtifactSaveReceipt {
+	if (!SAVE_KINDS.has(input.kind))
+		fail(
+			"invalid-kind",
+			`unsupported artifact kind: ${input.kind}; use one of ${ARTIFACT_SAVE_KINDS.join(", ")}`,
+		);
+	if (process.platform !== "linux")
+		fail(
+			"unsupported-platform",
+			"durable artifact capture requires Linux directory handles; other platforms are experimental",
+		);
+	if (input.expectedSourceDigest !== undefined) {
+		if (!/^[a-f0-9]{64}$/.test(input.expectedSourceDigest))
+			fail("invalid-input", "source digest must be a lowercase SHA-256");
+		if (input.file === undefined || input.text !== undefined)
+			fail("invalid-input", "verified source copies require --file");
+		if (
+			(input.session === undefined) === (input.record === undefined) ||
+			input.standalone === true
+		)
+			fail(
+				"invalid-input",
+				"verified source copies require one explicit --session or --record owner",
+			);
+		if (!input.requestId?.trim())
+			fail(
+				"invalid-input",
+				"verified source copies require a stable --request-id",
+			);
+	}
+	const body = readSourceContent(input);
+	const prepared: PreparedSaveInput = { ...input };
+	if (input.expectedSourceDigest !== undefined) {
+		prepared.source = {
+			path: relative(
+				input.root,
+				resolve(input.root, input.file as string),
+			).replaceAll("\\", "/"),
+			content_digest: input.expectedSourceDigest,
+			preserved: true,
+		};
+	}
+	resolveProjectPaths(input.root);
+	if (input.requestId === undefined)
+		return saveLocked(prepared, body, undefined, hooks);
+	if (
+		!input.requestId.trim() ||
+		Buffer.byteLength(input.requestId, "utf8") > 512
+	)
+		fail("invalid-input", "request id must contain 1 to 512 bytes");
+	const path = markerPath(input.root, input.requestId);
+	return withResourceLocks(input.root, [path], () =>
+		saveLocked(prepared, body, path, hooks),
+	);
 }

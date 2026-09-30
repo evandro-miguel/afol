@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import type { ArtifactReferenceV2 } from "../artifacts/types";
 import { readBoundedSourceFile } from "../io/safe-source";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import {
 	type ArtifactReference,
+	canonicalArtifactEvidenceReference,
 	verifyArtifactReference,
 } from "./artifact-inspection";
 import {
@@ -27,6 +29,9 @@ export const ASSISTED_PROPOSAL_KINDS = [
 ] as const;
 
 export type AssistedProposalKind = (typeof ASSISTED_PROPOSAL_KINDS)[number];
+export type AssistedProposalEvidenceReference =
+	| ArtifactReference
+	| ArtifactReferenceV2;
 
 type ReplaceTextOperation = {
 	type: "replace_text";
@@ -74,7 +79,7 @@ export type AssistedProposalPacketV1 = {
 	kind: AssistedProposalKind;
 	observed_fact: string;
 	hypothesis: string;
-	evidence_refs: ArtifactReference[];
+	evidence_refs: AssistedProposalEvidenceReference[];
 	intervention: { operations: ProposalOperation[] };
 	alternative: string;
 	validation_plan: { commands: string[]; expected: string };
@@ -98,7 +103,7 @@ export type AssistedProposalPreview = {
 	intervention_identity: string;
 	observed_fact: string;
 	hypothesis: string;
-	evidence_refs: ArtifactReference[];
+	evidence_refs: AssistedProposalEvidenceReference[];
 	intervention: { operations: Array<Record<string, unknown>> };
 	alternative: string;
 	validation_plan: { commands: string[]; expected: string; executed: false };
@@ -199,6 +204,12 @@ function sha256(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
+function isV2EvidenceReference(
+	ref: AssistedProposalEvidenceReference,
+): ref is ArtifactReferenceV2 {
+	return (ref as ArtifactReferenceV2).schema_version === 2;
+}
+
 export type LiteralReplaceResult = {
 	content: string;
 	sha256: string;
@@ -244,20 +255,38 @@ function canonicalProjectId(root: string): string {
 }
 
 function canonicalProblemEvidence(
-	refs: readonly ArtifactReference[],
+	root: string,
+	refs: readonly AssistedProposalEvidenceReference[],
 ): unknown[] {
-	const rows = refs.map((ref) => ({
-		session_id: ref.session_id,
-		path: ref.path,
-		content_digest: ref.content_digest,
-		...(ref.digest_scope === "range" || ref.anchor.startsWith("bytes:")
-			? {
-					anchor: ref.anchor,
-					digest_scope: "range",
-					source_identity_digest: ref.source_identity_digest,
-				}
-			: {}),
-	}));
+	const rows = refs.map((raw) => {
+		const ref = canonicalArtifactEvidenceReference(root, raw);
+		if (isV2EvidenceReference(ref))
+			return {
+				owner: ref.owner,
+				path: ref.relative_path,
+				content_digest: ref.content_digest,
+				...(ref.digest_scope === "range"
+					? {
+							anchor: ref.anchor,
+							digest_scope: "range",
+							source_identity_digest: ref.source_identity_digest,
+						}
+					: {}),
+			};
+		const legacy = ref as ArtifactReference;
+		return {
+			session_id: legacy.session_id,
+			path: legacy.path,
+			content_digest: legacy.content_digest,
+			...(legacy.digest_scope === "range" || legacy.anchor.startsWith("bytes:")
+				? {
+						anchor: legacy.anchor,
+						digest_scope: "range",
+						source_identity_digest: legacy.source_identity_digest,
+					}
+				: {}),
+		};
+	});
 	return [...new Set(rows.map(stableJson))]
 		.sort()
 		.map((row) => JSON.parse(row) as unknown);
@@ -613,11 +642,87 @@ function canonicalOperation(
 	throw new Error(`unsupported proposal operation: ${type || "missing type"}`);
 }
 
-function parseEvidence(value: unknown): ArtifactReference[] {
+function parseEvidence(value: unknown): AssistedProposalEvidenceReference[] {
 	if (!Array.isArray(value) || value.length < 1 || value.length > 20)
 		throw new Error("evidence_refs must contain 1 to 20 artifact references");
 	const refs = value.map((entry, index) => {
 		const ref = record(entry, `evidence_refs[${index}]`);
+		if (ref.schema_version === 2) {
+			onlyKeys(
+				ref,
+				[
+					"schema_version",
+					"owner",
+					"relative_path",
+					"anchor",
+					"content_digest",
+					"digest_scope",
+					"source_identity_digest",
+				],
+				`evidence_refs[${index}]`,
+			);
+			const owner = record(ref.owner, `evidence_refs[${index}].owner`);
+			onlyKeys(owner, ["kind", "id"], `evidence_refs[${index}].owner`);
+			const ownerKind = owner.kind;
+			const ownerId = nonEmpty(owner.id, "evidence owner id", 160);
+			const idPattern =
+				ownerKind === "record"
+					? /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
+					: IDENTIFIER_RE;
+			if (
+				(ownerKind !== "session" && ownerKind !== "record") ||
+				!idPattern.test(ownerId)
+			)
+				throw new Error(
+					`evidence_refs[${index}] contains an invalid owner identity`,
+				);
+			const path = nonEmpty(ref.relative_path, "evidence path", 512);
+			const anchor = nonEmpty(ref.anchor, "evidence anchor", 128);
+			const contentDigest = nonEmpty(
+				ref.content_digest,
+				"evidence content digest",
+				64,
+			);
+			if (!SHA256_RE.test(contentDigest))
+				throw new Error(
+					`evidence_refs[${index}] contains an invalid identity or digest`,
+				);
+			const byteAnchor = /^bytes:(\d+)-(\d+)$/.test(anchor);
+			const lineAnchor = /^line:[1-9]\d*$/.test(anchor);
+			if (
+				(ref.digest_scope === "range") !== byteAnchor ||
+				(ref.digest_scope === "artifact") !== lineAnchor ||
+				(ref.digest_scope !== "artifact" && ref.digest_scope !== "range")
+			)
+				throw new Error(
+					`evidence_refs[${index}] digest_scope does not match its anchor`,
+				);
+			const reference: ArtifactReferenceV2 = {
+				schema_version: 2,
+				owner: { kind: ownerKind, id: ownerId },
+				relative_path: path,
+				anchor,
+				content_digest: contentDigest,
+				digest_scope: ref.digest_scope,
+			};
+			if (ref.digest_scope === "range") {
+				const sourceIdentityDigest = nonEmpty(
+					ref.source_identity_digest,
+					`evidence_refs[${index}].source_identity_digest`,
+					64,
+				);
+				if (!SHA256_RE.test(sourceIdentityDigest))
+					throw new Error(
+						`evidence_refs[${index}].source_identity_digest must be a SHA-256 digest`,
+					);
+				reference.source_identity_digest = sourceIdentityDigest;
+			} else if (ref.source_identity_digest !== undefined) {
+				throw new Error(
+					`evidence_refs[${index}] artifact scope cannot include source_identity_digest`,
+				);
+			}
+			return reference;
+		}
 		onlyKeys(
 			ref,
 			[
@@ -678,7 +783,12 @@ function parseEvidence(value: unknown): ArtifactReference[] {
 		return reference;
 	});
 	const unique = new Set(
-		refs.map((ref) => `${ref.session_id}\n${ref.path}\n${ref.anchor}`),
+		refs.map((ref) => {
+			if (isV2EvidenceReference(ref))
+				return `${ref.owner.kind}\n${ref.owner.id}\n${ref.relative_path}\n${ref.anchor}`;
+			const legacy = ref as ArtifactReference;
+			return `session\n${legacy.session_id}\n${legacy.path}\n${legacy.anchor}`;
+		}),
 	);
 	if (unique.size !== refs.length)
 		throw new Error("evidence_refs must be unique");
@@ -848,6 +958,22 @@ function prepareAssistedProposalPreviewInternal(input: {
 			);
 		}
 	}
+	const normalizedReferenceKeys = packet.evidence_refs.map((raw) => {
+		const ref = canonicalArtifactEvidenceReference(input.root, raw);
+		return isV2EvidenceReference(ref)
+			? stableJson({
+					owner: ref.owner,
+					path: ref.relative_path,
+					anchor: ref.anchor,
+				})
+			: stableJson({
+					session_id: ref.session_id,
+					path: ref.path,
+					anchor: ref.anchor,
+				});
+	});
+	if (new Set(normalizedReferenceKeys).size !== packet.evidence_refs.length)
+		throw new AssistedProposalPacketError("evidence_refs must be unique");
 	const evaluationBaseline = prepareAssistedEvaluationBaseline({
 		root: input.root,
 		projectId,
@@ -932,7 +1058,7 @@ function prepareAssistedProposalPreviewInternal(input: {
 		stableJson({
 			project_id: projectId,
 			kind: packet.kind,
-			evidence_refs: canonicalProblemEvidence(packet.evidence_refs),
+			evidence_refs: canonicalProblemEvidence(input.root, packet.evidence_refs),
 			intervention_identity: interventionIdentity,
 		}),
 	);
@@ -1092,7 +1218,7 @@ export const ASSISTED_PROPOSAL_PACKET_SCHEMA = {
 		},
 	},
 	"x-afol-evaluation-baseline":
-		"Optional {task_type, cluster_id} selects an existing canonical observation cohort. The server verifies the selector against referenced sessions and freezes the existing evaluator contract; packets cannot supply scorecards or metrics.",
+		"Optional {task_type, cluster_id} selects an existing canonical observation cohort. The server verifies the selector against referenced session evidence and freezes the existing evaluator contract; record-only evidence does not invent a session cohort, and packets cannot supply scorecards or metrics.",
 	type: "object",
 	additionalProperties: false,
 	required: [
@@ -1115,38 +1241,106 @@ export const ASSISTED_PROPOSAL_PACKET_SCHEMA = {
 			minItems: 1,
 			maxItems: 20,
 			items: {
-				type: "object",
-				additionalProperties: false,
-				required: ["session_id", "path", "anchor", "content_digest"],
-				properties: {
-					session_id: { type: "string" },
-					path: { type: "string" },
-					anchor: { type: "string" },
-					content_digest: { type: "string", pattern: "^[a-f0-9]{64}$" },
-					digest_scope: { enum: ["artifact", "range"] },
-					source_identity_digest: {
-						type: "string",
-						pattern: "^[a-f0-9]{64}$",
-					},
-				},
 				oneOf: [
 					{
-						required: ["digest_scope"],
+						type: "object",
+						additionalProperties: false,
+						required: ["session_id", "path", "anchor", "content_digest"],
 						properties: {
-							digest_scope: { const: "artifact" },
-							anchor: { type: "string", pattern: "^line:[1-9]\\d*$" },
-						},
-						not: { required: ["source_identity_digest"] },
-					},
-					{
-						required: ["digest_scope", "source_identity_digest"],
-						properties: {
-							digest_scope: { const: "range" },
-							anchor: {
+							session_id: { type: "string" },
+							path: { type: "string" },
+							anchor: { type: "string" },
+							content_digest: {
 								type: "string",
-								pattern: "^bytes:\\d+-\\d+$",
+								pattern: "^[a-f0-9]{64}$",
+							},
+							digest_scope: { enum: ["artifact", "range"] },
+							source_identity_digest: {
+								type: "string",
+								pattern: "^[a-f0-9]{64}$",
 							},
 						},
+						oneOf: [
+							{
+								required: ["digest_scope"],
+								properties: {
+									digest_scope: { const: "artifact" },
+									anchor: {
+										type: "string",
+										pattern: "^line:[1-9]\\d*$",
+									},
+								},
+								not: { required: ["source_identity_digest"] },
+							},
+							{
+								required: ["digest_scope", "source_identity_digest"],
+								properties: {
+									digest_scope: { const: "range" },
+									anchor: {
+										type: "string",
+										pattern: "^bytes:\\d+-\\d+$",
+									},
+								},
+							},
+						],
+					},
+					{
+						type: "object",
+						additionalProperties: false,
+						required: [
+							"schema_version",
+							"owner",
+							"relative_path",
+							"anchor",
+							"content_digest",
+							"digest_scope",
+						],
+						properties: {
+							schema_version: { const: 2 },
+							owner: {
+								type: "object",
+								additionalProperties: false,
+								required: ["kind", "id"],
+								properties: {
+									kind: { enum: ["session", "record"] },
+									id: { type: "string" },
+								},
+							},
+							relative_path: { type: "string" },
+							anchor: { type: "string" },
+							content_digest: {
+								type: "string",
+								pattern: "^[a-f0-9]{64}$",
+							},
+							digest_scope: { enum: ["artifact", "range"] },
+							source_identity_digest: {
+								type: "string",
+								pattern: "^[a-f0-9]{64}$",
+							},
+						},
+						oneOf: [
+							{
+								required: ["digest_scope"],
+								properties: {
+									digest_scope: { const: "artifact" },
+									anchor: {
+										type: "string",
+										pattern: "^line:[1-9]\\d*$",
+									},
+								},
+								not: { required: ["source_identity_digest"] },
+							},
+							{
+								required: ["digest_scope", "source_identity_digest"],
+								properties: {
+									digest_scope: { const: "range" },
+									anchor: {
+										type: "string",
+										pattern: "^bytes:\\d+-\\d+$",
+									},
+								},
+							},
+						],
 					},
 				],
 			},

@@ -247,17 +247,25 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
-		guidance: ["Task selectors accept comma lists and ascending ranges."],
+		guidance: [
+			"Prefer: afol st T-01 when an active or bound session resolves.",
+			"Task selectors accept comma lists and ascending ranges.",
+		],
 		subcommands: [
 			{
-				usage: "--session <session-id> --task-id <task-id>",
+				usage: "T-01",
 				sideEffect: "write",
-				description: "Start a specific task in a specific session",
+				description: "Start a task in the active or bound session",
 			},
 			{
 				usage: "--task-id <task-id>",
 				sideEffect: "write",
 				description: "Start a task in the active or context session",
+			},
+			{
+				usage: "--session <session-id> --task-id <task-id>",
+				sideEffect: "write",
+				description: "Start a specific task in a specific session",
 			},
 			{
 				usage: "--json",
@@ -357,9 +365,12 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Create a workbench session",
 		category: "core",
+		guidance: [
+			'Prefer: afol n <theme> -t "<task>" or afol n <theme> -F <F-id> -P <spec-id> -t "<task>".',
+		],
 		subcommands: [
 			{
-				usage: "<theme> --task <summary>",
+				usage: "<theme> -t|--task <summary>",
 				sideEffect: "write",
 				description: "Create a session with one or more initial tasks",
 			},
@@ -630,7 +641,14 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Close the active session",
 		category: "workflow",
+		guidance: ["Prefer: afol c when an active or bound session resolves."],
 		subcommands: [
+			{
+				usage: "[-m|--summary <text>]",
+				sideEffect: "write",
+				description:
+					"Close the active or bound session after its tasks are complete",
+			},
 			{
 				usage: "--session <session-id> [-m|--summary <text>]",
 				sideEffect: "write",
@@ -671,7 +689,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		subcommands: [
 			{
 				usage:
-					"save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--json]",
+					"save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--source-digest <sha256>] [--json]",
 				sideEffect: "write",
 				description:
 					"Capture a note, research, report, or handoff; standalone without a selector",
@@ -856,6 +874,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		description: "Inspect local project indexes",
 		category: "inspect",
 		guidance: [
+			"ls is local-state, not session list. Use afol ss to list sessions.",
 			"Run rebuild before validation when indexes may be stale.",
 			"Use --verbose only when the full index snapshot is needed.",
 		],
@@ -1201,10 +1220,10 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		subcommands: [
 			{
 				usage:
-					"artifacts [--session <id>]... [--cursor <token>] [--limit <1-10>] [--artifact <canonical-name>]... [--byte-offset <n>] [--json]",
+					"artifacts [--records [--records-cursor <token>]] [--record <id> [--search <query> | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
 				sideEffect: "read",
 				description:
-					"Inspect bounded session artifacts; target omitted or oversized files by name and byte range",
+					"Inspect session or standalone record artifacts without Evolution projections. Records discovery scans at most 4,096 entries and reports partial coverage when bounded or unsupported; search has a 512 KiB work budget. Pages redact with up to 1 MiB of source context and withhold larger sources as partial. Page requests clamp to 4 bytes and offsets must be UTF-8 boundaries. History, records, and content cursors are separate.",
 			},
 			{
 				usage: "backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",

@@ -9,7 +9,10 @@ import {
 	proposalVersionEvents,
 	readAssistedProposalJournal,
 } from "./assisted-proposal-journal";
-import { distinctLocalProductionDays, readProductionDayJournal } from "./journal";
+import {
+	distinctLocalProductionDays,
+	readProductionDayJournal,
+} from "./journal";
 import type { ContextLessonEntry } from "./lesson-records";
 import {
 	lessonMatchesRequest,
@@ -56,7 +59,11 @@ export type AssistedContextGuidance = {
 	}>;
 	contextual_preference_health: "not_present" | "healthy" | "unknown";
 	current_production_day?: number;
-	omitted: Array<{ proposal_id: string; reason: string }>;
+	omitted: Array<{
+		proposal_id: string;
+		reason: string;
+		reconfirmation_required?: boolean;
+	}>;
 	omitted_count: number;
 	mandatory_omitted: boolean;
 	truncated: boolean;
@@ -131,10 +138,15 @@ function omitted(
 	proposalId: string,
 	reason: string,
 	stats: { count: number },
+	reconfirmationRequired = false,
 ): void {
 	stats.count += 1;
 	if (items.length < MAX_OMITTED_GUIDANCE)
-		items.push({ proposal_id: proposalId, reason });
+		items.push({
+			proposal_id: proposalId,
+			reason,
+			...(reconfirmationRequired ? { reconfirmation_required: true } : {}),
+		});
 }
 
 /** Returns only guidance that has an exact approved and applied receipt.
@@ -163,6 +175,7 @@ export function resolveAssistedContextGuidance(input: {
 	const omissionStats = { count: 0 };
 	let mandatoryOmitted = false;
 	let hasContextualPreference = false;
+	let hasUnknownApprovalBasis = false;
 	let currentProductionDay: number | undefined;
 	let preferenceHealth: AssistedContextGuidance["contextual_preference_health"] =
 		"not_present";
@@ -366,11 +379,26 @@ export function resolveAssistedContextGuidance(input: {
 			if (typeof statement !== "string" || !inRequestedScope(scope, input))
 				continue;
 			if (kind === "contextual_preference") {
+				if (
+					decision.payload.approval_production_day_base !==
+					"distinct_local_dates"
+				) {
+					hasUnknownApprovalBasis = true;
+					omitted(
+						omittedItems,
+						prepared.proposal_id,
+						"approval_production_day_basis_unknown",
+						omissionStats,
+						true,
+					);
+					continue;
+				}
 				const approvalDay = decision.payload.approval_production_day;
 				if (
 					preferenceHealth !== "healthy" ||
 					currentProductionDay === undefined ||
 					!Number.isInteger(approvalDay) ||
+					Number(approvalDay) < 0 ||
 					Number(approvalDay) > currentProductionDay
 				) {
 					omitted(
@@ -461,7 +489,9 @@ export function resolveAssistedContextGuidance(input: {
 			),
 		),
 		contextual_preference_health: hasContextualPreference
-			? preferenceHealth
+			? hasUnknownApprovalBasis
+				? "unknown"
+				: preferenceHealth
 			: "not_present",
 		...(currentProductionDay === undefined
 			? {}

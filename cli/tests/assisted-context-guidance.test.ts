@@ -98,6 +98,7 @@ function seedProposal(
 		kind: string;
 		operation: Record<string, unknown>;
 		approvalProductionDay?: number;
+		approvalProductionDayBasis?: "distinct_local_dates" | null;
 	},
 ): { proposalId: string; versionDigest: string } {
 	const versionDigest = input.seed.repeat(64).slice(0, 64);
@@ -135,7 +136,15 @@ function seedProposal(
 			decision: "approve",
 			...(input.approvalProductionDay === undefined
 				? {}
-				: { approval_production_day: input.approvalProductionDay }),
+				: {
+						approval_production_day: input.approvalProductionDay,
+						...(input.approvalProductionDayBasis === null
+							? {}
+							: {
+									approval_production_day_base:
+										input.approvalProductionDayBasis ?? "distinct_local_dates",
+								}),
+					}),
 		},
 		now: NOW,
 	});
@@ -379,6 +388,89 @@ describe("assisted context guidance", () => {
 					kind: "durable_restriction",
 				}),
 			);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("marked day-zero preferences guide immediately and age after the first production day", () => {
+		const root = fixture();
+		try {
+			const proposal = seedProposal(root, {
+				seed: "a",
+				kind: "contextual_preference",
+				approvalProductionDay: 0,
+				operation: {
+					type: "publish_guidance",
+					statement: "Use verified artifacts.",
+				},
+			});
+			for (const age of [0, 1]) {
+				if (age === 1) addProductionDays(root, 1);
+				const guidance = buildContextBundle(root, {
+					surface: "general",
+					role: "worker",
+					mode: "balanced",
+				}).approved_guidance;
+				expect(guidance?.contextual_preference_health).toBe("healthy");
+				expect(guidance?.items).toContainEqual(
+					expect.objectContaining({
+						proposal_id: proposal.proposalId,
+						production_day_age: age,
+						preference_freshness: 1,
+					}),
+				);
+			}
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("unmarked legacy production-day ordinals are unknown and require reconfirmation", () => {
+		const root = fixture();
+		try {
+			addProductionDays(root, 21);
+			const marked = seedProposal(root, {
+				seed: "a",
+				kind: "contextual_preference",
+				approvalProductionDay: 13,
+				operation: {
+					type: "publish_guidance",
+					statement: "Marked preference remains usable.",
+				},
+			});
+			const legacy = seedProposal(root, {
+				seed: "f",
+				kind: "contextual_preference",
+				approvalProductionDay: 13,
+				approvalProductionDayBasis: null,
+				operation: {
+					type: "publish_guidance",
+					statement: "Legacy guidance with an ambiguous ordinal.",
+				},
+			});
+			const guidance = buildContextBundle(root, {
+				surface: "general",
+				role: "worker",
+				mode: "balanced",
+			}).approved_guidance;
+
+			expect(guidance?.current_production_day).toBe(21);
+			expect(guidance?.contextual_preference_health).toBe("unknown");
+			expect(guidance?.items).toContainEqual(
+				expect.objectContaining({
+					proposal_id: marked.proposalId,
+					production_day_age: 8,
+				}),
+			);
+			expect(
+				guidance?.items.some((item) => item.proposal_id === legacy.proposalId),
+			).toBe(false);
+			expect(guidance?.omitted).toContainEqual({
+				proposal_id: legacy.proposalId,
+				reason: "approval_production_day_basis_unknown",
+				reconfirmation_required: true,
+			});
 		} finally {
 			removeEvolutionTestRoot(root);
 		}

@@ -602,6 +602,7 @@ describe("stage A regressions for the standalone records and evolve repair contr
 					decision: "approve",
 					// Ordinal 1 is the single distinct local date.
 					approval_production_day: 1,
+					approval_production_day_base: "distinct_local_dates",
 				},
 				now: NOW,
 			});

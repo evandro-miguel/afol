@@ -16,12 +16,18 @@ import {
 	type OperationContext,
 } from "../core/operation-context";
 import {
+	ArtifactCatalogChangedError,
+	ArtifactPageCursorError,
+	ArtifactSourceChangedError,
+} from "../services/artifacts/inventory";
+import {
 	analyzeEvolutionProject,
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
 	checkEvolutionDbHealth,
 	confirmExternalImport,
 	type DailySuggestionPreview,
+	distinctLocalProductionDays,
 	type EvolutionDbHealth,
 	type EvolutionStatus,
 	evolutionDbPath,
@@ -35,7 +41,6 @@ import {
 	previewProposalEvaluation,
 	productionDayJournalPath,
 	type RecurrenceThresholds,
-	distinctLocalProductionDays,
 	readObservationJournal,
 	readPreferenceJournal,
 	readProductionDayJournal,
@@ -55,7 +60,11 @@ import {
 	applyEvolutionProposal,
 	rollbackEvolutionProposal,
 } from "../services/evolution/apply-service";
-import { inspectEvolutionArtifacts } from "../services/evolution/artifact-inspection";
+import {
+	inspectArtifactRecords,
+	inspectEvolutionArtifacts,
+	inspectStandaloneRecordArtifacts,
+} from "../services/evolution/artifact-inspection";
 import { applyAssistedProposal } from "../services/evolution/assisted-proposal-apply";
 import {
 	previewAssistedProposalEvaluation,
@@ -1413,7 +1422,10 @@ function writeEvolutionError(
 						? `${action} requires local interactive rebuild; no mutation was performed`
 						: code === "EVOLVE_REPAIR_DISABLED"
 							? `${action} is disabled; no mutation was performed`
-							: `${action} failed; local interactive diagnostics required`;
+							: code === "EVOLVE_ARTIFACTS_FAILED" &&
+									message === "artifact byte offset is at end of source"
+								? message
+								: `${action} failed; local interactive diagnostics required`;
 	if (json)
 		io.stdout(
 			stringifyEnvelope(
@@ -1946,21 +1958,42 @@ function runBackfill(
 function parseArtifactsArgs(args: readonly string[]): {
 	sessions: string[];
 	artifacts: string[];
+	records: boolean;
+	record?: string;
+	search?: string;
 	cursor?: string;
+	recordsCursor?: string;
+	pageCursor?: string;
 	limit?: number;
 	byteOffset?: number;
 	json: boolean;
 } {
 	const sessions: string[] = [];
 	const artifacts: string[] = [];
+	let records = false;
+	let record: string | undefined;
+	let search: string | undefined;
 	let cursor: string | undefined;
+	let recordsCursor: string | undefined;
+	let pageCursor: string | undefined;
 	let limit: number | undefined;
 	let byteOffset: number | undefined;
 	let json = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (arg === "--json" || arg === "-j") json = true;
-		else if (arg === "--session") {
+		else if (arg === "--records") records = true;
+		else if (arg === "--record") {
+			const value = args[++index];
+			if (!value || value.startsWith("-") || record !== undefined)
+				throw new Error("evolve artifacts --record requires one <id>");
+			record = value;
+		} else if (arg === "--search") {
+			const value = args[++index];
+			if (value === undefined)
+				throw new Error("evolve artifacts --search requires a query");
+			search = value;
+		} else if (arg === "--session") {
 			const value = args[++index];
 			if (!value || value.startsWith("-"))
 				throw new Error("evolve artifacts --session requires <id>");
@@ -1977,26 +2010,75 @@ function parseArtifactsArgs(args: readonly string[]): {
 			if (!value || value.startsWith("-"))
 				throw new Error("evolve artifacts --cursor requires <token>");
 			cursor = value;
+		} else if (arg === "--records-cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --records-cursor requires <token>");
+			recordsCursor = value;
+		} else if (arg === "--page-cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --page-cursor requires <token>");
+			pageCursor = value;
 		} else if (arg === "--limit") {
 			const value = args[++index];
-			if (!value || !/^\d+$/.test(value))
+			if (
+				!value ||
+				!/^\d+$/.test(value) ||
+				!Number.isSafeInteger(Number(value))
+			)
 				throw new Error(
 					"evolve artifacts --limit requires an integer from 1 to 10",
 				);
 			limit = Number(value);
 		} else if (arg === "--byte-offset") {
 			const value = args[++index];
-			if (!value || !/^\d+$/.test(value))
+			if (
+				!value ||
+				!/^\d+$/.test(value) ||
+				!Number.isSafeInteger(Number(value))
+			)
 				throw new Error(
 					"evolve artifacts --byte-offset requires a non-negative integer",
 				);
 			byteOffset = Number(value);
-		} else throw new Error(`Unknown evolve artifacts argument: ${arg}`);
+		} else throw new Error("unknown evolve artifacts option");
 	}
+	if (
+		records &&
+		(record !== undefined ||
+			sessions.length > 0 ||
+			artifacts.length > 0 ||
+			search !== undefined ||
+			cursor !== undefined ||
+			pageCursor !== undefined ||
+			byteOffset !== undefined)
+	)
+		throw new Error("--records cannot be combined with another artifact route");
+	if (recordsCursor && !records)
+		throw new Error("--records-cursor requires --records");
+	if (
+		record !== undefined &&
+		(sessions.length > 0 || cursor !== undefined || recordsCursor !== undefined)
+	)
+		throw new Error(
+			"--record cannot be combined with session or history selection",
+		);
+	if (search !== undefined && (record === undefined || artifacts.length > 0))
+		throw new Error(
+			"--search requires --record and cannot be combined with --artifact",
+		);
+	if (pageCursor && cursor)
+		throw new Error("--page-cursor and history --cursor are separate routes");
 	return {
 		sessions,
 		artifacts,
+		records,
+		...(record === undefined ? {} : { record }),
+		...(search === undefined ? {} : { search }),
 		...(cursor ? { cursor } : {}),
+		...(recordsCursor === undefined ? {} : { recordsCursor }),
+		...(pageCursor === undefined ? {} : { pageCursor }),
 		...(limit === undefined ? {} : { limit }),
 		...(byteOffset === undefined ? {} : { byteOffset }),
 		json,
@@ -2014,11 +2096,78 @@ function runArtifacts(
 	const policy = { action: "evolve.artifacts", sideEffect: "read" as const };
 	if (!isActionAllowed(operationContext, policy))
 		throw new Error("evolve artifacts is not allowed for this caller");
+	if (parsed.records) {
+		const result = inspectArtifactRecords({
+			root,
+			...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+			...(parsed.recordsCursor === undefined
+				? {}
+				: { cursor: parsed.recordsCursor }),
+		});
+		const output = parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: result.records.join("\n");
+		if (Buffer.byteLength(output, "utf8") > MAX_ARTIFACT_OUTPUT_BYTES)
+			throw new Error("evolve artifacts output exceeds the bounded limit");
+		io.stdout(output);
+		return 0;
+	}
+	if (parsed.record !== undefined) {
+		const result = inspectStandaloneRecordArtifacts({
+			root,
+			recordId: parsed.record,
+			...(parsed.artifacts.length > 0 ? { artifacts: parsed.artifacts } : {}),
+			...(parsed.search === undefined ? {} : { search: parsed.search }),
+			...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+			...(parsed.pageCursor === undefined
+				? {}
+				: { pageCursor: parsed.pageCursor }),
+			...(parsed.byteOffset === undefined
+				? {}
+				: { byteOffset: parsed.byteOffset }),
+		});
+		const output = parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: result.search
+				? result.search.matches
+						.map(
+							(match) =>
+								match.path +
+								"#bytes:" +
+								match.byte_offset +
+								"\n" +
+								match.excerpt,
+						)
+						.join("\n\n")
+				: result.artifacts.length > 0
+					? result.artifacts
+							.map(
+								(artifact) =>
+									artifact.relative_path +
+									"#" +
+									artifact.anchor +
+									" " +
+									artifact.content_digest +
+									"\n" +
+									artifact.excerpt,
+							)
+							.join("\n\n")
+					: result.files
+							.map((file) => `${file.path} ${file.bytes} bytes`)
+							.join("\n");
+		if (Buffer.byteLength(output, "utf8") > MAX_ARTIFACT_OUTPUT_BYTES)
+			throw new Error("evolve artifacts output exceeds the bounded limit");
+		io.stdout(output);
+		return 0;
+	}
 	const result = inspectEvolutionArtifacts({
 		root,
 		...(parsed.sessions.length > 0 ? { sessions: parsed.sessions } : {}),
 		...(parsed.artifacts.length > 0 ? { artifacts: parsed.artifacts } : {}),
 		...(parsed.cursor ? { cursor: parsed.cursor } : {}),
+		...(parsed.pageCursor === undefined
+			? {}
+			: { pageCursor: parsed.pageCursor }),
 		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
 		...(parsed.byteOffset === undefined
 			? {}
@@ -3608,9 +3757,15 @@ export async function runEvolveCommand(
 		const message = (error as Error).message;
 		const actionName = action || "analyze";
 		const errorCode =
-			actionName === "status"
-				? "EVOLUTION_STATUS_FAILED"
-				: `EVOLVE_${actionName.toUpperCase()}_FAILED`;
+			error instanceof ArtifactSourceChangedError
+				? "ARTIFACT_SOURCE_CHANGED"
+				: error instanceof ArtifactCatalogChangedError
+					? "ARTIFACT_CATALOG_CHANGED"
+					: error instanceof ArtifactPageCursorError
+						? "ARTIFACT_PAGE_CURSOR_INVALID"
+						: actionName === "status"
+							? "EVOLUTION_STATUS_FAILED"
+							: `EVOLVE_${actionName.toUpperCase()}_FAILED`;
 		writeEvolutionError(
 			io,
 			jsonRequested,

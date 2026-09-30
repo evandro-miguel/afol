@@ -40,9 +40,9 @@ import {
 	withAssistedProposalJournalLock,
 } from "./assisted-proposal-journal";
 import {
+	type AssistedProposalPreview,
 	literalReplaceOnce,
 	targetAllowed,
-	type AssistedProposalPreview,
 } from "./assisted-proposal-packet";
 import { assertSafeEvolutionTarget } from "./db";
 import {
@@ -484,10 +484,7 @@ function mutationBeforeFromBackup(
 		throw new Error(
 			"proposal mutation backup does not match the approved preimage",
 		);
-	if (
-		typeof spec.beforeText !== "string" ||
-		typeof spec.afterText !== "string"
-	)
+	if (typeof spec.beforeText !== "string" || typeof spec.afterText !== "string")
 		throw new Error(
 			"proposal mutation backup does not match the approved operation",
 		);

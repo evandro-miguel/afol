@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
+import { readBoundedSourceFile } from "../io/safe-source";
 
 export const CANONICAL_PROJECT_CONFIG_PATH = ".afol/config.json";
 export const LEGACY_PROJECT_CONFIG_PATH = ".agents/config.json";
@@ -119,6 +120,52 @@ export function readProjectConfig(root: string): SchemaObject {
 	return {};
 }
 
+/** Artifact IO must not silently redirect an invalid configured destination. */
+export function resolveArtifactProjectPaths(
+	root: string,
+): ResolvedProjectPaths {
+	const source = resolveProjectConfigPath(root);
+	let parsedConfig: SchemaObject = {};
+	if (source) {
+		const raw = readBoundedSourceFile(
+			source.absolutePath,
+			"artifact configuration",
+			{
+				maxBytes: 256 * 1024,
+				maxLines: 20_000,
+				maxCandidates: 50_000,
+			},
+		);
+		let config: unknown;
+		try {
+			config = JSON.parse(raw ?? "");
+		} catch {
+			throw new Error("artifact configuration is invalid JSON");
+		}
+		if (config === null || typeof config !== "object" || Array.isArray(config))
+			throw new Error("artifact configuration must be an object");
+		parsedConfig = config as SchemaObject;
+		const paths = (config as Record<string, unknown>).paths;
+		if (paths !== undefined) {
+			if (paths === null || typeof paths !== "object" || Array.isArray(paths))
+				throw new Error("artifact configuration paths must be an object");
+			for (const key of ["mutable_dir", "wb_dir", "records_dir"]) {
+				const value = (paths as Record<string, unknown>)[key];
+				if (value === undefined) continue;
+				if (
+					typeof value !== "string" ||
+					!value.trim() ||
+					isAbsolute(value.trim()) ||
+					/^[A-Za-z]:|^[\\\\]/.test(value.trim()) ||
+					value.split(/[\\/]+/).includes("..")
+				)
+					throw new Error(`artifact configuration paths.${key} is invalid`);
+			}
+		}
+	}
+	return resolvePathsFromConfig(root, parsedConfig);
+}
+
 function objectAt(value: unknown, key: string): Record<string, unknown> | null {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) {
 		return null;
@@ -213,7 +260,14 @@ function absolute(root: string, paths: ProjectPathConfig): ProjectPathConfig {
 
 export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 	const projectRoot = realpathSync(root);
-	const config = readProjectConfig(projectRoot);
+	return resolvePathsFromConfig(projectRoot, readProjectConfig(projectRoot));
+}
+
+function resolvePathsFromConfig(
+	root: string,
+	config: SchemaObject,
+): ResolvedProjectPaths {
+	const projectRoot = realpathSync(root);
 	const agentsDir = fromConfig(config, ["paths", "agents_dir"], ".agents");
 	const mutableDir = fromConfig(config, ["paths", "mutable_dir"], ".afol");
 	const dataDir = fromConfig(

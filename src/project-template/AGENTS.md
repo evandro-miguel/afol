@@ -77,6 +77,8 @@ afol c
 
 ## Specs and evidence
 
+Capture durable supplementary notes with `afol artifact save --kind note --text "<content>" --record <record-id> --json`, or use `--standalone` to create a record without a session. An explicit `--session` targets that session's `artifacts/` directory. Capture never creates or completes lifecycle tasks. Standalone records use `paths.records_dir` (default `.afol/records`). Discover them with `afol evolve artifacts --records --json`; inspect a record with `--record <record-id>` and read its selected file with `--artifact <path>`. Continue content pages with the returned `--page-cursor`; keep owner, file, and source digest unchanged. Partial or withheld content is not complete evidence. Only unchanged verified references may support a proposal packet.
+
 - A spec defines the user-visible or system-visible contract.
 - Implementation follows the active spec. Update it when the contract changes.
 - Tests should cover the smallest stable behavior that prevents regression.

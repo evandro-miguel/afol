@@ -85,7 +85,7 @@ jobs:
 
   deep-validation:
     name: deep-validation
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs:
       - quality
       - tests

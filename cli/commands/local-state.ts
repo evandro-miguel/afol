@@ -300,6 +300,7 @@ export async function runLocalStateCommand(
 						(check) =>
 							`${check.ok ? "ok" : "fail"} ${check.id} ${check.message}`,
 					),
+					'hint="afol ss"',
 				].join("\n"),
 			);
 		}

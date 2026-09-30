@@ -21,43 +21,6 @@ import { kernelRegistry } from "./registry";
 import { resolveCommand } from "./router";
 import { loadProjectRoot } from "./services/project/root";
 
-const NEW_COMMAND_HELP = [
-	"Usage: afol new <theme> [options]",
-	"",
-	"Options",
-	"  --intent <intent>        Delivery or planning intent",
-	"  --feature-id <id>        Governing roadmap feature ID",
-	"  --parent-spec <spec-id>  Parent spec identifier",
-	"  --no-spec-required      Waive spec requirement for this session",
-	"  --reason <reason>       Required with --no-spec-required",
-	"  --task <text>            Initial task summary; repeat for multiple tasks",
-].join("\n");
-
-const START_COMMAND_HELP = [
-	"Usage: afol start --session <session-id> --task-id <task-id> [options]",
-	"",
-	"Options",
-	"  --session <session-id>  Workbench session to start from",
-	"  --task-id <task-id>    Task identifier to mark in progress",
-	"  --json                 Emit machine-readable start result",
-	"  --brief                Emit concise start briefing",
-	"  --brief full           Emit full start briefing",
-	"  --compact              Emit compact human output",
-].join("\n");
-
-const CLOSE_COMMAND_HELP = [
-	"Usage: afol close [--session <session-id>] [options]",
-	"",
-	"Options",
-	"  --session <session-id>      Workbench session; omit when active/bound",
-	"  -m, --summary <text>        Summary for the generated report",
-	"  --allow-no-report           Explicitly waive a missing report",
-	"  --carry-open                Move open tasks to one governed continuation",
-	"  --reason <text>             Required with --allow-no-report or --carry-open",
-	"  --admit-legacy-baseline     Waive issues admitted by the legacy evidence baseline",
-	"  -j, --json                  Emit machine-readable close result",
-].join("\n");
-
 const exit = (code: number): never => {
 	process.exit(code);
 };
@@ -305,21 +268,6 @@ export async function main(argv: string[]): Promise<number> {
 		}
 		console.error(resolution.message);
 		return resolution.exitCode;
-	}
-
-	if (resolution.kind === "new" && hasHelpArg(resolution.args)) {
-		console.log(NEW_COMMAND_HELP);
-		return 0;
-	}
-
-	if (resolution.kind === "start" && hasHelpArg(resolution.args)) {
-		console.log(START_COMMAND_HELP);
-		return 0;
-	}
-
-	if (resolution.kind === "close" && hasHelpArg(resolution.args)) {
-		console.log(CLOSE_COMMAND_HELP);
-		return 0;
 	}
 
 	const directHelpCommand =

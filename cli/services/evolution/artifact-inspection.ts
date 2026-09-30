@@ -2,23 +2,30 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import {
+	ArtifactSourceChangedError,
 	canonicalSessionArtifactKind,
+	DEFAULT_RECORD_LIMIT,
 	enumerateOwnerDirectory,
+	enumerateRecordsPage,
+	type InventoryFile,
+	MAX_RECORD_CATALOG_PAGE_SIZE,
+	MAX_RECORD_SEARCH_BYTES,
+	MAX_RECORD_SEARCH_MATCHES,
+	MAX_REDACTION_CONTEXT_BYTES,
 	OWNER_ID_RE,
 	readArtifactPage,
+	readArtifactSafeSource,
 	resolveRecordDirectory,
-	type InventoryFile,
 } from "../artifacts/inventory";
 import type { ArtifactReferenceV2 } from "../artifacts/types";
 import {
-	assertSafeSourceFile,
 	readBoundedSourceFile,
 	readBoundedSourceRange,
 } from "../io/safe-source";
 import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { evolutionDbPath } from "./db";
 import { enumerateEvolutionHistorySessions } from "./history-sessions";
-import { redactImported } from "./imports/redaction";
+import { importedTextRedactionSpans } from "./imports/redaction";
 import { resolveEvolutionConfig } from "./runtime-config";
 
 const DEFAULT_LIMIT = 3;
@@ -90,10 +97,7 @@ function stableJson(value: unknown): string {
 	return JSON.stringify(value) ?? "null";
 }
 
-function sessionArtifactScore(
-	name: string,
-	isCanonical: boolean,
-): number {
+function sessionArtifactScore(name: string, isCanonical: boolean): number {
 	if (!isCanonical) return 5;
 	if (name === ".evidence.jsonl") return 0;
 	if (name.includes("_task_")) return 1;
@@ -119,15 +123,17 @@ function artifactFiles(
 		dir: sessionDir,
 		sessionId,
 	});
-	const files: ArtifactFile[] = enumeration.files.map((file: InventoryFile) => ({
-		name: file.name,
-		path: file.path,
-		bytes: file.bytes,
-		mtime_ms: file.mtime_ms,
-		ctime_ms: file.ctime_ms,
-		dev: file.dev,
-		ino: file.ino,
-	}));
+	const files: ArtifactFile[] = enumeration.files.map(
+		(file: InventoryFile) => ({
+			name: file.name,
+			path: file.path,
+			bytes: file.bytes,
+			mtime_ms: file.mtime_ms,
+			ctime_ms: file.ctime_ms,
+			dev: file.dev,
+			ino: file.ino,
+		}),
+	);
 	files.sort((left, right) => {
 		const score = (name: string) =>
 			sessionArtifactScore(
@@ -243,8 +249,22 @@ function sourceCatalog(input: {
 	};
 }
 
+function redactSourcePreservingLines(content: string): string {
+	const characters = content.split("");
+	for (const span of importedTextRedactionSpans(content)) {
+		for (let index = span.start; index < span.end; index += 1) {
+			if (characters[index] !== "\r" && characters[index] !== "\n")
+				characters[index] = "*";
+		}
+	}
+	return characters.join("");
+}
+
 function excerpt(content: string): { anchor: string; excerpt: string } {
-	const normalized = content.replaceAll("\r\n", "\n");
+	const normalized = redactSourcePreservingLines(content).replaceAll(
+		"\r\n",
+		"\n",
+	);
 	const lines = normalized.split("\n");
 	const index = Math.max(
 		0,
@@ -255,13 +275,9 @@ function excerpt(content: string): { anchor: string; excerpt: string } {
 		.slice(start, start + 12)
 		.map((line, position) => `${start + position + 1}: ${line}`)
 		.join("\n");
-	const safe = redactImported(selected);
 	return {
 		anchor: `line:${index + 1}`,
-		excerpt: (typeof safe === "string" ? safe : "[redacted]").slice(
-			0,
-			MAX_EXCERPT_CHARS,
-		),
+		excerpt: selected.slice(0, MAX_EXCERPT_CHARS),
 	};
 }
 
@@ -280,12 +296,13 @@ type PageEnvelope = {
 	next_offset?: number;
 	cursor?: string;
 	coverage: "complete" | "partial";
+	redaction_status:
+		| "complete"
+		| "withheld_context_limit"
+		| "withheld_invalid_utf8";
 };
 
-function selectorError(
-	sessionId: string,
-	selector: string,
-): Error {
+function selectorError(sessionId: string, selector: string): Error {
 	return new Error(
 		`unsupported or missing artifact selector for ${sessionId}: ${selector}; supported names are session-prefixed plan, research, handoff, analysis, review, findings, report, log, task, postmortem, retrospective, .evidence.jsonl, or a supplementary file such as artifacts/<name>.md`,
 	);
@@ -328,6 +345,7 @@ function artifactListForSession(input: {
 	files: ArtifactFile[];
 	artifactSelectors?: readonly string[];
 	byteOffset?: number;
+	pageCursor?: string;
 	readBudget: { bytes: number };
 }): {
 	artifacts: SessionArtifact[];
@@ -390,6 +408,7 @@ function artifactListForSession(input: {
 				...(input.byteOffset === undefined
 					? {}
 					: { byteOffset: input.byteOffset }),
+				...(input.pageCursor ? { cursor: input.pageCursor } : {}),
 				maxBytes: Math.min(MAX_RANGE_BYTES, remaining),
 			});
 			if (read.page.byte_end === read.page.byte_start) {
@@ -397,33 +416,53 @@ function artifactListForSession(input: {
 				continue;
 			}
 			input.readBudget.bytes -= read.rawBytes.byteLength;
-			const content = read.rawBytes.toString("utf8");
-			const displayed = excerpt(content);
-			const projectPath = relative(input.root, file.path).replaceAll("\\", "/");
-			if (read.wholeSource && file.bytes <= MAX_ARTIFACT_BYTES) {
-				artifacts.push({
-					session_id: input.session.session_id,
-					path: projectPath,
-					anchor: displayed.anchor,
-					content_digest: digest(content),
-					digest_scope: "artifact",
-					bytes: file.bytes,
-					excerpt: displayed.excerpt,
-					page: read.page,
+			let anchor = read.anchor;
+			let contentDigest = read.rawDigest;
+			let digestScope: "artifact" | "range" = "range";
+			let sourceIdentityDigest: string | undefined = read.sourceIdentityDigest;
+			let excerptContent = read.page.content;
+			if (
+				input.byteOffset === undefined &&
+				input.pageCursor === undefined &&
+				read.page.byte_start === 0 &&
+				file.bytes <= MAX_ARTIFACT_BYTES &&
+				read.redactionStatus === "complete"
+			) {
+				const wholeSource = readArtifactSafeSource({
+					root: input.root,
+					ownerDir,
+					relativePath: file.name,
+					label: "session artifact",
+					expectedBytes: file.bytes,
 				});
-			} else {
-				artifacts.push({
-					session_id: input.session.session_id,
-					path: projectPath,
-					anchor: read.anchor,
-					content_digest: read.rawDigest,
-					digest_scope: "range",
-					source_identity_digest: read.sourceIdentityDigest,
-					bytes: file.bytes,
-					excerpt: displayed.excerpt,
-					page: read.page,
-				});
+				if (
+					wholeSource.redactionStatus === "complete" &&
+					wholeSource.content !== undefined
+				) {
+					if (wholeSource.sourceIdentityDigest !== read.sourceIdentityDigest)
+						throw new ArtifactSourceChangedError();
+					anchor = excerpt(wholeSource.content).anchor;
+					contentDigest = wholeSource.rawDigest;
+					digestScope = "artifact";
+					sourceIdentityDigest = undefined;
+					excerptContent = wholeSource.content;
+				}
 			}
+			const displayed = excerpt(excerptContent);
+			const projectPath = relative(input.root, file.path).replaceAll("\\", "/");
+			artifacts.push({
+				session_id: input.session.session_id,
+				path: projectPath,
+				anchor,
+				content_digest: contentDigest,
+				digest_scope: digestScope,
+				...(sourceIdentityDigest
+					? { source_identity_digest: sourceIdentityDigest }
+					: {}),
+				bytes: file.bytes,
+				excerpt: displayed.excerpt,
+				page: { ...read.page, redaction_status: read.redactionStatus },
+			});
 			continue;
 		}
 		if (input.readBudget.bytes < file.bytes) {
@@ -466,12 +505,307 @@ function artifactListForSession(input: {
 	};
 }
 
+export function inspectArtifactRecords(input: {
+	root: string;
+	limit?: number;
+	cursor?: string;
+}) {
+	return enumerateRecordsPage(input);
+}
+
+type RecordArtifactView = ArtifactReferenceV2 & {
+	bytes: number;
+	excerpt: string;
+	page?: PageEnvelope;
+};
+
+type RecordSearchMatch = {
+	path: string;
+	byte_offset: number;
+	excerpt: string;
+};
+
+function selectRecordArtifactFile(
+	files: readonly InventoryFile[],
+	selector: string,
+): InventoryFile {
+	const normalized = selector.replaceAll("\\", "/");
+	const exact = files.filter((file) => file.name === normalized);
+	if (exact.length === 1) return exact[0] as InventoryFile;
+	const basename = files.filter(
+		(file) => file.name.split("/").at(-1) === normalized,
+	);
+	if (basename.length === 1) return basename[0] as InventoryFile;
+	throw new Error("record artifact selector is unsupported or ambiguous");
+}
+
+function searchExcerpt(
+	content: string,
+	index: number,
+	queryLength: number,
+): string {
+	const start = Math.max(
+		0,
+		index - Math.floor((MAX_EXCERPT_CHARS - queryLength) / 2),
+	);
+	const end = Math.min(content.length, start + MAX_EXCERPT_CHARS);
+	return content.slice(start, end);
+}
+
+export function inspectStandaloneRecordArtifacts(input: {
+	root: string;
+	recordId: string;
+	artifacts?: readonly string[];
+	search?: string;
+	byteOffset?: number;
+	pageCursor?: string;
+	limit?: number;
+}): {
+	read_only: true;
+	owner: { kind: "record"; id: string };
+	files: Array<{ path: string; bytes: number }>;
+	artifacts: RecordArtifactView[];
+	coverage: {
+		status: "complete" | "partial";
+		complete: boolean;
+		total: number;
+		returned: number;
+		omitted: number;
+		unsupported_count: number;
+		targeted: boolean;
+	};
+	search?: {
+		matches: RecordSearchMatch[];
+		scanned_bytes: number;
+		work_bytes: number;
+		work_budget_bytes: number;
+		coverage: "complete" | "partial";
+		partial_reason?:
+			| "work_budget"
+			| "redaction_context"
+			| "unsupported_entries";
+		withheld_files: number;
+		matches_truncated: boolean;
+	};
+} {
+	if (!OWNER_ID_RE.test(input.recordId))
+		throw new Error("standalone record id is invalid");
+	if (input.artifacts?.length && input.search !== undefined)
+		throw new Error("record artifact read and search cannot be combined");
+	if ((input.artifacts?.length ?? 0) > 4)
+		throw new Error("record artifact reads accept at most four selectors");
+	if (input.search !== undefined) {
+		if (
+			!input.search.trim() ||
+			Buffer.byteLength(input.search, "utf8") > 256 ||
+			input.byteOffset !== undefined ||
+			input.pageCursor !== undefined
+		)
+			throw new Error(
+				"record search requires a query of at most 256 UTF-8 bytes",
+			);
+	}
+	if (input.pageCursor && input.artifacts?.length !== 1)
+		throw new Error(
+			"artifact page cursor requires one record artifact selector",
+		);
+	if (input.byteOffset !== undefined && input.artifacts?.length !== 1)
+		throw new Error(
+			"artifact byte offset requires one record artifact selector",
+		);
+	const limit = input.limit ?? DEFAULT_RECORD_LIMIT;
+	if (
+		!Number.isSafeInteger(limit) ||
+		limit < 1 ||
+		limit > MAX_RECORD_CATALOG_PAGE_SIZE
+	)
+		throw new Error(
+			"evolve artifacts --limit must be an integer from 1 to " +
+				MAX_RECORD_CATALOG_PAGE_SIZE,
+		);
+	const { recordDir } = resolveRecordDirectory(input.root, input.recordId);
+	const enumeration = enumerateOwnerDirectory({ dir: recordDir });
+	const baseCoverage = {
+		total: enumeration.files.length,
+		unsupported_count: enumeration.unsupportedCount,
+		targeted: Boolean(input.artifacts?.length || input.search !== undefined),
+	};
+	if (input.search !== undefined) {
+		const matches: RecordSearchMatch[] = [];
+		let scannedBytes = 0;
+		let workBytes = 0;
+		let withheldFiles = 0;
+		let partialReason:
+			| "work_budget"
+			| "redaction_context"
+			| "unsupported_entries"
+			| undefined;
+		let matchesTruncated = false;
+		for (const file of enumeration.files) {
+			if (file.bytes > MAX_REDACTION_CONTEXT_BYTES) {
+				withheldFiles += 1;
+				partialReason = "redaction_context";
+				continue;
+			}
+			const estimatedWork = file.bytes * 2;
+			if (workBytes + estimatedWork > MAX_RECORD_SEARCH_BYTES) {
+				partialReason = "work_budget";
+				break;
+			}
+			const safe = readArtifactSafeSource({
+				root: input.root,
+				ownerDir: recordDir,
+				relativePath: file.name,
+				label: "record artifact",
+				expectedBytes: file.bytes,
+			});
+			workBytes += safe.scannedBytes;
+			if (safe.redactionStatus !== "complete" || safe.content === undefined) {
+				withheldFiles += 1;
+				partialReason = "redaction_context";
+				continue;
+			}
+			if (safe.sourceBytes !== file.bytes)
+				throw new ArtifactSourceChangedError();
+			scannedBytes += safe.sourceBytes;
+			workBytes += safe.sourceBytes;
+			let position = safe.content.indexOf(input.search);
+			while (position >= 0) {
+				if (matches.length >= MAX_RECORD_SEARCH_MATCHES) {
+					matchesTruncated = true;
+					partialReason = "work_budget";
+					break;
+				}
+				matches.push({
+					path: file.name,
+					byte_offset: Buffer.byteLength(
+						safe.content.slice(0, position),
+						"utf8",
+					),
+					excerpt: searchExcerpt(safe.content, position, input.search.length),
+				});
+				position = safe.content.indexOf(
+					input.search,
+					position + Math.max(input.search.length, 1),
+				);
+			}
+			if (matchesTruncated) break;
+		}
+		if (enumeration.unsupportedCount > 0)
+			partialReason ??= "unsupported_entries";
+		const coverage = partialReason ? "partial" : "complete";
+		return {
+			read_only: true,
+			owner: { kind: "record", id: input.recordId },
+			files: [],
+			artifacts: [],
+			coverage: {
+				status: coverage,
+				complete: coverage === "complete",
+				...baseCoverage,
+				returned: 0,
+				omitted: 0,
+			},
+			search: {
+				matches,
+				scanned_bytes: scannedBytes,
+				work_bytes: workBytes,
+				work_budget_bytes: MAX_RECORD_SEARCH_BYTES,
+				coverage,
+				...(partialReason ? { partial_reason: partialReason } : {}),
+				withheld_files: withheldFiles,
+				matches_truncated: matchesTruncated,
+			},
+		};
+	}
+	if (input.artifacts?.length) {
+		const artifacts: RecordArtifactView[] = [];
+		for (const selector of input.artifacts) {
+			const file = selectRecordArtifactFile(enumeration.files, selector);
+			const read = readArtifactPage({
+				root: input.root,
+				ownerDir: recordDir,
+				relativePath: file.name,
+				label: "record artifact",
+				...(input.byteOffset === undefined
+					? {}
+					: { byteOffset: input.byteOffset }),
+				...(input.pageCursor ? { cursor: input.pageCursor } : {}),
+				maxBytes: MAX_RANGE_BYTES,
+			});
+			const displayed = excerpt(read.page.content);
+			const emptyWholeSource = file.bytes === 0 && read.wholeSource;
+			const reference: ArtifactReferenceV2 = emptyWholeSource
+				? {
+						schema_version: 2,
+						owner: { kind: "record", id: input.recordId },
+						relative_path: file.name,
+						content_digest: read.rawDigest,
+						digest_scope: "artifact",
+						anchor: "line:1",
+					}
+				: {
+						schema_version: 2,
+						owner: { kind: "record", id: input.recordId },
+						relative_path: file.name,
+						content_digest: read.rawDigest,
+						digest_scope: "range",
+						anchor: read.anchor,
+						source_identity_digest: read.sourceIdentityDigest,
+					};
+			verifyArtifactReference(input.root, reference);
+			artifacts.push({
+				...reference,
+				bytes: file.bytes,
+				excerpt: displayed.excerpt,
+				page: { ...read.page, redaction_status: read.redactionStatus },
+			});
+		}
+		const status =
+			enumeration.unsupportedCount > 0 ||
+			artifacts.some((artifact) => artifact.page?.coverage !== "complete")
+				? "partial"
+				: "complete";
+		return {
+			read_only: true,
+			owner: { kind: "record", id: input.recordId },
+			files: [],
+			artifacts,
+			coverage: {
+				status,
+				complete: status === "complete",
+				...baseCoverage,
+				returned: artifacts.length,
+				omitted: 0,
+			},
+		};
+	}
+	const selected = enumeration.files.slice(0, limit);
+	const omitted = enumeration.files.length - selected.length;
+	const status =
+		omitted > 0 || enumeration.unsupportedCount > 0 ? "partial" : "complete";
+	return {
+		read_only: true,
+		owner: { kind: "record", id: input.recordId },
+		files: selected.map((file) => ({ path: file.name, bytes: file.bytes })),
+		artifacts: [],
+		coverage: {
+			status,
+			complete: status === "complete",
+			...baseCoverage,
+			returned: selected.length,
+			omitted,
+		},
+	};
+}
+
 export function inspectEvolutionArtifacts(input: {
 	root: string;
 	sessions?: readonly string[];
 	artifacts?: readonly string[];
 	byteOffset?: number;
 	cursor?: string;
+	pageCursor?: string;
 	limit?: number;
 }): {
 	read_only: true;
@@ -517,6 +851,15 @@ export function inspectEvolutionArtifacts(input: {
 		);
 	if (input.byteOffset !== undefined && input.artifacts?.length !== 1)
 		throw new Error("--byte-offset requires exactly one --artifact selector");
+	if (
+		input.pageCursor &&
+		(selectedIds?.length !== 1 || input.artifacts?.length !== 1)
+	)
+		throw new Error(
+			"--page-cursor requires one session and one --artifact selector",
+		);
+	if (input.pageCursor && input.cursor)
+		throw new Error("--page-cursor and history --cursor are separate routes");
 	const selectorIds = selectedIds ?? [];
 	const seen = new Set<string>();
 	for (const id of selectorIds) {
@@ -643,6 +986,7 @@ export function inspectEvolutionArtifacts(input: {
 			...(input.byteOffset === undefined
 				? {}
 				: { byteOffset: input.byteOffset }),
+			...(input.pageCursor ? { pageCursor: input.pageCursor } : {}),
 			readBudget,
 		});
 		return {
@@ -725,6 +1069,38 @@ export function inspectEvolutionArtifacts(input: {
  * shared inventory, so every supplementary file the reader can return is a
  * verifiable reference, not only canonical session-prefixed names.
  */
+/** Preserve legacy session identity across reference encodings, including custom/archive roots. */
+export function canonicalArtifactEvidenceReference(
+	root: string,
+	reference: ArtifactReference | ArtifactReferenceV2,
+): ArtifactReference | ArtifactReferenceV2 {
+	const v2 = reference as ArtifactReferenceV2;
+	if (v2.schema_version !== 2 || v2.owner.kind !== "session") return reference;
+	const location = enumerateEvolutionHistorySessions(root).sessions.find(
+		(entry) => entry.session_id === v2.owner.id,
+	);
+	if (!location)
+		throw new Error("proposal evidence session is missing or conflicted");
+	const paths = resolveProjectPaths(root);
+	const ownerDir =
+		location.location === "archived"
+			? join(paths.abs.wbDir, "_archive", v2.owner.id)
+			: join(paths.abs.wbDir, v2.owner.id);
+	const absolute = resolve(ownerDir, v2.relative_path);
+	if (relative(ownerDir, absolute).replaceAll("\\", "/") !== v2.relative_path)
+		throw new Error("proposal evidence path is outside its selected owner");
+	return {
+		session_id: v2.owner.id,
+		path: relative(root, absolute).replaceAll("\\", "/"),
+		anchor: v2.anchor,
+		content_digest: v2.content_digest,
+		digest_scope: v2.digest_scope,
+		...(v2.source_identity_digest
+			? { source_identity_digest: v2.source_identity_digest }
+			: {}),
+	};
+}
+
 export function verifyArtifactReference(
 	root: string,
 	reference: ArtifactReference | ArtifactReferenceV2,

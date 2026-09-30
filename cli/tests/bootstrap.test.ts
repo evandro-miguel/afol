@@ -868,7 +868,38 @@ describe("bootstrap provider-compatible mutable state", () => {
 		const target = mkdtempSync(
 			join(tmpdir(), "bootstrap-afol-cleanup-confirmed-"),
 		);
+		const preservedFiles = new Map([
+			[".afol/wb/.active_session", Buffer.from("S-retained\n")],
+			[
+				".afol/wb/S-retained/S-retained_task_01.md",
+				Buffer.from(
+					"# Existing State Board\n\n| Task | State | Owner | Notes |\n| --- | --- | --- | --- |\n| T-01 | in_progress | agent | preserve |\n",
+				),
+			],
+			[
+				".afol/wb/S-retained/artifacts/report.md",
+				Buffer.from("# Existing observed evidence\n"),
+			],
+			[
+				".afol/records/R-retained/research.md",
+				Buffer.from("# Earlier research\n\nUTF-8: ação 🧭\r\n"),
+			],
+			[
+				".afol/wb/_archive/S-closed/S-closed_task_01.md",
+				Buffer.from(
+					'---\nstatus: "closed"\nclosed_at: "2026-09-26T12:00:00Z"\n---\n',
+				),
+			],
+			[
+				".afol/wb/_archive/S-closed/artifacts/report.md",
+				Buffer.from("# Immutable closed evidence\n"),
+			],
+		]);
 		try {
+			for (const [path, bytes] of preservedFiles) {
+				mkdirSync(dirname(join(target, path)), { recursive: true });
+				writeFileSync(join(target, path), bytes);
+			}
 			for (const relativePath of [
 				".agents/skills/custom.md",
 				".agents/wb/session/task.md",
@@ -913,6 +944,8 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(
 				existsSync(join(archiveRoot, "data", "events", "events.jsonl")),
 			).toBe(true);
+			for (const [path, bytes] of preservedFiles)
+				expect(readFileSync(join(target, path))).toEqual(bytes);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}

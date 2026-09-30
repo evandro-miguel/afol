@@ -360,14 +360,19 @@
       "description": "Start a workbench task",
       "subcommands": [
         {
-          "usage": "--session <session-id> --task-id <task-id>",
+          "usage": "T-01",
           "side_effect": "write",
-          "description": "Start a specific task in a specific session"
+          "description": "Start a task in the active or bound session"
         },
         {
           "usage": "--task-id <task-id>",
           "side_effect": "write",
           "description": "Start a task in the active or context session"
+        },
+        {
+          "usage": "--session <session-id> --task-id <task-id>",
+          "side_effect": "write",
+          "description": "Start a specific task in a specific session"
         },
         {
           "usage": "--json",
@@ -481,7 +486,7 @@
       "description": "Create a workbench session",
       "subcommands": [
         {
-          "usage": "<theme> --task <summary>",
+          "usage": "<theme> -t|--task <summary>",
           "side_effect": "write",
           "description": "Create a session with one or more initial tasks"
         },
@@ -804,6 +809,11 @@
       "description": "Close the active session",
       "subcommands": [
         {
+          "usage": "[-m|--summary <text>]",
+          "side_effect": "write",
+          "description": "Close the active or bound session after its tasks are complete"
+        },
+        {
           "usage": "--session <session-id> [-m|--summary <text>]",
           "side_effect": "write",
           "description": "Close a specific session after its tasks are complete"
@@ -844,7 +854,7 @@
       "description": "Save durable work artifacts without a session",
       "subcommands": [
         {
-          "usage": "save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--json]",
+          "usage": "save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--source-digest <sha256>] [--json]",
           "side_effect": "write",
           "description": "Capture a note, research, report, or handoff; standalone without a selector"
         }
@@ -1426,9 +1436,9 @@
       "description": "Analyze project evolution state and proposals",
       "subcommands": [
         {
-          "usage": "artifacts [--session <id>]... [--cursor <token>] [--limit <1-10>] [--artifact <canonical-name>]... [--byte-offset <n>] [--json]",
+          "usage": "artifacts [--records [--records-cursor <token>]] [--record <id> [--search <query> | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
           "side_effect": "read",
-          "description": "Inspect bounded session artifacts; target omitted or oversized files by name and byte range"
+          "description": "Inspect session or standalone record artifacts without Evolution projections. Records discovery scans at most 4,096 entries and reports partial coverage when bounded or unsupported; search has a 512 KiB work budget. Pages redact with up to 1 MiB of source context and withhold larger sources as partial. Page requests clamp to 4 bytes and offsets must be UTF-8 boundaries. History, records, and content cursors are separate."
         },
         {
           "usage": "backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",

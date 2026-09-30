@@ -9,11 +9,13 @@ import {
 	openSync,
 	writeSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
+import type { ArtifactReferenceV2 } from "../artifacts/types";
 import { readBoundedSourceFile } from "../io/safe-source";
 import { withSessionLock } from "../io/session-lock";
-import { readProjectConfig } from "../project/paths";
+import { readProjectConfig, resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
+import { canonicalArtifactEvidenceReference } from "./artifact-inspection";
 import type { AssistedProposalPreview } from "./assisted-proposal-packet";
 import {
 	assertSafeEvolutionProjectRoot,
@@ -412,14 +414,14 @@ export function storePreparedAssistedProposal(
 			(event) => event.problem_identity === preview.problem_identity,
 		);
 		const previewEvidence = new Set(
-			canonicalEvidenceIdentity(preview.evidence_refs),
+			canonicalEvidenceIdentity(root, preview.evidence_refs),
 		);
 		const overlappingRejected = rejectedPrepared.find((event) => {
 			const previous = event.payload.preview as AssistedProposalPreview;
 			if (previous.intervention_identity !== preview.intervention_identity)
 				return false;
-			return canonicalEvidenceIdentity(previous.evidence_refs).some((item) =>
-				previewEvidence.has(item),
+			return canonicalEvidenceIdentity(root, previous.evidence_refs).some(
+				(item) => previewEvidence.has(item),
 			);
 		});
 		const previousProposalId = preview.problem_reopen_link;
@@ -447,7 +449,15 @@ export function storePreparedAssistedProposal(
 				previousPreview.intervention_identity !== preview.intervention_identity
 			)
 				throw new Error("proposal reopen intervention does not match source");
-			if (previous.problem_identity === preview.problem_identity)
+			const previousEvidence = new Set(
+				canonicalEvidenceIdentity(root, previousPreview.evidence_refs),
+			);
+			if (
+				previous.problem_identity === preview.problem_identity ||
+				canonicalEvidenceIdentity(root, preview.evidence_refs).every((item) =>
+					previousEvidence.has(item),
+				)
+			)
 				throw new AssistedProposalSuppressedError(
 					"proposal reopen requires materially new evidence",
 				);
@@ -467,14 +477,46 @@ export function storePreparedAssistedProposal(
 	});
 }
 
+type ProposalEvidenceReference =
+	AssistedProposalPreview["evidence_refs"][number];
+
+function isV2EvidenceReference(
+	ref: ProposalEvidenceReference,
+): ref is ArtifactReferenceV2 {
+	return (ref as ArtifactReferenceV2).schema_version === 2;
+}
+
 function canonicalEvidenceIdentity(
-	refs: readonly AssistedProposalPreview["evidence_refs"][number][],
+	root: string,
+	refs: readonly ProposalEvidenceReference[],
 ): string[] {
+	const wb = relative(root, resolveProjectPaths(root).abs.wbDir).replaceAll(
+		"\\",
+		"/",
+	);
 	return refs
-		.map((ref) =>
-			stableJson({
+		.map((raw) => {
+			const ref = canonicalArtifactEvidenceReference(root, raw);
+			if (isV2EvidenceReference(ref)) {
+				return stableJson({
+					owner: ref.owner,
+					path: ref.relative_path,
+					content_digest: ref.content_digest,
+					...(ref.digest_scope === "range"
+						? {
+								anchor: ref.anchor,
+								source_identity_digest: ref.source_identity_digest,
+							}
+						: {}),
+				});
+			}
+			const ownerPrefix = [
+				`${wb}/${ref.session_id}/`,
+				`${wb}/_archive/${ref.session_id}/`,
+			].find((prefix) => ref.path.startsWith(prefix));
+			return stableJson({
 				session_id: ref.session_id,
-				path: ref.path,
+				path: ownerPrefix ? ref.path.slice(ownerPrefix.length) : ref.path,
 				content_digest: ref.content_digest,
 				...(ref.digest_scope === "range"
 					? {
@@ -482,8 +524,8 @@ function canonicalEvidenceIdentity(
 							source_identity_digest: ref.source_identity_digest,
 						}
 					: {}),
-			}),
-		)
+			});
+		})
 		.sort();
 }
 

@@ -1,3 +1,4 @@
+import type { ArtifactReferenceV2 } from "../artifacts/types";
 import { readProjectConfig } from "../project/paths";
 import { scorecardFromObservations } from "./analysis";
 import type { ArtifactReference } from "./artifact-inspection";
@@ -82,6 +83,12 @@ function baselineKey(observation: ObservationRecord): string {
 	return JSON.stringify([observation.task_type, observation.fingerprint]);
 }
 
+function isV2EvidenceReference(
+	ref: ArtifactReference | ArtifactReferenceV2,
+): ref is ArtifactReferenceV2 {
+	return (ref as ArtifactReferenceV2).schema_version === 2;
+}
+
 function readCurrentProductionDay(
 	root: string,
 	projectId: string,
@@ -101,11 +108,11 @@ function readCurrentProductionDay(
 	return dates.size;
 }
 
-/** Maps artifact sessions to one canonical observation cohort and freezes its existing evaluator contract. */
+/** Maps referenced session owners to one canonical observation cohort and freezes its existing evaluator contract. */
 export function prepareAssistedEvaluationBaseline(input: {
 	root: string;
 	projectId: string;
-	evidenceRefs: readonly ArtifactReference[];
+	evidenceRefs: readonly (ArtifactReference | ArtifactReferenceV2)[];
 	selector?: AssistedEvaluationSelector;
 }): AssistedEvaluationBaseline {
 	let observations: ObservationRecord[];
@@ -126,7 +133,11 @@ export function prepareAssistedEvaluationBaseline(input: {
 		};
 	}
 	const evidenceSessions = new Set(
-		input.evidenceRefs.map((ref) => ref.session_id),
+		input.evidenceRefs.flatMap((ref) => {
+			if (isV2EvidenceReference(ref))
+				return ref.owner.kind === "session" ? [ref.owner.id] : [];
+			return [ref.session_id];
+		}),
 	);
 	const linked = observations.filter((row) =>
 		evidenceSessions.has(row.session_id),

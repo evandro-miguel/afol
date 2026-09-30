@@ -1,8 +1,4 @@
-import {
-	envelopeErr,
-	envelopeOk,
-	stringifyEnvelope,
-} from "../core/envelope";
+import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	assertAdmittedOperationContext,
 	defaultOperationContext,
@@ -11,7 +7,7 @@ import {
 } from "../core/operation-context";
 import { ArtifactSaveError, saveArtifact } from "../services/artifacts/storage";
 import type { ArtifactSaveReceipt } from "../services/artifacts/types";
-import { DEFAULT_IO, type CommandIo } from "./io";
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 const POLICY = { action: "artifact.save", sideEffect: "write" as const };
 
@@ -19,6 +15,7 @@ type ParsedSaveArgs = {
 	kind?: string;
 	text?: string;
 	file?: string;
+	sourceDigest?: string;
 	title?: string;
 	sessions: string[];
 	records: string[];
@@ -52,6 +49,7 @@ function parseSaveArgs(args: readonly string[]): ParsedSaveArgs {
 		else if (arg === "--session") parsed.sessions.push(next());
 		else if (arg === "--record") parsed.records.push(next());
 		else if (arg === "--request-id") parsed.requestId = next();
+		else if (arg === "--source-digest") parsed.sourceDigest = next();
 		else throw new Error(`Unknown artifact save argument: ${arg}`);
 	}
 	return parsed;
@@ -65,6 +63,7 @@ function formatReceipt(receipt: ArtifactSaveReceipt): string {
 		`bytes=${receipt.bytes}`,
 		`persisted=${receipt.persisted} duplicate=${receipt.duplicate}`,
 		`index=${receipt.index.status}`,
+		...(receipt.request_state ? [`request=${receipt.request_state}`] : []),
 	].join("\n");
 }
 
@@ -95,10 +94,11 @@ export async function runArtifactCommand(
 			kind: parsed.kind,
 			...(parsed.text !== undefined ? { text: parsed.text } : {}),
 			...(parsed.file !== undefined ? { file: parsed.file } : {}),
-			...(parsed.title !== undefined ? { title: parsed.title } : {}),
-			...(parsed.sessions.length === 1
-				? { session: parsed.sessions[0] }
+			...(parsed.sourceDigest !== undefined
+				? { expectedSourceDigest: parsed.sourceDigest }
 				: {}),
+			...(parsed.title !== undefined ? { title: parsed.title } : {}),
+			...(parsed.sessions.length === 1 ? { session: parsed.sessions[0] } : {}),
 			...(parsed.records.length === 1 ? { record: parsed.records[0] } : {}),
 			...(parsed.standalone ? { standalone: true } : {}),
 			...(process.env.AFOL_SESSION?.trim()

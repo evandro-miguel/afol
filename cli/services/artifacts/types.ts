@@ -35,7 +35,7 @@ export type ArtifactPage = {
 	coverage: "complete" | "partial";
 };
 
-export type ArtifactSaveIndexStatus = "ok" | "pending";
+export type ArtifactSaveIndexStatus = "ok" | "pending" | "not_requested";
 
 export type ArtifactSaveReceipt = {
 	persisted: boolean;
@@ -47,7 +47,10 @@ export type ArtifactSaveReceipt = {
 	bytes: number;
 	created_at: string;
 	request_id?: string;
+	/** Artifact bytes are durable even when request completion must be retried. */
+	request_state?: "prepared" | "committed";
 	index: { status: ArtifactSaveIndexStatus; detail?: string };
+	source?: { path: string; content_digest: string; preserved: true };
 };
 
 export const ARTIFACT_SAVE_KINDS = Object.freeze([
