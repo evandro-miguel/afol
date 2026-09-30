@@ -27,6 +27,7 @@
           "rule",
           "skill",
           "close",
+          "artifact",
           "file",
           "fleet",
           "update",
@@ -122,6 +123,7 @@
           "evidence",
           "legacy",
           "close",
+          "artifact",
           "bootstrap",
           "verify",
           "verify-tasks",
@@ -358,14 +360,19 @@
       "description": "Start a workbench task",
       "subcommands": [
         {
-          "usage": "--session <session-id> --task-id <task-id>",
+          "usage": "T-01",
           "side_effect": "write",
-          "description": "Start a specific task in a specific session"
+          "description": "Start a task in the active or bound session"
         },
         {
           "usage": "--task-id <task-id>",
           "side_effect": "write",
           "description": "Start a task in the active or context session"
+        },
+        {
+          "usage": "--session <session-id> --task-id <task-id>",
+          "side_effect": "write",
+          "description": "Start a specific task in a specific session"
         },
         {
           "usage": "--json",
@@ -479,7 +486,7 @@
       "description": "Create a workbench session",
       "subcommands": [
         {
-          "usage": "<theme> --task <summary>",
+          "usage": "<theme> -t|--task <summary>",
           "side_effect": "write",
           "description": "Create a session with one or more initial tasks"
         },
@@ -802,6 +809,11 @@
       "description": "Close the active session",
       "subcommands": [
         {
+          "usage": "[-m|--summary <text>]",
+          "side_effect": "write",
+          "description": "Close the active or bound session after its tasks are complete"
+        },
+        {
           "usage": "--session <session-id> [-m|--summary <text>]",
           "side_effect": "write",
           "description": "Close a specific session after its tasks are complete"
@@ -825,6 +837,26 @@
           "usage": "--json",
           "side_effect": "write",
           "description": "Emit machine-readable close result"
+        }
+      ]
+    },
+    {
+      "id": "artifact",
+      "name": "AFOL Artifact",
+      "tool": "afol",
+      "wrapper_command": "afol artifact",
+      "aliases": [],
+      "stability": "experimental",
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Save durable work artifacts without a session",
+      "subcommands": [
+        {
+          "usage": "save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--source-digest <sha256>] [--json]",
+          "side_effect": "write",
+          "description": "Capture a note, research, report, or handoff; standalone without a selector"
         }
       ]
     },
@@ -1404,9 +1436,54 @@
       "description": "Analyze project evolution state and proposals",
       "subcommands": [
         {
-          "usage": "backfill [--offset <n>] [--limit <1-10>] [--json]",
+          "usage": "artifacts [--records [--records-cursor <token>]] [--record <id> [--search <query> | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
           "side_effect": "read",
-          "description": "Preview bounded historical observation and adoption coverage without writes"
+          "description": "Inspect session or standalone record artifacts without Evolution projections. Records discovery scans at most 4,096 entries and reports partial coverage when bounded or unsupported; search has a 512 KiB work budget. Pages redact with up to 1 MiB of source context and withhold larger sources as partial. Page requests clamp to 4 bytes and offsets must be UTF-8 boundaries. History, records, and content cursors are separate."
+        },
+        {
+          "usage": "backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",
+          "side_effect": "write",
+          "description": "Preview bounded historical coverage; --run ingests one authorized bounded page"
+        },
+        {
+          "usage": "proposal schema [--json]",
+          "side_effect": "read",
+          "description": "Print the assisted proposal packet schema and example"
+        },
+        {
+          "usage": "proposal prepare --packet <path> --dry-run [--json]",
+          "side_effect": "preview",
+          "description": "Validate packet evidence, bounded operations, and target baselines without writing or executing checks"
+        },
+        {
+          "usage": "proposal show <proposal-id> [--operation <1-8>] [--field <before|after|content|rationale|statement> --offset <bytes> --bytes <1-12000>] [--json]",
+          "side_effect": "read",
+          "description": "Inspect the exact persisted operations and current decision/application state"
+        },
+        {
+          "usage": "proposal decide <proposal-id> --version <sha256> --decision <approve|defer|reject> [--reason <text>] [--resume-when <condition>] [--reconsider-rejection] [--json]",
+          "side_effect": "write",
+          "description": "Record a trusted local exact-version decision; rejection reconsideration requires explicit approval and a reason"
+        },
+        {
+          "usage": "proposal apply <proposal-id> --version <sha256> [--json]",
+          "side_effect": "write",
+          "description": "Apply only the exact approved proposal operations after rechecking evidence and target baselines"
+        },
+        {
+          "usage": "proposal evaluate <proposal-id> --version <sha256> [--json]",
+          "side_effect": "read",
+          "description": "Preview the existing canonical evaluator for the frozen proposal baseline and later comparable observations"
+        },
+        {
+          "usage": "proposal evaluate <proposal-id> --version <sha256> --record [--json]",
+          "side_effect": "write",
+          "description": "Record a read-only evaluation receipt from a trusted local interactive active task"
+        },
+        {
+          "usage": "proposal revoke <proposal-id> --version <sha256> --reason <text> [--json]",
+          "side_effect": "write",
+          "description": "Retire exact applied context guidance; previously written code and skill bytes remain unchanged"
         },
         {
           "usage": "candidates [--session <id>] [--limit <1-10>] [--json]",
@@ -1417,6 +1494,16 @@
           "usage": "candidates review --session <id> --id <candidate-id> --decision <approved|rejected> --reason <text> [--approve] [--json]",
           "side_effect": "write",
           "description": "Append an explicit approval-gated learning review decision"
+        },
+        {
+          "usage": "lessons --session <id> [--json]",
+          "side_effect": "write",
+          "description": "Record every explicit lesson statement from a closed session with versioned duplicates and contradictions"
+        },
+        {
+          "usage": "lessons apply --session <id> --id <lesson-id> --evidence <evidence-id> [--json]",
+          "side_effect": "write",
+          "description": "Record one observed lesson application without marking the lesson applied"
         },
         {
           "usage": "evaluate <id> [--record] [--superseded-by <id>] [-j]",

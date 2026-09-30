@@ -6,10 +6,16 @@ import {
 
 describe("workbench hints", () => {
 	test("nextCommandHint prefers d -x after start and c after done", () => {
+		expect(nextCommandHint("new", { taskId: "T-01" })).toBe("afol st T-01");
 		expect(nextCommandHint("start", { taskId: "T-02" })).toBe(
 			'afol d T-02 -x "<cmd>"',
 		);
+		expect(nextCommandHint("evidence", { taskId: "T-02" })).toBe(
+			'afol d T-02 -x "<cmd>"',
+		);
 		expect(nextCommandHint("done", { session: "s1" })).toBe("afol c");
+		expect(nextCommandHint("close")).toBe("afol s");
+		expect(nextCommandHint("quick-task")).toBe("afol s");
 		expect(nextCommandHint("log", { taskId: "T-03" })).toBe(
 			'afol d T-03 -x "<cmd>"',
 		);
@@ -22,5 +28,6 @@ describe("workbench hints", () => {
 		);
 		expect(repairHintForStep("quick-task")).toContain("afol qt");
 		expect(repairHintForStep("quick-task")).toContain('-c "<cmd>"');
+		expect(repairHintForStep("close")).toBe("afol c");
 	});
 });

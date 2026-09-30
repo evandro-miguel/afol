@@ -307,6 +307,22 @@ function compactSafeNextAction(next: string[]): string | undefined {
 	return compactSafeAction(next);
 }
 
+function unboundNextAction(root: string): string {
+	let open: string | undefined;
+	try {
+		for (const id of collectSessionIds(root)) {
+			if (sessionLifecycleState(root, id) !== "open") continue;
+			if (open) return "afol ss list";
+			open = id;
+		}
+	} catch {
+		return "afol ss list";
+	}
+	return open
+		? `afol ss switch ${open}`
+		: 'afol qt <theme> -t "<task>" -c "<cmd>"';
+}
+
 function extractFieldList(
 	content: string,
 	label: "FILES_WRITTEN" | "VALIDATION_OR_CHECKS" | "BLOCKERS" | "NEXT",
@@ -632,6 +648,7 @@ function readStatusSnapshot(
 		return {
 			status: "none",
 			task: "none",
+			safeNextAction: unboundNextAction(project.root),
 			filesWritten: ["none"],
 			validationOrChecks: mergeStatusEntries(["none"], []),
 			blockers: ["none"],

@@ -168,28 +168,35 @@ function isMarkdownValueBoundary(line: string): boolean {
 		/^[A-Za-z][A-Za-z0-9 _-]{0,80}:\s*/.test(trimmed)
 	);
 }
-function labeledValue(
+type LabeledMatch = { label: string; value: string };
+/** Every labeled statement in document order; a later statement is never
+ * swallowed by an earlier one's continuation lines. */
+export function labeledValues(
 	content: string,
 	labels: readonly string[],
-): { label: string; value: string } | null {
+): LabeledMatch[] {
 	const labelPattern = labels.join("|");
 	const linePattern = new RegExp(
 		`^\\s*(?:[-*]\\s*)?(${labelPattern})\\s*:\\s*(\\S(?:.*?\\S)?)\\s*$`,
 		"i",
 	);
 	const lines = content.split(/\r?\n/);
+	const matches: LabeledMatch[] = [];
 	for (let index = 0; index < lines.length; index += 1) {
 		const match = linePattern.exec(lines[index] ?? "");
 		if (!match?.[1] || !match[2]) continue;
 		const parts = [match[2]];
 		for (let next = index + 1; next < lines.length; next += 1) {
 			const line = lines[next] ?? "";
+			// Continuations stop at any markdown boundary, and every boundary
+			// line (label, bullet, heading) is also a non-continuation, so the
+			// scan below still reaches every later labeled statement.
 			if (!/^\s+/.test(line) || isMarkdownValueBoundary(line)) break;
 			parts.push(line.trim());
 		}
-		return { label: match[1].toLowerCase(), value: parts.join(" ") };
+		matches.push({ label: match[1].toLowerCase(), value: parts.join(" ") });
 	}
-	return null;
+	return matches;
 }
 function emptyResult(
 	session: string | null,
@@ -209,7 +216,7 @@ function emptyResult(
 		},
 	};
 }
-function sessionPath(root: string, session: string): string {
+export function sessionPath(root: string, session: string): string {
 	if (!SESSION_ID.test(session))
 		throw new Error("evolve candidates session is invalid");
 	const wbDir = resolveProjectPaths(root).abs.wbDir;
@@ -220,7 +227,7 @@ function sessionPath(root: string, session: string): string {
 		throw new Error("evolve candidates session was not found");
 	return path;
 }
-function explicitStatement(sessionDir: string): {
+type ExplicitStatement = {
 	problem: string;
 	problemTruncated: boolean;
 	recommendation: string;
@@ -228,60 +235,116 @@ function explicitStatement(sessionDir: string): {
 	destination: AdoptionDestination;
 	path: string;
 	digest: string;
-} | null {
+};
+function isAdoptionDestination(
+	value: string | undefined,
+): value is AdoptionDestination {
+	return value === "memory" || value === "library";
+}
+/** Every explicit statement in the session: each Problem/Recommendation pair
+ * plus each labeled decision, correction, lesson, or preference. */
+function explicitStatements(sessionDir: string): ExplicitStatement[] {
 	const files = readdirSync(sessionDir, { withFileTypes: true })
 		.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
 		.map((entry) => join(sessionDir, entry.name))
 		.sort()
 		.slice(0, MAX_SESSION_FILES);
+	const statements: ExplicitStatement[] = [];
 	for (const path of files) {
 		const stat = lstatSync(path);
 		if (!stat.isFile() || stat.size > MAX_SESSION_FILE_BYTES) continue;
 		const content = readFileSync(path, "utf8");
-		const problem = boundedPublicText(
-			labeledValue(content, ["problem"])?.value ?? "",
-		);
-		const recommendation = boundedPublicText(
-			labeledValue(content, ["recommendation"])?.value ?? "",
-		);
-		const destination = labeledValue(content, [
+		const matches = labeledValues(content, [
+			"problem",
+			"recommendation",
 			"destination",
-		])?.value.toLowerCase() as AdoptionDestination | undefined;
-		if (
-			problem &&
-			recommendation &&
-			(destination === "memory" || destination === "library")
-		)
-			return {
-				problem: problem.value,
-				problemTruncated: problem.truncated,
-				recommendation: recommendation.value,
-				recommendationTruncated: recommendation.truncated,
-				destination,
+			...EXPLICIT_LABELS,
+		]);
+		const structured: ExplicitStatement[] = [];
+		const explicit: ExplicitStatement[] = [];
+		let pair: {
+			problem?: PublicText;
+			recommendation?: PublicText;
+			destination?: AdoptionDestination;
+		} = {};
+		const closePair = () => {
+			if (
+				!pair.problem ||
+				!pair.recommendation ||
+				!isAdoptionDestination(pair.destination)
+			) {
+				pair = {};
+				return;
+			}
+			structured.push({
+				problem: pair.problem.value,
+				problemTruncated: pair.problem.truncated,
+				recommendation: pair.recommendation.value,
+				recommendationTruncated: pair.recommendation.truncated,
+				destination: pair.destination,
 				path,
 				digest: digest(content),
-			};
-		const explicit = labeledValue(content, EXPLICIT_LABELS);
-		if (!explicit) continue;
-		const statement = boundedPublicText(explicit.value);
-		if (!statement) continue;
-		const kind = explicit.label;
-		const fallbackProblem = boundedPublicText(
-			`Explicit ${kind} recorded by the closed session`,
-		);
-		if (!fallbackProblem) continue;
-		return {
-			problem: fallbackProblem.value,
-			problemTruncated: fallbackProblem.truncated,
-			recommendation: statement.value,
-			recommendationTruncated: statement.truncated,
-			destination:
-				kind === "correction" || kind === "lesson" ? "library" : "memory",
-			path,
-			digest: digest(content),
+			});
+			pair = {};
 		};
+		for (const match of matches) {
+			if (match.label === "problem") {
+				closePair();
+				const problem = boundedPublicText(match.value);
+				pair = problem ? { problem } : {};
+				continue;
+			}
+			if (match.label === "recommendation") {
+				if (!pair.recommendation) {
+					const recommendation = boundedPublicText(match.value);
+					if (recommendation) pair.recommendation = recommendation;
+				}
+				continue;
+			}
+			if (match.label === "destination") {
+				const destination = match.value.toLowerCase();
+				if (
+					isAdoptionDestination(destination) &&
+					pair.problem &&
+					pair.destination === undefined
+				)
+					pair.destination = destination;
+				continue;
+			}
+			const statement = boundedPublicText(match.value);
+			if (!statement) continue;
+			const kind = match.label;
+			const fallbackProblem = boundedPublicText(
+				`Explicit ${kind} recorded by the closed session`,
+			);
+			if (!fallbackProblem) continue;
+			explicit.push({
+				problem: fallbackProblem.value,
+				problemTruncated: fallbackProblem.truncated,
+				recommendation: statement.value,
+				recommendationTruncated: statement.truncated,
+				destination:
+					kind === "correction" || kind === "lesson" ? "library" : "memory",
+				path,
+				digest: digest(content),
+			});
+		}
+		closePair();
+		for (const statement of [...structured, ...explicit]) {
+			if (
+				statements.some(
+					(existing) =>
+						existing.destination === statement.destination &&
+						existing.problem === statement.problem &&
+						existing.recommendation === statement.recommendation,
+				)
+			)
+				continue;
+			statements.push(statement);
+			if (statements.length >= MAX_CANDIDATES) return statements;
+		}
 	}
-	return null;
+	return statements;
 }
 function evidenceRef(
 	sessionDir: string,
@@ -617,97 +680,122 @@ function discoverAdoptionCandidatesUnlocked(input: {
 	if (sessionLifecycleState(input.root, session) !== "closed")
 		return emptyResult(session, "blocked_missing_evidence", limit);
 	const verification = verifyWorkbenchTasks(path, true);
-	const explicit = explicitStatement(path);
+	const statements = explicitStatements(path);
 	const evidence = evidenceRef(path, completedTaskIds(path));
-	if (!verification.allCompleted || !explicit || !evidence)
+	if (!verification.allCompleted || statements.length === 0 || !evidence)
 		return emptyResult(
 			session,
-			explicit ? "blocked_missing_evidence" : "no_candidate",
+			statements.length > 0 ? "blocked_missing_evidence" : "no_candidate",
 			limit,
 		);
-	const fingerprint = digest(
-		`${configured.projectId}\n${session}\n${explicit.destination}\n${explicit.problem}\n${explicit.recommendation}\n${evidence.digest}`,
+	const reviewEvents = readAdoptionReviewEvents(input.root).filter(
+		(event) => event.session_id === session,
 	);
-	const id = `AC-${fingerprint.slice(0, 20)}`;
-	const prior = readAdoptionReviewEvents(input.root).filter(
-		(event) =>
-			event.session_id === session && event.fingerprint === fingerprint,
-	);
-	const adopted =
-		explicit.destination === "memory" &&
-		alreadyAdopted(input.root, explicit.recommendation);
-	const decisions = new Set(prior.map((event) => event.decision));
-	const reviewState: CandidateReviewState =
-		decisions.size > 1
-			? "conflict"
-			: (prior.at(-1)?.decision ??
-				(adopted
-					? "already_adopted"
-					: prior.length > 0
-						? "duplicate"
-						: "candidate_available"));
-	const candidate: AdoptionCandidate = {
-		record_type: "adoption_candidate",
-		id,
-		state_class: "derived",
-		status: "candidate",
-		created_at: evidence.createdAt,
-		project_id: configured.projectId,
-		session_id: session,
-		destination: explicit.destination,
-		candidate_type: "project_continuity",
-		statement: explicit.recommendation,
-		problem: explicit.problem,
-		problem_truncated: explicit.problemTruncated,
-		recommendation: explicit.recommendation,
-		recommendation_truncated: explicit.recommendationTruncated,
-		fingerprint,
-		provenance: "explicit",
-		confidence: 0.9,
-		confidence_reason: "explicit session material with passed evidence",
-		review_state: reviewState,
-		conflict_refs: prior.map((event) => event.id),
-		approval_required: true,
-		approval_owner: "learning_reviewer",
-		next_action:
-			reviewState === "candidate_available"
-				? `afol evolve candidates review --session ${session} --id ${id} --decision approved --approve --reason <reason>`
-				: "inspect append-only review history",
-		project_scope: "project",
-		explicitness: "explicit",
-		source_refs: [
-			{ id: session, kind: "session", authority: "canonical" },
-			{
-				id: `R-${explicit.digest.slice(0, 20)}`,
-				kind: "report",
-				path: relative(input.root, explicit.path),
-				digest: explicit.digest,
-				authority: "canonical",
-			},
-			{
-				id: evidence.id,
-				kind: "evidence",
+	const projectId = configured.projectId;
+	const candidates: AdoptionCandidate[] = statements.map((explicit) => {
+		const fingerprint = digest(
+			`${projectId}\n${session}\n${explicit.destination}\n${explicit.problem}\n${explicit.recommendation}\n${evidence.digest}`,
+		);
+		const id = `AC-${fingerprint.slice(0, 20)}`;
+		const prior = reviewEvents.filter(
+			(event) => event.fingerprint === fingerprint,
+		);
+		const adopted =
+			explicit.destination === "memory" &&
+			alreadyAdopted(input.root, explicit.recommendation);
+		const decisions = new Set(prior.map((event) => event.decision));
+		const reviewState: CandidateReviewState =
+			decisions.size > 1
+				? "conflict"
+				: (prior.at(-1)?.decision ??
+					(adopted
+						? "already_adopted"
+						: prior.length > 0
+							? "duplicate"
+							: "candidate_available"));
+		return {
+			record_type: "adoption_candidate",
+			id,
+			state_class: "derived",
+			status: "candidate",
+			created_at: evidence.createdAt,
+			project_id: projectId,
+			session_id: session,
+			destination: explicit.destination,
+			candidate_type: "project_continuity",
+			statement: explicit.recommendation,
+			problem: explicit.problem,
+			problem_truncated: explicit.problemTruncated,
+			recommendation: explicit.recommendation,
+			recommendation_truncated: explicit.recommendationTruncated,
+			fingerprint,
+			provenance: "explicit",
+			confidence: 0.9,
+			confidence_reason: "explicit session material with passed evidence",
+			review_state: reviewState,
+			conflict_refs: prior.map((event) => event.id),
+			approval_required: true,
+			approval_owner: "learning_reviewer",
+			next_action:
+				reviewState === "candidate_available"
+					? `afol evolve candidates review --session ${session} --id ${id} --decision approved --approve --reason <reason>`
+					: "inspect append-only review history",
+			project_scope: "project",
+			explicitness: "explicit",
+			source_refs: [
+				{ id: session, kind: "session", authority: "canonical" },
+				{
+					id: `R-${explicit.digest.slice(0, 20)}`,
+					kind: "report",
+					path: relative(input.root, explicit.path),
+					digest: explicit.digest,
+					authority: "canonical",
+				},
+				{
+					id: evidence.id,
+					kind: "evidence",
+					digest: evidence.digest,
+					authority: "canonical",
+				},
+			],
+			session_provenance: { session_id: session, lifecycle: "closed" },
+			evidence_provenance: {
+				evidence_id: evidence.id,
+				task_id: evidence.taskId,
 				digest: evidence.digest,
-				authority: "canonical",
 			},
-		],
-		session_provenance: { session_id: session, lifecycle: "closed" },
-		evidence_provenance: {
-			evidence_id: evidence.id,
-			task_id: evidence.taskId,
-			digest: evidence.digest,
-		},
-	};
+		} satisfies AdoptionCandidate;
+	});
+	const available = candidates.length;
+	const reviewState = aggregateReviewState(candidates);
 	return {
 		read_only: true,
 		session_id: session,
-		review_state: candidate.review_state,
-		candidates: [candidate].slice(0, limit),
+		review_state: reviewState,
+		candidates: candidates.slice(0, limit),
 		list: {
 			requested_limit: limit,
-			returned: 1,
-			available: 1,
-			truncated: false,
+			returned: Math.min(limit, available),
+			available,
+			truncated: available > limit,
 		},
 	};
+}
+
+/** Terminal states ordered by review precedence for multi-candidate sessions. */
+const REVIEW_STATE_PRECEDENCE = [
+	"candidate_available",
+	"conflict",
+	"approved",
+	"rejected",
+	"duplicate",
+	"already_adopted",
+] as const satisfies readonly CandidateReviewState[];
+function aggregateReviewState(
+	candidates: readonly AdoptionCandidate[],
+): CandidateReviewState {
+	for (const state of REVIEW_STATE_PRECEDENCE)
+		if (candidates.some((candidate) => candidate.review_state === state))
+			return state;
+	return "candidate_available";
 }

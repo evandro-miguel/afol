@@ -74,16 +74,16 @@ in one command:
 For work with several steps:
 
 ```bash
-"$AFOL" new improve-search \
-  --task "Implement ranked results" \
-  --task "Add regression tests"
+"$AFOL" n improve-search \
+  -t "Implement ranked results" \
+  -t "Add regression tests"
 
-"$AFOL" start T-01
+"$AFOL" st T-01
 # Work on the project.
-"$AFOL" done T-01 -x "bun test"
-"$AFOL" start T-02
-"$AFOL" done T-02 -x "bun test"
-"$AFOL" close
+"$AFOL" d T-01 -x "bun test"
+"$AFOL" st T-02
+"$AFOL" d T-02 -x "bun test"
+"$AFOL" c
 ```
 
 Use `"$AFOL" help` or `"$AFOL" help <command>` to inspect the live command

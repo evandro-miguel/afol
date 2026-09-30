@@ -1073,7 +1073,36 @@ describe("update command", () => {
 		);
 		const sourceRuleReadme = templateText(".afol/adm/rules/README.md");
 		const downstreamRuleReadme = "downstream rules note\n";
+		const preservedFiles = new Map([
+			[".afol/wb/.active_session", Buffer.from(`${session}\n`)],
+			[
+				`.afol/wb/${session}/${session}_task_01.md`,
+				readFileSync(join(root, `.afol/wb/${session}/${session}_task_01.md`)),
+			],
+			[
+				".afol/records/R-retained/research.md",
+				Buffer.from("# Retained standalone evidence\n\nUTF-8: ação 🧭\r\n"),
+			],
+			[
+				`.afol/wb/${session}/artifacts/report.md`,
+				Buffer.from("# Observed session evidence\n"),
+			],
+			[
+				".afol/wb/_archive/S-retained/S-retained_task_01.md",
+				Buffer.from(
+					'---\nstatus: "closed"\nclosed_at: "2026-09-26T12:00:00Z"\n---\n',
+				),
+			],
+			[
+				".afol/wb/_archive/S-retained/artifacts/report.md",
+				Buffer.from("# Immutable archived evidence\n"),
+			],
+		]);
 		try {
+			for (const [path, bytes] of preservedFiles) {
+				mkdirSync(join(root, path, ".."), { recursive: true });
+				writeFileSync(join(root, path), bytes);
+			}
 			mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 			writeFileSync(
 				join(root, ".afol", "adm", "rules", "README.md"),
@@ -1170,6 +1199,8 @@ describe("update command", () => {
 			expect(ruleEntry?.session).toBe(session);
 			expect(ruleEntry?.taskId).toBe(taskId);
 			expect(lockEntry?.batchId).toBe(ruleEntry?.batchId);
+			for (const [path, bytes] of preservedFiles)
+				expect(readFileSync(join(root, path))).toEqual(bytes);
 			expect(lockEntry?.backupPath).toBeTruthy();
 			expect(readFileSync(ruleEntry?.backupPath ?? "", "utf8")).toBe(
 				downstreamRuleReadme,
@@ -1220,6 +1251,8 @@ describe("update command", () => {
 			expect(
 				readFileSync(join(root, ".afol", "adm", "rules", "README.md"), "utf8"),
 			).toBe(downstreamRuleReadme);
+			for (const [path, bytes] of preservedFiles)
+				expect(readFileSync(join(root, path))).toEqual(bytes);
 			const secondRollback = capture();
 			expect(
 				await runUpdateCommand(

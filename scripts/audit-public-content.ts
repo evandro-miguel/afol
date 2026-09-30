@@ -140,6 +140,10 @@ const HISTORY_SYNTHETIC_LITERALS = new Map<string, string[]>([
 		[["Bearer", "REDACTION_CANARY_678901"].join(" ")],
 	],
 	[
+		"cli/tests/evolution-artifact-inspection.test.ts",
+		[["GET https://agent", ":password_secret@example.invalid/path"].join("")],
+	],
+	[
 		"cli/tests/evolution-suggestion-authority.test.ts",
 		[["Bearer", "REDACTION_CANARY_2"].join(" ")],
 	],

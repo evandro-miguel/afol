@@ -155,7 +155,7 @@ describe("hosted CI contract", () => {
 			"bun run smoke:example",
 		]);
 		expect(jobs["deep-validation"]?.if).toBe(
-			"github.event_name == 'push' && github.ref == 'refs/heads/main'",
+			"(github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main')",
 		);
 		expect(jobs["deep-validation"]?.needs).toEqual([
 			"quality",

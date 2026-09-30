@@ -1,3 +1,6 @@
+import type { AssistedContextGuidance } from "../evolution/assisted-context-guidance";
+import type { ContextLessonSection } from "../evolution/lesson-records";
+
 export type ContextRef = {
 	domain: string;
 	path: string;
@@ -77,6 +80,10 @@ export type ContextBundle = {
 	do_not_load: string[];
 	rule_injection: ContextRuleInjection;
 	expanded_sections?: ContextExpandedSection[];
+	/** Bounded lesson section; omitted entirely when no lesson applies. */
+	lessons?: ContextLessonSection;
+	/** Exact approval and application provenance for context guidance. */
+	approved_guidance?: AssistedContextGuidance;
 };
 
 export type SectionEntry = {

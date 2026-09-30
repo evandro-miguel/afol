@@ -1,6 +1,10 @@
-import { resolveProjectPaths } from "../../services/project/paths";
 import type { NewWorkstreamMetadata } from "../../services/workbench/lifecycle";
 import { selectSingleOpenTask } from "../../services/workbench/lifecycle";
+import {
+	defaultAllowGlobalFallback,
+	resolveSession as resolveEffectiveSession,
+} from "../../services/workbench/session-context";
+import { isNoopExecutionCommand } from "../../services/workbench/verify";
 import { type FlagDef, parseFlagSpec } from "../flag-spec";
 import type {
 	CloseArgs,
@@ -610,6 +614,18 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			"done requires both --command and --result when recording evidence.",
 		);
 	}
+	const noop = [
+		...parsed.testCommands,
+		...parsed.verifications
+			.filter((spec) => spec.mode === "argv")
+			.map((spec) => [spec.executable, ...spec.args].join(" ").trim()),
+		...(parsed.testShellCommand ? [parsed.testShellCommand] : []),
+	].some(isNoopExecutionCommand);
+	if (noop) {
+		throw new DoneArgumentError(
+			`Verification is a shell no-op and cannot authorize done. Use afol d ${taskIds[0]} -x "<cmd>".`,
+		);
+	}
 	return {
 		session: resolveSession(root, parsed.session, "done"),
 		taskId: taskIds[0] ?? parsed.taskId,
@@ -625,6 +641,49 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		requireSpecCheck: parsed.requireSpecCheck,
 		json: parsed.json,
 	};
+}
+
+const DONE_VALUE_FLAGS = new Set([
+	"--session",
+	"--task-id",
+	"--test",
+	"--test-shell",
+	"--command",
+	"--result",
+	"--artifact",
+	"--note",
+	"--verification-timeout-ms",
+]);
+
+function tryPrimaryDoneTaskId(value: string | undefined): string | null {
+	if (!value) return null;
+	try {
+		return parseTaskSelector(value)[0] ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/** Best-effort task id from argv when parseDoneArgs throws before returning. */
+export function peekDoneTaskIdFromArgv(args: readonly string[]): string | null {
+	let positional: string | null = null;
+	let flagged: string | null = null;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (!arg || arg === "--") break;
+		if (arg === "--task-id") {
+			flagged = tryPrimaryDoneTaskId(args[index + 1]);
+			index += 1;
+			continue;
+		}
+		if (DONE_VALUE_FLAGS.has(arg)) {
+			index += 1;
+			continue;
+		}
+		if (arg.startsWith("-")) continue;
+		positional ??= tryPrimaryDoneTaskId(arg);
+	}
+	return flagged ?? positional;
 }
 
 export function parseLogArgs(args: string[], root: string): LogArgs {
@@ -712,7 +771,14 @@ export function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 	}
 
 	if (!sessionPath) {
-		sessionPath = resolveProjectPaths(root).abs.wbDir;
+		const bound = resolveEffectiveSession(root, {
+			allowGlobalFallback: defaultAllowGlobalFallback(),
+		});
+		if (!bound)
+			throw new Error(
+				"Missing --session for verify; omit only when a session is active or bound. Example: afol vt -S <session-id> --strict",
+			);
+		sessionPath = resolveVerifySessionPath(root, bound.session);
 	}
 
 	return { sessionPath, strict, json, verbose };

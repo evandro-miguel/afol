@@ -63,6 +63,7 @@ export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
 	"telemetry",
 	"receipt",
 	"session",
+	"artifact",
 ]);
 
 const SUBCOMMAND_GROUPS = new Set(ROUTED_SUBCOMMAND_GROUPS);

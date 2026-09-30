@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { sessionPaths } from "./session-reader";
+import { type SessionLocation, sessionPaths } from "./session-reader";
 
 export type TaskDocument =
 	| { kind: "legacy"; content: string }
@@ -94,7 +94,19 @@ export function readTaskLifecycleState(
 	taskPath: string,
 	session: string,
 ): TaskLifecycleState {
-	const document = parseTaskDocument(readFileSync(taskPath, "utf8"), taskPath);
+	return parseTaskLifecycleState(
+		readFileSync(taskPath, "utf8"),
+		taskPath,
+		session,
+	);
+}
+
+export function parseTaskLifecycleState(
+	content: string,
+	taskPath: string,
+	session: string,
+): TaskLifecycleState {
+	const document = parseTaskDocument(content, taskPath);
 	if (document.kind === "legacy") {
 		return { kind: "open", document };
 	}
@@ -152,8 +164,9 @@ export type SessionLifecycleState = "open" | "closed" | "corrupt";
 export function sessionLifecycleState(
 	root: string,
 	session: string,
+	location: SessionLocation = "live",
 ): SessionLifecycleState {
-	const paths = sessionPaths(root, session);
+	const paths = sessionPaths(root, session, location);
 	if (!existsSync(paths.taskPath)) {
 		return "corrupt";
 	}
@@ -161,6 +174,10 @@ export function sessionLifecycleState(
 	return state.kind === "closed" ? "closed" : "open";
 }
 
-export function isSessionClosed(root: string, session: string): boolean {
-	return sessionLifecycleState(root, session) === "closed";
+export function isSessionClosed(
+	root: string,
+	session: string,
+	location: SessionLocation = "live",
+): boolean {
+	return sessionLifecycleState(root, session, location) === "closed";
 }

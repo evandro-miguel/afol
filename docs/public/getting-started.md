@@ -39,12 +39,16 @@ Record one evidenced task:
 Several tasks:
 
 ```bash
-"$AFOL_ROOT/afol" new feature-name --task "Implement behavior" --task "Add tests"
-"$AFOL_ROOT/afol" start T-01
+"$AFOL_ROOT/afol" n feature-name -t "Implement behavior" -t "Add tests"
+"$AFOL_ROOT/afol" st T-01..T-02
 # edit the project
-"$AFOL_ROOT/afol" d T-01 -x "git diff --check"
-"$AFOL_ROOT/afol" close
+"$AFOL_ROOT/afol" d T-01..T-02 -x "git diff --check"
+"$AFOL_ROOT/afol" c
 ```
+
+Omit `-S` when an active or bound session resolves. Use a real verification
+command; shell no-ops cannot authorize completion. Prefer `d -x` for observed
+verification and completion in one step.
 
 AFOL writes mutable state under `.afol/`. The optional Antigravity workspace
 rule is the exact file `.agents/rules/afol.md`; the source runner stays outside

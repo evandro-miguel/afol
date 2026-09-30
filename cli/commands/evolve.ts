@@ -16,12 +16,18 @@ import {
 	type OperationContext,
 } from "../core/operation-context";
 import {
+	ArtifactCatalogChangedError,
+	ArtifactPageCursorError,
+	ArtifactSourceChangedError,
+} from "../services/artifacts/inventory";
+import {
 	analyzeEvolutionProject,
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
 	checkEvolutionDbHealth,
 	confirmExternalImport,
 	type DailySuggestionPreview,
+	distinctLocalProductionDays,
 	type EvolutionDbHealth,
 	type EvolutionStatus,
 	evolutionDbPath,
@@ -54,9 +60,41 @@ import {
 	applyEvolutionProposal,
 	rollbackEvolutionProposal,
 } from "../services/evolution/apply-service";
+import {
+	inspectArtifactRecords,
+	inspectEvolutionArtifacts,
+	inspectStandaloneRecordArtifacts,
+} from "../services/evolution/artifact-inspection";
+import { applyAssistedProposal } from "../services/evolution/assisted-proposal-apply";
+import {
+	previewAssistedProposalEvaluation,
+	recordAssistedProposalEvaluation,
+} from "../services/evolution/assisted-proposal-evaluation";
+import {
+	AssistedProposalSuppressedError,
+	appendAssistedProposalEvent,
+	proposalPreparedEvent,
+	proposalVersionEvents,
+	readAssistedProposalJournal,
+	storePreparedAssistedProposal,
+} from "../services/evolution/assisted-proposal-journal";
+import {
+	ASSISTED_PROPOSAL_PACKET_EXAMPLE,
+	ASSISTED_PROPOSAL_PACKET_SCHEMA,
+	AssistedProposalPacketError,
+	type AssistedProposalPreview,
+	prepareAssistedProposalPreview,
+} from "../services/evolution/assisted-proposal-packet";
 import { localDateForTimezone } from "../services/evolution/config";
-import { previewHistoryBackfill } from "../services/evolution/history-backfill";
+import {
+	previewHistoryBackfill,
+	runHistoryBackfill,
+} from "../services/evolution/history-backfill";
 import type { ImportProvider } from "../services/evolution/imports";
+import {
+	ingestLessonStatements,
+	recordLessonApplication,
+} from "../services/evolution/lesson-records";
 import { ingestObservationsForSession } from "../services/evolution/observation-ingest";
 import {
 	dispatchSuggestionDecision,
@@ -84,6 +122,8 @@ import { type CommandIo, DEFAULT_IO } from "./io";
 const CONTROL_CHARACTER = /\p{Cc}/u;
 const MAX_OBSERVE_IDENTIFIER_LENGTH = 256;
 const MAX_ANALYSIS_OUTPUT_BYTES = 4_000;
+const MAX_ARTIFACT_OUTPUT_BYTES = 16_000;
+const MAX_ASSISTED_PROPOSAL_OUTPUT_BYTES = 8_000;
 const MAX_ANALYSIS_PUBLIC_TEXT_BYTES = 128;
 const MAX_ANALYSIS_PUBLIC_PROPOSAL_TEXT_BYTES = 160;
 const MAX_ANALYSIS_PUBLIC_REF_ID_BYTES = 64;
@@ -1355,6 +1395,9 @@ export function writeAnalysisPayload(
 	io.stdout(output);
 }
 
+const EVOLVE_REPAIR_APPROVAL_MESSAGE =
+	"evolve.repair requires a trusted local interactive terminal; run `afol evolve repair --json` there, then verify with `afol evolve status --json` and `afol evolve analyze --json`";
+
 function writeEvolutionError(
 	io: CommandIo,
 	json: boolean,
@@ -1371,13 +1414,18 @@ function writeEvolutionError(
 		? "analysis unavailable"
 		: trusted
 			? message
-			: code === "approval-required"
-				? `${action} is not allowed; local interactive approval required`
-				: code === "EVOLUTION_REBUILD_REQUIRED"
-					? `${action} requires local interactive rebuild; no mutation was performed`
-					: code === "EVOLVE_REPAIR_DISABLED"
-						? `${action} is disabled; no mutation was performed`
-						: `${action} failed; local interactive diagnostics required`;
+			: code === "approval-required" && action === "evolve.repair"
+				? EVOLVE_REPAIR_APPROVAL_MESSAGE
+				: code === "approval-required"
+					? `${action} is not allowed; local interactive approval required`
+					: code === "EVOLUTION_REBUILD_REQUIRED"
+						? `${action} requires local interactive rebuild; no mutation was performed`
+						: code === "EVOLVE_REPAIR_DISABLED"
+							? `${action} is disabled; no mutation was performed`
+							: code === "EVOLVE_ARTIFACTS_FAILED" &&
+									message === "artifact byte offset is at end of source"
+								? message
+								: `${action} failed; local interactive diagnostics required`;
 	if (json)
 		io.stdout(
 			stringifyEnvelope(
@@ -1683,7 +1731,7 @@ function runRepair(
 			io,
 			json,
 			"approval-required",
-			"evolve.repair requires a trusted local interactive context",
+			EVOLVE_REPAIR_APPROVAL_MESSAGE,
 			"evolve.repair",
 			operationContext,
 		);
@@ -1826,14 +1874,17 @@ function parseCandidatesArgs(args: readonly string[]): {
 function parseBackfillArgs(args: readonly string[]): {
 	offset?: number;
 	limit?: number;
+	run: boolean;
 	json: boolean;
 } {
 	let offset: number | undefined;
 	let limit: number | undefined;
+	let run = false;
 	let json = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
-		if (arg === "--json" || arg === "-j") json = true;
+		if (arg === "--run") run = true;
+		else if (arg === "--json" || arg === "-j") json = true;
 		else if (arg === "--offset" || arg === "--limit") {
 			const value = args[++index];
 			if (!value || !/^\d+$/.test(value))
@@ -1847,6 +1898,7 @@ function parseBackfillArgs(args: readonly string[]): {
 	return {
 		...(offset === undefined ? {} : { offset }),
 		...(limit === undefined ? {} : { limit }),
+		run,
 		json,
 	};
 }
@@ -1857,25 +1909,1404 @@ function runBackfill(
 	io: CommandIo,
 	operationContext: OperationContext,
 ): number {
-	if (
-		!isActionAllowed(operationContext, {
-			action: "evolve.backfill",
-			sideEffect: "read",
-		})
-	)
-		throw new Error("evolve.backfill is not allowed for this caller");
+	assertAdmittedOperationContext(operationContext);
 	const parsed = parseBackfillArgs(args);
-	const result = previewHistoryBackfill({
+	const policy = {
+		action: parsed.run ? "evolve.backfill.run" : "evolve.backfill",
+		sideEffect: parsed.run ? ("write" as const) : ("read" as const),
+	};
+	// The writing backfill mutates observations/production days and its
+	// cursors, so it requires a trusted local interactive operator; a trusted
+	// local non-interactive caller (no TTY) stays refused. Preview remains
+	// readable for agents and remote callers.
+	if (
+		!isActionAllowed(operationContext, policy) ||
+		(parsed.run && !isTrustedLocalInteractive(operationContext))
+	) {
+		const message = "evolve.backfill.run requires local interactive approval";
+		if (parsed.json)
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("approval-required", message, {
+						action: "evolve.backfill.run",
+						exitCode: 2,
+					}),
+				),
+			);
+		else io.stderr(message);
+		return 2;
+	}
+	const input = {
 		root,
 		...(parsed.offset === undefined ? {} : { offset: parsed.offset }),
 		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
-	});
+	};
+	const result = parsed.run
+		? runHistoryBackfill(input)
+		: previewHistoryBackfill(input);
 	const output = parsed.json
-		? stringifyEnvelope(envelopeOk(result, { action: "evolve.backfill" }))
-		: `backfill eligible=${result.coverage.eligible} returned=${result.pagination.returned} pending=${result.observations.pending_backfill} observed=${result.observations.already_observed}`;
+		? stringifyEnvelope(envelopeOk(result, policy))
+		: "totals" in result
+			? `backfill run returned=${result.pagination.returned} appended=${result.totals.appended} duplicates=${result.totals.duplicates} pending=${result.totals.pending} failed=${result.totals.failed}`
+			: `backfill eligible=${result.coverage.eligible} returned=${result.pagination.returned} pending=${result.observations.pending_backfill} observed=${result.observations.already_observed}`;
 	if (Buffer.byteLength(output, "utf8") > MAX_ANALYSIS_OUTPUT_BYTES)
 		throw new Error("evolve backfill output exceeds the bounded limit");
 	io.stdout(output);
+	return 0;
+}
+
+function parseArtifactsArgs(args: readonly string[]): {
+	sessions: string[];
+	artifacts: string[];
+	records: boolean;
+	record?: string;
+	search?: string;
+	cursor?: string;
+	recordsCursor?: string;
+	pageCursor?: string;
+	limit?: number;
+	byteOffset?: number;
+	json: boolean;
+} {
+	const sessions: string[] = [];
+	const artifacts: string[] = [];
+	let records = false;
+	let record: string | undefined;
+	let search: string | undefined;
+	let cursor: string | undefined;
+	let recordsCursor: string | undefined;
+	let pageCursor: string | undefined;
+	let limit: number | undefined;
+	let byteOffset: number | undefined;
+	let json = false;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "--records") records = true;
+		else if (arg === "--record") {
+			const value = args[++index];
+			if (!value || value.startsWith("-") || record !== undefined)
+				throw new Error("evolve artifacts --record requires one <id>");
+			record = value;
+		} else if (arg === "--search") {
+			const value = args[++index];
+			if (value === undefined)
+				throw new Error("evolve artifacts --search requires a query");
+			search = value;
+		} else if (arg === "--session") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --session requires <id>");
+			sessions.push(value);
+		} else if (arg === "--artifact") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error(
+					"evolve artifacts --artifact requires <canonical-name>",
+				);
+			artifacts.push(value);
+		} else if (arg === "--cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --cursor requires <token>");
+			cursor = value;
+		} else if (arg === "--records-cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --records-cursor requires <token>");
+			recordsCursor = value;
+		} else if (arg === "--page-cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --page-cursor requires <token>");
+			pageCursor = value;
+		} else if (arg === "--limit") {
+			const value = args[++index];
+			if (
+				!value ||
+				!/^\d+$/.test(value) ||
+				!Number.isSafeInteger(Number(value))
+			)
+				throw new Error(
+					"evolve artifacts --limit requires an integer from 1 to 10",
+				);
+			limit = Number(value);
+		} else if (arg === "--byte-offset") {
+			const value = args[++index];
+			if (
+				!value ||
+				!/^\d+$/.test(value) ||
+				!Number.isSafeInteger(Number(value))
+			)
+				throw new Error(
+					"evolve artifacts --byte-offset requires a non-negative integer",
+				);
+			byteOffset = Number(value);
+		} else throw new Error("unknown evolve artifacts option");
+	}
+	if (
+		records &&
+		(record !== undefined ||
+			sessions.length > 0 ||
+			artifacts.length > 0 ||
+			search !== undefined ||
+			cursor !== undefined ||
+			pageCursor !== undefined ||
+			byteOffset !== undefined)
+	)
+		throw new Error("--records cannot be combined with another artifact route");
+	if (recordsCursor && !records)
+		throw new Error("--records-cursor requires --records");
+	if (
+		record !== undefined &&
+		(sessions.length > 0 || cursor !== undefined || recordsCursor !== undefined)
+	)
+		throw new Error(
+			"--record cannot be combined with session or history selection",
+		);
+	if (search !== undefined && (record === undefined || artifacts.length > 0))
+		throw new Error(
+			"--search requires --record and cannot be combined with --artifact",
+		);
+	if (pageCursor && cursor)
+		throw new Error("--page-cursor and history --cursor are separate routes");
+	return {
+		sessions,
+		artifacts,
+		records,
+		...(record === undefined ? {} : { record }),
+		...(search === undefined ? {} : { search }),
+		...(cursor ? { cursor } : {}),
+		...(recordsCursor === undefined ? {} : { recordsCursor }),
+		...(pageCursor === undefined ? {} : { pageCursor }),
+		...(limit === undefined ? {} : { limit }),
+		...(byteOffset === undefined ? {} : { byteOffset }),
+		json,
+	};
+}
+
+function runArtifacts(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	assertAdmittedOperationContext(operationContext);
+	const parsed = parseArtifactsArgs(args);
+	const policy = { action: "evolve.artifacts", sideEffect: "read" as const };
+	if (!isActionAllowed(operationContext, policy))
+		throw new Error("evolve artifacts is not allowed for this caller");
+	if (parsed.records) {
+		const result = inspectArtifactRecords({
+			root,
+			...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+			...(parsed.recordsCursor === undefined
+				? {}
+				: { cursor: parsed.recordsCursor }),
+		});
+		const output = parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: result.records.join("\n");
+		if (Buffer.byteLength(output, "utf8") > MAX_ARTIFACT_OUTPUT_BYTES)
+			throw new Error("evolve artifacts output exceeds the bounded limit");
+		io.stdout(output);
+		return 0;
+	}
+	if (parsed.record !== undefined) {
+		const result = inspectStandaloneRecordArtifacts({
+			root,
+			recordId: parsed.record,
+			...(parsed.artifacts.length > 0 ? { artifacts: parsed.artifacts } : {}),
+			...(parsed.search === undefined ? {} : { search: parsed.search }),
+			...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+			...(parsed.pageCursor === undefined
+				? {}
+				: { pageCursor: parsed.pageCursor }),
+			...(parsed.byteOffset === undefined
+				? {}
+				: { byteOffset: parsed.byteOffset }),
+		});
+		const output = parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: result.search
+				? result.search.matches
+						.map(
+							(match) =>
+								match.path +
+								"#bytes:" +
+								match.byte_offset +
+								"\n" +
+								match.excerpt,
+						)
+						.join("\n\n")
+				: result.artifacts.length > 0
+					? result.artifacts
+							.map(
+								(artifact) =>
+									artifact.relative_path +
+									"#" +
+									artifact.anchor +
+									" " +
+									artifact.content_digest +
+									"\n" +
+									artifact.excerpt,
+							)
+							.join("\n\n")
+					: result.files
+							.map((file) => `${file.path} ${file.bytes} bytes`)
+							.join("\n");
+		if (Buffer.byteLength(output, "utf8") > MAX_ARTIFACT_OUTPUT_BYTES)
+			throw new Error("evolve artifacts output exceeds the bounded limit");
+		io.stdout(output);
+		return 0;
+	}
+	const result = inspectEvolutionArtifacts({
+		root,
+		...(parsed.sessions.length > 0 ? { sessions: parsed.sessions } : {}),
+		...(parsed.artifacts.length > 0 ? { artifacts: parsed.artifacts } : {}),
+		...(parsed.cursor ? { cursor: parsed.cursor } : {}),
+		...(parsed.pageCursor === undefined
+			? {}
+			: { pageCursor: parsed.pageCursor }),
+		...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
+		...(parsed.byteOffset === undefined
+			? {}
+			: { byteOffset: parsed.byteOffset }),
+	});
+	const output = parsed.json
+		? stringifyEnvelope(envelopeOk(result, policy))
+		: result.items
+				.map((item) =>
+					[
+						`${item.session_id} (${item.location}) snapshot=${item.snapshot_digest}`,
+						...item.artifacts.map(
+							(artifact) =>
+								`${artifact.path}#${artifact.anchor} ${artifact.content_digest}\n${artifact.excerpt}`,
+						),
+						...item.warnings.map((warning) => `warning=${warning}`),
+					].join("\n"),
+				)
+				.join("\n\n");
+	if (Buffer.byteLength(output, "utf8") > MAX_ARTIFACT_OUTPUT_BYTES)
+		throw new Error(
+			"evolve artifacts output exceeds the bounded limit; select fewer sessions",
+		);
+	io.stdout(output);
+	return 0;
+}
+
+function proposalTextSummary(value: string): {
+	text: string;
+	sha256: string;
+	bytes: number;
+	truncated: boolean;
+} {
+	const text = value.slice(0, 240);
+	return {
+		text,
+		sha256: createHash("sha256").update(value).digest("hex"),
+		bytes: Buffer.byteLength(value, "utf8"),
+		truncated: text.length !== value.length,
+	};
+}
+
+function evaluationBaselineSummary(
+	preview: ReturnType<typeof prepareAssistedProposalPreview>,
+) {
+	const baseline = preview.evaluation_baseline;
+	if (!baseline)
+		return {
+			status: "unavailable",
+			reason: "prepared version predates evaluation baseline binding",
+		};
+	const contract = baseline.contract;
+	return {
+		status: baseline.status,
+		reason: baseline.reason,
+		...(contract
+			? {
+					contract_digest: createHash("sha256")
+						.update(JSON.stringify(contract))
+						.digest("hex"),
+					task_type: contract.task_type,
+					cluster_id: contract.cluster_id,
+					baseline_observation_count: contract.baseline.observation_count,
+					baseline_anchor_journal_sequence:
+						contract.baseline.anchor_journal_sequence,
+				}
+			: {}),
+	};
+}
+
+function compactAssistedProposalPreview(
+	preview: ReturnType<typeof prepareAssistedProposalPreview>,
+) {
+	const operations = preview.intervention.operations.map((operation) => {
+		const summary: Record<string, unknown> = {
+			type: operation.type,
+			target: typeof operation.target === "string" ? operation.target : null,
+		};
+		for (const field of [
+			"before",
+			"after",
+			"content",
+			"rationale",
+			"statement",
+		] as const) {
+			const value = operation[field];
+			if (typeof value === "string")
+				summary[field] = proposalTextSummary(value);
+		}
+		if (typeof operation.scope === "string") summary.scope = operation.scope;
+		return summary;
+	});
+	return {
+		read_only: true,
+		approved: false,
+		kind: preview.kind,
+		proposal_id: preview.proposal_id,
+		version_digest: preview.version_digest,
+		problem_identity: preview.problem_identity,
+		observed_fact: proposalTextSummary(preview.observed_fact),
+		hypothesis: proposalTextSummary(preview.hypothesis),
+		alternative: proposalTextSummary(preview.alternative),
+		evidence_refs: {
+			items: preview.evidence_refs.slice(0, 3),
+			count: preview.evidence_refs.length,
+			omitted: Math.max(0, preview.evidence_refs.length - 3),
+			digest: createHash("sha256")
+				.update(JSON.stringify(preview.evidence_refs))
+				.digest("hex"),
+		},
+		intervention: {
+			operations,
+			operation_count: operations.length,
+			target_baselines: preview.target_baselines,
+		},
+		validation_plan: {
+			commands: preview.validation_plan.commands
+				.slice(0, 2)
+				.map(proposalTextSummary),
+			command_count: preview.validation_plan.commands.length,
+			commands_digest: createHash("sha256")
+				.update(JSON.stringify(preview.validation_plan.commands))
+				.digest("hex"),
+			expected: proposalTextSummary(preview.validation_plan.expected),
+			executed: false,
+		},
+		evaluation_baseline: evaluationBaselineSummary(preview),
+		problem_reopen_link: preview.problem_reopen_link,
+		inspection:
+			"Exact proposed text remains in the packet supplied to --packet; no validation command ran.",
+	};
+}
+
+const MAX_PROPOSAL_SHOW_BYTES = 20_000;
+const MAX_PROPOSAL_FIELD_PAGE_BYTES = 12_000;
+
+function proposalFieldPage(
+	value: string,
+	offset: number,
+	maximumBytes: number,
+): {
+	text: string;
+	offset_bytes: number;
+	returned_bytes: number;
+	total_bytes: number;
+	next_offset_bytes: number | null;
+	sha256: string;
+} {
+	const bytes = Buffer.from(value, "utf8");
+	if (
+		!Number.isInteger(offset) ||
+		offset < 0 ||
+		offset > bytes.byteLength ||
+		(offset < bytes.byteLength && ((bytes.at(offset) ?? 0) & 0xc0) === 0x80)
+	)
+		throw new Error("proposal field offset must be a UTF-8 byte boundary");
+	let end = Math.min(bytes.byteLength, offset + maximumBytes);
+	while (end < bytes.byteLength && ((bytes.at(end) ?? 0) & 0xc0) === 0x80)
+		end += 1;
+	const nextOffset = end < bytes.byteLength ? end : null;
+	return {
+		text: bytes.subarray(offset, end).toString("utf8"),
+		offset_bytes: offset,
+		returned_bytes: end - offset,
+		total_bytes: bytes.byteLength,
+		next_offset_bytes: nextOffset,
+		sha256: createHash("sha256").update(bytes).digest("hex"),
+	};
+}
+
+function runAssistedProposalShow(
+	parsed: Extract<ReturnType<typeof parseProposalCommand>, { action: "show" }>,
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	const policy = {
+		action: "evolve.proposal.show",
+		sideEffect: "read" as const,
+	};
+	if (!isActionAllowed(operationContext, policy))
+		throw new Error("evolve proposal show is not allowed for this caller");
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId) throw new Error("evolution project id is required");
+	const events = readAssistedProposalJournal(root, resolved.projectId);
+	const prepared = proposalPreparedEvent(events, parsed.proposalId);
+	if (!prepared) throw new Error("assisted proposal is missing");
+	const preview = prepared.payload.preview as ReturnType<
+		typeof prepareAssistedProposalPreview
+	>;
+	const versionEvents = proposalVersionEvents(
+		events,
+		prepared.proposal_id,
+		prepared.version_digest,
+	);
+	const decision = versionEvents.findLast(
+		(event) => event.event_type === "decision",
+	);
+	const revoked = versionEvents.find((event) => event.event_type === "revoked");
+	const latestEvaluation = versionEvents.findLast(
+		(event) => event.event_type === "evaluation",
+	);
+	const operation =
+		parsed.operationIndex === undefined
+			? undefined
+			: preview.intervention.operations[parsed.operationIndex - 1];
+	if (parsed.operationIndex !== undefined && !operation)
+		throw new Error("proposal operation index is outside the prepared packet");
+	const summarizedOperations = preview.intervention.operations.map(
+		(item, index) => {
+			const fields: Record<string, ReturnType<typeof proposalTextSummary>> = {};
+			for (const field of [
+				"before",
+				"after",
+				"content",
+				"rationale",
+				"statement",
+			] as const) {
+				const value = item[field];
+				if (typeof value === "string")
+					fields[field] = proposalTextSummary(value);
+			}
+			return {
+				index: index + 1,
+				type: item.type,
+				target: "target" in item ? item.target : null,
+				sha256: "expected_sha256" in item ? item.expected_sha256 : null,
+				// Lesson adoption identity is exact and short; expose it in the
+				// summary so approval binds a verifiable lesson version (R9).
+				...(item.type === "apply_lesson"
+					? {
+							lesson_id: item.lesson_id,
+							version_id: item.version_id,
+							field_set_digest: item.field_set_digest,
+						}
+					: {}),
+				text_fields: fields,
+			};
+		},
+	);
+	let exactField: ReturnType<typeof proposalFieldPage> | undefined;
+	if (parsed.operationField) {
+		if (!operation)
+			throw new Error("proposal --field requires --operation <1-8>");
+		const value = operation[parsed.operationField];
+		if (typeof value !== "string")
+			throw new Error(
+				`proposal operation has no ${parsed.operationField} text field`,
+			);
+		exactField = proposalFieldPage(
+			value,
+			parsed.operationOffset,
+			parsed.operationBytes,
+		);
+	}
+	const result = {
+		read_only: true,
+		proposal_id: prepared.proposal_id,
+		project_id: prepared.project_id,
+		kind: preview.kind,
+		version_digest: prepared.version_digest,
+		problem_identity: prepared.problem_identity,
+		intervention_identity: preview.intervention_identity,
+		decision: decision?.payload.decision ?? "pending",
+		applied: versionEvents.some((event) => event.event_type === "applied"),
+		revoked: Boolean(revoked),
+		active: Boolean(
+			versionEvents.some((event) => event.event_type === "applied") && !revoked,
+		),
+		latest_evaluation: latestEvaluation?.payload.result ?? null,
+		observed_fact: proposalTextSummary(preview.observed_fact),
+		hypothesis: proposalTextSummary(preview.hypothesis),
+		evidence_refs: {
+			items: preview.evidence_refs.slice(0, 3),
+			count: preview.evidence_refs.length,
+			omitted: Math.max(0, preview.evidence_refs.length - 3),
+			digest: createHash("sha256")
+				.update(JSON.stringify(preview.evidence_refs))
+				.digest("hex"),
+		},
+		operations:
+			parsed.operationIndex === undefined
+				? summarizedOperations
+				: [summarizedOperations[parsed.operationIndex - 1]],
+		...(exactField && parsed.operationField
+			? {
+					operation_field: {
+						name: parsed.operationField,
+						...exactField,
+					},
+				}
+			: {}),
+		target_baselines: preview.target_baselines,
+		alternative: proposalTextSummary(preview.alternative),
+		validation_plan: {
+			commands: preview.validation_plan.commands
+				.slice(0, 3)
+				.map(proposalTextSummary),
+			command_count: preview.validation_plan.commands.length,
+			expected: proposalTextSummary(preview.validation_plan.expected),
+			executed: false,
+		},
+		evaluation_baseline: evaluationBaselineSummary(preview),
+	};
+	const output = parsed.json
+		? stringifyEnvelope(envelopeOk(result, policy))
+		: JSON.stringify(result, null, 2);
+	if (Buffer.byteLength(output, "utf8") > MAX_PROPOSAL_SHOW_BYTES)
+		throw new Error(
+			"proposal inspection exceeds the bounded output limit; inspect one operation with --operation <1-8>",
+		);
+	io.stdout(output);
+	return 0;
+}
+
+function safeProposalDecisionText(
+	value: string | undefined,
+	label: string,
+	maxBytes = 512,
+): string | undefined {
+	if (value === undefined) return undefined;
+	if (
+		[...value].some((character) => {
+			const code = character.codePointAt(0) ?? 0;
+			return code < 32 && code !== 9;
+		})
+	)
+		throw new Error(`${label} contains unsupported control characters`);
+	const text = redactSensitiveText(value).trim();
+	if (!text || Buffer.byteLength(text, "utf8") > maxBytes)
+		throw new Error(`${label} must be non-empty and at most ${maxBytes} bytes`);
+	return text;
+}
+
+function runAssistedProposalDecision(
+	parsed: Extract<
+		ReturnType<typeof parseProposalCommand>,
+		{ action: "decide" }
+	>,
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): number {
+	const policy = {
+		action: "evolve.proposal.decide",
+		sideEffect: "write" as const,
+	};
+	if (
+		!isActionAllowed(operationContext, policy) ||
+		!isTrustedLocalInteractive(operationContext)
+	)
+		throw new Error(
+			"proposal decision requires trusted local interactive approval",
+		);
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId) throw new Error("evolution project id is required");
+	const events = readAssistedProposalJournal(root, resolved.projectId);
+	const prepared = proposalPreparedEvent(events, parsed.proposalId);
+	if (!prepared) throw new Error("assisted proposal is missing");
+	if (prepared.version_digest !== parsed.versionDigest)
+		throw new Error(
+			"proposal decision version is stale; inspect the current version",
+		);
+	const preview = prepared.payload.preview as ReturnType<
+		typeof prepareAssistedProposalPreview
+	>;
+	const reason = safeProposalDecisionText(parsed.reason, "decision reason");
+	const resumeWhen = safeProposalDecisionText(
+		parsed.resumeWhen,
+		"defer resumption condition",
+	);
+	const previousDecision = proposalVersionEvents(
+		events,
+		prepared.proposal_id,
+		prepared.version_digest,
+	).findLast((event) => event.event_type === "decision");
+	if (
+		parsed.reconsiderRejection &&
+		(previousDecision?.payload.decision !== "reject" || !reason)
+	)
+		throw new Error(
+			"reconsideration requires a rejected exact version and a non-empty approval reason",
+		);
+	let approvalProductionDay: number | undefined;
+	if (
+		parsed.decision === "approve" &&
+		preview.kind === "contextual_preference"
+	) {
+		try {
+			// One ordinal per distinct local production date; same-date
+			// events must not age the preference (R4).
+			approvalProductionDay = distinctLocalProductionDays(
+				readProductionDayJournal(
+					root,
+					resolved.projectId,
+					resolved.timezone,
+					resolved.paths.evolutionEventsDir,
+				),
+				resolved.projectId,
+			);
+		} catch {
+			// A contextual preference with unknown production-day health will remain inactive.
+		}
+	}
+	const event = appendAssistedProposalEvent({
+		root,
+		projectId: resolved.projectId,
+		eventType: "decision",
+		proposalId: prepared.proposal_id,
+		versionDigest: prepared.version_digest,
+		problemIdentity: prepared.problem_identity,
+		payload: {
+			decision: parsed.decision,
+			...(parsed.reconsiderRejection ? { reconsider_rejection: true } : {}),
+			...(reason ? { reason } : {}),
+			...(resumeWhen ? { resume_when: resumeWhen } : {}),
+			...(approvalProductionDay === undefined
+				? {}
+				: {
+						approval_production_day: approvalProductionDay,
+						// Marks the ordinal base so legacy receipts written with
+						// event counts are never silently reinterpreted as dates.
+						approval_production_day_base: "distinct_local_dates",
+					}),
+		},
+		now,
+	});
+	const result = {
+		proposal_id: prepared.proposal_id,
+		version_digest: prepared.version_digest,
+		decision: event.payload.decision,
+		duplicate: event.sequence <= events.length,
+		...(event.payload.reconsider_rejection === true
+			? { reconsidered_rejection: true }
+			: {}),
+		...(event.payload.resume_when
+			? { resume_when: event.payload.resume_when }
+			: {}),
+	};
+	io.stdout(
+		parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: `proposal=${prepared.proposal_id} decision=${parsed.decision} version=${prepared.version_digest}`,
+	);
+	return 0;
+}
+
+function runAssistedProposalApply(
+	parsed: Extract<ReturnType<typeof parseProposalCommand>, { action: "apply" }>,
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): number {
+	const policy = {
+		action: "evolve.proposal.apply",
+		sideEffect: "write" as const,
+	};
+	if (
+		!isActionAllowed(operationContext, policy) ||
+		!isTrustedLocalInteractive(operationContext)
+	)
+		throw new Error(
+			"proposal apply requires trusted local interactive approval",
+		);
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId) throw new Error("evolution project id is required");
+	const { session, taskId } = resolveSingleInProgressTask(root);
+	const result = applyAssistedProposal({
+		root,
+		projectId: resolved.projectId,
+		proposalId: parsed.proposalId,
+		versionDigest: parsed.versionDigest,
+		session,
+		taskId,
+		now,
+	});
+	io.stdout(
+		parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: `proposal=${result.proposal_id} applied=${result.applied} duplicate=${result.duplicate} targets=${result.targets.length} mutations=${result.mutation_ids.length}`,
+	);
+	return 0;
+}
+
+function runAssistedProposalEvaluation(
+	parsed: Extract<
+		ReturnType<typeof parseProposalCommand>,
+		{ action: "evaluate" }
+	>,
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): number {
+	const policy = {
+		action: parsed.record
+			? "evolve.proposal.evaluation.record"
+			: "evolve.proposal.evaluate",
+		sideEffect: parsed.record ? ("write" as const) : ("read" as const),
+	};
+	if (
+		!isActionAllowed(operationContext, policy) ||
+		(parsed.record && !isTrustedLocalInteractive(operationContext))
+	)
+		throw new Error(
+			"proposal evaluation recording requires trusted local interactive approval",
+		);
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId) throw new Error("evolution project id is required");
+	const preview = previewAssistedProposalEvaluation({
+		root,
+		projectId: resolved.projectId,
+		proposalId: parsed.proposalId,
+		versionDigest: parsed.versionDigest,
+	});
+	const workbench = parsed.record
+		? resolveSingleInProgressTask(root)
+		: undefined;
+	const result = parsed.record
+		? recordAssistedProposalEvaluation({
+				root,
+				projectId: resolved.projectId,
+				proposalId: parsed.proposalId,
+				versionDigest: parsed.versionDigest,
+				result: preview,
+				session: workbench?.session as string,
+				taskId: workbench?.taskId as string,
+				now,
+			})
+		: preview;
+	io.stdout(
+		parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: `proposal=${result.proposal_id} evaluation=${result.state} comparable_sessions=${result.comparable_sessions} reason=${result.reason}`,
+	);
+	return 0;
+}
+
+function runAssistedProposalRevocation(
+	parsed: Extract<
+		ReturnType<typeof parseProposalCommand>,
+		{ action: "revoke" }
+	>,
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): number {
+	const policy = {
+		action: "evolve.proposal.revoke",
+		sideEffect: "write" as const,
+	};
+	if (
+		!isActionAllowed(operationContext, policy) ||
+		!isTrustedLocalInteractive(operationContext)
+	)
+		throw new Error(
+			"proposal revocation requires trusted local interactive approval",
+		);
+	const resolved = resolveEvolutionConfig(readProjectConfig(root));
+	if (!resolved.projectId) throw new Error("evolution project id is required");
+	const events = readAssistedProposalJournal(root, resolved.projectId);
+	const prepared = proposalPreparedEvent(
+		events,
+		parsed.proposalId,
+		parsed.versionDigest,
+	);
+	if (!prepared)
+		throw new Error("assisted proposal version is missing or stale");
+	const preview = prepared.payload.preview as AssistedProposalPreview;
+	if (
+		!new Set([
+			"skill_discovery",
+			"lesson_adoption",
+			"contextual_preference",
+			"durable_decision",
+			"durable_restriction",
+		]).has(preview.kind)
+	)
+		throw new Error(
+			"proposal revoke only retires adopted context guidance; it does not undo file changes",
+		);
+	const reason = safeProposalDecisionText(parsed.reason, "revocation reason");
+	if (!reason) throw new Error("proposal revoke requires --reason <text>");
+	const event = appendAssistedProposalEvent({
+		root,
+		projectId: resolved.projectId,
+		eventType: "revoked",
+		proposalId: parsed.proposalId,
+		versionDigest: parsed.versionDigest,
+		problemIdentity: prepared.problem_identity,
+		payload: { reason },
+		now,
+	});
+	const result = {
+		read_only: false,
+		proposal_id: parsed.proposalId,
+		version_digest: parsed.versionDigest,
+		revoked: true,
+		duplicate: event.sequence <= events.length,
+		reason: event.payload.reason,
+	};
+	io.stdout(
+		parsed.json
+			? stringifyEnvelope(envelopeOk(result, policy))
+			: `proposal=${result.proposal_id} revoked=true duplicate=${result.duplicate}`,
+	);
+	return 0;
+}
+
+function parseProposalCommand(args: readonly string[]):
+	| { action: "schema"; json: boolean }
+	| { action: "prepare"; packetPath: string; dryRun: boolean; json: boolean }
+	| {
+			action: "show";
+			proposalId: string;
+			operationIndex?: number;
+			operationField?:
+				| "before"
+				| "after"
+				| "content"
+				| "rationale"
+				| "statement"
+				| "lesson_id"
+				| "version_id"
+				| "field_set_digest";
+			operationOffset: number;
+			operationBytes: number;
+			json: boolean;
+	  }
+	| {
+			action: "decide";
+			proposalId: string;
+			versionDigest: string;
+			decision: "approve" | "defer" | "reject";
+			reason?: string;
+			resumeWhen?: string;
+			reconsiderRejection: boolean;
+			json: boolean;
+	  }
+	| {
+			action: "apply";
+			proposalId: string;
+			versionDigest: string;
+			json: boolean;
+	  }
+	| {
+			action: "evaluate";
+			proposalId: string;
+			versionDigest: string;
+			record: boolean;
+			json: boolean;
+	  }
+	| {
+			action: "revoke";
+			proposalId: string;
+			versionDigest: string;
+			reason: string;
+			json: boolean;
+	  } {
+	const subcommand = args[0];
+	if (subcommand === "schema") {
+		let json = false;
+		for (const arg of args.slice(1)) {
+			if (arg === "--json" || arg === "-j") json = true;
+			else throw new Error(`Unknown evolve proposal schema argument: ${arg}`);
+		}
+		return { action: "schema", json };
+	}
+	if (subcommand === "show") {
+		let proposalId = "";
+		let operationIndex: number | undefined;
+		let operationField:
+			| "before"
+			| "after"
+			| "content"
+			| "rationale"
+			| "statement"
+			| "lesson_id"
+			| "version_id"
+			| "field_set_digest"
+			| undefined;
+		let operationOffset = 0;
+		let operationBytes = 8_000;
+		let json = false;
+		for (let index = 1; index < args.length; index += 1) {
+			const arg = args[index];
+			if (arg === "--json" || arg === "-j") json = true;
+			else if (arg === "--operation") {
+				const value = args[++index] ?? "";
+				if (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 8)
+					throw new Error("evolve proposal show --operation requires 1 to 8");
+				operationIndex = Number(value);
+			} else if (arg === "--field") {
+				const value = args[++index] ?? "";
+				if (
+					!(
+						[
+							"before",
+							"after",
+							"content",
+							"rationale",
+							"statement",
+							"lesson_id",
+							"version_id",
+							"field_set_digest",
+						] as string[]
+					).includes(value)
+				)
+					throw new Error(
+						"evolve proposal show --field requires before, after, content, rationale, statement, lesson_id, version_id, or field_set_digest",
+					);
+				operationField = value as typeof operationField;
+			} else if (arg === "--offset") {
+				const value = args[++index] ?? "";
+				if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))
+					throw new Error(
+						"evolve proposal show --offset requires a non-negative byte offset",
+					);
+				operationOffset = Number(value);
+			} else if (arg === "--bytes") {
+				const value = args[++index] ?? "";
+				if (
+					!/^\d+$/.test(value) ||
+					Number(value) < 1 ||
+					Number(value) > MAX_PROPOSAL_FIELD_PAGE_BYTES
+				)
+					throw new Error(
+						`evolve proposal show --bytes requires 1 to ${MAX_PROPOSAL_FIELD_PAGE_BYTES}`,
+					);
+				operationBytes = Number(value);
+			} else if (!proposalId && arg && !arg.startsWith("-")) proposalId = arg;
+			else throw new Error(`Unknown evolve proposal show argument: ${arg}`);
+		}
+		if (!proposalId)
+			throw new Error("evolve proposal show requires <proposal-id>");
+		if (operationField && operationIndex === undefined)
+			throw new Error(
+				"evolve proposal show --field requires --operation <1-8>",
+			);
+		if (!operationField && (operationOffset !== 0 || operationBytes !== 8_000))
+			throw new Error("evolve proposal show --offset/--bytes require --field");
+		return {
+			action: "show",
+			proposalId,
+			...(operationIndex === undefined ? {} : { operationIndex }),
+			...(operationField ? { operationField } : {}),
+			operationOffset,
+			operationBytes,
+			json,
+		};
+	}
+	if (subcommand === "evaluate" || subcommand === "revoke") {
+		let proposalId = "";
+		let versionDigest = "";
+		let reason: string | undefined;
+		let record = false;
+		let json = false;
+		for (let index = 1; index < args.length; index += 1) {
+			const arg = args[index];
+			if (arg === "--json" || arg === "-j") json = true;
+			else if (arg === "--version") versionDigest = args[++index] ?? "";
+			else if (arg === "--reason") reason = args[++index] ?? "";
+			else if (arg === "--record" && subcommand === "evaluate") record = true;
+			else if (!proposalId && arg && !arg.startsWith("-")) proposalId = arg;
+			else
+				throw new Error(
+					`Unknown evolve proposal ${subcommand} argument: ${arg}`,
+				);
+		}
+		if (!proposalId)
+			throw new Error(`evolve proposal ${subcommand} requires <proposal-id>`);
+		if (!/^[a-f0-9]{64}$/.test(versionDigest))
+			throw new Error(
+				`evolve proposal ${subcommand} requires --version <sha256>`,
+			);
+		if (subcommand === "evaluate")
+			return { action: "evaluate", proposalId, versionDigest, record, json };
+		if (!reason?.trim())
+			throw new Error("evolve proposal revoke requires --reason <text>");
+		return { action: "revoke", proposalId, versionDigest, reason, json };
+	}
+	if (subcommand === "decide" || subcommand === "apply") {
+		let proposalId = "";
+		let versionDigest = "";
+		let decision: "approve" | "defer" | "reject" | undefined;
+		let reason: string | undefined;
+		let resumeWhen: string | undefined;
+		let reconsiderRejection = false;
+		let json = false;
+		for (let index = 1; index < args.length; index += 1) {
+			const arg = args[index];
+			if (arg === "--json" || arg === "-j") json = true;
+			else if (arg === "--version") versionDigest = args[++index] ?? "";
+			else if (arg === "--decision") {
+				const value = args[++index];
+				if (
+					!("approve defer reject".split(" ") as string[]).includes(
+						String(value),
+					)
+				)
+					throw new Error(
+						"evolve proposal decide --decision requires approve, defer, or reject",
+					);
+				decision = value as typeof decision;
+			} else if (arg === "--reason") reason = args[++index] ?? "";
+			else if (arg === "--resume-when") resumeWhen = args[++index] ?? "";
+			else if (arg === "--reconsider-rejection") reconsiderRejection = true;
+			else if (!proposalId && arg && !arg.startsWith("-")) proposalId = arg;
+			else
+				throw new Error(
+					`Unknown evolve proposal ${subcommand} argument: ${arg}`,
+				);
+		}
+		if (!proposalId)
+			throw new Error(`evolve proposal ${subcommand} requires <proposal-id>`);
+		if (!/^[a-f0-9]{64}$/.test(versionDigest))
+			throw new Error(
+				`evolve proposal ${subcommand} requires --version <sha256>`,
+			);
+		if (subcommand === "decide") {
+			if (!decision)
+				throw new Error("evolve proposal decide requires --decision");
+			if (decision === "reject" && !reason?.trim())
+				throw new Error("reject requires --reason <text>");
+			if (decision === "defer" && !resumeWhen?.trim())
+				throw new Error("defer requires --resume-when <date-or-condition>");
+			if (reconsiderRejection && (decision !== "approve" || !reason?.trim()))
+				throw new Error(
+					"--reconsider-rejection requires --decision approve --reason <text>",
+				);
+			return {
+				action: "decide",
+				proposalId,
+				versionDigest,
+				decision,
+				reconsiderRejection,
+				...(reason === undefined ? {} : { reason }),
+				...(resumeWhen === undefined ? {} : { resumeWhen }),
+				json,
+			};
+		}
+		if (reconsiderRejection)
+			throw new Error(
+				"--reconsider-rejection is only valid for proposal decide",
+			);
+		return { action: "apply", proposalId, versionDigest, json };
+	}
+	if (subcommand !== "prepare")
+		throw new Error(
+			"evolve proposal requires schema, prepare, show, decide, apply, evaluate, or revoke",
+		);
+	let packetPath = "";
+	let dryRun = false;
+	let json = false;
+	for (let index = 1; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "--dry-run") dryRun = true;
+		else if (arg === "--packet") {
+			packetPath = args[++index] ?? "";
+			if (!packetPath || packetPath.startsWith("-"))
+				throw new Error("evolve proposal prepare --packet requires <path>");
+		} else throw new Error(`Unknown evolve proposal prepare argument: ${arg}`);
+	}
+	if (!packetPath)
+		throw new Error("evolve proposal prepare requires --packet <path>");
+	return { action: "prepare", packetPath, dryRun, json };
+}
+
+function runAssistedProposalPacket(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+	now: Date,
+): number {
+	assertAdmittedOperationContext(operationContext);
+	const parsed = parseProposalCommand(args);
+	if (parsed.action === "schema") {
+		const policy = {
+			action: "evolve.proposal.schema",
+			sideEffect: "read" as const,
+		};
+		if (!isActionAllowed(operationContext, policy))
+			throw new Error("evolve proposal schema is not allowed for this caller");
+		const result = {
+			read_only: true,
+			schema: ASSISTED_PROPOSAL_PACKET_SCHEMA,
+			example: ASSISTED_PROPOSAL_PACKET_EXAMPLE,
+			limits: {
+				operations: "1-8",
+				evidence_refs: "1-20",
+				validation_commands: "1-8",
+			},
+			validation_commands_are_executed: false,
+		};
+		io.stdout(
+			parsed.json
+				? stringifyEnvelope(envelopeOk(result, policy))
+				: JSON.stringify(result, null, 2),
+		);
+		return 0;
+	}
+	if (parsed.action === "show")
+		return runAssistedProposalShow(parsed, root, io, operationContext);
+	if (parsed.action === "decide")
+		return runAssistedProposalDecision(parsed, root, io, operationContext, now);
+	if (parsed.action === "apply")
+		return runAssistedProposalApply(parsed, root, io, operationContext, now);
+	if (parsed.action === "evaluate")
+		return runAssistedProposalEvaluation(
+			parsed,
+			root,
+			io,
+			operationContext,
+			now,
+		);
+	if (parsed.action === "revoke")
+		return runAssistedProposalRevocation(
+			parsed,
+			root,
+			io,
+			operationContext,
+			now,
+		);
+	const policy = {
+		action: parsed.dryRun
+			? "evolve.proposal.prepare.preview"
+			: "evolve.proposal.prepare",
+		sideEffect: parsed.dryRun ? ("preview" as const) : ("write" as const),
+	};
+	if (!isActionAllowed(operationContext, policy))
+		throw new Error("evolve proposal prepare is not allowed for this caller");
+	let result: ReturnType<typeof prepareAssistedProposalPreview>;
+	try {
+		result = prepareAssistedProposalPreview({
+			root,
+			packetPath: parsed.packetPath,
+		});
+	} catch (error) {
+		const diagnostic =
+			error instanceof AssistedProposalPacketError
+				? error
+				: new AssistedProposalPacketError(
+						"proposal packet or source failed safe validation",
+					);
+		if (parsed.json) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr(diagnostic.code, diagnostic.message, {
+						action: policy.action,
+						exitCode: 2,
+						hint: diagnostic.hint,
+					}),
+				),
+			);
+		} else {
+			io.stderr(
+				`${diagnostic.code}: ${diagnostic.message}\n${diagnostic.hint}`,
+			);
+		}
+		return 2;
+	}
+	const compact = compactAssistedProposalPreview(result);
+	const receiptOutput = (dto: Record<string, unknown>) =>
+		parsed.json
+			? stringifyEnvelope(envelopeOk(dto, policy))
+			: `proposal=${result.proposal_id} kind=${result.kind} version=${result.version_digest} operations=${result.intervention.operations.length} persisted=${!parsed.dryRun} approved=false; inspect with evolve proposal show`;
+	// Size the receipt before persisting: an oversized summary degrades to a
+	// minimal persisted receipt instead of failing after a durable write or
+	// hiding the prepared version behind a refusal.
+	const fullDto = {
+		...compact,
+		read_only: parsed.dryRun,
+		persisted: !parsed.dryRun,
+		inspection:
+			"Use evolve proposal show <proposal-id> before deciding; --operation <1-8> displays exact prepared text.",
+	};
+	const oversized =
+		Buffer.byteLength(receiptOutput(fullDto), "utf8") >
+		MAX_ASSISTED_PROPOSAL_OUTPUT_BYTES;
+	let stored: { duplicate: boolean } | undefined;
+	if (!parsed.dryRun) {
+		try {
+			stored = storePreparedAssistedProposal(root, result, now);
+		} catch (error) {
+			const code =
+				error instanceof AssistedProposalSuppressedError
+					? error.code
+					: "EVOLVE_PROPOSAL_STORE_FAILED";
+			const message =
+				error instanceof Error ? error.message : "proposal could not be stored";
+			const hint =
+				error instanceof AssistedProposalSuppressedError
+					? error.hint
+					: "Inspect proposal show for the current version and retry after resolving the reported journal condition.";
+			if (parsed.json)
+				io.stdout(
+					stringifyEnvelope(
+						envelopeErr(code, message, {
+							action: policy.action,
+							exitCode: 2,
+							hint,
+						}),
+					),
+				);
+			else io.stderr(`${code}: ${message}\n${hint}`);
+			return 2;
+		}
+	}
+	const resultDto = oversized
+		? {
+				read_only: parsed.dryRun,
+				persisted: !parsed.dryRun,
+				...(stored ? { duplicate: stored.duplicate } : {}),
+				kind: result.kind,
+				proposal_id: result.proposal_id,
+				version_digest: result.version_digest,
+				operation_count: result.intervention.operations.length,
+				evidence_ref_count: result.evidence_refs.length,
+				inspection:
+					"Proposal preview summary exceeded its bounded output limit; the prepared version is persisted and inspectable via evolve proposal show.",
+			}
+		: {
+				...fullDto,
+				...(stored ? { duplicate: stored.duplicate } : {}),
+			};
+	const output = receiptOutput(resultDto);
+	io.stdout(output);
+	return 0;
+}
+
+function parseLessonsArgs(args: readonly string[]): {
+	session?: string;
+	json: boolean;
+	apply?: {
+		id: string;
+		evidence: string;
+	};
+} {
+	let session: string | undefined;
+	let json = false;
+	let apply = false;
+	let id = "";
+	let evidence = "";
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (!arg) continue;
+		if (arg === "--json" || arg === "-j") json = true;
+		else if (arg === "apply") apply = true;
+		else if (arg === "--session" || arg === "-S") {
+			session = args[++index];
+			if (!session || session.startsWith("-"))
+				throw new Error("evolve lessons --session requires a value");
+		} else if (arg === "--id") {
+			id = args[++index] ?? "";
+			if (!id || id.startsWith("-"))
+				throw new Error("evolve lessons apply --id requires a lesson id");
+		} else if (arg === "--evidence") {
+			evidence = args[++index] ?? "";
+			if (!evidence || evidence.startsWith("-"))
+				throw new Error(
+					"evolve lessons apply --evidence requires an evidence id",
+				);
+		} else throw new Error(`Unknown evolve lessons argument: ${arg}`);
+	}
+	if (apply && (!id || !evidence))
+		throw new Error(
+			"evolve lessons apply requires --id <lesson-id> --evidence <evidence-id>",
+		);
+	return {
+		...(session ? { session } : {}),
+		json,
+		...(apply ? { apply: { id, evidence } } : {}),
+	};
+}
+
+function runLessons(
+	args: string[],
+	root: string,
+	io: CommandIo,
+	operationContext: OperationContext,
+): number {
+	if (
+		!isActionAllowed(operationContext, {
+			action: "evolve.lessons",
+			sideEffect: "write",
+		})
+	)
+		throw new Error("evolve.lessons is not allowed for this caller");
+	if (!isTrustedLocalInteractive(operationContext))
+		throw new Error("evolve lessons requires local interactive approval");
+	const parsed = parseLessonsArgs(args);
+	if (!parsed.session)
+		throw new Error("evolve lessons requires --session <session>");
+	if (parsed.apply) {
+		const application = recordLessonApplication({
+			root,
+			session: parsed.session,
+			lessonId: parsed.apply.id,
+			evidenceId: parsed.apply.evidence,
+			createdAt: new Date().toISOString(),
+		});
+		if (parsed.json)
+			io.stdout(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							lesson_id: application.lesson_id,
+							evidence_id: application.evidence_id,
+							application_id: application.id,
+							applied: false,
+							append_only: true,
+						},
+						{ action: "evolve.lessons.apply" },
+					),
+				),
+			);
+		else
+			io.stdout(
+				`application=${application.id} lesson=${application.lesson_id} evidence=${application.evidence_id} applied=false`,
+			);
+		return 0;
+	}
+	const result = ingestLessonStatements({
+		root,
+		session: parsed.session,
+	});
+	if (parsed.json)
+		io.stdout(
+			stringifyEnvelope(envelopeOk(result, { action: "evolve.lessons" })),
+		);
+	else
+		io.stdout(
+			`lessons=${result.state} appended=${result.appended} duplicates=${result.duplicates} session=${result.session_id}`,
+		);
 	return 0;
 }
 
@@ -2275,8 +3706,20 @@ export async function runEvolveCommand(
 		}
 		if (action === "candidates")
 			return runCandidates(args, projectRoot, io, operationContext);
+		if (action === "lessons")
+			return runLessons(args, projectRoot, io, operationContext);
 		if (action === "backfill")
 			return runBackfill(args, projectRoot, io, operationContext);
+		if (action === "artifacts")
+			return runArtifacts(args, projectRoot, io, operationContext);
+		if (action === "proposal")
+			return runAssistedProposalPacket(
+				args,
+				projectRoot,
+				io,
+				operationContext,
+				now,
+			);
 		if (action && action !== "status") {
 			throw new Error(`Unknown evolve action: ${action}`);
 		}
@@ -2314,9 +3757,15 @@ export async function runEvolveCommand(
 		const message = (error as Error).message;
 		const actionName = action || "analyze";
 		const errorCode =
-			actionName === "status"
-				? "EVOLUTION_STATUS_FAILED"
-				: `EVOLVE_${actionName.toUpperCase()}_FAILED`;
+			error instanceof ArtifactSourceChangedError
+				? "ARTIFACT_SOURCE_CHANGED"
+				: error instanceof ArtifactCatalogChangedError
+					? "ARTIFACT_CATALOG_CHANGED"
+					: error instanceof ArtifactPageCursorError
+						? "ARTIFACT_PAGE_CURSOR_INVALID"
+						: actionName === "status"
+							? "EVOLUTION_STATUS_FAILED"
+							: `EVOLVE_${actionName.toUpperCase()}_FAILED`;
 		writeEvolutionError(
 			io,
 			jsonRequested,

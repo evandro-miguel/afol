@@ -112,6 +112,22 @@ work and keep this template focused on the stored data and docs contract.
 
 ## Planning And Evidence
 
+- Sessions are optional for ordinary work. When a session is associated with
+  the work, keep reports, handoffs, reviews, plans, and durable evidence in its
+  configured `paths.wb_dir/<session-id>`; never retain them in `paths.tmp_dir`.
+- Preserve AFOL-managed plan/task/log/report/evidence-ledger paths. Needed
+  supplementary artifacts go in `<session>/artifacts/` with distinct
+  task-purpose names and exclusive creation. A closed-session review appends a
+  new artifact there without changing original records or closure; new
+  implementation uses a linked open continuation.
+- Keep canonical code, product docs, reusable specs, and governance at their
+  project locations. Caches, builds, and fixtures may use disposable scratch;
+  retained acceptance logs/results belong to the session. No-session work
+  keeps durable outputs at canonical project locations.
+- `afol validate project` checks known session-linked declarations in
+  configured temporary roots. Confirmed misplaced artifacts fail and uncertain
+  legacy candidates warn; the bounded check does not watch arbitrary external
+  harness writes.
 - Keep plans executable.
 - Default artifact pair: `plan + task`.
 - Workbench task state lives in the `State Board` plus AFOL lifecycle commands.
@@ -129,7 +145,8 @@ work and keep this template focused on the stored data and docs contract.
 - Use focused validation as appropriate: lint, typecheck, tests,
   content/schema validation, link validation, browser smoke, build, screenshots.
 - Every security check -> include secret scanning and dependency vulnerability
-  scanning.
+  scanning. Keep disposable scanner output in ignored `tmp/security-audit/`;
+  sanitized reports retained for session work go in `<session>/artifacts/`.
 - Secrets -> never print secret values in terminal output, reports, docs, or
   summaries.
 
@@ -138,9 +155,13 @@ work and keep this template focused on the stored data and docs contract.
 - New versioned root files -> avoid unless project entrypoint, standard config,
   or explicitly justified.
 - Local `.env` files -> allowed only as ignored, non-versioned files.
-- Screenshots/images -> `.afol/wb/screenshots/` or `tests/screenshots/`.
-- Temp files -> configured `paths.tmp_dir` (default `.afol/tmp/`).
-- Workbench artifacts -> `.afol/wb/<session>/`.
+- Screenshots -> retain session evidence in `<session>/artifacts/`; use the
+  configured temp root for disposable captures and canonical test or asset
+  paths for no-session images.
+- Temp files -> configured `paths.tmp_dir` (default `.afol/tmp/`), for
+  disposable scratch only.
+- Workbench artifacts -> configured `paths.wb_dir/<session>/`; supplementary
+  artifacts use `<session>/artifacts/`.
 - User data -> never delete or move vault content, backups, keys, secrets,
   archives, Windows profile data, or other user data without explicit approval.
 

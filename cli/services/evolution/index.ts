@@ -50,6 +50,7 @@ export {
 } from "./import-store";
 export {
 	appendProductionDayAllocation,
+	distinctLocalProductionDays,
 	type EvolutionJournalContext,
 	type ProductionDayJournalEvent,
 	productionDayJournalPath,

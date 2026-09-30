@@ -491,6 +491,7 @@ describe("kernel registry", () => {
 		);
 
 		expect(localState?.guidance).toEqual([
+			"ls is local-state, not session list. Use afol ss to list sessions.",
 			"Run rebuild before validation when indexes may be stale.",
 			"Use --verbose only when the full index snapshot is needed.",
 		]);

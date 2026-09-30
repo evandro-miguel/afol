@@ -12,11 +12,19 @@ import type { EvidenceEntry } from "./types";
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 export const MAX_SESSION_IDENTIFIER_LENGTH = 128;
 
+export type SessionLocation = "live" | "archived";
+
 /**
  * Validate and resolve a safe session path without mutation.
  * Throws on invalid session identifiers or path traversal attempts.
+ * Archived sessions resolve under `<wb>/_archive/<session>` and keep the same
+ * identifier, so moving a session never mints a second identity.
  */
-function resolveSafeSessionPath(root: string, session: string): string {
+function resolveSafeSessionPath(
+	root: string,
+	session: string,
+	location: SessionLocation = "live",
+): string {
 	const normalized = session.trim();
 	if (
 		!SESSION_NAME_RE.test(normalized) ||
@@ -28,7 +36,11 @@ function resolveSafeSessionPath(root: string, session: string): string {
 	}
 
 	const projectPaths = resolveProjectPaths(root);
-	const result = resolveProjectPath(root, join(projectPaths.wbDir, normalized));
+	const sessionDir =
+		location === "archived"
+			? join(projectPaths.wbDir, "_archive", normalized)
+			: join(projectPaths.wbDir, normalized);
+	const result = resolveProjectPath(root, sessionDir);
 	if (!result.ok) {
 		throw new Error(result.error);
 	}
@@ -46,6 +58,7 @@ export function assertSafeSessionSourceFile(path: string, label: string): void {
 export function sessionPaths(
 	root: string,
 	session: string,
+	location: SessionLocation = "live",
 ): {
 	wbRoot: string;
 	sessionDir: string;
@@ -57,7 +70,7 @@ export function sessionPaths(
 } {
 	const projectPaths = resolveProjectPaths(root);
 	const wbRoot = projectPaths.abs.wbDir;
-	const sessionDir = resolveSafeSessionPath(root, session);
+	const sessionDir = resolveSafeSessionPath(root, session, location);
 	return {
 		wbRoot,
 		sessionDir,

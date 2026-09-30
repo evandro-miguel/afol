@@ -47,7 +47,8 @@ export type CommandKind =
 	| "adapter"
 	| "telemetry"
 	| "receipt"
-	| "session";
+	| "session"
+	| "artifact";
 export type CommandSideEffect =
 	| "read"
 	| "preview"
@@ -246,17 +247,25 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
-		guidance: ["Task selectors accept comma lists and ascending ranges."],
+		guidance: [
+			"Prefer: afol st T-01 when an active or bound session resolves.",
+			"Task selectors accept comma lists and ascending ranges.",
+		],
 		subcommands: [
 			{
-				usage: "--session <session-id> --task-id <task-id>",
+				usage: "T-01",
 				sideEffect: "write",
-				description: "Start a specific task in a specific session",
+				description: "Start a task in the active or bound session",
 			},
 			{
 				usage: "--task-id <task-id>",
 				sideEffect: "write",
 				description: "Start a task in the active or context session",
+			},
+			{
+				usage: "--session <session-id> --task-id <task-id>",
+				sideEffect: "write",
+				description: "Start a specific task in a specific session",
 			},
 			{
 				usage: "--json",
@@ -356,9 +365,12 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Create a workbench session",
 		category: "core",
+		guidance: [
+			'Prefer: afol n <theme> -t "<task>" or afol n <theme> -F <F-id> -P <spec-id> -t "<task>".',
+		],
 		subcommands: [
 			{
-				usage: "<theme> --task <summary>",
+				usage: "<theme> -t|--task <summary>",
 				sideEffect: "write",
 				description: "Create a session with one or more initial tasks",
 			},
@@ -629,7 +641,14 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Close the active session",
 		category: "workflow",
+		guidance: ["Prefer: afol c when an active or bound session resolves."],
 		subcommands: [
+			{
+				usage: "[-m|--summary <text>]",
+				sideEffect: "write",
+				description:
+					"Close the active or bound session after its tasks are complete",
+			},
 			{
 				usage: "--session <session-id> [-m|--summary <text>]",
 				sideEffect: "write",
@@ -656,6 +675,24 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 				usage: "--json",
 				sideEffect: "write",
 				description: "Emit machine-readable close result",
+			},
+		],
+	},
+	{
+		command: "artifact",
+		aliases: [],
+		kind: "artifact",
+		sideEffect: "write",
+		description: "Save durable work artifacts without a session",
+		category: "workflow",
+		stability: "experimental",
+		subcommands: [
+			{
+				usage:
+					"save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--source-digest <sha256>] [--json]",
+				sideEffect: "write",
+				description:
+					"Capture a note, research, report, or handoff; standalone without a selector",
 			},
 		],
 	},
@@ -837,6 +874,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		description: "Inspect local project indexes",
 		category: "inspect",
 		guidance: [
+			"ls is local-state, not session list. Use afol ss to list sessions.",
 			"Run rebuild before validation when indexes may be stale.",
 			"Use --verbose only when the full index snapshot is needed.",
 		],
@@ -1174,14 +1212,75 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		],
 		category: "inspect",
 		guidance: [
-			"Use evolve suggest --first-session; decisions require a shown receipt and reject requires --reason.",
+			"Daily suggestion accept acknowledges a receipt; it does not approve a scoped proposal mutation.",
+			"Inspect evidence with artifacts; validate external packets with proposal prepare.",
+			"Inspect exact operations with proposal show; evaluate is read-only unless --record.",
+			"Proposal revocation retires adopted context guidance and never rolls back code or skill file changes.",
 		],
 		subcommands: [
 			{
-				usage: "backfill [--offset <n>] [--limit <1-10>] [--json]",
+				usage:
+					"artifacts [--records [--records-cursor <token>]] [--record <id> [--search <query> | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
 				sideEffect: "read",
 				description:
-					"Preview bounded historical observation and adoption coverage without writes",
+					"Inspect session or standalone record artifacts without Evolution projections. Records discovery scans at most 4,096 entries and reports partial coverage when bounded or unsupported; search has a 512 KiB work budget. Pages redact with up to 1 MiB of source context and withhold larger sources as partial. Page requests clamp to 4 bytes and offsets must be UTF-8 boundaries. History, records, and content cursors are separate.",
+			},
+			{
+				usage: "backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",
+				sideEffect: "write",
+				description:
+					"Preview bounded historical coverage; --run ingests one authorized bounded page",
+			},
+			{
+				usage: "proposal schema [--json]",
+				sideEffect: "read",
+				description: "Print the assisted proposal packet schema and example",
+			},
+			{
+				usage: "proposal prepare --packet <path> --dry-run [--json]",
+				sideEffect: "preview",
+				description:
+					"Validate packet evidence, bounded operations, and target baselines without writing or executing checks",
+			},
+			{
+				usage:
+					"proposal show <proposal-id> [--operation <1-8>] [--field <before|after|content|rationale|statement> --offset <bytes> --bytes <1-12000>] [--json]",
+				sideEffect: "read",
+				description:
+					"Inspect the exact persisted operations and current decision/application state",
+			},
+			{
+				usage:
+					"proposal decide <proposal-id> --version <sha256> --decision <approve|defer|reject> [--reason <text>] [--resume-when <condition>] [--reconsider-rejection] [--json]",
+				sideEffect: "write",
+				description:
+					"Record a trusted local exact-version decision; rejection reconsideration requires explicit approval and a reason",
+			},
+			{
+				usage: "proposal apply <proposal-id> --version <sha256> [--json]",
+				sideEffect: "write",
+				description:
+					"Apply only the exact approved proposal operations after rechecking evidence and target baselines",
+			},
+			{
+				usage: "proposal evaluate <proposal-id> --version <sha256> [--json]",
+				sideEffect: "read",
+				description:
+					"Preview the existing canonical evaluator for the frozen proposal baseline and later comparable observations",
+			},
+			{
+				usage:
+					"proposal evaluate <proposal-id> --version <sha256> --record [--json]",
+				sideEffect: "write",
+				description:
+					"Record a read-only evaluation receipt from a trusted local interactive active task",
+			},
+			{
+				usage:
+					"proposal revoke <proposal-id> --version <sha256> --reason <text> [--json]",
+				sideEffect: "write",
+				description:
+					"Retire exact applied context guidance; previously written code and skill bytes remain unchanged",
 			},
 			{
 				usage: "candidates [--session <id>] [--limit <1-10>] [--json]",
@@ -1195,6 +1294,19 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 				sideEffect: "write",
 				description:
 					"Append an explicit approval-gated learning review decision",
+			},
+			{
+				usage: "lessons --session <id> [--json]",
+				sideEffect: "write",
+				description:
+					"Record every explicit lesson statement from a closed session with versioned duplicates and contradictions",
+			},
+			{
+				usage:
+					"lessons apply --session <id> --id <lesson-id> --evidence <evidence-id> [--json]",
+				sideEffect: "write",
+				description:
+					"Record one observed lesson application without marking the lesson applied",
 			},
 			{
 				usage: "evaluate <id> [--record] [--superseded-by <id>] [-j]",

@@ -1,4 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	setSystemTime,
+	test,
+} from "bun:test";
 import {
 	existsSync,
 	mkdirSync,
@@ -9,10 +16,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_IO } from "../commands/io";
 import { runProjectBenchmarkCommand } from "../commands/project-benchmark";
 import { agentOperationContext } from "../core/operation-context";
 import { loadProjectBenchmarkCatalog } from "../services/project-benchmark/catalog";
 import { validateProjectBenchmarkCatalog } from "../services/project-benchmark/validate";
+
+const NOW = new Date("2026-06-20T00:00:00.000Z");
 
 type CapturedIo = {
 	stdout: string[];
@@ -479,12 +489,27 @@ describe("project-benchmark service", () => {
 });
 
 describe("project-benchmark command", () => {
+	beforeEach(() => {
+		setSystemTime(new Date("2026-06-20T00:00:00.000Z"));
+	});
+
+	afterEach(() => {
+		setSystemTime();
+	});
+
 	test("list, show, matrix, recommend, validate, and generate support json output", async () => {
 		const root = createProjectRoot();
 		try {
 			const list = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+				await runProjectBenchmarkCommand(
+					"list",
+					["--json"],
+					root,
+					list.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
 				schema: string;
@@ -514,6 +539,8 @@ describe("project-benchmark command", () => {
 					["aider", "--json"],
 					root,
 					show.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const showPayload = JSON.parse(show.stdout[0] ?? "{}") as {
@@ -537,7 +564,14 @@ describe("project-benchmark command", () => {
 
 			const matrix = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("matrix", ["--json"], root, matrix.io),
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--json"],
+					root,
+					matrix.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			const matrixPayload = JSON.parse(matrix.stdout[0] ?? "{}") as {
 				data: {
@@ -559,6 +593,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map", "--json"],
 					root,
 					filteredMatrix.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const filteredMatrixPayload = JSON.parse(
@@ -581,6 +617,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map", "--json"],
 					root,
 					recommend.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const recommendPayload = JSON.parse(recommend.stdout[0] ?? "{}") as {
@@ -619,6 +657,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					validate.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const validatePayload = JSON.parse(validate.stdout[0] ?? "{}") as {
@@ -635,6 +675,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					generate.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const generatePayload = JSON.parse(generate.stdout[0] ?? "{}") as {
@@ -672,16 +714,30 @@ describe("project-benchmark command", () => {
 		const root = createProjectRoot();
 		try {
 			const list = captureIo();
-			expect(await runProjectBenchmarkCommand("list", [], root, list.io)).toBe(
-				0,
-			);
+			expect(
+				await runProjectBenchmarkCommand(
+					"list",
+					[],
+					root,
+					list.io,
+					undefined,
+					NOW,
+				),
+			).toBe(0);
 			expect(list.stdout.join("\n")).toContain("project-benchmark: 1 projects");
 			expect(list.stdout.join("\n")).toContain("aider");
 			expect(list.stdout.join("\n")).toContain("overall=80 focused=80");
 
 			const matrix = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("matrix", [], root, matrix.io),
+				await runProjectBenchmarkCommand(
+					"matrix",
+					[],
+					root,
+					matrix.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			expect(matrix.stdout.join("\n")).toContain(
 				"project-benchmark matrix: 1 projects",
@@ -696,6 +752,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map"],
 					root,
 					filteredMatrix.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			expect(filteredMatrix.stdout.join("\n")).toContain(
@@ -709,6 +767,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map"],
 					root,
 					recommend.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			expect(recommend.stdout.join("\n")).toContain("axis: repo_context_map");
@@ -727,13 +787,22 @@ describe("project-benchmark command", () => {
 					["--for", "safe_mutation"],
 					root,
 					emptyRecommendation.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			expect(emptyRecommendation.stdout.join("\n")).toContain("- none");
 
 			const validate = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("validate", [], root, validate.io),
+				await runProjectBenchmarkCommand(
+					"validate",
+					[],
+					root,
+					validate.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			expect(validate.stdout.join("\n")).toContain(
 				"project-benchmark validate: ok",
@@ -741,7 +810,14 @@ describe("project-benchmark command", () => {
 
 			const generate = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("generate", [], root, generate.io),
+				await runProjectBenchmarkCommand(
+					"generate",
+					[],
+					root,
+					generate.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			expect(generate.stdout.join("\n")).toContain(
 				"project-benchmark generate: ok projects=1 files=4",
@@ -762,6 +838,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					generated.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 
@@ -828,6 +906,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					regenerated.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			expect(readFileSync(join(dataDir, "index.json"), "utf8")).toBe(
@@ -867,6 +947,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					validate.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const validation = JSON.parse(validate.stdout[0] ?? "{}");
@@ -882,6 +964,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map", "--json"],
 					root,
 					matrix.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const matrixPayload = JSON.parse(matrix.stdout[0] ?? "{}") as {
@@ -911,6 +995,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					generated.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 
@@ -955,6 +1041,8 @@ describe("project-benchmark command", () => {
 					["--check", "--json"],
 					root,
 					check.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const payload = JSON.parse(check.stdout[0] ?? "{}") as {
@@ -990,6 +1078,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					rewrite.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			expect(JSON.parse(rewrite.stdout[0] ?? "{}").error.code).toBe(
@@ -1015,6 +1105,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					validate.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const validatePayload = JSON.parse(validate.stdout[0] ?? "{}") as {
@@ -1033,6 +1125,8 @@ describe("project-benchmark command", () => {
 					["--strict", "--json"],
 					root,
 					strict.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
@@ -1055,6 +1149,8 @@ describe("project-benchmark command", () => {
 					["--strict"],
 					root,
 					strictText.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			expect(strictText.stdout.join("\n")).toContain("warning ");
@@ -1069,6 +1165,8 @@ describe("project-benchmark command", () => {
 					["--check", "--json"],
 					root,
 					check.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const checkPayload = JSON.parse(check.stdout[0] ?? "{}") as {
@@ -1096,6 +1194,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					generated.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 
@@ -1106,6 +1206,8 @@ describe("project-benchmark command", () => {
 					["--check", "--json"],
 					root,
 					cleanCheck.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const cleanCheckPayload = JSON.parse(cleanCheck.stdout[0] ?? "{}") as {
@@ -1136,6 +1238,7 @@ describe("project-benchmark command", () => {
 					root,
 					denied.io,
 					agentOperationContext(),
+					NOW,
 				),
 			).toBe(2);
 			const deniedPayload = JSON.parse(denied.stdout[0] ?? "{}") as {
@@ -1156,6 +1259,7 @@ describe("project-benchmark command", () => {
 					root,
 					check.io,
 					agentOperationContext(),
+					NOW,
 				),
 			).toBe(1);
 			expect(JSON.parse(check.stdout[0] ?? "{}").error.code).toBe(
@@ -1174,7 +1278,14 @@ describe("project-benchmark command", () => {
 
 			const matrix = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("matrix", ["--json"], root, matrix.io),
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--json"],
+					root,
+					matrix.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			const payload = JSON.parse(matrix.stdout[0] ?? "{}") as {
 				data: { projects: Array<{ id: string }> };
@@ -1192,6 +1303,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map", "--json"],
 					root,
 					filteredMatrix.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const filteredPayload = JSON.parse(filteredMatrix.stdout[0] ?? "{}") as {
@@ -1203,7 +1316,14 @@ describe("project-benchmark command", () => {
 
 			const list = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+				await runProjectBenchmarkCommand(
+					"list",
+					["--json"],
+					root,
+					list.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
 				data: { projects: Array<{ id: string }> };
@@ -1262,7 +1382,14 @@ describe("project-benchmark command", () => {
 
 			const list = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+				await runProjectBenchmarkCommand(
+					"list",
+					["--json"],
+					root,
+					list.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			const payload = JSON.parse(list.stdout[0] ?? "{}") as {
 				data: {
@@ -1321,6 +1448,8 @@ describe("project-benchmark command", () => {
 					["--for", "repo_context_map", "--json"],
 					root,
 					recommend.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const payload = JSON.parse(recommend.stdout[0] ?? "{}") as {
@@ -1380,7 +1509,14 @@ describe("project-benchmark command", () => {
 		try {
 			const text = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("show", ["aider"], root, text.io),
+				await runProjectBenchmarkCommand(
+					"show",
+					["aider"],
+					root,
+					text.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			expect(text.stdout.join("\n")).toContain("aider: Aider");
 			expect(text.stdout.join("\n")).toContain("overall=80 focused=80");
@@ -1392,6 +1528,8 @@ describe("project-benchmark command", () => {
 					["Aider", "--json"],
 					root,
 					byName.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			expect(JSON.parse(byName.stdout[0] ?? "{}").data.project.id).toBe(
@@ -1405,6 +1543,8 @@ describe("project-benchmark command", () => {
 					["missing", "--json"],
 					root,
 					missing.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const payload = JSON.parse(missing.stdout[0] ?? "{}") as {
@@ -1428,6 +1568,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					missingShowId.io,
+					undefined,
+					NOW,
 				),
 			).toBe(2);
 			expect(JSON.parse(missingShowId.stdout[0] ?? "{}").error.code).toBe(
@@ -1441,6 +1583,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					missingAxis.io,
+					undefined,
+					NOW,
 				),
 			).toBe(2);
 			expect(JSON.parse(missingAxis.stdout[0] ?? "{}").error.code).toBe(
@@ -1454,6 +1598,8 @@ describe("project-benchmark command", () => {
 					["--bad", "--json"],
 					root,
 					invalidListArg.io,
+					undefined,
+					NOW,
 				),
 			).toBe(2);
 			expect(JSON.parse(invalidListArg.stdout[0] ?? "{}").error.code).toBe(
@@ -1467,6 +1613,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					unknownAction.io,
+					undefined,
+					NOW,
 				),
 			).toBe(2);
 			expect(JSON.parse(unknownAction.stdout[0] ?? "{}").error.code).toBe(
@@ -1480,6 +1628,8 @@ describe("project-benchmark command", () => {
 					["--bad"],
 					root,
 					humanInvalidArg.io,
+					undefined,
+					NOW,
 				),
 			).toBe(2);
 			expect(humanInvalidArg.stderr.join("\n")).toContain(
@@ -1493,6 +1643,8 @@ describe("project-benchmark command", () => {
 					[],
 					root,
 					humanUnknownAction.io,
+					undefined,
+					NOW,
 				),
 			).toBe(2);
 			expect(humanUnknownAction.stderr.join("\n")).toContain(
@@ -1513,6 +1665,8 @@ describe("project-benchmark command", () => {
 					["--for", "missing_axis", "--json"],
 					root,
 					unknownAxis.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const unknownAxisPayload = JSON.parse(unknownAxis.stdout[0] ?? "{}") as {
@@ -1529,6 +1683,8 @@ describe("project-benchmark command", () => {
 					["--for", "missing_axis", "--json"],
 					root,
 					unknownMatrixAxis.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const unknownMatrixPayload = JSON.parse(
@@ -1548,7 +1704,14 @@ describe("project-benchmark command", () => {
 
 			const list = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+				await runProjectBenchmarkCommand(
+					"list",
+					["--json"],
+					root,
+					list.io,
+					undefined,
+					NOW,
+				),
 			).toBe(1);
 			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
 				error: { code: string };
@@ -1569,7 +1732,14 @@ describe("project-benchmark command", () => {
 
 			const validate = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("validate", [], root, validate.io),
+				await runProjectBenchmarkCommand(
+					"validate",
+					[],
+					root,
+					validate.io,
+					undefined,
+					NOW,
+				),
 			).toBe(1);
 			expect(validate.stdout.join("\n")).toContain(
 				"project-benchmark validate: failed",
@@ -1583,6 +1753,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					validateJson.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const payload = JSON.parse(validateJson.stdout[0] ?? "{}") as {
@@ -1622,6 +1794,8 @@ describe("project-benchmark command", () => {
 					["--json"],
 					root,
 					validate.io,
+					undefined,
+					NOW,
 				),
 			).toBe(0);
 			const validatePayload = JSON.parse(validate.stdout[0] ?? "{}") as {
@@ -1637,7 +1811,14 @@ describe("project-benchmark command", () => {
 
 			const list = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+				await runProjectBenchmarkCommand(
+					"list",
+					["--json"],
+					root,
+					list.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
 				data: { catalog_source: string; projects: Array<{ id: string }> };
@@ -1655,6 +1836,8 @@ describe("project-benchmark command", () => {
 					["--check", "--json"],
 					root,
 					generate.io,
+					undefined,
+					NOW,
 				),
 			).toBe(1);
 			const generatePayload = JSON.parse(generate.stdout[0] ?? "{}") as {
@@ -1666,7 +1849,14 @@ describe("project-benchmark command", () => {
 
 			const validateText = captureIo();
 			expect(
-				await runProjectBenchmarkCommand("validate", [], root, validateText.io),
+				await runProjectBenchmarkCommand(
+					"validate",
+					[],
+					root,
+					validateText.io,
+					undefined,
+					NOW,
+				),
 			).toBe(0);
 			expect(validateText.stdout.join("\n")).toContain(
 				"project-benchmark validate: ok",
@@ -1689,12 +1879,28 @@ describe("project-benchmark command", () => {
 			errors.push(String(message));
 		};
 		try {
-			expect(await runProjectBenchmarkCommand("list", ["--json"], root)).toBe(
-				0,
-			);
+			expect(
+				await runProjectBenchmarkCommand(
+					"list",
+					["--json"],
+					root,
+					DEFAULT_IO,
+					undefined,
+					NOW,
+				),
+			).toBe(0);
 			expect(logs.join("\n")).toContain("project-benchmark.list");
 
-			expect(await runProjectBenchmarkCommand("unknown", [], root)).toBe(2);
+			expect(
+				await runProjectBenchmarkCommand(
+					"unknown",
+					[],
+					root,
+					DEFAULT_IO,
+					undefined,
+					NOW,
+				),
+			).toBe(2);
 			expect(errors.join("\n")).toContain("err unknown-action");
 		} finally {
 			console.log = originalLog;

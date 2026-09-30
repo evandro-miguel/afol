@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -16,7 +17,9 @@ import {
 	evolutionDbPath,
 	openEvolutionDb,
 	productionDayJournalPath,
+	repairEvolutionDerivedState,
 } from "../services/evolution";
+import { resolveEvolutionRuntime } from "../services/evolution/runtime-config";
 import {
 	releaseEvolutionTestHandles,
 	removeEvolutionTestRoot,
@@ -121,7 +124,8 @@ function createJournal(root: string, projectId = PROJECT_ID): void {
 		})}\n`,
 		"utf8",
 	);
-	const db = openEvolutionDb(evolutionDbPath(root));
+	const runtime = resolveEvolutionRuntime(root);
+	const db = openEvolutionDb(runtime.dbPath);
 	appendProductionDayAllocation({
 		root,
 		db,
@@ -129,18 +133,84 @@ function createJournal(root: string, projectId = PROJECT_ID): void {
 		timezone: "America/Asuncion",
 		sessionId,
 		evidenceId,
+		evolutionEventsDir: runtime.eventsDir,
 	});
 	db.close();
 }
 
 function removeDb(root: string): void {
 	releaseEvolutionTestHandles();
-	const path = evolutionDbPath(root);
+	const path = resolveEvolutionRuntime(root).dbPath;
 	for (const candidate of [path, `${path}-wal`, `${path}-shm`])
 		rmSync(candidate, { force: true });
 }
 
 describe("evolve status canonical journal integrity", () => {
+	test("producer, repair and status share custom database and journal paths", async () => {
+		const root = fixture();
+		try {
+			const configPath = join(root, ".afol/config.json");
+			const config = JSON.parse(readFileSync(configPath, "utf8"));
+			config.paths.evolution_db = ".afol/custom/evolution.sqlite";
+			config.paths.evolution_events_dir = ".afol/custom/journal";
+			writeFileSync(configPath, JSON.stringify(config));
+			createJournal(root);
+			const journalPath = productionDayJournalPath(
+				root,
+				config.paths.evolution_events_dir,
+			);
+			expect(journalPath).toContain(".afol/custom/journal/");
+			expect(resolveEvolutionRuntime(root).dbPath).toBe(
+				join(root, ".afol/custom/evolution.sqlite"),
+			);
+			const journal = readFileSync(journalPath);
+			removeDb(root);
+			const repaired = repairEvolutionDerivedState({ root });
+			expect(repaired.changed).toBe(true);
+			const output = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, output.io),
+			).toBe(0);
+			expect(JSON.parse(output.stdout[0] ?? "{}").data.state).toBe("healthy");
+			expect(readFileSync(journalPath)).toEqual(journal);
+			expect(existsSync(join(root, ".afol/state/evolution.db"))).toBe(false);
+			expect(existsSync(join(root, ".afol/data/events/evolution"))).toBe(false);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("valid canonical journal repairs a divergent projection without fabricating production events", async () => {
+		const root = fixture();
+		try {
+			createJournal(root);
+			const journalPath = productionDayJournalPath(root);
+			const journal = readFileSync(journalPath);
+			const db = openEvolutionDb(evolutionDbPath(root));
+			const expected = db.query("SELECT * FROM production_days").all();
+			db.exec("UPDATE production_days SET qualifying_events = '[]'");
+			db.close();
+			const database = readFileSync(evolutionDbPath(root));
+			const output = captureIo();
+			expect(
+				await runEvolveCommand("status", ["--json"], root, output.io),
+			).toBe(1);
+			const status = JSON.parse(output.stdout[0] ?? "{}").data;
+			expect(status.state).toBe("unhealthy");
+			expect(status.journal_health.valid).toBe(true);
+			expect(readFileSync(evolutionDbPath(root))).toEqual(database);
+			expect(readFileSync(journalPath)).toEqual(journal);
+			repairEvolutionDerivedState({ root });
+			const rebuilt = openEvolutionDb(evolutionDbPath(root));
+			expect(rebuilt.query("SELECT * FROM production_days").all()).toEqual(
+				expected,
+			);
+			rebuilt.close();
+			expect(readFileSync(journalPath)).toEqual(journal);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
 	test("reports the safe recovery action in restricted output when projection is absent", async () => {
 		const root = fixture();
 		try {
