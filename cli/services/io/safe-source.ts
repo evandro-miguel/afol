@@ -25,6 +25,11 @@ export type BoundedSourceRange = {
 	maxBytes: number;
 };
 
+export type BoundedSourceFileContents = {
+	bytes: Buffer;
+	text: string;
+};
+
 export type SafeSourceIdentity = {
 	dev: string;
 	ino: string;
@@ -124,13 +129,13 @@ function countCandidates(text: string): number {
 	return text.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
 }
 
-/** Read a bounded regular source using a descriptor and re-check its identity. */
-export function readBoundedSourceFile(
+/** Read bounded UTF-8 source bytes using a descriptor and re-check its identity. */
+export function readBoundedSourceFileWithBytes(
 	path: string,
 	label: string,
 	limits: BoundedSourceLimits,
 	hooks?: SafeSourceReadHooks,
-): string | null {
+): BoundedSourceFileContents | null {
 	if (
 		!Number.isSafeInteger(limits.maxBytes) ||
 		limits.maxBytes < 0 ||
@@ -180,15 +185,35 @@ export function readBoundedSourceFile(
 		if (!after || !sameFile(before, after))
 			throw new Error(`${label} changed during read`);
 
-		const text = buffer.subarray(0, offset).toString("utf8");
+		const bytes = buffer.subarray(0, offset);
+		let text: string;
+		try {
+			text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+				bytes,
+			);
+		} catch {
+			throw new Error(`${label} is not valid UTF-8`);
+		}
 		if (countLines(text) > limits.maxLines)
 			throw new Error(`${label} exceeds the line limit`);
 		if (countCandidates(text) > limits.maxCandidates)
 			throw new Error(`${label} exceeds the candidate limit`);
-		return text;
+		return { bytes, text };
 	} finally {
 		closeSync(fd);
 	}
+}
+
+/** Read a bounded regular UTF-8 source and return its decoded text. */
+export function readBoundedSourceFile(
+	path: string,
+	label: string,
+	limits: BoundedSourceLimits,
+	hooks?: SafeSourceReadHooks,
+): string | null {
+	return (
+		readBoundedSourceFileWithBytes(path, label, limits, hooks)?.text ?? null
+	);
 }
 
 /** Read one bounded byte range without following the final path component. */

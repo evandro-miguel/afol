@@ -357,22 +357,29 @@ describe("project root loader", () => {
 		},
 	);
 
-	test("falls back when config declares absolute project paths", () => {
+	test("rejects invalid artifact paths but keeps non-artifact path fallbacks", () => {
 		const root = mkProjectRoot("absolute-config-paths");
 		try {
-			writeFileSync(
-				join(root, ".afol", "config.json"),
-				JSON.stringify({
-					schema_version: 1,
-					project: { name: "afol" },
-					paths: {
-						mutable_dir: join(tmpdir(), "outside-afol"),
-						skills_dir: join(tmpdir(), "outside-skills"),
-					},
-				}),
-				"utf8",
+			const configPath = join(root, ".afol", "config.json");
+			const config: {
+				schema_version: number;
+				project: { name: string };
+				paths: Record<string, string>;
+			} = {
+				schema_version: 1,
+				project: { name: "afol" },
+				paths: {
+					mutable_dir: join(tmpdir(), "outside-afol"),
+					skills_dir: join(tmpdir(), "outside-skills"),
+				},
+			};
+			writeFileSync(configPath, JSON.stringify(config), "utf8");
+			expect(() => resolveProjectPaths(root)).toThrow(
+				"artifact configuration paths.mutable_dir is invalid",
 			);
 
+			config.paths = { skills_dir: join(tmpdir(), "outside-skills") };
+			writeFileSync(configPath, JSON.stringify(config), "utf8");
 			const paths = resolveProjectPaths(root);
 			expect(paths.mutableDir).toBe(".afol");
 			expect(paths.skillsDir).toBe(".agents/skills");

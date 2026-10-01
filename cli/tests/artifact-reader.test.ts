@@ -19,6 +19,7 @@ import {
 	defaultOperationContext,
 } from "../core/operation-context";
 import {
+	enumerateOwnerDirectory,
 	enumerateRecordsPage,
 	MAX_RECORD_CATALOG_ENTRIES,
 	readArtifactPage,
@@ -666,6 +667,509 @@ describe("artifact reader contract", () => {
 		}
 	});
 
+	test("record file listing continues through 101 entries with an owner-bound stable cursor", async () => {
+		const root = fixtureRoot();
+		try {
+			const recordDir = resolveRecordDirectory(root, "R-list").recordDir;
+			mkdirSync(recordDir, { recursive: true });
+			const expected = Array.from(
+				{ length: 101 },
+				(_, index) => `file-${String(index).padStart(3, "0")}.md`,
+			);
+			for (const name of expected) writeFileSync(join(recordDir, name), name);
+
+			const first = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--record", "R-list", "--limit", "10", "--json"],
+					root,
+					first.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const firstData = lastEnvelope<{
+				files: Array<{ path: string }>;
+				files_page: {
+					offset: number;
+					returned: number;
+					total: number;
+					has_more: boolean;
+				};
+				files_cursor?: string;
+			}>(first.stdout).data;
+			expect(firstData?.files).toHaveLength(10);
+			expect(firstData?.files_page).toMatchObject({
+				offset: 0,
+				returned: 10,
+				total: 101,
+				has_more: true,
+			});
+			expect(firstData?.files_cursor).toBeTruthy();
+
+			const otherOwner = resolveRecordDirectory(root, "R-other-list").recordDir;
+			mkdirSync(otherOwner, { recursive: true });
+			const wrongOwner = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-other-list",
+						"--file-cursor",
+						firstData?.files_cursor ?? "",
+						"--json",
+					],
+					root,
+					wrongOwner.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(wrongOwner.stdout).error?.code).toBe(
+				"ARTIFACT_FILE_CURSOR_INVALID",
+			);
+
+			const discovered = [...(firstData?.files.map((file) => file.path) ?? [])];
+			let cursor = firstData?.files_cursor;
+			while (cursor) {
+				const page = captureIo();
+				expect(
+					await runEvolveCommand(
+						"artifacts",
+						[
+							"--record",
+							"R-list",
+							"--limit",
+							"10",
+							"--file-cursor",
+							cursor,
+							"--json",
+						],
+						root,
+						page.io,
+						agentOperationContext(),
+					),
+				).toBe(0);
+				const data = lastEnvelope<{
+					files: Array<{ path: string }>;
+					files_cursor?: string;
+					files_page: { has_more: boolean };
+				}>(page.stdout).data;
+				discovered.push(...(data?.files.map((file) => file.path) ?? []));
+				cursor = data?.files_cursor;
+				expect(data?.files_page.has_more).toBe(Boolean(cursor));
+			}
+			expect(discovered).toEqual(expected);
+
+			const changed = captureIo();
+			writeFileSync(join(recordDir, "file-050.md"), "changed source");
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-list",
+						"--file-cursor",
+						firstData?.files_cursor ?? "",
+						"--json",
+					],
+					root,
+					changed.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(changed.stdout).error?.code).toBe(
+				"ARTIFACT_CATALOG_CHANGED",
+			);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("record search cursor reaches later files and retains skipped-source coverage", async () => {
+		const root = fixtureRoot();
+		try {
+			const recordDir = resolveRecordDirectory(
+				root,
+				"R-search-pages",
+			).recordDir;
+			mkdirSync(recordDir, { recursive: true });
+			writeFileSync(join(recordDir, "00-large.md"), "x".repeat(256 * 1024));
+			writeFileSync(join(recordDir, "01-tail.md"), "tail-needle");
+			writeFileSync(join(recordDir, "02-too-large.md"), "z".repeat(300 * 1024));
+
+			const first = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--record", "R-search-pages", "--search", "tail-needle", "--json"],
+					root,
+					first.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const firstSearch = lastEnvelope<{
+				search: {
+					matches: Array<{ path: string }>;
+					read_bytes: number;
+					scanned_bytes: number;
+					work_bytes: number;
+					coverage: string;
+					cursor?: string;
+				};
+			}>(first.stdout).data?.search;
+			expect(firstSearch?.matches).toEqual([]);
+			expect(firstSearch?.read_bytes).toBe(256 * 1024);
+			expect(firstSearch?.scanned_bytes).toBe(256 * 1024);
+			expect(firstSearch?.work_bytes).toBe(512 * 1024);
+			expect(firstSearch?.cursor).toBeTruthy();
+
+			const wrongOwner = resolveRecordDirectory(
+				root,
+				"R-search-other",
+			).recordDir;
+			mkdirSync(wrongOwner, { recursive: true });
+			const rejectedOwner = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-search-other",
+						"--search",
+						"tail-needle",
+						"--search-cursor",
+						firstSearch?.cursor ?? "",
+						"--json",
+					],
+					root,
+					rejectedOwner.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(rejectedOwner.stdout).error?.code).toBe(
+				"ARTIFACT_SEARCH_CURSOR_INVALID",
+			);
+
+			const wrongQuery = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-search-pages",
+						"--search",
+						"different-query",
+						"--search-cursor",
+						firstSearch?.cursor ?? "",
+						"--json",
+					],
+					root,
+					wrongQuery.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(wrongQuery.stdout).error?.code).toBe(
+				"ARTIFACT_SEARCH_CURSOR_INVALID",
+			);
+
+			const filePage = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--record", "R-search-pages", "--limit", "1", "--json"],
+					root,
+					filePage.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const fileCursor = lastEnvelope<{
+				files_cursor?: string;
+			}>(filePage.stdout).data?.files_cursor;
+			const wrongSearchScope = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-search-pages",
+						"--search",
+						"tail-needle",
+						"--search-cursor",
+						fileCursor ?? "",
+						"--json",
+					],
+					root,
+					wrongSearchScope.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(wrongSearchScope.stdout).error?.code).toBe(
+				"ARTIFACT_SEARCH_CURSOR_INVALID",
+			);
+			const wrongFileScope = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-search-pages",
+						"--file-cursor",
+						firstSearch?.cursor ?? "",
+						"--json",
+					],
+					root,
+					wrongFileScope.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(wrongFileScope.stdout).error?.code).toBe(
+				"ARTIFACT_FILE_CURSOR_INVALID",
+			);
+
+			const continuation = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-search-pages",
+						"--search",
+						"tail-needle",
+						"--search-cursor",
+						firstSearch?.cursor ?? "",
+						"--json",
+					],
+					root,
+					continuation.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const continuedSearch = lastEnvelope<{
+				search: {
+					matches: Array<{ path: string }>;
+					coverage: string;
+					partial_reason?: string;
+					read_bytes: number;
+					scanned_bytes: number;
+					work_bytes: number;
+					total_work_bytes: number;
+					cursor?: string;
+				};
+			}>(continuation.stdout).data?.search;
+			expect(continuedSearch?.matches.map((match) => match.path)).toContain(
+				"01-tail.md",
+			);
+			expect(continuedSearch?.coverage).toBe("partial");
+			expect(continuedSearch?.partial_reason).toBe("work_budget");
+			expect(continuedSearch?.cursor).toBeUndefined();
+			expect(continuedSearch?.total_work_bytes).toBeGreaterThan(
+				continuedSearch?.work_bytes ?? 0,
+			);
+
+			const changed = captureIo();
+			writeFileSync(join(recordDir, "03-new.md"), "new source");
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-search-pages",
+						"--search",
+						"tail-needle",
+						"--search-cursor",
+						firstSearch?.cursor ?? "",
+						"--json",
+					],
+					root,
+					changed.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(changed.stdout).error?.code).toBe(
+				"ARTIFACT_CATALOG_CHANGED",
+			);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("direct record reads and verification bypass oversized sibling inventories safely", async () => {
+		const root = fixtureRoot();
+		try {
+			const recordDir = resolveRecordDirectory(root, "R-many-files").recordDir;
+			mkdirSync(recordDir, { recursive: true });
+			writeFileSync(join(recordDir, "known.md"), "safe target");
+			for (let index = 0; index < 4_096; index += 1)
+				writeFileSync(join(recordDir, `sibling-${index}.bin`), "ignored");
+
+			const output = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--record", "R-many-files", "--artifact", "known.md", "--json"],
+					root,
+					output.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const data = lastEnvelope<{
+				coverage: {
+					status: string;
+					complete: boolean;
+					inventory_scanned: boolean;
+				};
+				artifacts: Array<{ page: { coverage: string } }>;
+			}>(output.stdout).data;
+			expect(data?.coverage).toMatchObject({
+				status: "partial",
+				complete: false,
+				inventory_scanned: false,
+			});
+			expect(data?.artifacts[0]?.page.coverage).toBe("complete");
+			const reference = lastEnvelope<{
+				artifacts: Array<Record<string, unknown>>;
+			}>(output.stdout).data?.artifacts[0];
+			expect(() =>
+				verifyArtifactReference(root, reference as never),
+			).not.toThrow();
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("nested record inventory overflow refuses catalogs but permits exact reads", async () => {
+		const root = fixtureRoot();
+		try {
+			const recordDir = resolveRecordDirectory(
+				root,
+				"R-nested-overflow",
+			).recordDir;
+			const attachments = join(recordDir, "artifacts");
+			mkdirSync(attachments, { recursive: true });
+			writeFileSync(join(attachments, "known.md"), "safe nested target");
+			for (let index = 0; index < 4_095; index += 1)
+				writeFileSync(join(attachments, `file-${index}.md`), "supported text");
+			expect(() => enumerateOwnerDirectory({ dir: recordDir })).toThrow(
+				"artifact owner exceeds the bounded inventory",
+			);
+
+			for (const args of [[], ["--search", "safe nested target"]]) {
+				const output = captureIo();
+				expect(
+					await runEvolveCommand(
+						"artifacts",
+						["--record", "R-nested-overflow", ...args, "--json"],
+						root,
+						output.io,
+						agentOperationContext(),
+					),
+				).toBe(2);
+				expect(lastEnvelope<never>(output.stdout).error?.code).toBe(
+					"EVOLVE_ARTIFACTS_FAILED",
+				);
+				expect(lastEnvelope<never>(output.stdout).data).toBeUndefined();
+			}
+
+			const directed = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-nested-overflow",
+						"--artifact",
+						"artifacts/known.md",
+						"--json",
+					],
+					root,
+					directed.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const reference = lastEnvelope<{
+				artifacts: Array<Record<string, unknown>>;
+			}>(directed.stdout).data?.artifacts[0];
+			expect(reference).toBeDefined();
+			expect(() =>
+				verifyArtifactReference(root, reference as never),
+			).not.toThrow();
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("root basename selectors refuse collisions with nested artifact paths", async () => {
+		const root = fixtureRoot();
+		try {
+			const recordDir = resolveRecordDirectory(
+				root,
+				"R-ambiguous-name",
+			).recordDir;
+			mkdirSync(recordDir, { recursive: true });
+			writeFileSync(join(recordDir, "same.md"), "root source");
+			const original = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--record", "R-ambiguous-name", "--artifact", "same.md", "--json"],
+					root,
+					original.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const reference = lastEnvelope<{
+				artifacts: Array<Record<string, unknown>>;
+			}>(original.stdout).data?.artifacts[0];
+			expect(reference).toBeDefined();
+
+			mkdirSync(join(recordDir, "artifacts", "nested"), { recursive: true });
+			writeFileSync(
+				join(recordDir, "artifacts", "nested", "same.md"),
+				"nested source",
+			);
+
+			const ambiguous = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--record", "R-ambiguous-name", "--artifact", "same.md", "--json"],
+					root,
+					ambiguous.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(ambiguous.stdout).data).toBeUndefined();
+			expect(() =>
+				verifyArtifactReference(root, reference as never),
+			).not.toThrow();
+
+			const canonical = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					[
+						"--record",
+						"R-ambiguous-name",
+						"--artifact",
+						"artifacts/nested/same.md",
+						"--json",
+					],
+					root,
+					canonical.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			expect(
+				lastEnvelope<{ artifacts: Array<{ relative_path: string }> }>(
+					canonical.stdout,
+				).data?.artifacts[0]?.relative_path,
+			).toBe("artifacts/nested/same.md");
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
 	test("record capture, listing, bounded search, and directed read work without Evolution projections", async () => {
 		for (const state of ["absent", "corrupt", "disabled"] as const) {
 			const root = fixtureRoot(state !== "disabled");
@@ -1079,13 +1583,28 @@ describe("artifact reader contract", () => {
 				agentOperationContext(),
 			);
 			expect(firstCode).toBe(0);
-			const firstArtifact = lastEnvelope<{
+			const firstData = lastEnvelope<{
+				source_catalog: {
+					sessions_considered: number;
+					owners_scanned: number;
+					owner_entries_scanned: number;
+					work_units: number;
+					work_budget_units: number;
+				};
 				items: Array<{
 					artifacts: Array<{
 						page: { cursor?: string; byte_end: number; content: string };
 					}>;
 				}>;
-			}>(first.stdout).data?.items[0]?.artifacts[0];
+			}>(first.stdout).data;
+			expect(firstData?.source_catalog).toMatchObject({
+				sessions_considered: 1,
+				owners_scanned: 1,
+				owner_entries_scanned: 1,
+				work_units: 2,
+				work_budget_units: 4_096,
+			});
+			const firstArtifact = firstData?.items[0]?.artifacts[0];
 			expect(firstArtifact?.page.byte_end).toBe(8_192);
 			expect(firstArtifact?.page.cursor).toBeTruthy();
 
@@ -1141,6 +1660,77 @@ describe("artifact reader contract", () => {
 			);
 			expect(lastEnvelope<never>(changed.stdout).data).toBeUndefined();
 			expect(existsSync(evolutionDbPath(root))).toBe(false);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("session artifact catalog refuses work beyond its global work-unit budget", async () => {
+		const root = fixtureRoot();
+		try {
+			writeValidEvolutionConfig(root);
+			const counts = new Map<string, number>();
+			for (let index = 0; index < 4_097; index += 1) {
+				const sessionId = index < 3_000 ? "S-catalog-a" : "S-catalog-b";
+				const sequence = counts.get(sessionId) ?? 0;
+				counts.set(sessionId, sequence + 1);
+				const sessionDir = join(root, ".afol", "wb", sessionId);
+				mkdirSync(sessionDir, { recursive: true });
+				writeFileSync(
+					join(
+						sessionDir,
+						`${sessionId}_report_${String(sequence + 1).padStart(4, "0")}.md`,
+					),
+					"entry",
+				);
+			}
+
+			const output = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--session", "S-catalog-a", "--session", "S-catalog-b", "--json"],
+					root,
+					output.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(output.stdout).error?.code).toBe(
+				"ARTIFACT_SESSION_CATALOG_BUDGET",
+			);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("empty session owners also consume the bounded source-catalog budget", async () => {
+		const root = fixtureRoot();
+		try {
+			writeValidEvolutionConfig(root);
+			for (let index = 0; index < 4_096; index += 1)
+				mkdirSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						`S-empty-${String(index).padStart(4, "0")}`,
+					),
+					{ recursive: true },
+				);
+
+			const output = captureIo();
+			expect(
+				await runEvolveCommand(
+					"artifacts",
+					["--json"],
+					root,
+					output.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(lastEnvelope<never>(output.stdout).error?.code).toBe(
+				"ARTIFACT_SESSION_CATALOG_BUDGET",
+			);
 		} finally {
 			removeEvolutionTestRoot(root);
 		}

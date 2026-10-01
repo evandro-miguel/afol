@@ -7,14 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import {
-	type Dirent,
-	lstatSync,
-	opendirSync,
-	readdirSync,
-	realpathSync,
-	type Stats,
-} from "node:fs";
+import { lstatSync, opendirSync, realpathSync, type Stats } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { importedTextRedactionSpans } from "../evolution/imports/redaction";
 import {
@@ -73,6 +66,8 @@ export type InventoryFile = {
 export type InventoryEnumeration = {
 	files: InventoryFile[];
 	unsupportedCount: number;
+	scannedEntries: number;
+	complete: boolean;
 };
 
 export type SourceIdentityDigest = string;
@@ -91,6 +86,11 @@ export type ArtifactPageRead = {
 	wholeSource: boolean;
 	/** Raw bytes of the page before redaction; only for in-process validation. */
 	rawBytes: Buffer;
+	/** Complete, redacted source snapshot reused by trusted in-process callers. */
+	fullSourceSnapshot?: { content: string; rawDigest: string };
+	readBytes: number;
+	scannedBytes: number;
+	workBytes: number;
 };
 
 function isMissing(error: unknown): boolean {
@@ -237,20 +237,21 @@ function enumerateArtifactSubtree(
 		baseDir: string;
 		prefix: string;
 		depth: number;
-		budget: { entries: number };
+		budget: { entries: number; scannedEntries: number; limit: number };
 	},
 	out: {
 		files: InventoryFile[];
 		unsupportedCount: number;
+		complete: boolean;
 	},
 ): void {
 	if (input.depth > MAX_ARTIFACT_NESTING_DEPTH) {
 		out.unsupportedCount += 1;
 		return;
 	}
-	let entries: Dirent[];
+	let directory: ReturnType<typeof opendirSync>;
 	try {
-		entries = readdirSync(input.baseDir, { withFileTypes: true });
+		directory = opendirSync(input.baseDir);
 	} catch (error) {
 		if (isMissing(error)) {
 			out.unsupportedCount += 1;
@@ -258,40 +259,49 @@ function enumerateArtifactSubtree(
 		}
 		throw error;
 	}
-	for (const entry of entries) {
-		if (input.budget.entries >= MAX_OWNER_FILES) {
-			out.unsupportedCount += 1;
-			return;
+	try {
+		while (true) {
+			const entry = directory.readSync();
+			if (!entry) break;
+			input.budget.scannedEntries += 1;
+			if (input.budget.entries >= input.budget.limit) {
+				out.unsupportedCount += 1;
+				out.complete = false;
+				return;
+			}
+			input.budget.entries += 1;
+			const path = join(input.baseDir, entry.name);
+			const name = `${input.prefix}${entry.name}`;
+			if (entry.isDirectory()) {
+				enumerateArtifactSubtree(
+					{
+						baseDir: path,
+						prefix: `${name}/`,
+						depth: input.depth + 1,
+						budget: input.budget,
+					},
+					out,
+				);
+				if (!out.complete) return;
+				continue;
+			}
+			if (
+				!entry.isFile() ||
+				entry.name.startsWith(".") ||
+				!ARTIFACT_TEXT_EXTENSION_RE.test(entry.name)
+			) {
+				out.unsupportedCount += 1;
+				continue;
+			}
+			const stat = supplementaryStat(path);
+			if (!stat) {
+				out.unsupportedCount += 1;
+				continue;
+			}
+			out.files.push(inventoryFile(path, name, stat, false));
 		}
-		input.budget.entries += 1;
-		const path = join(input.baseDir, entry.name);
-		const name = `${input.prefix}${entry.name}`;
-		if (entry.isDirectory()) {
-			enumerateArtifactSubtree(
-				{
-					baseDir: path,
-					prefix: `${name}/`,
-					depth: input.depth + 1,
-					budget: input.budget,
-				},
-				out,
-			);
-			continue;
-		}
-		if (
-			!entry.isFile() ||
-			entry.name.startsWith(".") ||
-			!ARTIFACT_TEXT_EXTENSION_RE.test(entry.name)
-		) {
-			out.unsupportedCount += 1;
-			continue;
-		}
-		const stat = supplementaryStat(path);
-		if (!stat) {
-			out.unsupportedCount += 1;
-			continue;
-		}
-		out.files.push(inventoryFile(path, name, stat, false));
+	} finally {
+		directory.closeSync();
 	}
 }
 
@@ -304,71 +314,205 @@ function enumerateArtifactSubtree(
 export function enumerateOwnerDirectory(input: {
 	dir: string;
 	sessionId?: string;
+	maxEntries?: number;
 }): InventoryEnumeration {
-	const budget = { entries: 0 };
-	const out: InventoryEnumeration = { files: [], unsupportedCount: 0 };
+	if (
+		input.maxEntries !== undefined &&
+		(!Number.isSafeInteger(input.maxEntries) ||
+			input.maxEntries < 1 ||
+			input.maxEntries > MAX_OWNER_FILES)
+	)
+		throw new Error("artifact inventory entry limit is invalid");
+	const strictLimit = input.maxEntries === undefined;
+	const budget = {
+		entries: 0,
+		scannedEntries: 0,
+		limit: input.maxEntries ?? MAX_OWNER_FILES,
+	};
+	const out: InventoryEnumeration = {
+		files: [],
+		unsupportedCount: 0,
+		scannedEntries: 0,
+		complete: true,
+	};
 	assertRealDirectory(input.dir, "artifact owner directory");
-	let entries: Dirent[];
+	let directory: ReturnType<typeof opendirSync>;
 	try {
-		entries = readdirSync(input.dir, { withFileTypes: true });
+		directory = opendirSync(input.dir);
 	} catch (error) {
 		if (!isMissing(error)) throw error;
 		throw new Error(
 			"artifact owner directory must be a real directory inside the project root",
 		);
 	}
-	for (const entry of entries) {
-		if (budget.entries >= MAX_OWNER_FILES)
-			throw new Error(
-				"artifact owner exceeds the bounded inventory; select a specific artifact",
-			);
-		budget.entries += 1;
-		if (entry.isDirectory()) {
-			if (entry.name === "artifacts") {
-				enumerateArtifactSubtree(
-					{
-						baseDir: join(input.dir, entry.name),
-						prefix: "artifacts/",
-						depth: 1,
-						budget,
-					},
-					out,
-				);
-			} else {
+	try {
+		while (true) {
+			const entry = directory.readSync();
+			if (!entry) break;
+			budget.scannedEntries += 1;
+			if (budget.entries >= budget.limit) {
+				if (strictLimit)
+					throw new Error(
+						"artifact owner exceeds the bounded inventory; select a specific artifact",
+					);
 				out.unsupportedCount += 1;
+				out.complete = false;
+				break;
 			}
-			continue;
+			budget.entries += 1;
+			if (entry.isDirectory()) {
+				if (entry.name === "artifacts") {
+					enumerateArtifactSubtree(
+						{
+							baseDir: join(input.dir, entry.name),
+							prefix: "artifacts/",
+							depth: 1,
+							budget,
+						},
+						out,
+					);
+					if (!out.complete) break;
+				} else {
+					out.unsupportedCount += 1;
+				}
+				continue;
+			}
+			if (!entry.isFile()) {
+				out.unsupportedCount += 1;
+				continue;
+			}
+			const path = join(input.dir, entry.name);
+			const canonicalKind = input.sessionId
+				? canonicalSessionArtifactKind(entry.name, input.sessionId)
+				: null;
+			if (canonicalKind) {
+				const stat = assertSafeSourceFile(path, "session artifact");
+				if (!stat) continue;
+				out.files.push(inventoryFile(path, entry.name, stat, true));
+				continue;
+			}
+			if (
+				entry.name.startsWith(".") ||
+				!ARTIFACT_TEXT_EXTENSION_RE.test(entry.name)
+			) {
+				out.unsupportedCount += 1;
+				continue;
+			}
+			const stat = supplementaryStat(path);
+			if (!stat) {
+				out.unsupportedCount += 1;
+				continue;
+			}
+			out.files.push(inventoryFile(path, entry.name, stat, false));
 		}
-		if (!entry.isFile()) {
-			out.unsupportedCount += 1;
-			continue;
-		}
-		const path = join(input.dir, entry.name);
-		const canonicalKind = input.sessionId
-			? canonicalSessionArtifactKind(entry.name, input.sessionId)
-			: null;
-		if (canonicalKind) {
-			const stat = assertSafeSourceFile(path, "session artifact");
-			if (!stat) continue;
-			out.files.push(inventoryFile(path, entry.name, stat, true));
-			continue;
-		}
-		if (
-			entry.name.startsWith(".") ||
-			!ARTIFACT_TEXT_EXTENSION_RE.test(entry.name)
-		) {
-			out.unsupportedCount += 1;
-			continue;
-		}
-		const stat = supplementaryStat(path);
-		if (!stat) {
-			out.unsupportedCount += 1;
-			continue;
-		}
-		out.files.push(inventoryFile(path, entry.name, stat, false));
+	} finally {
+		directory.closeSync();
 	}
+	if (strictLimit && !out.complete)
+		throw new Error(
+			"artifact owner exceeds the bounded inventory; select a specific artifact",
+		);
 	out.files.sort((left, right) => left.name.localeCompare(right.name));
+	out.scannedEntries = budget.scannedEntries;
 	return out;
+}
+
+/** Search only the nested artifact tree for a basename alias. */
+function hasNestedArtifactBasename(input: {
+	dir: string;
+	basename: string;
+}): boolean {
+	const baseDir = join(input.dir, "artifacts");
+	const rootStat = lstatIfPresent(baseDir);
+	if (
+		!rootStat ||
+		rootStat.isSymbolicLink() ||
+		!rootStat.isDirectory() ||
+		realpathSync(baseDir) !== resolve(baseDir)
+	)
+		return false;
+	let scannedEntries = 0;
+	const visit = (dir: string, depth: number): boolean => {
+		if (depth > MAX_ARTIFACT_NESTING_DEPTH)
+			throw new Error("record artifact basename cannot be resolved safely");
+		const directory = opendirSync(dir);
+		try {
+			while (true) {
+				const entry = directory.readSync();
+				if (!entry) return false;
+				scannedEntries += 1;
+				if (scannedEntries > MAX_OWNER_FILES)
+					throw new Error(
+						"record artifact basename exceeds its bounded inventory",
+					);
+				if (entry.isDirectory()) {
+					const path = join(dir, entry.name);
+					if (realpathSync(path) !== resolve(path))
+						throw new Error("record artifact parent must be a real directory");
+					if (visit(path, depth + 1)) return true;
+					continue;
+				}
+				if (
+					entry.isFile() &&
+					!entry.name.startsWith(".") &&
+					ARTIFACT_TEXT_EXTENSION_RE.test(entry.name) &&
+					entry.name === input.basename
+				)
+					return true;
+			}
+		} finally {
+			directory.closeSync();
+		}
+	};
+	return visit(baseDir, 1);
+}
+
+/** Resolve one canonical owner-relative file without inventorying siblings. */
+export function resolveOwnerArtifactFile(input: {
+	dir: string;
+	relativePath: string;
+	/** Refuse root aliases when a nested artifact has the same basename. */
+	rejectRootBasenameCollision?: boolean;
+}): InventoryFile | null {
+	const normalized = input.relativePath.replaceAll("\\", "/");
+	const parts = normalized.split("/");
+	if (
+		!normalized ||
+		normalized.startsWith("/") ||
+		parts.some((part) => !part || part === "." || part === "..")
+	)
+		return null;
+	if (
+		parts.length > 1 &&
+		(parts[0] !== "artifacts" || parts.length > MAX_ARTIFACT_NESTING_DEPTH + 1)
+	)
+		return null;
+	if (
+		parts.some((part) => part.startsWith(".")) ||
+		!ARTIFACT_TEXT_EXTENSION_RE.test(parts.at(-1) ?? "")
+	)
+		return null;
+	if (
+		input.rejectRootBasenameCollision &&
+		parts.length === 1 &&
+		hasNestedArtifactBasename({ dir: input.dir, basename: parts[0] as string })
+	)
+		throw new Error("record artifact selector is ambiguous; use its full path");
+	let baseDir = input.dir;
+	for (const segment of parts.slice(0, -1)) {
+		baseDir = join(baseDir, segment);
+		const stat = lstatIfPresent(baseDir);
+		if (!stat) return null;
+		if (
+			stat.isSymbolicLink() ||
+			!stat.isDirectory() ||
+			realpathSync(baseDir) !== resolve(baseDir)
+		)
+			throw new Error("artifact parent must be a real directory");
+	}
+	const path = join(input.dir, ...parts);
+	const stat = assertSafeSourceFile(path, "record artifact");
+	return stat ? inventoryFile(path, normalized, stat, false) : null;
 }
 
 /** Resolve and validate a standalone record directory. */
@@ -419,7 +563,7 @@ export function recordsDirectory(root: string): string {
 
 export class ArtifactCatalogChangedError extends Error {
 	constructor() {
-		super("artifact records catalog changed; restart without a records cursor");
+		super("artifact catalog changed; restart without its cursor");
 		this.name = "ArtifactCatalogChangedError";
 	}
 }
@@ -737,6 +881,7 @@ function isUtf8Boundary(
 		mtime_ms: string;
 		ctime_ms: string;
 	},
+	onBytesRead?: (bytes: number) => void,
 ): boolean {
 	if (target === 0 || target === totalBytes) return true;
 	const start = Math.max(0, target - 4);
@@ -744,6 +889,7 @@ function isUtf8Boundary(
 		offset: start,
 		maxBytes: target - start,
 	});
+	onBytesRead?.(range.bytes.byteLength);
 	if (!sameSourceIdentity(range.sourceIdentity, expectedSource))
 		throw new ArtifactSourceChangedError();
 	let index = range.bytes.length - 1;
@@ -847,6 +993,7 @@ export type SafeArtifactSourceRead = {
 	redactionStatus: ArtifactPageRead["redactionStatus"];
 	content?: string;
 	rawDigest: string;
+	readBytes: number;
 	sourceBytes: number;
 	scannedBytes: number;
 	sourceIdentityDigest: string;
@@ -900,6 +1047,7 @@ export function readArtifactSafeSource(input: {
 				ignoreBOM: true,
 			}).decode(safeBytes),
 			rawDigest: digestBytes(full.range.bytes),
+			readBytes: full.range.bytes.byteLength,
 			sourceBytes: totalBytes,
 			scannedBytes: full.range.bytes.byteLength,
 			sourceIdentityDigest: full.identity,
@@ -909,6 +1057,7 @@ export function readArtifactSafeSource(input: {
 		return {
 			redactionStatus: "withheld_invalid_utf8",
 			rawDigest: digestBytes(full.range.bytes),
+			readBytes: full.range.bytes.byteLength,
 			sourceBytes: totalBytes,
 			scannedBytes: full.range.bytes.byteLength,
 			sourceIdentityDigest: full.identity,
@@ -930,6 +1079,7 @@ export function readArtifactPage(input: {
 	byteOffset?: number;
 	maxBytes?: number;
 	cursor?: string;
+	includeFullSourceSnapshot?: boolean;
 }): ArtifactPageRead {
 	if (
 		input.maxBytes !== undefined &&
@@ -972,6 +1122,9 @@ export function readArtifactPage(input: {
 	const sourcePath = resolvedPath.value.path;
 	let rawBytes: Buffer;
 	let safeText: string | undefined;
+	let wholeSourceSnapshot: ArtifactPageRead["fullSourceSnapshot"];
+	let readBytes = 0;
+	let scannedBytes = 0;
 	let redactionStatus: ArtifactPageRead["redactionStatus"] = "complete";
 	let identity: string;
 	let totalBytes: number;
@@ -986,6 +1139,7 @@ export function readArtifactPage(input: {
 		1,
 		expectedIdentity,
 	);
+	readBytes += head.range.bytes.byteLength;
 	totalBytes = head.range.totalBytes;
 	identity = head.identity;
 	rangeSourceIdentity = head.range.sourceIdentity;
@@ -1004,6 +1158,8 @@ export function readArtifactPage(input: {
 			Math.max(1, totalBytes),
 			identity,
 		);
+		readBytes += full.range.bytes.byteLength;
+		scannedBytes = full.range.bytes.byteLength;
 		rangeSourceIdentity = full.range.sourceIdentity;
 		identity = full.identity;
 		let decoded: ReturnType<typeof decodeCompleteUtf8> | undefined;
@@ -1036,10 +1192,23 @@ export function readArtifactPage(input: {
 			);
 			const pageRawBytes = full.range.bytes.subarray(offset, byteEnd);
 			rawBytes = pageRawBytes;
-			safeText = new TextDecoder("utf-8", {
-				fatal: true,
-				ignoreBOM: true,
-			}).decode(redactedPageBytes(pageRawBytes, offset, spans));
+			if (input.includeFullSourceSnapshot) {
+				const safeFullBytes = redactedPageBytes(full.range.bytes, 0, spans);
+				const decoder = new TextDecoder("utf-8", {
+					fatal: true,
+					ignoreBOM: true,
+				});
+				wholeSourceSnapshot = {
+					content: decoder.decode(safeFullBytes),
+					rawDigest: digestBytes(full.range.bytes),
+				};
+				safeText = decoder.decode(safeFullBytes.subarray(offset, byteEnd));
+			} else {
+				safeText = new TextDecoder("utf-8", {
+					fatal: true,
+					ignoreBOM: true,
+				}).decode(redactedPageBytes(pageRawBytes, offset, spans));
+			}
 		} else {
 			const invalidRange = readRawBoundedPage(
 				sourcePath,
@@ -1048,6 +1217,7 @@ export function readArtifactPage(input: {
 				Math.min(maxBytes, Math.max(1, totalBytes - offset)),
 				identity,
 			);
+			readBytes += invalidRange.range.bytes.byteLength;
 			rawBytes = invalidRange.range.bytes;
 			byteEnd = offset + rawBytes.length;
 			safeText = "[content withheld: source is not valid UTF-8]";
@@ -1061,6 +1231,9 @@ export function readArtifactPage(input: {
 				offset,
 				totalBytes,
 				rangeSourceIdentity,
+				(bytes) => {
+					readBytes += bytes;
+				},
 			)
 		) {
 			if (input.cursor) throw new ArtifactPageCursorError();
@@ -1073,6 +1246,7 @@ export function readArtifactPage(input: {
 			Math.min(maxBytes, Math.max(1, totalBytes - offset)),
 			identity,
 		);
+		readBytes += next.range.bytes.byteLength;
 		rawBytes = next.range.bytes;
 		byteEnd = offset + rawBytes.length;
 		while (
@@ -1083,6 +1257,9 @@ export function readArtifactPage(input: {
 				byteEnd,
 				totalBytes,
 				rangeSourceIdentity,
+				(bytes) => {
+					readBytes += bytes;
+				},
 			)
 		) {
 			byteEnd -= 1;
@@ -1096,7 +1273,7 @@ export function readArtifactPage(input: {
 	}
 	const byteStart = offset;
 	const hasMore = byteEnd < totalBytes;
-	const wholeSource = byteStart === 0 && !hasMore;
+	const isWholeSource = byteStart === 0 && !hasMore;
 	const ownerPath = relative(
 		resolve(input.root),
 		resolve(input.ownerDir),
@@ -1122,14 +1299,20 @@ export function readArtifactPage(input: {
 					}
 				: {}),
 			coverage:
-				redactionStatus === "complete" && wholeSource ? "complete" : "partial",
+				redactionStatus === "complete" && isWholeSource
+					? "complete"
+					: "partial",
 		},
 		redactionStatus,
 		rawDigest: digestBytes(rawBytes),
 		sourceIdentityDigest: identity,
 		anchor: `bytes:${byteStart}-${byteEnd}`,
 		digestScope: "range",
-		wholeSource: wholeSource && redactionStatus === "complete",
+		wholeSource: isWholeSource && redactionStatus === "complete",
 		rawBytes,
+		...(wholeSourceSnapshot ? { fullSourceSnapshot: wholeSourceSnapshot } : {}),
+		readBytes,
+		scannedBytes,
+		workBytes: readBytes + scannedBytes,
 	};
 }
