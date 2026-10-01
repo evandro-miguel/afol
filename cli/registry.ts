@@ -1220,10 +1220,10 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		subcommands: [
 			{
 				usage:
-					"artifacts [--records [--records-cursor <token>]] [--record <id> [--search <query> | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
+					"artifacts [--records [--records-cursor <token>]] [--record <id> [--file-cursor <token> | --search <query> [--search-cursor <token>] | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
 				sideEffect: "read",
 				description:
-					"Inspect session or standalone record artifacts without Evolution projections. Records discovery scans at most 4,096 entries and reports partial coverage when bounded or unsupported; search has a 512 KiB work budget. Pages redact with up to 1 MiB of source context and withhold larger sources as partial. Page requests clamp to 4 bytes and offsets must be UTF-8 boundaries. History, records, and content cursors are separate.",
+					"Inspect session or standalone record artifacts without Evolution projections. Record file listings continue with --file-cursor; search continues at file boundaries with --search-cursor and binds the owner, query, and inventory snapshot. Search has a 512 KiB per-response read-plus-scan budget and retains partial coverage for files it must skip. Exact safe record paths can bypass sibling inventory; coverage reports when the owner catalog was not scanned. Session artifact catalog work is capped at 4,096 units across selected sessions, counting each owner plus inventoried entries, and refuses larger catalogs. Pages redact with up to 1 MiB of source context; page work counts full-context reads and scans separately from returned bytes. Page requests clamp to 4 bytes and offsets must be UTF-8 boundaries. History, records, content, file, and search cursors are separate.",
 			},
 			{
 				usage: "backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",

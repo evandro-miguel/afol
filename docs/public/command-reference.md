@@ -73,6 +73,12 @@ changing task state or completing sessions. Production days still require a
 complete workbench session and observed passing completion evidence; failure
 evidence alone never allocates one. AFOL does not execute models.
 
+Session artifact inspection includes live and archived sessions. If the same
+session ID appears in both locations, the JSON response reports it in
+`conflicts` and marks coverage `partial`; selecting that session explicitly
+fails until the duplicate is resolved. Whole-artifact evidence hashes the
+original valid UTF-8 bytes, and malformed UTF-8 is refused.
+
 ## Standalone artifacts
 
 Save an artifact to a standalone record, discover available records, then list
@@ -83,11 +89,14 @@ afol artifact save --kind report --text "Review notes" --record <record-id> --js
 afol evolve artifacts --records --limit <n> --json
 afol evolve artifacts --records --records-cursor <token> --limit <n> --json
 afol evolve artifacts --record <record-id> --json
+afol evolve artifacts --record <record-id> --limit <n> --file-cursor <token> --json
 afol evolve artifacts --record <record-id> --artifact <path> --json
 afol evolve artifacts --record <record-id> --artifact <path> \
   --page-cursor <token> --json
 afol evolve artifacts --record <record-id> --artifact <path> --byte-offset <n> --json
 afol evolve artifacts --record <record-id> --search <literal> --json
+afol evolve artifacts --record <record-id> --search <literal> \
+  --search-cursor <token> --json
 ```
 
 To copy an explicitly reviewed file from temporary storage, confirm its
@@ -101,15 +110,35 @@ Archived sources can be copied to a related record; archived snapshots remain
 immutable. Capture performs no secondary indexing (`index=not_requested`);
 read directly by the receipt path when Evolution projections are unavailable.
 
-Record discovery is metadata-only and reports partial coverage when its entry
-budget is reached or inventory entries are unsupported. Search has a bounded
-work budget and reports partial coverage when it cannot scan the full inventory.
+Record file listings use `files_page` and `files_cursor` to continue through
+the bounded owner inventory. The cursor binds the record, page size, and file
+metadata snapshot; owner or source changes require a fresh listing. A directed
+safe owner-relative file can be read without scanning its siblings. Such a
+response sets `coverage.inventory_scanned` to `false` and reports partial
+inventory coverage while retaining the selected page's own coverage.
+
+Search has a 512 KiB per-response work budget. `read_bytes` counts complete
+source bytes read, `scanned_bytes` counts complete source bytes decoded and
+searched, and `work_bytes` is their sum. `search.cursor` continues at a file
+boundary and binds the record, query, and file metadata snapshot. The response
+also reports cumulative `total_*_bytes` across that cursor chain. A file too
+large to fit one response is skipped; its omission remains explicit and keeps
+the final result partial. Unsupported inventory entries also keep coverage
+partial.
+
 Reads preserve raw byte anchors and digests while redacting the presented text.
-Search checks that redacted presentation. Requested page sizes clamp to at least
+Search checks the redacted presentation. Requested page sizes clamp to at least
 four bytes, offsets must be UTF-8 boundaries, and offsets at the end of
 nonempty files are refused. Invalid UTF-8 sources and sources larger than the
-1 MiB redaction-context budget are withheld with partial coverage.
-`--page-cursor` continues a content page; `--cursor` remains the
+1 MiB redaction-context budget are withheld with partial coverage. The initial
+page reuses its complete redacted source snapshot for evidence promotion, and
+page work budgets account for the full-context read and scan separately from
+returned page bytes. Session artifact catalog work is capped at 4,096 units
+across selected sessions per response, counting each owner plus its inventoried
+entries. Larger catalogs are refused instead of being reported as complete.
+`source_catalog` reports sessions considered, owners scanned, owner entries
+scanned, and total work units. Root session-name discovery remains a separate
+metadata scan. `--page-cursor` continues a content page; `--cursor` remains the
 session-history cursor.
 
 Assisted changes use an explicit version-bound review cycle. Prepare an

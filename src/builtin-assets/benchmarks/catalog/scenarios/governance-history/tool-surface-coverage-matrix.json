@@ -233,7 +233,7 @@
 			"feedback last -m <text>",
 			"evolve status [--json]",
 			"artifact save --kind <kind> (--text <text>|--file <path>) [--title <text>] [--session <id>] [--record <id>] [--standalone] [--request-id <id>] [--source-digest <sha256>] [--json]",
-			"evolve artifacts [--records [--records-cursor <token>]] [--record <id> [--search <query> | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
+			"evolve artifacts [--records [--records-cursor <token>]] [--record <id> [--file-cursor <token> | --search <query> [--search-cursor <token>] | --artifact <path>... [--page-cursor <token> | --byte-offset <n>]]] [--session <id>]... [--cursor <token>] [--limit <n>] [--json]",
 			"evolve backfill [--run] [--offset <n>] [--limit <1-10>] [--json]",
 			"evolve proposal schema [--json]",
 			"evolve proposal prepare --packet <path> --dry-run [--json]",

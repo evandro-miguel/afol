@@ -120,6 +120,25 @@ export function readProjectConfig(root: string): SchemaObject {
 	return {};
 }
 
+function assertConfiguredArtifactPaths(config: SchemaObject): void {
+	const paths = config.paths;
+	if (paths === undefined) return;
+	if (paths === null || typeof paths !== "object" || Array.isArray(paths))
+		throw new Error("artifact configuration paths must be an object");
+	for (const key of ["mutable_dir", "wb_dir", "records_dir"]) {
+		const value = (paths as Record<string, unknown>)[key];
+		if (value === undefined) continue;
+		if (
+			typeof value !== "string" ||
+			!value.trim() ||
+			isAbsolute(value.trim()) ||
+			/^[A-Za-z]:|^[\\\\]/.test(value.trim()) ||
+			value.split(/[\\/]+/).includes("..")
+		)
+			throw new Error(`artifact configuration paths.${key} is invalid`);
+	}
+}
+
 /** Artifact IO must not silently redirect an invalid configured destination. */
 export function resolveArtifactProjectPaths(
 	root: string,
@@ -145,23 +164,6 @@ export function resolveArtifactProjectPaths(
 		if (config === null || typeof config !== "object" || Array.isArray(config))
 			throw new Error("artifact configuration must be an object");
 		parsedConfig = config as SchemaObject;
-		const paths = (config as Record<string, unknown>).paths;
-		if (paths !== undefined) {
-			if (paths === null || typeof paths !== "object" || Array.isArray(paths))
-				throw new Error("artifact configuration paths must be an object");
-			for (const key of ["mutable_dir", "wb_dir", "records_dir"]) {
-				const value = (paths as Record<string, unknown>)[key];
-				if (value === undefined) continue;
-				if (
-					typeof value !== "string" ||
-					!value.trim() ||
-					isAbsolute(value.trim()) ||
-					/^[A-Za-z]:|^[\\\\]/.test(value.trim()) ||
-					value.split(/[\\/]+/).includes("..")
-				)
-					throw new Error(`artifact configuration paths.${key} is invalid`);
-			}
-		}
 	}
 	return resolvePathsFromConfig(root, parsedConfig);
 }
@@ -267,6 +269,7 @@ function resolvePathsFromConfig(
 	root: string,
 	config: SchemaObject,
 ): ResolvedProjectPaths {
+	assertConfiguredArtifactPaths(config);
 	const projectRoot = realpathSync(root);
 	const agentsDir = fromConfig(config, ["paths", "agents_dir"], ".agents");
 	const mutableDir = fromConfig(config, ["paths", "mutable_dir"], ".afol");

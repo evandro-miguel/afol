@@ -61,6 +61,9 @@ import {
 	rollbackEvolutionProposal,
 } from "../services/evolution/apply-service";
 import {
+	ArtifactFileCursorError,
+	ArtifactSearchCursorError,
+	ArtifactSessionCatalogBudgetError,
 	inspectArtifactRecords,
 	inspectEvolutionArtifacts,
 	inspectStandaloneRecordArtifacts,
@@ -1964,6 +1967,8 @@ function parseArtifactsArgs(args: readonly string[]): {
 	cursor?: string;
 	recordsCursor?: string;
 	pageCursor?: string;
+	fileCursor?: string;
+	searchCursor?: string;
 	limit?: number;
 	byteOffset?: number;
 	json: boolean;
@@ -1976,6 +1981,8 @@ function parseArtifactsArgs(args: readonly string[]): {
 	let cursor: string | undefined;
 	let recordsCursor: string | undefined;
 	let pageCursor: string | undefined;
+	let fileCursor: string | undefined;
+	let searchCursor: string | undefined;
 	let limit: number | undefined;
 	let byteOffset: number | undefined;
 	let json = false;
@@ -2020,6 +2027,16 @@ function parseArtifactsArgs(args: readonly string[]): {
 			if (!value || value.startsWith("-"))
 				throw new Error("evolve artifacts --page-cursor requires <token>");
 			pageCursor = value;
+		} else if (arg === "--file-cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --file-cursor requires <token>");
+			fileCursor = value;
+		} else if (arg === "--search-cursor") {
+			const value = args[++index];
+			if (!value || value.startsWith("-"))
+				throw new Error("evolve artifacts --search-cursor requires <token>");
+			searchCursor = value;
 		} else if (arg === "--limit") {
 			const value = args[++index];
 			if (
@@ -2052,11 +2069,17 @@ function parseArtifactsArgs(args: readonly string[]): {
 			search !== undefined ||
 			cursor !== undefined ||
 			pageCursor !== undefined ||
+			fileCursor !== undefined ||
+			searchCursor !== undefined ||
 			byteOffset !== undefined)
 	)
 		throw new Error("--records cannot be combined with another artifact route");
 	if (recordsCursor && !records)
 		throw new Error("--records-cursor requires --records");
+	if (fileCursor && record === undefined)
+		throw new Error("--file-cursor requires --record");
+	if (searchCursor && search === undefined)
+		throw new Error("--search-cursor requires --search");
 	if (
 		record !== undefined &&
 		(sessions.length > 0 || cursor !== undefined || recordsCursor !== undefined)
@@ -2070,6 +2093,8 @@ function parseArtifactsArgs(args: readonly string[]): {
 		);
 	if (pageCursor && cursor)
 		throw new Error("--page-cursor and history --cursor are separate routes");
+	if (fileCursor && search !== undefined)
+		throw new Error("--file-cursor and --search use separate routes");
 	return {
 		sessions,
 		artifacts,
@@ -2079,6 +2104,8 @@ function parseArtifactsArgs(args: readonly string[]): {
 		...(cursor ? { cursor } : {}),
 		...(recordsCursor === undefined ? {} : { recordsCursor }),
 		...(pageCursor === undefined ? {} : { pageCursor }),
+		...(fileCursor === undefined ? {} : { fileCursor }),
+		...(searchCursor === undefined ? {} : { searchCursor }),
 		...(limit === undefined ? {} : { limit }),
 		...(byteOffset === undefined ? {} : { byteOffset }),
 		json,
@@ -2118,6 +2145,12 @@ function runArtifacts(
 			recordId: parsed.record,
 			...(parsed.artifacts.length > 0 ? { artifacts: parsed.artifacts } : {}),
 			...(parsed.search === undefined ? {} : { search: parsed.search }),
+			...(parsed.fileCursor === undefined
+				? {}
+				: { fileCursor: parsed.fileCursor }),
+			...(parsed.searchCursor === undefined
+				? {}
+				: { searchCursor: parsed.searchCursor }),
 			...(parsed.limit === undefined ? {} : { limit: parsed.limit }),
 			...(parsed.pageCursor === undefined
 				? {}
@@ -3763,9 +3796,15 @@ export async function runEvolveCommand(
 					? "ARTIFACT_CATALOG_CHANGED"
 					: error instanceof ArtifactPageCursorError
 						? "ARTIFACT_PAGE_CURSOR_INVALID"
-						: actionName === "status"
-							? "EVOLUTION_STATUS_FAILED"
-							: `EVOLVE_${actionName.toUpperCase()}_FAILED`;
+						: error instanceof ArtifactSessionCatalogBudgetError
+							? "ARTIFACT_SESSION_CATALOG_BUDGET"
+							: error instanceof ArtifactFileCursorError
+								? "ARTIFACT_FILE_CURSOR_INVALID"
+								: error instanceof ArtifactSearchCursorError
+									? "ARTIFACT_SEARCH_CURSOR_INVALID"
+									: actionName === "status"
+										? "EVOLUTION_STATUS_FAILED"
+										: `EVOLVE_${actionName.toUpperCase()}_FAILED`;
 		writeEvolutionError(
 			io,
 			jsonRequested,

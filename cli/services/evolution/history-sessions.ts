@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { resolveProjectPaths } from "../project/paths";
+import { resolveArtifactProjectPaths } from "../project/paths";
 
 /**
  * Evolution-only session enumeration. Unlike the workbench index collector,
@@ -43,7 +43,7 @@ function listSessionDirectories(path: string): string[] {
 export function enumerateEvolutionHistorySessions(
 	root: string,
 ): EvolutionHistorySessionEnumeration {
-	const wbRoot = resolveProjectPaths(root).abs.wbDir;
+	const wbRoot = resolveArtifactProjectPaths(root).abs.wbDir;
 	const live = new Set(listSessionDirectories(wbRoot));
 	const archived = new Set(listSessionDirectories(join(wbRoot, "_archive")));
 	const conflicts = [...live].filter((session) => archived.has(session)).sort();
