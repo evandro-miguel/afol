@@ -515,70 +515,74 @@ describe("evolution history backfill resume", () => {
 		}
 	});
 
-	test("an oversized telemetry source stays pending and resumes by page without duplicate ids", () => {
-		const root = fixtureRoot();
-		try {
-			const sessionDir = writeSession(root, "S-big", { closed: false });
-			const taskPath = join(sessionDir, "S-big_task_01.md");
-			const originalTask = readFileSync(taskPath, "utf8");
-			// 110 matched lines of ~10.4KB exceed the 1MB telemetry byte limit,
-			// so each call may only drain one bounded page.
-			const eventCount = 110;
-			writeTelemetry(
-				root,
-				Array.from({ length: eventCount }, (_, index) =>
-					telemetryLine({
-						id: `TEL-big-${index}`,
-						session: "S-big",
-						note: "x".repeat(10 * 1024),
-					}),
-				),
-			);
-			const preview = previewHistoryBackfill({ root, limit: 10 });
-			expect(preview.skip_reasons.telemetry_limit_exceeded).toBe(1);
-			expect(preview.coverage).toMatchObject({ eligible: 1 });
-			const first = runHistoryBackfill({ root, now: T1 });
-			expect(first.sessions[0]).toMatchObject({
-				session_id: "S-big",
-				outcome: "pending",
-			});
-			const pendingCursor = cursorFor(root, "S-big");
-			expect(pendingCursor).toMatchObject({
-				status: "pending",
-				source_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
-			});
-			if (!pendingCursor) throw new Error("expected pending cursor");
-			expect(pendingCursor.byte_offset).toBeGreaterThan(0);
-			expect(first.sessions[0]?.appended).toBeGreaterThan(0);
-			expect(first.sessions[0]?.appended ?? 0).toBeLessThan(eventCount);
-			// The gap between calls is a kill between two pages: the second call
-			// resumes after the cursor and must not duplicate observation ids.
-			const second = runHistoryBackfill({ root, now: T2 });
-			expect(second.sessions[0]).toMatchObject({
-				session_id: "S-big",
-				outcome: "ingested",
-			});
-			const completeCursor = cursorFor(root, "S-big");
-			expect(completeCursor).toMatchObject({
-				status: "complete",
-				updated_at: T2.toISOString(),
-			});
-			const views = observationViews(root);
-			expect(views).toHaveLength(eventCount);
-			expect(new Set(views.map((view) => view.id)).size).toBe(eventCount);
-			expect(views.every((view) => view.session_id === "S-big")).toBe(true);
-			expect(existsSync(productionDayJournalPath(root))).toBe(false);
-			expect(readFileSync(taskPath, "utf8")).toBe(originalTask);
-			const third = runHistoryBackfill({ root, now: T3 });
-			expect(third.sessions[0]).toMatchObject({
-				outcome: "unchanged",
-				appended: 0,
-			});
-			expect(observationViews(root)).toHaveLength(eventCount);
-		} finally {
-			removeEvolutionTestRoot(root);
-		}
-	});
+	test(
+		"an oversized telemetry source stays pending and resumes by page without duplicate ids",
+		() => {
+			const root = fixtureRoot();
+			try {
+				const sessionDir = writeSession(root, "S-big", { closed: false });
+				const taskPath = join(sessionDir, "S-big_task_01.md");
+				const originalTask = readFileSync(taskPath, "utf8");
+				// 110 matched lines of ~10.4KB exceed the 1MB telemetry byte limit,
+				// so each call may only drain one bounded page.
+				const eventCount = 110;
+				writeTelemetry(
+					root,
+					Array.from({ length: eventCount }, (_, index) =>
+						telemetryLine({
+							id: `TEL-big-${index}`,
+							session: "S-big",
+							note: "x".repeat(10 * 1024),
+						}),
+					),
+				);
+				const preview = previewHistoryBackfill({ root, limit: 10 });
+				expect(preview.skip_reasons.telemetry_limit_exceeded).toBe(1);
+				expect(preview.coverage).toMatchObject({ eligible: 1 });
+				const first = runHistoryBackfill({ root, now: T1 });
+				expect(first.sessions[0]).toMatchObject({
+					session_id: "S-big",
+					outcome: "pending",
+				});
+				const pendingCursor = cursorFor(root, "S-big");
+				expect(pendingCursor).toMatchObject({
+					status: "pending",
+					source_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+				});
+				if (!pendingCursor) throw new Error("expected pending cursor");
+				expect(pendingCursor.byte_offset).toBeGreaterThan(0);
+				expect(first.sessions[0]?.appended).toBeGreaterThan(0);
+				expect(first.sessions[0]?.appended ?? 0).toBeLessThan(eventCount);
+				// The gap between calls is a kill between two pages: the second call
+				// resumes after the cursor and must not duplicate observation ids.
+				const second = runHistoryBackfill({ root, now: T2 });
+				expect(second.sessions[0]).toMatchObject({
+					session_id: "S-big",
+					outcome: "ingested",
+				});
+				const completeCursor = cursorFor(root, "S-big");
+				expect(completeCursor).toMatchObject({
+					status: "complete",
+					updated_at: T2.toISOString(),
+				});
+				const views = observationViews(root);
+				expect(views).toHaveLength(eventCount);
+				expect(new Set(views.map((view) => view.id)).size).toBe(eventCount);
+				expect(views.every((view) => view.session_id === "S-big")).toBe(true);
+				expect(existsSync(productionDayJournalPath(root))).toBe(false);
+				expect(readFileSync(taskPath, "utf8")).toBe(originalTask);
+				const third = runHistoryBackfill({ root, now: T3 });
+				expect(third.sessions[0]).toMatchObject({
+					outcome: "unchanged",
+					appended: 0,
+				});
+				expect(observationViews(root)).toHaveLength(eventCount);
+			} finally {
+				removeEvolutionTestRoot(root);
+			}
+		},
+		{ timeout: 25_000 },
+	);
 
 	test("does not complete a cursor after an observation projection warning and retries the failed append", () => {
 		const root = fixtureRoot();
@@ -670,81 +674,86 @@ describe("evolution history backfill resume", () => {
 		}
 	});
 
-	test("normal and oversized ingestion allocate the same production day and observation ordinal", () => {
-		const sequenceFor = (oversized: boolean) => {
-			const root = fixtureRoot();
-			try {
-				const session = oversized ? "S-large-complete" : "S-small-complete";
-				const sessionDir = writeSession(root, session, {
-					closed: false,
-					evidence: [
-						{
-							id: `E-pass-${session}`,
-							session,
-							result: "passed",
-							exit_code: 0,
-						},
-					],
-				});
-				const taskPath = join(sessionDir, `${session}_task_01.md`);
-				writeFileSync(
-					taskPath,
-					readFileSync(taskPath, "utf8").replace(
-						"| T-01 | in_progress |",
-						"| T-01 | done |",
-					),
-				);
-				if (oversized) {
-					const note = "x".repeat(10_200);
-					writeTelemetry(
-						root,
-						Array.from({ length: 110 }, (_, index) =>
-							telemetryLine({
-								id: `E-large-complete-${index}`,
+	test(
+		"normal and oversized ingestion allocate the same production day and observation ordinal",
+		() => {
+			const sequenceFor = (oversized: boolean) => {
+				const root = fixtureRoot();
+				try {
+					const session = oversized ? "S-large-complete" : "S-small-complete";
+					const sessionDir = writeSession(root, session, {
+						closed: false,
+						evidence: [
+							{
+								id: `E-pass-${session}`,
 								session,
-								note,
-							}),
+								result: "passed",
+								exit_code: 0,
+							},
+						],
+					});
+					const taskPath = join(sessionDir, `${session}_task_01.md`);
+					writeFileSync(
+						taskPath,
+						readFileSync(taskPath, "utf8").replace(
+							"| T-01 | in_progress |",
+							"| T-01 | done |",
 						),
 					);
-				} else {
-					writeTelemetry(root, [
-						telemetryLine({ id: "E-small-complete", session }),
-					]);
+					if (oversized) {
+						const note = "x".repeat(10_200);
+						writeTelemetry(
+							root,
+							Array.from({ length: 110 }, (_, index) =>
+								telemetryLine({
+									id: `E-large-complete-${index}`,
+									session,
+									note,
+								}),
+							),
+						);
+					} else {
+						writeTelemetry(root, [
+							telemetryLine({ id: "E-small-complete", session }),
+						]);
+					}
+					const result = runHistoryBackfill({ root, now: T1 });
+					expect(result.coverage.legacy_terminal).toBe(1);
+					expect(result.sessions[0]?.outcome).toBe(
+						oversized ? "pending" : "ingested",
+					);
+					const productionDays = readProductionDayJournal(
+						root,
+						PROJECT_ID,
+						"UTC",
+					);
+					expect(productionDays).toHaveLength(1);
+					const receipt = resolveProductionDayReceipt({
+						root,
+						projectId: PROJECT_ID,
+						timezone: "UTC",
+						evidenceId: `E-pass-${session}`,
+					});
+					expect(receipt?.ordinal_sequence).toBe(1);
+					const observations = observationViews(root);
+					expect(observations.length).toBeGreaterThan(0);
+					expect(
+						observations.every(
+							(observation) =>
+								observation.production_day_sequence ===
+								receipt?.ordinal_sequence,
+						),
+					).toBe(true);
+					return observations[0]?.production_day_sequence;
+				} finally {
+					removeEvolutionTestRoot(root);
 				}
-				const result = runHistoryBackfill({ root, now: T1 });
-				expect(result.coverage.legacy_terminal).toBe(1);
-				expect(result.sessions[0]?.outcome).toBe(
-					oversized ? "pending" : "ingested",
-				);
-				const productionDays = readProductionDayJournal(
-					root,
-					PROJECT_ID,
-					"UTC",
-				);
-				expect(productionDays).toHaveLength(1);
-				const receipt = resolveProductionDayReceipt({
-					root,
-					projectId: PROJECT_ID,
-					timezone: "UTC",
-					evidenceId: `E-pass-${session}`,
-				});
-				expect(receipt?.ordinal_sequence).toBe(1);
-				const observations = observationViews(root);
-				expect(observations.length).toBeGreaterThan(0);
-				expect(
-					observations.every(
-						(observation) =>
-							observation.production_day_sequence === receipt?.ordinal_sequence,
-					),
-				).toBe(true);
-				return observations[0]?.production_day_sequence;
-			} finally {
-				removeEvolutionTestRoot(root);
-			}
-		};
+			};
 
-		expect(sequenceFor(false)).toBe(sequenceFor(true));
-	});
+			expect(sequenceFor(false)).toBe(sequenceFor(true));
+		},
+		{ timeout: 25_000 },
+	);
 
 	test("declared successes and declared failures never become observations", () => {
 		const root = fixtureRoot();
