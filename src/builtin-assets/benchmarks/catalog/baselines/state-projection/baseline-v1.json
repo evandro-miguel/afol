@@ -10,7 +10,7 @@
   "tokenizer_id": "tiktoken-o200k-base",
   "tokenizer_version": "recorded",
   "git_commit": "3297ae1660103ffa77a3d78f0edbf705bd2f8f68",
-  "source_repository": "github.com/evandro-miguel/afol",
+  "source_repository": "github.com/evandro-miguel/afol-internal",
   "timestamp": "2026-08-23T19:30:59.130Z",
   "provenance": "fresh-local-runnable-smoke"
 }

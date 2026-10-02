@@ -1,3 +1,6 @@
+import type { AcceptanceContract } from "../services/benchmark/acceptance";
+import type { RawMetrics } from "../services/benchmark/types";
+
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
 
@@ -129,6 +132,7 @@ export interface Scenario {
 	deterministic_metrics: Record<string, number>;
 	implementation_status?: "implemented" | "planned" | "skipped";
 	live_runner_scenario_id?: string;
+	acceptance?: AcceptanceContract;
 	compiled_binary?: boolean;
 	measurement?: ScenarioMeasurement;
 	runner?: "hot-path";
@@ -239,16 +243,16 @@ export interface BenchmarkResult {
 	baseline_reference: string;
 	threshold_reference: Record<string, number>;
 	pass: boolean;
-	duration_ms: number;
-	timing_p50_ms: number;
-	timing_p95_ms: number;
-	error_count: number;
-	retry_count: number;
-	context_tokens: number;
-	prompt_tokens: number;
-	output_tokens: number;
-	context_bytes: number;
-	output_bytes: number;
+	duration_ms: number | null;
+	timing_p50_ms: number | null;
+	timing_p95_ms: number | null;
+	error_count: number | null;
+	retry_count: number | null;
+	context_tokens: number | null;
+	prompt_tokens: number | null;
+	output_tokens: number | null;
+	context_bytes: number | null;
+	output_bytes: number | null;
 	canonical_write_count?: number;
 	telemetry_append_count?: number;
 	derived_work_calls?: number;
@@ -258,8 +262,18 @@ export interface BenchmarkResult {
 	setup_duration_ms?: number;
 	recovery_duration_ms?: number;
 	argv_chars?: number;
-	tool_call_count: number;
-	tool_success_rate: number;
+	tool_call_count: number | null;
+	tool_success_rate: number | null;
+	observations?: Pick<
+		RawMetrics,
+		"schema_version" | "source" | "tokens" | "timing" | "issues"
+	>;
+	acceptance_checks?: Array<{
+		id: string;
+		exit_code: number | null;
+		duration_ms: number;
+		status: "passed" | "failed" | "blocked";
+	}>;
 	git_commit: string;
 	source_repository?: string;
 	timestamp?: string;

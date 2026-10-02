@@ -138,7 +138,7 @@ function runtimeLiveProfile(snapshot: Record<string, unknown> | null): {
 	const profile = asRecord(snapshot?.benchmark_profile);
 	return {
 		runtime: typeof profile?.runtime === "string" ? profile.runtime : "codex",
-		model: typeof profile?.model === "string" ? profile.model : "gpt-5.4-mini",
+		model: typeof profile?.model === "string" ? profile.model : "gpt-5.6-luna",
 		reasoning_effort:
 			typeof profile?.reasoning_effort === "string"
 				? profile.reasoning_effort

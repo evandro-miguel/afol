@@ -277,6 +277,7 @@ function collectBenchmarkPackResults(
 			projectRoot,
 			scenarios,
 			baselinePath,
+			packScenarios,
 		);
 		return {
 			results: runtimeLiveResults.results.map(applyProjectTokenRule),
@@ -704,7 +705,10 @@ function handleBenchmark(
 		command_family: "validation",
 		mode: "benchmark",
 		timing_mode: timingMode,
-		benchmark_result_schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
+		benchmark_result_schema_version:
+			new Set(results.map((result) => result.schema_version)).size > 1
+				? "mixed"
+				: (results[0]?.schema_version ?? BENCHMARK_RESULT_SCHEMA_VERSION),
 		status,
 		pass: status === "passed",
 		selected_pack_ids: selectedPacks,

@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import { boundedSpawn } from "../core/subprocess";
 import { BUILTIN_ASSET_FILES } from "../generated/builtin-assets";
 import { kernelRegistry } from "../registry";
+import { parseAcceptanceContract } from "../services/benchmark/acceptance";
 import {
 	asNumberRecord,
 	asOptionalNumber,
@@ -250,6 +251,9 @@ function parseScenario(
 		),
 	};
 	const hotPath = parseHotPathScenario(data, sourcePath);
+	if (data.acceptance !== undefined) {
+		scenario.acceptance = parseAcceptanceContract(data.acceptance);
+	}
 	if (hotPath !== undefined) {
 		scenario.runner = "hot-path";
 		scenario.hot_path = hotPath;
@@ -1802,7 +1806,11 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 					`scenario-schema-version-mismatch:${packId}:${scenario.scenario_id}:${scenario.schema_version}`,
 				);
 			}
-			if (scenario.result_schema !== BENCHMARK_RESULT_SCHEMA_VERSION) {
+			const resultSchema =
+				packId === "runtime-live-agent"
+					? "2.0.0"
+					: BENCHMARK_RESULT_SCHEMA_VERSION;
+			if (scenario.result_schema !== resultSchema) {
 				issues.push(
 					`scenario-schema-mismatch:${packId}:${scenario.scenario_id}`,
 				);

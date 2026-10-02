@@ -167,6 +167,7 @@
 			"ctx bundle",
 			"ctx bundle --json [--full]",
 			"ctx bundle --persist-rule-injection",
+			"ctx bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
 			"ctx section --ref <ref>",
 			"ctx explain [--full]",
 			"ctx tools",
