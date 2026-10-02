@@ -6,13 +6,18 @@ claim.
 
 ## Development flow
 
-1. Create a short-lived topic branch from `main`.
+1. Create a short-lived topic branch from `main_dev`.
 2. Install the pinned dependencies with `bun install --frozen-lockfile`.
 3. Make the smallest change that addresses one problem.
 4. Add focused tests for behavior changes.
-5. Open a pull request into `main`.
+5. Open a pull request into `main_dev`.
 6. Merge only through the reviewed pull request; do not push directly to
-   `main`.
+   `main_dev` or `main`.
+
+`main_dev` is the sole development and integration branch. Promotion to
+protected `main` is a separate step that requires the exact `main_dev` tree to
+pass local and hosted checks, review, and explicit approval. This contribution
+guide does not authorize a promotion.
 
 ## Required checks
 
@@ -43,7 +48,8 @@ structure. Release evidence is produced locally against the exact candidate
 SHA. The alpha is source-only: a source tag does not imply a standalone binary
 or registry package. Hosted CI supplies regression evidence but not release
 authorization; see the [continuous integration contract](docs/public/ci.md)
-and ADR-007.
+and ADR-007. The same checks run before integration into `main_dev` and before
+any approved promotion to `main`.
 
 ## Security and privacy
 

@@ -6,19 +6,24 @@ executable, registry package, or hosted update channel.
 
 ## Branch and review
 
-Use the short-lived branch flow:
+`main_dev` is the sole development and integration branch. Keep `main`
+protected. Use the short-lived branch flow:
 
-1. Create a topic branch from `main`.
+1. Create a topic branch from `main_dev`.
 2. Make the smallest focused change and keep the checkout free of unrelated
    state.
 3. Run the relevant local checks against the candidate commit.
-4. Open a pull request into `main` with the exact commit and evidence.
-5. Merge only after review, then tag the reviewed `main` commit when a source
-   release is authorized.
+4. Open a pull request into `main_dev` with the exact commit and evidence.
+5. Merge into `main_dev` only after review and required checks pass.
+6. Promote the validated `main_dev` tree to `main` only after separate review
+   and explicit approval. This process document does not authorize promotion.
+   Tag a `main` commit only when a source release is separately authorized.
 
-Hosted CI validates pull requests and `main`, but local validation against the
-exact candidate SHA remains the canonical release evidence. A green hosted run
-does not satisfy scanner, provenance, publication, or installation gates.
+Hosted CI validates pull requests and pushes to `main_dev` and `main`, with
+`deep-validation` required for pull requests targeting either branch. Local
+validation against the exact candidate SHA remains the canonical release
+evidence. A green hosted run does not satisfy scanner, provenance, publication,
+or installation gates.
 
 ## Source validation
 
@@ -54,8 +59,9 @@ as release evidence.
 
 ## Source release
 
-After the reviewed pull request is merged and the exact commit passes the
-local gate:
+After a `main_dev` candidate passes the local gate, review, and explicit
+approval for promotion, and the resulting `main` source commit passes its exact
+SHA gate:
 
 - record the commit SHA, version, platform claim, and local check results;
 - confirm README and documentation commands work from a clean checkout;
