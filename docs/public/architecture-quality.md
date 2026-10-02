@@ -42,6 +42,16 @@ observational only.
 Selected-surface coverage and whole-tree coverage are different metrics. Do
 not treat them as interchangeable.
 
+Historical benchmark records retain their original measured commit, timestamp,
+runtime, and artifact hash. The optional `source_root_commit` identifies the Git
+history in which they were measured: a public export can reuse the repository
+URL while starting a new history. Baseline and scenario records must agree on
+this root. References to a different history are historical comparison data;
+their commits are not verified by the public checkout and do not establish
+current release readiness. Missing commits in the current history still fail
+validation. Fresh local benchmark runs remain necessary to assess current
+performance.
+
 ## Remaining work
 
 - Decompose high-complexity functions only with behavior-preserving tests.

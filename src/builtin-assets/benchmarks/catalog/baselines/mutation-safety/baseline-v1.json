@@ -7,6 +7,7 @@
   "warmup_count": 1,
   "git_commit": "4c70a4672b164a65d58e0b7244752bc51fd21711",
   "source_repository": "github.com/evandro-miguel/afol",
+  "source_root_commit": "412de5b9943092ea7d6e862fa25964384a19765c",
   "timestamp": "2026-07-29T16:33:06.368Z",
   "provenance": "controlled-local-release-calibration-20260729",
   "host_profile_id": "linux-x64-intel-r-core-tm-i9-14900k",

@@ -11,6 +11,7 @@
   "tokenizer_version": "1",
   "git_commit": "ffbf031e6e68",
   "source_repository": "github.com/evandro-miguel/afol",
+  "source_root_commit": "412de5b9943092ea7d6e862fa25964384a19765c",
   "run_id": "bench-evolution-core-evolution-status-contract-1.1.0",
   "timestamp": "2026-07-26T02:54:28.057Z",
   "results_count": 1,

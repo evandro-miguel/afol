@@ -11,6 +11,7 @@
   "tokenizer_version": "recorded",
   "git_commit": "3297ae1660103ffa77a3d78f0edbf705bd2f8f68",
   "source_repository": "github.com/evandro-miguel/afol",
+  "source_root_commit": "412de5b9943092ea7d6e862fa25964384a19765c",
   "timestamp": "2026-08-23T19:30:59.130Z",
   "provenance": "fresh-local-runnable-smoke"
 }

@@ -409,7 +409,7 @@ describe("kernel front-door", () => {
 			expect(proc.stdout as string).toContain("Commands");
 			expect(proc.stdout as string).toContain("s/status");
 			expect(proc.stdout as string).toContain(
-				"s/status[read] - project status",
+				"s/status[read]: project status",
 			);
 			expect(proc.stdout as string).toContain("v/validate");
 			expect(proc.stdout as string).toContain("n/new");

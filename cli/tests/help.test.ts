@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,7 +14,15 @@ import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
-const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 610;
+const ROOT_HELP_OUTPUT_TOKEN_BUDGET = JSON.parse(
+	readFileSync(
+		join(
+			repoRoot,
+			"src/builtin-assets/benchmarks/catalog/scenarios/token-economy/token-help.json",
+		),
+		"utf8",
+	),
+).thresholds.max_output_tokens as number;
 
 function estimateOutputTokens(output: string): number {
 	return Math.ceil(Buffer.byteLength(output, "utf8") / 4);
@@ -38,18 +46,18 @@ describe("help formatter", () => {
 		expect(help).toContain("Commands");
 		expect(help).toContain("\n  s/status");
 		expect(help).toContain("s/status");
-		expect(help).toContain("s/status[read] - project status");
+		expect(help).toContain("s/status[read]: project status");
 		expect(help).toContain("v/validate");
-		expect(help).toContain("v/validate[read] - validation gates");
+		expect(help).toContain("v/validate[read]: checks");
 		expect(help).toContain("n/new");
 		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
-		expect(help).toContain("evolve[read] - evolution status");
+		expect(help).toContain("evolve[read]: evolution status");
 		expect(help).toContain(
-			"pb/project-benchmark[generated] - compare references",
+			"pb/project-benchmark[generated]: compare references",
 		);
-		expect(help).toContain("fleet[write] - fleet state");
+		expect(help).toContain("fleet[write]: fleet state");
 		expect(help).toContain("Side effects");
 		expect(help).toContain("read=none");
 		expect(help).toContain("write=state");
@@ -105,7 +113,7 @@ describe("help formatter", () => {
 		for (const spec of kernelRegistry.commands) {
 			const alias = spec.aliases[0];
 			const name = alias ? `${alias}/${spec.command}` : spec.command;
-			expect(help).toContain(`${name}[${spec.sideEffect}] - `);
+			expect(help).toContain(`${name}[${spec.sideEffect}]: `);
 		}
 	});
 

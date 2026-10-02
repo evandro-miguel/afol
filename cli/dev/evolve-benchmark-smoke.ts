@@ -51,7 +51,7 @@ const CONTRACT = JSON.parse(
 		resolve(
 			import.meta.dir,
 			"../..",
-			".afol/data/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
+			"src/builtin-assets/benchmarks/catalog/scenarios/evolution-core/evolution-status-contract.json",
 		),
 		"utf8",
 	),

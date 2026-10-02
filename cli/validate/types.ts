@@ -39,6 +39,7 @@ export interface ScenarioMeasurement {
 	warmup_count?: number;
 	git_commit?: string;
 	source_repository?: string;
+	source_root_commit?: string;
 	timestamp?: string;
 }
 
@@ -189,6 +190,7 @@ export interface Baseline {
 	warmup_count?: number;
 	git_commit?: string;
 	source_repository?: string;
+	source_root_commit?: string;
 	timestamp?: string;
 	provenance?: string;
 	host_profile_id?: string;

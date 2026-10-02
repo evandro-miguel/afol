@@ -27,39 +27,37 @@ credentials, raw private transcripts, production data, or secrets in AFOL.
 Start by reading this file and the repository's own documentation. Then use:
 
 ```bash
-afol status
-afol session status
-afol work list
+afol s
+afol ss list
 afol help <command>
 ```
 
-If a session or work item is active, resume it before creating overlapping work.
-Use `afol preflight` before operations that depend on project integrity.
+Resume active work before creating an overlapping session.
 
 ## Work lifecycle
 
-Create or select a spec before substantial implementation:
+For a small change, replace `<check>` with the project's verification command:
 
 ```bash
-afol spec list
-afol spec create <id> --title "..."
-afol session start --spec <id>
-afol work start <work-id>
+afol qt verified-change -t "Verify the change" -c "<check>"
 ```
 
-During work, record only decisions and evidence that another agent needs to
-continue safely. Keep implementation details in code, tests, and focused docs.
+`qt` creates, starts, verifies, completes, and closes the session. Repeat `-t`
+when several tasks share one check; the check runs once.
 
-Before completion:
+For staged work, select an approved roadmap feature and parent spec:
 
 ```bash
-afol validate
-afol work done <work-id> --evidence "<command and observed result>"
-afol session close
+afol n verified-work -F <F-id> -P <spec-id> -t "Verify the change"
+afol st T-01
+afol d T-01 -x "<check>"
+afol c
 ```
 
-Do not mark work complete from intention alone. Evidence must name the command,
-artifact, or observed behavior that proves the acceptance criteria.
+`d -x` records the observed check result. A failed check leaves the task open.
+Missing governance produces a `pending_spec` warning; resolve it with
+`afol gov rs -F <F-id> -P <spec-id>`. Keep durable decisions in the session log
+and implementation details in code and tests.
 
 ## Specs and evidence
 
