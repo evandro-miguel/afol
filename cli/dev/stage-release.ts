@@ -582,13 +582,20 @@ function assertStageTarget(stageDir: string): void {
 	}
 }
 
-function publishStage(tempDir: string, stageDir: string): void {
+function publishStage(tempDir: string, stageDir: string, cwd: string): void {
 	const parent = resolve(stageDir, "..");
 	const backup = `${stageDir}.previous-${process.pid}-${Date.now()}`;
 	let movedExisting = false;
 	try {
 		assertStageTarget(stageDir);
 		if (existsSync(stageDir)) {
+			try {
+				verifyStagedRelease({ cwd, stageDir });
+			} catch {
+				throw new Error(
+					`refusing to replace an unverified release stage: ${stageDir}`,
+				);
+			}
 			renameSync(stageDir, backup);
 			movedExisting = true;
 		}
@@ -721,7 +728,7 @@ export function stageRelease(
 		});
 		syncDirectoryDurablyIfSupported(tempDir);
 		verifyStagedRelease({ cwd, stageDir: tempDir });
-		publishStage(tempDir, stageDir);
+		publishStage(tempDir, stageDir, cwd);
 		return {
 			stageDir,
 			assetName: ASSET_NAME,

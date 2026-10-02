@@ -965,6 +965,100 @@ describe("release staging", () => {
 		}
 	});
 
+	test("preserves an unrecognized directory at the stage destination", () => {
+		const fixtureState = fixture();
+		try {
+			mkdirSync(fixtureState.stageDir, { recursive: true });
+			writeFileSync(
+				join(fixtureState.stageDir, "notes.txt"),
+				"user-owned bytes\n",
+			);
+			const before = snapshotFiles(fixtureState.stageDir);
+			expect(() => stageRelease({ cwd: fixtureState.root })).toThrow(
+				"refusing to replace an unverified release stage",
+			);
+			expect(snapshotFiles(fixtureState.stageDir)).toEqual(before);
+			expect(readdirSync(join(fixtureState.stageDir, ".."))).toEqual([
+				"afol-linux-x64",
+			]);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves a modified prior stage instead of deleting extra files", () => {
+		const fixtureState = fixture();
+		try {
+			stageRelease({ cwd: fixtureState.root });
+			writeFileSync(
+				join(fixtureState.stageDir, "notes.txt"),
+				"user-owned bytes\n",
+			);
+			const before = snapshotFiles(fixtureState.stageDir);
+			expect(() => stageRelease({ cwd: fixtureState.root })).toThrow(
+				"refusing to replace an unverified release stage",
+			);
+			expect(snapshotFiles(fixtureState.stageDir)).toEqual(before);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	test("replaces a verified prior stage with a different source and artifact", () => {
+		const fixtureState = fixture();
+		try {
+			stageRelease({ cwd: fixtureState.root });
+			const artifact = Buffer.from("new deterministic binary\n");
+			const artifactHash = sha256(artifact);
+			const commitSha = "b".repeat(40);
+			writeFileSync(join(fixtureState.root, "dist/afol"), artifact);
+			const provenancePath = join(
+				fixtureState.root,
+				"dist/afol.provenance.json",
+			);
+			const provenance = JSON.parse(readFileSync(provenancePath, "utf8"));
+			writeJson(provenancePath, {
+				...provenance,
+				sha256: artifactHash,
+				size_bytes: artifact.byteLength,
+				commit_sha: commitSha,
+			});
+			const securityPath = join(
+				fixtureState.root,
+				"dist/security-scan.release.json",
+			);
+			const security = JSON.parse(readFileSync(securityPath, "utf8"));
+			writeJson(securityPath, {
+				...security,
+				target: {
+					...security.target,
+					artifact_sha256: artifactHash,
+					commit_sha: commitSha,
+				},
+			});
+			const reviewPath = join(
+				fixtureState.root,
+				"release/compliance/linux-x64/compliance-review.json",
+			);
+			const review = JSON.parse(readFileSync(reviewPath, "utf8"));
+			writeJson(reviewPath, {
+				...review,
+				artifact_sha256: artifactHash,
+				source_commit_sha: commitSha,
+			});
+			const stage = stageRelease({ cwd: fixtureState.root });
+			expect(stage.artifactSha256).toBe(artifactHash);
+			expect(stage.artifactSha256).not.toBe(fixtureState.artifactHash);
+			const verified = verifyStagedRelease({
+				cwd: fixtureState.root,
+				stageDir: stage.stageDir,
+			});
+			expect(verified.provenance.commit_sha).toBe(commitSha);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
 	for (const stageDir of ["dist/release/candidate", "dist/afol"]) {
 		test(`preserves an existing file at ${stageDir}`, () => {
 			const fixtureState = fixture();
