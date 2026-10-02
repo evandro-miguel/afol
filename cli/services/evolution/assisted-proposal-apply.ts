@@ -11,11 +11,6 @@ import {
 	writeSync,
 } from "node:fs";
 import {
-	backupPath,
-	readJournalBackupBytes,
-	resolveJournalBackupPath,
-} from "../../commands/file/shared";
-import {
 	atomicWriteText,
 	atomicWriteTextPreservingMetadata,
 } from "../io/atomic";
@@ -29,6 +24,11 @@ import {
 	type MutationRecord,
 	withMutationJournalLock,
 } from "../mutations/journal";
+import {
+	backupPath,
+	readJournalBackupBytes,
+	resolveJournalBackupPath,
+} from "../mutations/shared";
 import { readProjectConfig } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 import { verifyArtifactReference } from "./artifact-inspection";
