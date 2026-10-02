@@ -476,77 +476,71 @@ describe("observation-ingest", () => {
 		).toThrow("Session folder not found");
 	});
 
-	test.each(["symlink", "hardlink"] as const)(
-		"rejects an unsafe evidence target (%s) before mutation",
-		(mode) => {
-			if (mode === "symlink" && !symlinkTestSupport.available) return;
-			const root = fixtureRoot();
-			const session = "S-unsafe-evidence";
-			seedCompleteEvidence(root, session);
-			const evidencePath = join(
+	test.each([
+		"symlink",
+		"hardlink",
+	] as const)("rejects an unsafe evidence target (%s) before mutation", (mode) => {
+		if (mode === "symlink" && !symlinkTestSupport.available) return;
+		const root = fixtureRoot();
+		const session = "S-unsafe-evidence";
+		seedCompleteEvidence(root, session);
+		const evidencePath = join(root, ".afol", "wb", session, ".evidence.jsonl");
+		const outside = join(root, "evidence-target.jsonl");
+		if (mode === "symlink") {
+			writeFileSync(outside, readFileSync(evidencePath));
+			rmSync(evidencePath);
+			symlinkSync(outside, evidencePath);
+		} else {
+			linkSync(evidencePath, outside);
+		}
+
+		expect(() =>
+			ingestObservationsForSession({
 				root,
-				".afol",
-				"wb",
+				projectId: PROJECT_ID,
 				session,
-				".evidence.jsonl",
-			);
-			const outside = join(root, "evidence-target.jsonl");
-			if (mode === "symlink") {
-				writeFileSync(outside, readFileSync(evidencePath));
-				rmSync(evidencePath);
-				symlinkSync(outside, evidencePath);
-			} else {
-				linkSync(evidencePath, outside);
-			}
+			}),
+		).toThrow(/session evidence ledger|hardlinked/);
+		expect(existsSync(evolutionDbPath(root))).toBe(false);
+		expect(existsSync(observationJournalPath(root))).toBe(false);
+		expect(existsSync(productionDayJournalPath(root))).toBe(false);
+	});
 
-			expect(() =>
-				ingestObservationsForSession({
-					root,
-					projectId: PROJECT_ID,
-					session,
-				}),
-			).toThrow(/session evidence ledger|hardlinked/);
-			expect(existsSync(evolutionDbPath(root))).toBe(false);
-			expect(existsSync(observationJournalPath(root))).toBe(false);
-			expect(existsSync(productionDayJournalPath(root))).toBe(false);
-		},
-	);
+	test.each([
+		"symlink",
+		"hardlink",
+	] as const)("rejects an unsafe task target (%s) before mutation", (mode) => {
+		if (mode === "symlink" && !symlinkTestSupport.available) return;
+		const root = fixtureRoot();
+		const session = "S-unsafe-task";
+		seedCompleteEvidence(root, session);
+		const taskPath = join(
+			root,
+			".afol",
+			"wb",
+			session,
+			`${session}_task_01.md`,
+		);
+		const outside = join(root, "task-target.md");
+		if (mode === "symlink") {
+			writeFileSync(outside, readFileSync(taskPath));
+			rmSync(taskPath);
+			symlinkSync(outside, taskPath);
+		} else {
+			linkSync(taskPath, outside);
+		}
 
-	test.each(["symlink", "hardlink"] as const)(
-		"rejects an unsafe task target (%s) before mutation",
-		(mode) => {
-			if (mode === "symlink" && !symlinkTestSupport.available) return;
-			const root = fixtureRoot();
-			const session = "S-unsafe-task";
-			seedCompleteEvidence(root, session);
-			const taskPath = join(
+		expect(() =>
+			ingestObservationsForSession({
 				root,
-				".afol",
-				"wb",
+				projectId: PROJECT_ID,
 				session,
-				`${session}_task_01.md`,
-			);
-			const outside = join(root, "task-target.md");
-			if (mode === "symlink") {
-				writeFileSync(outside, readFileSync(taskPath));
-				rmSync(taskPath);
-				symlinkSync(outside, taskPath);
-			} else {
-				linkSync(taskPath, outside);
-			}
-
-			expect(() =>
-				ingestObservationsForSession({
-					root,
-					projectId: PROJECT_ID,
-					session,
-				}),
-			).toThrow(/session task file|hardlinked/);
-			expect(existsSync(evolutionDbPath(root))).toBe(false);
-			expect(existsSync(observationJournalPath(root))).toBe(false);
-			expect(existsSync(productionDayJournalPath(root))).toBe(false);
-		},
-	);
+			}),
+		).toThrow(/session task file|hardlinked/);
+		expect(existsSync(evolutionDbPath(root))).toBe(false);
+		expect(existsSync(observationJournalPath(root))).toBe(false);
+		expect(existsSync(productionDayJournalPath(root))).toBe(false);
+	});
 
 	test("rejects an oversized evidence source before parsing or mutation", () => {
 		const root = fixtureRoot();

@@ -159,20 +159,17 @@ describe("operation-context", () => {
 	test.each([
 		["note", "annotate"],
 		["clear", "purge"],
-	] as const)(
-		"feedback alias %s keeps restricted write policy",
-		(alias, action) => {
-			expect(
+	] as const)("feedback alias %s keeps restricted write policy", (alias, action) => {
+		expect(resolveCanonicalAction({ kind: "feedback", args: [alias] })).toEqual(
+			{ action: `feedback.${action}`, sideEffect: "write" },
+		);
+		expect(
+			isActionAllowed(
+				agentOperationContext(),
 				resolveCanonicalAction({ kind: "feedback", args: [alias] }),
-			).toEqual({ action: `feedback.${action}`, sideEffect: "write" });
-			expect(
-				isActionAllowed(
-					agentOperationContext(),
-					resolveCanonicalAction({ kind: "feedback", args: [alias] }),
-				),
-			).toBe(false);
-		},
-	);
+			),
+		).toBe(false);
+	});
 
 	test.each([
 		agentOperationContext(),
@@ -268,27 +265,27 @@ describe("operation-context", () => {
 		expect(isActionAllowed(agentOperationContext(), review)).toBe(false);
 	});
 
-	test.each(["apply", "rollback"] as const)(
-		"evolve %s is local-interactive only",
-		(action) => {
-			const policy = resolveCanonicalAction({
-				kind: "subcommand",
-				group: "evolve",
-				action,
-				args: ["EVO-1", "--json"],
-			});
-			expect(policy).toEqual({
-				action: `evolve.${action}`,
-				sideEffect: "write",
-			});
-			expect(isActionAllowed(defaultOperationContext(), policy)).toBe(false);
-			expect(
-				isActionAllowed(resolveOperationContext([], {}, true).ctx, policy),
-			).toBe(true);
-			expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
-			expect(isActionAllowed(remoteOperationContext(), policy)).toBe(false);
-		},
-	);
+	test.each([
+		"apply",
+		"rollback",
+	] as const)("evolve %s is local-interactive only", (action) => {
+		const policy = resolveCanonicalAction({
+			kind: "subcommand",
+			group: "evolve",
+			action,
+			args: ["EVO-1", "--json"],
+		});
+		expect(policy).toEqual({
+			action: `evolve.${action}`,
+			sideEffect: "write",
+		});
+		expect(isActionAllowed(defaultOperationContext(), policy)).toBe(false);
+		expect(
+			isActionAllowed(resolveOperationContext([], {}, true).ctx, policy),
+		).toBe(true);
+		expect(isActionAllowed(agentOperationContext(), policy)).toBe(false);
+		expect(isActionAllowed(remoteOperationContext(), policy)).toBe(false);
+	});
 
 	test("assisted proposal evaluation preview is readable while recording is local-interactive only", () => {
 		const versionArgs = [

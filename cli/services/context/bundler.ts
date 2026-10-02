@@ -5,7 +5,7 @@ import {
 	HookResolverError,
 	resolveHooks,
 } from "../catalog/hooks";
-import { listSkills, searchSkills } from "../catalog/skills";
+import { searchSkills } from "../catalog/skills";
 import {
 	activatedSkillNames,
 	approvedLessonViews,

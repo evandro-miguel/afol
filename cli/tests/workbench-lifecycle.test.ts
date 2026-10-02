@@ -33,7 +33,10 @@ import {
 	validateFilesIndex,
 } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
-import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
+import {
+	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import {
 	admitsEvidenceTransitionIssue,
 	transitionAdmitEvidence,
@@ -67,7 +70,6 @@ import {
 	readSessionContext,
 	resolveSession,
 } from "../services/workbench/session-context";
-import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { sessionPaths } from "../services/workbench/session-reader";
 import {
 	briefingUnavailableFor,

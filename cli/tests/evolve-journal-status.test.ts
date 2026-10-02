@@ -21,8 +21,8 @@ import {
 	repairEvolutionDerivedState,
 } from "../services/evolution";
 import { productionDayValidationDependencies } from "../services/evolution/journal";
-import { checkAreaHealth } from "../services/health/checker";
 import { resolveEvolutionRuntime } from "../services/evolution/runtime-config";
+import { checkAreaHealth } from "../services/health/checker";
 import {
 	releaseEvolutionTestHandles,
 	removeEvolutionTestRoot,

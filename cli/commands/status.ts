@@ -98,7 +98,6 @@ type StatusJsonData = {
 };
 
 const COMPACT_LIST_LIMIT = 5;
-const QT_START_ACTION = 'afol qt <theme> -t "<task>" -c "<cmd>"';
 
 const FIELD_HEADERS = [
 	"STATUS",
