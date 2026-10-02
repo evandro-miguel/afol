@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -482,6 +483,312 @@ function writeCoordinationRadarHook(root: string): void {
 }
 
 describe("context system", () => {
+	test("CLI delivers rules, acknowledged deltas and context-reset recovery", () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const call = (extra: string[]) => {
+				const result = spawnSync(
+					process.execPath,
+					[
+						join(import.meta.dir, "..", "main.ts"),
+						"ctx",
+						"bundle",
+						"--json",
+						"--surface",
+						"alpha",
+						...extra,
+					],
+					{ cwd: root, encoding: "utf8" },
+				);
+				expect(result.status).toBe(0);
+				return JSON.parse(result.stdout).data.rule_injection;
+			};
+			const identity = ["--consumer", "cli-a", "--context-epoch", "1"];
+			const first = call(identity);
+			expect(first.injected[0].content).toContain("Alpha rule");
+			const delta = call([...identity, "--ack-rules", first.base_digest]);
+			expect(delta.injected).toEqual([]);
+			expect(delta.already_injected[0].id).toBe("RULE-ALPHA");
+			expect(
+				call([
+					"--consumer",
+					"cli-a",
+					"--context-epoch",
+					"2",
+					"--ack-rules",
+					first.base_digest,
+				]).injected,
+			).toHaveLength(1);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("budget trimming preserves required multibyte rules and disables partial-base acknowledgement", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: { max_chars_per_rule: 20000, max_chars_total: 20000 },
+					},
+				}),
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "REQUIRED",
+							name: "required",
+							path: "alpha.md",
+							surfaces: ["alpha"],
+							inject: "always",
+							required: true,
+							priority: 100,
+						},
+						{
+							id: "OPTIONAL",
+							name: "optional",
+							path: "optional.md",
+							surfaces: ["alpha"],
+							inject: "always",
+							priority: 90,
+						},
+					],
+				}),
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"🧭 Preserve required constraints.\n",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "optional.md"),
+				"Optional details.\n".repeat(700),
+			);
+			const bundle = buildContextBundle(root, {
+				surface: "alpha",
+				consumer: "a",
+				contextEpoch: "1",
+				persistRuleInjection: true,
+			});
+			expect(bundle.rule_injection.injected.map((r) => r.id)).toEqual([
+				"REQUIRED",
+			]);
+			expect(bundle.rule_injection.injected[0]?.content).toContain("🧭");
+			expect(bundle.rule_injection.base_digest).toBeNull();
+			expect(bundle.budget.used_tokens).toBeLessThanOrEqual(
+				bundle.budget.total_tokens,
+			);
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			);
+			expect(
+				Object.keys(state.identities[bundle.rule_injection.identity].rules),
+			).toEqual(["REQUIRED"]);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("consumer options reject incomplete identities and malformed acknowledgement", async () => {
+		const root = createBundleFixture();
+		try {
+			for (const args of [
+				["--consumer", "a"],
+				["--ack-rules", "0".repeat(64)],
+				["--consumer", "a", "--context-epoch", "1", "--ack-rules", "bad"],
+			]) {
+				const captured = captureIo();
+				expect(
+					await runContextCommand(
+						"bundle",
+						["--json", ...args],
+						root,
+						captured.io,
+					),
+				).not.toBe(0);
+				expect(JSON.parse(captured.stdout[0] ?? "{}").ok).toBe(false);
+			}
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("required bundle rules cannot be trimmed or recorded on budget failure", async () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: { max_chars_per_rule: 20000, max_chars_total: 20000 },
+					},
+				}),
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-REQUIRED",
+							name: "required",
+							path: "alpha.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							required: true,
+						},
+					],
+				}),
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"Mandatory constraint.\n".repeat(700),
+			);
+			const captured = captureIo();
+			const code = await runContextCommand(
+				"bundle",
+				["--json", "--surface", "alpha", "--persist-rule-injection"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}").error.code).toBe(
+				"CTX_BUDGET_INSUFFICIENT",
+			);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("compact context discloses missing task and summary-only scope", () => {
+		const root = createBundleFixture();
+		try {
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-99",
+				mode: "compact",
+			});
+			expect(bundle.gaps).toContain("missing task record");
+			expect(bundle.gaps).toContain(
+				"compact summary only; load balanced context before execution",
+			);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("unmatched skills do not fall back to the project catalog", () => {
+		const root = createBundleFixture();
+		try {
+			expect(
+				buildContextBundle(root, { surface: "unrelated", role: "unrelated" })
+					.skills,
+			).toEqual([]);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("Python project gets only its declared stack checks", () => {
+		const root = createBundleFixture();
+		try {
+			writeAlphaHook(root);
+			const path = join(root, ".afol", "adm", "hooks", "index.json");
+			const hooks = JSON.parse(readFileSync(path, "utf8"));
+			hooks.hooks[0].contributions.validation_commands = ["python -m pytest"];
+			writeFileSync(path, JSON.stringify(hooks));
+			const bundle = buildContextBundle(root, {
+				surface: "alpha",
+				role: "designer",
+			});
+			expect(bundle.validation_commands).toContain("python -m pytest");
+			expect(
+				[...bundle.validation_commands, ...bundle.tools].some((command) =>
+					command.startsWith("bun "),
+				),
+			).toBe(false);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("persisted rule delivery is not proof of consumer memory", () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const options = {
+				session: "session-1",
+				task: "T-01",
+				surface: "alpha",
+				persistRuleInjection: true,
+			};
+			buildContextBundle(root, options);
+			expect(
+				buildContextBundle(root, options).rule_injection.injected.map(
+					(rule) => rule.id,
+				),
+			).toEqual(["RULE-ALPHA"]);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
+	test("rule deltas require a matching consumer epoch and acknowledged base", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			async function bundle(consumer: string, epoch: string, ack?: string) {
+				const captured = captureIo();
+				const args = [
+					"--json",
+					"--surface",
+					"alpha",
+					"--consumer",
+					consumer,
+					"--context-epoch",
+					epoch,
+					...(ack ? ["--ack-rules", ack] : []),
+				];
+				expect(await runContextCommand("bundle", args, root, captured.io)).toBe(
+					0,
+				);
+				return JSON.parse(captured.stdout[0] ?? "{}").data.rule_injection;
+			}
+			const first = await bundle("agent-a", "1");
+			expect(first.injected).toHaveLength(1);
+			expect(first.base_digest).toMatch(/^[a-f0-9]{64}$/);
+			expect(
+				(await bundle("agent-a", "1", first.base_digest)).already_injected,
+			).toHaveLength(1);
+			expect(
+				(await bundle("agent-b", "1", first.base_digest)).injected,
+			).toHaveLength(1);
+			expect(
+				(await bundle("agent-a", "2", first.base_digest)).injected,
+			).toHaveLength(1);
+			expect(
+				(await bundle("agent-a", "1", "0".repeat(64))).injected,
+			).toHaveLength(1);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"Updated required guidance.\n",
+			);
+			expect(
+				(await bundle("agent-a", "1", first.base_digest)).injected,
+			).toHaveLength(1);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			removeTestRoot(root);
+		}
+	});
+
 	test("rebuildSectionIndex creates valid index from spec and adr files", () => {
 		const root = createSectionFixture();
 		try {
@@ -669,7 +976,7 @@ describe("context system", () => {
 			expect(bundle.validation_commands).toContain(
 				"afol state validate -S session-1",
 			);
-			expect(bundle.validation_commands).toContain("bun test");
+			expect(bundle.validation_commands).not.toContain("bun test");
 		} finally {
 			removeTestRoot(root);
 		}
@@ -754,6 +1061,8 @@ describe("context system", () => {
 				role: "designer",
 				surface: "alpha",
 				persistRuleInjection: true,
+				consumer: "test-agent",
+				contextEpoch: "1",
 			});
 			expect(first.rule_injection.first_use).toBe(true);
 			expect(first.rule_injection.injected.map((rule) => rule.id)).toEqual([
@@ -784,6 +1093,8 @@ describe("context system", () => {
 				"task:T-01",
 				"role:designer",
 				"surface:alpha",
+				"consumer:test-agent",
+				"epoch:1",
 			].join("|");
 			expect(identities).toEqual([expectedIdentity]);
 			expect(state.identities[identities[0] ?? ""]?.file_path).toBeNull();
@@ -796,7 +1107,10 @@ describe("context system", () => {
 				task: "T-01",
 				role: "designer",
 				surface: "alpha",
+				acknowledgedRules: first.rule_injection.base_digest ?? "",
 				persistRuleInjection: true,
+				consumer: "test-agent",
+				contextEpoch: "1",
 			});
 			expect(second.rule_injection.first_use).toBe(false);
 			expect(second.rule_injection.injected).toEqual([]);
@@ -884,6 +1198,8 @@ describe("context system", () => {
 				role: "designer",
 				surface: "alpha",
 				persistRuleInjection: true,
+				consumer: "test-agent",
+				contextEpoch: "1",
 			});
 			expect(first.rule_injection.injected[0]?.content).toBe(body);
 			expect(first.rule_injection.injected[0]?.char_count).toBe(body.length);
@@ -918,7 +1234,10 @@ describe("context system", () => {
 				task: "T-01",
 				role: "designer",
 				surface: "alpha",
+				acknowledgedRules: first.rule_injection.base_digest ?? "",
 				persistRuleInjection: true,
+				consumer: "test-agent",
+				contextEpoch: "1",
 			});
 			expect(second.rule_injection.injected).toEqual([]);
 			expect(
@@ -952,6 +1271,8 @@ describe("context system", () => {
 				role: "designer",
 				surface: "alpha",
 				persistRuleInjection: true,
+				consumer: "test-agent",
+				contextEpoch: "1",
 			});
 			expect(first.rule_injection.injected[0]?.content).toContain("Initial");
 
@@ -966,7 +1287,10 @@ describe("context system", () => {
 				task: "T-01",
 				role: "designer",
 				surface: "alpha",
+				acknowledgedRules: first.rule_injection.base_digest ?? "",
 				persistRuleInjection: true,
+				consumer: "test-agent",
+				contextEpoch: "1",
 			});
 			expect(second.rule_injection.injected.map((rule) => rule.id)).toEqual([
 				"RULE-ALPHA",
@@ -3141,7 +3465,7 @@ describe("context system", () => {
 				),
 			).toBe(0);
 			expect(captured.stdout[0]).toContain("afol ctx section");
-			expect(captured.stdout[0]).toContain("bun test");
+			expect(captured.stdout[0]).toContain("afol validate project --json");
 		} finally {
 			removeTestRoot(root);
 		}
@@ -3182,7 +3506,9 @@ describe("context system", () => {
 			expect(payload.action).toBe("ctx.tools");
 			expect(payload.exit_code).toBe(0);
 			expect(payload.data.tools.join("\n")).toContain("afol ctx section");
-			expect(payload.tools.join("\n")).toContain("bun test");
+			expect(payload.tools.join("\n")).toContain(
+				"afol validate project --json",
+			);
 		} finally {
 			removeTestRoot(root);
 		}

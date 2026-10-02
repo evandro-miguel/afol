@@ -5,16 +5,15 @@ import {
 	HookResolverError,
 	resolveHooks,
 } from "../catalog/hooks";
-import { listSkills, searchSkills } from "../catalog/skills";
+import { searchSkills } from "../catalog/skills";
 import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
 import {
 	deriveRuleSelectionContext,
-	forgetRecordedRuleInjections,
 	RuleInjectionError,
-	resolveAndRecordRuleInjection,
+	recordRuleInjection,
 	resolveContextRules,
 	resolveRuleInjection,
 	resolveRuleInjectionShape,
@@ -43,7 +42,19 @@ type BuildOptions = {
 	mode?: ContextRetrievalMode;
 	trusted?: boolean;
 	persistRuleInjection?: boolean;
+	consumer?: string;
+	contextEpoch?: string;
+	acknowledgedRules?: string;
 };
+
+export class ContextBudgetError extends Error {
+	constructor(used: number, available: number) {
+		super(
+			`Context requires at least ${used} estimated tokens; budget is ${available}. Use a larger mode or reduce optional project context.`,
+		);
+		this.name = "ContextBudgetError";
+	}
+}
 
 export class ContextTrustError extends Error {
 	readonly code = "CTX_TRUST_ERROR";
@@ -187,6 +198,7 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 		...bundle.gaps,
 		...bundle.do_not_load,
 		bundle.rule_injection.identity,
+		bundle.rule_injection.base_digest ?? "",
 		bundle.rule_injection.state_path,
 		...bundle.rule_injection.injected.flatMap((rule) => [
 			rule.id,
@@ -300,9 +312,9 @@ function selectRules(
 
 function selectSkills(root: string, surface: string, role: string): string[] {
 	const query = [surface, role].filter(Boolean).join(" ").trim();
-	const matches = query ? searchSkills(root, query) : listSkills(root);
-	const selected = matches.length > 0 ? matches : listSkills(root);
-	return selected.slice(0, 5).map((skill) => skill.name);
+	return (query ? searchSkills(root, query) : [])
+		.slice(0, 5)
+		.map((skill) => skill.name);
 }
 
 function selectHooks(
@@ -374,8 +386,6 @@ function selectTools(
 		"afol pstr validate",
 		"afol state validate",
 		"afol validate project --json",
-		"bun run typecheck",
-		"bun test",
 	];
 	if (session) {
 		tools.splice(2, 0, `afol state validate -S ${session}`);
@@ -392,11 +402,7 @@ function selectValidationCommands(
 	session: string | undefined,
 	task: string | undefined,
 ): string[] {
-	const commands = [
-		"bun run typecheck",
-		"bun test",
-		"afol validate project --json",
-	];
+	const commands = ["afol validate project --json"];
 	if (session && task) {
 		commands.unshift(`afol state validate -S ${session}`);
 	}
@@ -516,10 +522,15 @@ function assertTrustedContext(root: string, session: string | undefined): void {
 }
 
 function omitLastInjectedRuleForBudget(next: ContextBundle): string | null {
-	const removed = next.rule_injection.injected.pop();
+	const index = next.rule_injection.injected.findLastIndex(
+		(rule) => !rule.required,
+	);
+	const removed =
+		index < 0 ? undefined : next.rule_injection.injected.splice(index, 1)[0];
 	if (!removed) {
 		return null;
 	}
+	next.rule_injection.base_digest = null;
 	next.rule_injection.budget.used_chars = Math.max(
 		0,
 		next.rule_injection.budget.used_chars - removed.char_count,
@@ -534,13 +545,8 @@ function omitLastInjectedRuleForBudget(next: ContextBundle): string | null {
 	return removed.id;
 }
 
-function trimToBudget(
-	root: string,
-	bundle: ContextBundle,
-	options: { persistRuleInjection?: boolean } = {},
-): ContextBundle {
+function trimToBudget(bundle: ContextBundle): ContextBundle {
 	const next = structuredClone(bundle) as ContextBundle;
-	const omittedPersistedRuleIds: string[] = [];
 	while (estimateBundleTokens(next) > next.budget.total_tokens) {
 		if (next.expanded_sections && next.expanded_sections.length > 0) {
 			const last = next.expanded_sections[next.expanded_sections.length - 1];
@@ -596,21 +602,16 @@ function trimToBudget(
 		if (next.rule_injection.injected.length > 0) {
 			const omittedRuleId = omitLastInjectedRuleForBudget(next);
 			if (omittedRuleId) {
-				omittedPersistedRuleIds.push(omittedRuleId);
+				continue;
 			}
-			continue;
 		}
 		break;
 	}
 	next.budget.used_tokens = estimateBundleTokens(next);
-	if (
-		options.persistRuleInjection === true &&
-		omittedPersistedRuleIds.length > 0
-	) {
-		forgetRecordedRuleInjections(
-			root,
-			next.rule_injection.identity,
-			omittedPersistedRuleIds,
+	if (next.budget.used_tokens > next.budget.total_tokens) {
+		throw new ContextBudgetError(
+			next.budget.used_tokens,
+			next.budget.total_tokens,
 		);
 	}
 	return next;
@@ -660,12 +661,15 @@ export function buildContextBundle(
 		...(taskId ? { task: taskId } : {}),
 		...(scope ? { scope } : {}),
 		...(filePath ? { filePath } : {}),
+		...(opts.consumer ? { consumer: opts.consumer } : {}),
+		...(opts.contextEpoch ? { contextEpoch: opts.contextEpoch } : {}),
+		...(opts.acknowledgedRules
+			? { acknowledgedRules: opts.acknowledgedRules }
+			: {}),
 	};
 	const ruleInjection = compact
 		? resolveRuleInjectionShape(root, ruleInjectionOptions)
-		: opts.persistRuleInjection === true
-			? resolveAndRecordRuleInjection(root, ruleInjectionOptions)
-			: resolveRuleInjection(root, ruleInjectionOptions);
+		: resolveRuleInjection(root, ruleInjectionOptions);
 	const hookEntries = compact
 		? []
 		: selectHooks(root, {
@@ -738,21 +742,24 @@ export function buildContextBundle(
 					...hookLibraryRefs,
 				]),
 		budget: { total_tokens: totalTokens, used_tokens: 0 },
-		gaps: compact
-			? []
-			: [
-					!session ? "missing session" : "",
-					!task ? "missing task record" : "",
-					sections.length === 0 ? "no matching spec sections" : "",
-					state ? "" : "no hydrated session state",
-				].filter(Boolean),
+		gaps: [
+			compact
+				? "compact summary only; load balanced context before execution"
+				: "",
+			!session ? "missing session" : "",
+			!task ? "missing task record" : "",
+			sections.length === 0 ? "no matching spec sections" : "",
+			state ? "" : "no hydrated session state",
+		].filter(Boolean),
 		do_not_load: uniqueStrings([...doNotLoadList(), ...hookDoNotLoad]),
 		rule_injection: ruleInjection,
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 	};
-	return trimToBudget(root, bundle, {
-		persistRuleInjection: opts.persistRuleInjection === true && !compact,
-	});
+	const trimmed = trimToBudget(bundle);
+	if (opts.persistRuleInjection === true && !compact) {
+		recordRuleInjection(root, ruleInjectionOptions, trimmed.rule_injection);
+	}
+	return trimmed;
 }
 
 export { RuleInjectionError };

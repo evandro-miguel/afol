@@ -7,6 +7,7 @@ import {
 } from "../core/operation-context";
 import {
 	buildContextBundle,
+	ContextBudgetError,
 	ContextTrustError,
 	RuleInjectionError,
 } from "../services/context/bundler";
@@ -41,6 +42,9 @@ type ParsedArgs = {
 	full: boolean;
 	refsOnly: boolean;
 	persistRuleInjection: boolean;
+	consumer?: string;
+	contextEpoch?: string;
+	acknowledgedRules?: string;
 	session?: string;
 	task?: string;
 	role?: string;
@@ -104,6 +108,20 @@ function parseArgs(args: string[]): ParsedArgs {
 	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
+		if (
+			value === "--consumer" ||
+			value === "--context-epoch" ||
+			value === "--ack-rules"
+		) {
+			const next = args[index + 1];
+			if (!next || next.startsWith("--"))
+				throw new Error(`Missing value for ${value}.`);
+			if (value === "--consumer") parsed.consumer = next;
+			else if (value === "--context-epoch") parsed.contextEpoch = next;
+			else parsed.acknowledgedRules = next;
+			index += 1;
+			continue;
+		}
 		if (value === "--json" || value === "-j") {
 			parsed.json = true;
 			continue;
@@ -252,6 +270,7 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 		`tools: ${bundle.tools.length}`,
 		`pstr_refs: ${bundle.pstr_refs.join(",") || "none"}`,
 		`budget: ${bundle.budget.used_tokens}/${bundle.budget.total_tokens}`,
+		...(bundle.gaps.length > 0 ? [`gaps: ${bundle.gaps.join("; ")}`] : []),
 	].join("\n");
 }
 
@@ -497,8 +516,25 @@ export async function runContextCommand(
 				...(parsed.mode ? { mode: parsed.mode } : {}),
 				...(parsed.trusted ? { trusted: true } : {}),
 				...(persistRuleInjection ? { persistRuleInjection: true } : {}),
+				...(parsed.consumer ? { consumer: parsed.consumer } : {}),
+				...(parsed.contextEpoch ? { contextEpoch: parsed.contextEpoch } : {}),
+				...(parsed.acknowledgedRules
+					? { acknowledgedRules: parsed.acknowledgedRules }
+					: {}),
 			});
 		} catch (error) {
+			if (error instanceof ContextBudgetError) {
+				if (parsed.json)
+					jsonOutput.err(
+						io,
+						ctxAction,
+						"CTX_BUDGET_INSUFFICIENT",
+						error.message,
+						1,
+					);
+				else io.stderr(error.message);
+				return 1;
+			}
 			if (error instanceof ContextTrustError) {
 				emitTrustError(io, ctxAction, parsed.json, error);
 				return 1;
