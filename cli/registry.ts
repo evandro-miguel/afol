@@ -685,7 +685,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 				description: "Append text with backup and mutation journal",
 			},
 			{
-				usage: "mv|move --from <path> --to <path>",
+				usage: "mv|move --path <path> --to <path>",
 				sideEffect: "write",
 				description: "Move file with backup and mutation journal",
 			},
@@ -960,8 +960,14 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 			{
 				usage: "bundle --persist-rule-injection",
 				sideEffect: "generated",
+				description: "Record delivery diagnostics; local approval required",
+			},
+			{
+				usage:
+					"bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
+				sideEffect: "read",
 				description:
-					"Persist first-use rule injection state with local approval",
+					"Acknowledge base_digest for this consumer; reset epoch after context loss",
 			},
 			{
 				usage: "section --ref <ref>",

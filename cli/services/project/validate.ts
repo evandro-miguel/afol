@@ -25,6 +25,7 @@ import {
 	validLegacyEvidenceBaseline,
 } from "./legacy-evidence-baseline";
 import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
+import { inspectSessionArtifactLocations } from "./session-artifacts";
 import {
 	collectFreshnessReportFast,
 	type FreshnessReport,
@@ -54,6 +55,7 @@ export type ProjectValidationCheck = {
 		| "governance_pending_specs"
 		| "session_evidence"
 		| "session_health"
+		| "session_artifact_locations"
 		| "index_drift"
 		| "toolchain_claims";
 	ok: boolean;
@@ -78,6 +80,7 @@ const DEFAULT_HARD_CHECK_IDS: ReadonlySet<ProjectValidationCheck["id"]> =
 		"event_ledger",
 		"session_evidence",
 		"session_health",
+		"session_artifact_locations",
 	]);
 
 function applyDefaultPolicy(
@@ -566,6 +569,10 @@ export async function validateProjectStructure(
 		validateJsonFile("adm_tools", join(projectPaths.abs.admDir, "tools.json")),
 		validateDirectory(projectRoot, "skills_dir", projectPaths.abs.skillsDir),
 		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
+		{
+			id: "session_artifact_locations",
+			...inspectSessionArtifactLocations(projectRoot),
+		},
 		validateAgentsPayloadClean(projectRoot),
 		validateAdapterConsistency(projectRoot),
 		validateSharedEventLedger(eventLedger),

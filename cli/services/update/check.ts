@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { createPatch } from "diff";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
 import {
@@ -405,6 +406,47 @@ function hasUnsafeLockEdits(sourceText: string, currentText: string): boolean {
 	return false;
 }
 
+function hasEquivalentLockRevision(
+	sourceText: string,
+	currentText: string,
+): boolean {
+	const source = readJsonText(sourceText);
+	const current = readJsonText(currentText);
+	if (
+		!source ||
+		!current ||
+		typeof source.revision !== "string" ||
+		source.revision.length === 0 ||
+		source.revision === "unknown" ||
+		source.revision !== current.revision
+	) {
+		return false;
+	}
+	if (!isObject(source.managed_hashes) || !isObject(current.managed_hashes)) {
+		return false;
+	}
+
+	const sourceKeys = Object.keys(source).sort();
+	const currentKeys = Object.keys(current).sort();
+	if (!isDeepStrictEqual(sourceKeys, currentKeys)) {
+		return false;
+	}
+	const mutableFields = new Set(["project", "revision", "managed_hashes"]);
+	const templateFields = (lock: RawManifest): RawManifest =>
+		Object.fromEntries(
+			Object.entries(lock).filter(([key]) => !mutableFields.has(key)),
+		);
+	const sourceHashes = source.managed_hashes;
+	const currentHashes = current.managed_hashes;
+	const sourceHashesMatch = Object.entries(sourceHashes).every(([path, hash]) =>
+		isDeepStrictEqual(currentHashes[path], hash),
+	);
+	return (
+		sourceHashesMatch &&
+		isDeepStrictEqual(templateFields(source), templateFields(current))
+	);
+}
+
 function hasUnsafeManifestEdits(
 	sourceText: string,
 	currentText: string,
@@ -532,6 +574,11 @@ function safeManagedContent(
 		}
 		if (typeof current.project === "string") {
 			source.project = current.project;
+		}
+		if (isObject(current.managed_hashes)) {
+			source.managed_hashes = isObject(source.managed_hashes)
+				? { ...current.managed_hashes, ...source.managed_hashes }
+				: current.managed_hashes;
 		}
 		return `${JSON.stringify(source, null, 2)}\n`;
 	}
@@ -700,12 +747,18 @@ function planUpdateOperations(
 			continue;
 		}
 
-		if (entry.currentContent === entry.sourceContent) {
+		const sameLockRevision =
+			entry.path === ".agents/lock.json" &&
+			hasEquivalentLockRevision(entry.sourceContent, entry.currentContent);
+		if (entry.currentContent === entry.sourceContent || sameLockRevision) {
 			operations.push({
 				kind: "skip-identical",
 				path: entry.path,
 				owner,
-				reason: "same-content",
+				reason:
+					entry.currentContent === entry.sourceContent
+						? "same-content"
+						: "same-revision",
 			});
 			continue;
 		}

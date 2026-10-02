@@ -70,7 +70,11 @@ import {
 	parseSessionTaskArgs,
 	parseVerifyArgs,
 } from "./workbench/args";
-import { repairHintForStep } from "./workbench/hints";
+import {
+	formatHintLine,
+	nextCommandHint,
+	repairHintForStep,
+} from "./workbench/hints";
 import { writeJsonError } from "./workbench/shared";
 import type { DoneArgs, VerificationSpec } from "./workbench/types";
 import {
@@ -184,6 +188,14 @@ export async function runNewCommand(
 				`session created: ${created.session}`,
 				`status: ${creationStatus}`,
 				`governance_status: ${governance.governanceStatus}`,
+				formatHintLine(
+					nextCommandHint(
+						"new",
+						envSession && envSession !== created.session
+							? { session: created.session }
+							: {},
+					),
+				),
 			];
 			lines.push(...created.warnings.map((warning) => `warning: ${warning}`));
 			if (governance.pendingSpec) {
@@ -251,9 +263,16 @@ export async function runStartCommand(
 			parsed.taskIds.length === 1
 				? `task started: ${parsed.taskId}`
 				: `tasks started: ${parsed.taskIds.length} (${formatTaskSelection(parsed.taskIds)})`;
+		const nextHint = formatHintLine(
+			nextCommandHint("start", {
+				taskId: formatTaskSelection(parsed.taskIds),
+				...(args.includes("--session") ? { session: parsed.session } : {}),
+			}),
+		);
 		if (parsed.compact && !parsed.brief && !parsed.json) {
 			const lines = [
 				startedLabel,
+				nextHint,
 				...warnings.map((warning) => `warning: ${warning}`),
 			];
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
@@ -264,6 +283,7 @@ export async function runStartCommand(
 			if (!parsed.json) {
 				const lines = [
 					startedLabel,
+					nextHint,
 					...warnings.map((warning) => `warning: ${warning}`),
 				];
 				appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);

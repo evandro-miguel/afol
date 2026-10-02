@@ -14,6 +14,7 @@ import {
 } from "../core/operation-context";
 import { atomicWriteText } from "../services/io/atomic";
 import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
+import { collectSessionIds } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
 	archiveSessions as archiveWorkbenchSessions,
@@ -383,6 +384,33 @@ function displayWorktreePath(
 	return relative(projectRoot, worktree).replace(/\\/g, "/") || ".";
 }
 
+const OPEN_SESSION_LIST_LIMIT = 5;
+
+/**
+ * Open means the canonical task file still has an open lifecycle; historical
+ * closed and corrupt directories must not count.
+ */
+export function collectOpenWorkbenchSessions(projectRoot: string): string[] {
+	return collectSessionIds(projectRoot).filter((session) => {
+		try {
+			return sessionLifecycleState(projectRoot, session) === "open";
+		} catch {
+			return false;
+		}
+	});
+}
+
+function formatOpenSessionsLine(sessions: string[]): string | null {
+	if (sessions.length === 0) {
+		return null;
+	}
+	const visible = sessions.slice(0, OPEN_SESSION_LIST_LIMIT).join(", ");
+	const omitted = sessions.length - OPEN_SESSION_LIST_LIMIT;
+	return omitted > 0
+		? `  open sessions: ${visible} (omitted=${omitted})`
+		: `  open sessions: ${visible}`;
+}
+
 function listSessions(projectRoot: string, debug: boolean): ActionResult {
 	const currentBranch = currentGitBranch(projectRoot);
 	const currentWorktree = currentGitWorktree(projectRoot);
@@ -428,6 +456,8 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			(currentWorktree !== null && binding.worktree === currentWorktree),
 		is_global_active: globalActiveSession === binding.session,
 	}));
+	const openSessions = collectOpenWorkbenchSessions(projectRoot);
+	const openSessionsLine = formatOpenSessionsLine(openSessions);
 	return {
 		data: {
 			current_branch: currentBranch,
@@ -443,6 +473,11 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			effective_session: effective?.session ?? null,
 			effective_source: effective?.source ?? null,
 			context_file_state: contextFileState,
+			open_sessions: openSessions.slice(0, OPEN_SESSION_LIST_LIMIT),
+			open_sessions_omitted: Math.max(
+				0,
+				openSessions.length - OPEN_SESSION_LIST_LIMIT,
+			),
 			bindings,
 		},
 		lines: [
@@ -452,6 +487,7 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			`  global active: ${globalActiveSession ?? "(none)"}${globalActiveState && globalActiveState !== "open" ? ` (ignored: ${globalActiveState})` : ""}`,
 			`  context session: ${contextSession ?? "(none)"}${contextSessionState && contextSessionState !== "open" ? ` (ignored: ${contextSessionState})` : ""}`,
 			`  effective session: ${effective ? `${effective.session} (${effective.source})` : "(none)"}`,
+			...(openSessionsLine ? [openSessionsLine] : []),
 			...(contextFileState === "corrupt"
 				? [
 						"  context file: corrupt (bindings unavailable; switch repairs it, and new repairs it in a Git context)",

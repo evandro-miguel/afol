@@ -391,6 +391,120 @@ describe("update command", () => {
 		}
 	});
 
+	test("check skips a project-adjusted lock when its revision is current", () => {
+		const root = mkRoot();
+		const sourceLock =
+			templateJson<Record<string, unknown>>(".agents/lock.json");
+		const projectOwnedHashes = {
+			...(sourceLock.managed_hashes as Record<string, string>),
+			".afol/adm/rules/project-local.md": "keep-this-project-owned-hash",
+		};
+		const adjustedLock = {
+			...sourceLock,
+			project: "Panku project",
+			managed_hashes: projectOwnedHashes,
+		};
+		const adjustedLockText = `${JSON.stringify(adjustedLock, null, 2)}\n`;
+		const lockPath = join(root, ".agents", "lock.json");
+		try {
+			writeFileSync(lockPath, adjustedLockText, "utf8");
+
+			const result = checkTemplateUpdate(root);
+			const lockOperation = result.operations.find(
+				(operation) => operation.path === ".agents/lock.json",
+			);
+
+			expect(result.currentRevision).toBe(result.sourceRevision);
+			expect(lockOperation?.kind).toBe("skip-identical");
+			expect(readFileSync(lockPath, "utf8")).toBe(adjustedLockText);
+			expect(JSON.parse(readFileSync(lockPath, "utf8"))).toMatchObject({
+				project: "Panku project",
+				managed_hashes: projectOwnedHashes,
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("same-revision managed hash drift applies source bytes and becomes idempotent", async () => {
+		const root = mkRoot();
+		const { session, taskId } = mkBoundUpdateContext(root);
+		startTask(root, { session, taskId });
+		const sourceLock = templateJson<{
+			revision: string;
+			project: string;
+			managed_hashes: Record<string, string>;
+		}>(".agents/lock.json");
+		const sourcePath: TemplateUpdatePath = ".afol/adm/rules/README.md";
+		const sourceRuleReadme = templateText(sourcePath);
+		const localRuleReadme = "project version before source refresh\n";
+		const localHashPath = ".afol/adm/rules/project-local.md";
+		const localHash = "keep-project-hash-without-recomputing";
+		try {
+			mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+			writeFileSync(join(root, sourcePath), localRuleReadme, "utf8");
+			const currentHashes = {
+				...sourceLock.managed_hashes,
+				[sourcePath]: sha256Hex(localRuleReadme),
+				[localHashPath]: localHash,
+			};
+			writeFileSync(
+				join(root, ".agents", "lock.json"),
+				`${JSON.stringify(
+					{
+						...sourceLock,
+						project: "Panku same-revision fixture",
+						managed_hashes: currentHashes,
+					},
+					null,
+					2,
+				)}\n`,
+				"utf8",
+			);
+
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						session,
+						"--task-id",
+						taskId,
+						"--reason",
+						"same-revision managed source drift",
+					],
+					root,
+					output.io,
+				),
+			).toBe(0);
+
+			const appliedLock = JSON.parse(
+				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
+			) as {
+				project: string;
+				managed_hashes: Record<string, string>;
+			};
+			expect(appliedLock.project).toBe("Panku same-revision fixture");
+			expect(appliedLock.managed_hashes[sourcePath]).toBe(
+				sourceLock.managed_hashes[sourcePath],
+			);
+			expect(appliedLock.managed_hashes[localHashPath]).toBe(localHash);
+			expect(readFileSync(join(root, sourcePath), "utf8")).toBe(
+				sourceRuleReadme,
+			);
+
+			const nextPreview = checkTemplateUpdate(root);
+			expect(
+				nextPreview.operations.find(
+					(operation) => operation.path === ".agents/lock.json",
+				)?.kind,
+			).toBe("skip-identical");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("apply preserves stale vendored paths without a managed hash contract", async () => {
 		const root = mkRoot();
 		const staleSkillPath = join(
@@ -1065,14 +1179,23 @@ describe("update command", () => {
 		const root = mkRoot();
 		const { session, taskId } = mkBoundUpdateContext(root);
 		startTask(root, { session, taskId });
-		const sourceLock = templateJson<{ revision: string; project: string }>(
-			".agents/lock.json",
-		);
+		const sourceLock = templateJson<{
+			revision: string;
+			project: string;
+			managed_hashes: Record<string, string>;
+		}>(".agents/lock.json");
 		const sourceManifest = templateJson<{ commands: Record<string, string[]> }>(
 			".agents/manifest.json",
 		);
 		const sourceRuleReadme = templateText(".afol/adm/rules/README.md");
 		const downstreamRuleReadme = "downstream rules note\n";
+		const projectHashPath = ".afol/adm/rules/project-local.md";
+		const projectHash = "preserve-project-owned-hash";
+		const currentManagedHashes = {
+			...sourceLock.managed_hashes,
+			".afol/adm/rules/README.md": sha256Hex(downstreamRuleReadme),
+			[projectHashPath]: projectHash,
+		};
 		try {
 			mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 			writeFileSync(
@@ -1084,12 +1207,10 @@ describe("update command", () => {
 				join(root, ".agents", "lock.json"),
 				JSON.stringify(
 					{
-						schema_version: 1,
+						...sourceLock,
+						project: "Panku revision-mismatch fixture",
 						revision: "old",
-						locked: true,
-						managed_hashes: {
-							"rules/README.md": sha256Hex(downstreamRuleReadme),
-						},
+						managed_hashes: currentManagedHashes,
 					},
 					null,
 					2,
@@ -1120,11 +1241,20 @@ describe("update command", () => {
 				readFileSync(join(root, ".agents", "manifest.json"), "utf8"),
 			);
 			expect(lock.revision).toBe(sourceLock.revision);
-			expect(lock.project).toBe(sourceLock.project);
+			expect(lock.project).toBe("Panku revision-mismatch fixture");
+			expect(lock.managed_hashes[".afol/adm/rules/README.md"]).toBe(
+				sourceLock.managed_hashes[".afol/adm/rules/README.md"],
+			);
+			expect(lock.managed_hashes[projectHashPath]).toBe(projectHash);
 			expect(manifest.commands).toEqual(sourceManifest.commands);
 			expect(
 				readFileSync(join(root, ".afol", "adm", "rules", "README.md"), "utf8"),
 			).toBe(sourceRuleReadme);
+			expect(
+				checkTemplateUpdate(root).operations.find(
+					(operation) => operation.path === ".agents/lock.json",
+				)?.kind,
+			).toBe("skip-identical");
 			expect(output.stdout.join("\n")).toContain(
 				"update apply: changes available",
 			);

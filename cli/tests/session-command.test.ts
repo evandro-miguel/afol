@@ -1300,6 +1300,89 @@ describe("afol session command", () => {
 		}
 	});
 
+	test("list shows open sessions without dropping bindings", async () => {
+		const root = createProjectRoot("list-open-sessions");
+		initGitRepo(root);
+		try {
+			createSessionFixture(root, "OPEN-A");
+			createSessionFixture(root, "OPEN-B");
+			createClosedSession(root, "CLOSED-HIST");
+			mkdirSync(join(root, ".afol", "wb", "BROKEN-DIR"), { recursive: true });
+			bindSession(root, { session: "OPEN-A" });
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"OPEN-A\n",
+				"utf8",
+			);
+
+			const text = captureIo();
+			expect(await runSessionCommand("list", [], root, text.io)).toBe(0);
+			const textOutput = text.stdout.join("\n");
+			expect(textOutput).toContain("open sessions: OPEN-A, OPEN-B");
+			expect(textOutput).toContain("- OPEN-A branch=");
+			expect(textOutput).not.toContain("CLOSED-HIST");
+			expect(textOutput).not.toContain("BROKEN-DIR");
+
+			const json = captureIo();
+			expect(await runSessionCommand("list", ["--json"], root, json.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(json.stdout.join("\n")) as {
+				data: {
+					open_sessions: string[];
+					open_sessions_omitted: number;
+					bindings: Array<{ session: string }>;
+				};
+			};
+			expect(payload.data.open_sessions).toEqual(["OPEN-A", "OPEN-B"]);
+			expect(payload.data.open_sessions_omitted).toBe(0);
+			expect(payload.data.bindings.map((binding) => binding.session)).toEqual([
+				"OPEN-A",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("list caps open sessions at five ids with an omitted count", async () => {
+		const root = createProjectRoot("list-open-sessions-cap");
+		try {
+			for (let index = 1; index <= 7; index += 1) {
+				createSessionFixture(root, `OPEN-${index}`);
+			}
+
+			const text = captureIo();
+			expect(await runSessionCommand("list", [], root, text.io)).toBe(0);
+			const textOutput = text.stdout.join("\n");
+			expect(textOutput).toContain(
+				"open sessions: OPEN-1, OPEN-2, OPEN-3, OPEN-4, OPEN-5 (omitted=2)",
+			);
+			expect(textOutput).not.toContain("OPEN-6");
+			expect(textOutput).toContain("(no bindings)");
+
+			const json = captureIo();
+			expect(await runSessionCommand("list", ["--json"], root, json.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(json.stdout.join("\n")) as {
+				data: {
+					open_sessions: string[];
+					open_sessions_omitted: number;
+				};
+			};
+			expect(payload.data.open_sessions).toEqual([
+				"OPEN-1",
+				"OPEN-2",
+				"OPEN-3",
+				"OPEN-4",
+				"OPEN-5",
+			]);
+			expect(payload.data.open_sessions_omitted).toBe(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("bind creates a context binding", async () => {
 		const root = createProjectRoot("bind");
 		initGitRepo(root);

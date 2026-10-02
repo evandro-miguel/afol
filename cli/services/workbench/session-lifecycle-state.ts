@@ -94,7 +94,19 @@ export function readTaskLifecycleState(
 	taskPath: string,
 	session: string,
 ): TaskLifecycleState {
-	const document = parseTaskDocument(readFileSync(taskPath, "utf8"), taskPath);
+	return parseTaskLifecycleState(
+		readFileSync(taskPath, "utf8"),
+		taskPath,
+		session,
+	);
+}
+
+export function parseTaskLifecycleState(
+	content: string,
+	taskPath: string,
+	session: string,
+): TaskLifecycleState {
+	const document = parseTaskDocument(content, taskPath);
 	if (document.kind === "legacy") {
 		return { kind: "open", document };
 	}

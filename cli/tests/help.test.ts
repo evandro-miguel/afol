@@ -32,31 +32,36 @@ describe("help formatter", () => {
 		expect(help.split("\n").length).toBeLessThanOrEqual(71);
 		expect(help).toContain("Usage: afol");
 		expect(help).toContain("Agent fast path (active session)");
+		expect(help).toContain('afol qt <theme> -t "<task>" -c "<check>"');
 		expect(help).toContain(
 			'afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
 		);
-		expect(help).toContain("Commands");
 		expect(help).toContain("\n  s/status");
-		expect(help).toContain("s/status");
-		expect(help).toContain("s/status[read] - project status");
-		expect(help).toContain("v/validate");
-		expect(help).toContain("v/validate[read] - validation gates");
-		expect(help).toContain("n/new");
-		expect(help).toContain("hk/hook");
-		expect(help).toContain("bench");
-		expect(help).toContain("pb/project-benchmark");
-		expect(help).toContain("evolve[read] - analyze evolution");
+		for (const name of [
+			"s/status",
+			"n/new",
+			"qt/quick-task",
+			"st/start",
+			"d/done",
+			"c/close",
+			"v/validate",
+		]) {
+			expect(help).toContain(name);
+		}
 		expect(help).toContain(
-			"pb/project-benchmark[generated] - compare references",
+			"Full catalog: afol help --for execution|planning|maintenance",
 		);
-		expect(help).toContain("fleet[write] - fleet state");
+		expect(help).toContain("afol help <command>");
+		expect(help).toContain("Flags");
 		expect(help).toContain("Side effects");
 		expect(help).toContain("read=none");
 		expect(help).toContain("write=state");
 		expect(help).toContain("  help --verbose|<command>");
 		expect(help).toContain("a=afol");
-		expect(help).not.toContain("do/doctor");
-		expect(help).not.toContain("ma/maintenance");
+		expect(help).not.toContain("Commands");
+		expect(help).not.toContain("hk/hook");
+		expect(help).not.toContain("pb/project-benchmark");
+		expect(help).not.toContain("fleet[write]");
 	});
 
 	test("keeps root help within the agent output token budget", () => {
@@ -99,13 +104,28 @@ describe("help formatter", () => {
 		expect(maintenance).not.toContain("n/new");
 	});
 
-	test("lists every top-level command with a short compact description", () => {
+	test("keeps every registry command out of default root help", () => {
 		const help = formatHelpText(kernelRegistry);
 
-		for (const spec of kernelRegistry.commands) {
+		const listed = kernelRegistry.commands.filter((spec) => {
 			const alias = spec.aliases[0];
 			const name = alias ? `${alias}/${spec.command}` : spec.command;
-			expect(help).toContain(`${name}[${spec.sideEffect}] - `);
+			return help.includes(`${name}[${spec.sideEffect}] - `);
+		});
+		expect(listed).toEqual([]);
+	});
+
+	test("lists each intent's full command set with compact descriptions", () => {
+		const intents = ["planning", "execution", "maintenance"] as const;
+		for (const intent of intents) {
+			const help = formatHelpText(kernelRegistry, { intent });
+			const catalog = buildCommandCatalog(kernelRegistry, { intent });
+			expect(catalog.length).toBeGreaterThan(0);
+			for (const entry of catalog) {
+				const alias = entry.aliases[0];
+				const name = alias ? `${alias}/${entry.command}` : entry.command;
+				expect(help).toContain(`${name}[${entry.sideEffect}] - `);
+			}
 		}
 	});
 
@@ -760,8 +780,15 @@ describe("help formatter", () => {
 					usage: "bundle --persist-rule-injection",
 					sideEffect: "generated",
 					requires_approval: true,
+					description: "Record delivery diagnostics; local approval required",
+				},
+				{
+					usage:
+						"bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
+					sideEffect: "read",
+					requires_approval: false,
 					description:
-						"Persist first-use rule injection state with local approval",
+						"Acknowledge base_digest for this consumer; reset epoch after context loss",
 				},
 				{
 					usage: "section --ref <ref>",

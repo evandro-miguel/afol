@@ -460,8 +460,15 @@ describe("kernel registry", () => {
 				usage: "bundle --persist-rule-injection",
 				sideEffect: "generated",
 				requires_approval: true,
+				description: "Record delivery diagnostics; local approval required",
+			},
+			{
+				usage:
+					"bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
+				sideEffect: "read",
+				requires_approval: false,
 				description:
-					"Persist first-use rule injection state with local approval",
+					"Acknowledge base_digest for this consumer; reset epoch after context loss",
 			},
 			{
 				usage: "section --ref <ref>",

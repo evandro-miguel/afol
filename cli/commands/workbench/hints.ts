@@ -36,11 +36,12 @@ export function nextCommandHint(
 	step: LifecycleStep,
 	ctx: WorkbenchHintContext = {},
 ): string {
+	const session = ctx.session ? ` -S ${ctx.session}` : "";
 	switch (step) {
 		case "new":
-			return `afol st ${taskId(ctx)}`;
+			return `afol st${session} ${taskId(ctx)}`;
 		case "start":
-			return `afol d ${taskId(ctx)} -x "<cmd>"`;
+			return `afol d${session} ${taskId(ctx)} -x "<cmd>"`;
 		case "evidence":
 			return `afol d ${taskId(ctx)}`;
 		case "done":

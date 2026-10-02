@@ -419,14 +419,31 @@ describe("kernel front-door", () => {
 			const lines = (proc.stdout as string).trim().split("\n");
 			expect(lines.length).toBeLessThanOrEqual(71);
 			expect(proc.stdout as string).toContain("Usage: afol");
-			expect(proc.stdout as string).toContain("Commands");
-			expect(proc.stdout as string).toContain("s/status");
 			expect(proc.stdout as string).toContain(
-				"s/status[read] - project status",
+				"Agent fast path (active session)",
 			);
-			expect(proc.stdout as string).toContain("v/validate");
-			expect(proc.stdout as string).toContain("n/new");
-			expect(proc.stdout as string).toContain("bench");
+			expect(proc.stdout as string).toContain(
+				'afol qt <theme> -t "<task>" -c "<check>"',
+			);
+			expect(proc.stdout as string).toContain(
+				'afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+			);
+			for (const name of [
+				"s/status",
+				"n/new",
+				"qt/quick-task",
+				"st/start",
+				"d/done",
+				"c/close",
+				"v/validate",
+			]) {
+				expect(proc.stdout as string).toContain(name);
+			}
+			expect(proc.stdout as string).toContain(
+				"Full catalog: afol help --for execution|planning|maintenance",
+			);
+			expect(proc.stdout as string).not.toContain("Commands");
+			expect(proc.stdout as string).not.toContain("bench");
 			expect(proc.stdout as string).toContain("help --verbose|<command>");
 			expect(proc.stdout as string).toContain("a=afol");
 		} finally {

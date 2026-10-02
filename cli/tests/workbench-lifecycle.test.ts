@@ -379,6 +379,34 @@ describe("workbench lifecycle service", () => {
 				"AFOL_SESSION still selects PINNED",
 			);
 			expect(proc.stdout as string).toContain(`-S ${envelope.data.session}`);
+			const human = spawnSync(
+				"bun",
+				[
+					kernelPath,
+					"n",
+					"env hint",
+					"--no-spec-required",
+					"--reason",
+					"test fixture",
+				],
+				{
+					cwd: root,
+					encoding: "utf8",
+					env: { ...process.env, AFOL_SESSION: "PINNED" },
+				},
+			);
+			expect(human.status).toBe(0);
+			const hint = /^hint=(".*")$/m.exec(human.stdout as string);
+			expect(hint).not.toBeNull();
+			const next = (JSON.parse(hint?.[1] ?? '""') as string).split(" ");
+			expect(next.slice(0, 3)).toEqual(["afol", "st", "-S"]);
+			const started = spawnSync("bun", [kernelPath, ...next.slice(1)], {
+				cwd: root,
+				encoding: "utf8",
+				env: { ...process.env, AFOL_SESSION: "PINNED" },
+			});
+			expect(started.status).toBe(0);
+			expect(started.stdout as string).toContain("task started: T-01");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1993,6 +2021,39 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("new and start expose executable next steps without accepting result prose", () => {
+		const root = mkRoot("next-step-journey");
+		try {
+			writeCliProjectContract(root);
+			const created = runKernel(root, [
+				"n",
+				"next-step",
+				"-t",
+				"Check behavior",
+				"--no-spec-required",
+				"--reason",
+				"test",
+			]);
+			expect(created.status).toBe(0);
+			expect(created.stdout as string).toContain('hint="afol st T-01"');
+			const started = runKernel(root, ["st", "T-01"]);
+			expect(started.status).toBe(0);
+			expect(started.stdout as string).toContain('hint="afol d T-01 -x');
+			const invalid = runKernel(root, [
+				"d",
+				"T-01",
+				"-x",
+				"bun test: 5 pass, 0 fail",
+			]);
+			expect(invalid.status).toBe(1);
+			const completed = runKernel(root, ["d", "T-01", "-x", "bun --version"]);
+			expect(completed.status).toBe(0);
+			expect(runKernel(root, ["c"]).status).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol start defaults to compact output", () => {
 		const root = mkRoot("start-human");
 		try {
@@ -2003,7 +2064,11 @@ describe("workbench lifecycle service", () => {
 			const proc = runKernel(root, ["start", "--session", created.session]);
 
 			expect(proc.status).toBe(0);
-			expect((proc.stdout as string).trim()).toBe("task started: T-01");
+			expect(proc.stdout as string).toContain("task started: T-01");
+			expect(proc.stdout as string).toContain(
+				`afol d -S ${created.session} T-01 -x`,
+			);
+			expect((proc.stdout as string).length).toBeLessThan(200);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2118,6 +2183,227 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("buildStartBriefing scopes action and reason to the selected task", () => {
+		const root = mkRoot("start-briefing-selected-task");
+		try {
+			writeCliProjectContract(root);
+			const unrelated = newWorkstream(root, "a-unrelated-problem", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			const selected = newWorkstream(root, "z-selected-task", {
+				tasks: ["first selected task", "second selected task"],
+				noSpecRequiredReason: "briefing fixture",
+			});
+			startTask(root, { session: unrelated.session, taskId: "T-01" });
+			transitionTask(root, {
+				session: unrelated.session,
+				taskId: "T-01",
+				state: "problem",
+				reason: "unrelated blocker",
+			});
+
+			const briefing = buildStartBriefing(root, {
+				session: selected.session,
+				taskId: "T-02",
+			});
+
+			expect(briefing.tasks.open_task_ids[0]).not.toBe(
+				`${selected.session}:T-02`,
+			);
+			expect(briefing.problem_reason).toBeUndefined();
+			expect(briefing.safe_next_action).toBe(
+				`advance ${selected.session}:T-02`,
+			);
+
+			const started = runKernel(root, [
+				"start",
+				"--session",
+				selected.session,
+				"--task-id",
+				"T-02",
+				"--brief",
+				"--json",
+			]);
+			expect(started.status).toBe(0);
+			const startedBriefing = (
+				parseEnvelope(started.stdout as string).data as Record<string, unknown>
+			).briefing as Record<string, unknown>;
+			expect(startedBriefing.problem_reason).toBeUndefined();
+			expect(startedBriefing.safe_next_action).toBe(
+				`advance ${selected.session}:T-02`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing ignores incidental tables before the State Board", () => {
+		const root = mkRoot("start-briefing-incidental-table");
+		try {
+			writeCliProjectContract(root);
+			const selected = newWorkstream(root, "selected-incidental-table", {
+				tasks: ["first selected task", "second selected task"],
+				noSpecRequiredReason: "briefing fixture",
+			});
+			const taskDocument = readFileSync(selected.taskPath, "utf8");
+			writeFileSync(
+				selected.taskPath,
+				taskDocument.replace(
+					"## State Board",
+					[
+						"## Incidental table",
+						"",
+						"| Task | State | Owner | Notes |",
+						"|------|-------|-------|-------|",
+						"| T-02 | problem | decoy | reason=wrong-row |",
+						"",
+						"## State Board",
+					].join("\n"),
+				),
+				"utf8",
+			);
+
+			const briefing = buildStartBriefing(root, {
+				session: selected.session,
+				taskId: "T-02",
+			});
+
+			expect(briefing.problem_reason).toBeUndefined();
+			expect(briefing.safe_next_action).toBe(
+				`advance ${selected.session}:T-02`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing rejects duplicate canonical State Board task ids", () => {
+		const root = mkRoot("start-briefing-duplicate-task");
+		try {
+			writeCliProjectContract(root);
+			const selected = newWorkstream(root, "selected-duplicate-task", {
+				tasks: ["first selected task", "second selected task"],
+				noSpecRequiredReason: "briefing fixture",
+			});
+			const taskDocument = readFileSync(selected.taskPath, "utf8");
+			writeFileSync(
+				selected.taskPath,
+				taskDocument.replace(
+					"| T-02 | pending | worker | second selected task |",
+					[
+						"| T-02 | pending | worker | second selected task |",
+						"| T-02 | problem | worker | reason=duplicate-row |",
+					].join("\n"),
+				),
+				"utf8",
+			);
+
+			expect(() =>
+				buildStartBriefing(root, {
+					session: selected.session,
+					taskId: "T-02",
+				}),
+			).toThrow("Duplicate task id T-02");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing keeps a selected problem task as the next action", () => {
+		const root = mkRoot("start-briefing-selected-problem");
+		try {
+			writeCliProjectContract(root);
+			const unrelated = newWorkstream(root, "a-unrelated-open", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			const selected = newWorkstream(root, "z-selected-problem", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			startTask(root, { session: unrelated.session, taskId: "T-01" });
+			startTask(root, { session: selected.session, taskId: "T-01" });
+			transitionTask(root, {
+				session: selected.session,
+				taskId: "T-01",
+				state: "problem",
+				reason: "selected blocker",
+			});
+
+			const briefing = buildStartBriefing(root, {
+				session: selected.session,
+				taskId: "T-01",
+			});
+
+			expect(briefing.problem_reason).toBe("selected blocker");
+			expect(briefing.safe_next_action).toBe(
+				"resolve or park problem tasks before broadening scope",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing reports a selected missing task without choosing another", () => {
+		const root = mkRoot("start-briefing-selected-missing");
+		try {
+			writeCliProjectContract(root);
+			const unrelated = newWorkstream(root, "a-unrelated-open", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			const selected = newWorkstream(root, "z-selected-missing", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			startTask(root, { session: unrelated.session, taskId: "T-01" });
+
+			const briefing = buildStartBriefing(root, {
+				session: selected.session,
+				taskId: "T-99",
+			});
+
+			expect(briefing.problem_reason).toBeUndefined();
+			expect(briefing.safe_next_action).toContain(
+				`selected task ${selected.session}:T-99 is missing`,
+			);
+			expect(briefing.safe_next_action).not.toContain(unrelated.session);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing reports a selected closed task without choosing another", () => {
+		const root = mkRoot("start-briefing-selected-closed");
+		try {
+			writeCliProjectContract(root);
+			const unrelated = newWorkstream(root, "a-unrelated-open", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			const selected = newWorkstream(root, "z-selected-closed", {
+				noSpecRequiredReason: "briefing fixture",
+			});
+			startTask(root, { session: unrelated.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: selected.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: selected.session, taskId: "T-01" });
+			closeSession(root, selected.session);
+
+			const briefing = buildStartBriefing(root, {
+				session: selected.session,
+				taskId: "T-01",
+			});
+
+			expect(briefing.problem_reason).toBeUndefined();
+			expect(briefing.safe_next_action).toContain(
+				`selected task ${selected.session}:T-01 is closed`,
+			);
+			expect(briefing.safe_next_action).not.toContain(unrelated.session);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol st keeps task start output compact", () => {
 		const root = mkRoot("start-compact");
 		try {
@@ -2128,7 +2414,11 @@ describe("workbench lifecycle service", () => {
 			const proc = runKernel(root, ["st", "-S", created.session]);
 
 			expect(proc.status).toBe(0);
-			expect((proc.stdout as string).trim()).toBe("task started: T-01");
+			expect(proc.stdout as string).toContain("task started: T-01");
+			expect(proc.stdout as string).toContain(
+				`afol d -S ${created.session} T-01 -x`,
+			);
+			expect((proc.stdout as string).length).toBeLessThan(200);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -5939,6 +6229,9 @@ describe("task completion authorization and transitions", () => {
 			expect(new Set(evidence.map((entry) => entry.id)).size).toBe(3);
 			const renderedOutput = output.join("\n");
 			expect(renderedOutput).toContain("tasks started: 3 (T-01..T-03)");
+			expect(renderedOutput).toContain(
+				`afol d -S ${created.session} T-01..T-03 -x`,
+			);
 			expect(renderedOutput).toContain("tasks done: 3 (T-01..T-03)");
 			expect(Buffer.byteLength(renderedOutput, "utf8")).toBeLessThan(160);
 		} finally {
