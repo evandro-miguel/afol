@@ -948,6 +948,56 @@ describe("release staging", () => {
 		}
 	});
 
+	test("stages and replaces a release directly under dist", () => {
+		const fixtureState = fixture();
+		try {
+			const options = { cwd: fixtureState.root, stageDir: "dist/candidate" };
+			const first = stageRelease(options);
+			expect(first.stageDir).toBe(join(fixtureState.root, "dist/candidate"));
+			expect(verifyStagedRelease(options).artifactSha256).toBe(
+				fixtureState.artifactHash,
+			);
+			const before = snapshotFiles(first.stageDir);
+			stageRelease(options);
+			expect(snapshotFiles(first.stageDir)).toEqual(before);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	for (const stageDir of ["dist/release/candidate", "dist/afol"]) {
+		test(`preserves an existing file at ${stageDir}`, () => {
+			const fixtureState = fixture();
+			try {
+				const target = join(fixtureState.root, stageDir);
+				mkdirSync(join(target, ".."), { recursive: true });
+				if (!existsSync(target)) writeFileSync(target, "user-owned bytes\n");
+				const before = readFileSync(target);
+				expect(() =>
+					stageRelease({ cwd: fixtureState.root, stageDir }),
+				).toThrow("release stage is not a directory");
+				expect(readFileSync(target)).toEqual(before);
+				expect(existsSync(fixtureState.stageDir)).toBe(false);
+			} finally {
+				rmSync(fixtureState.root, { recursive: true, force: true });
+			}
+		});
+	}
+
+	for (const stageDir of ["dist", "outside/candidate"]) {
+		test(`rejects a stage outside strict dist containment: ${stageDir}`, () => {
+			const fixtureState = fixture();
+			try {
+				expect(() =>
+					stageRelease({ cwd: fixtureState.root, stageDir }),
+				).toThrow("release stage must stay inside dist");
+				expect(existsSync(join(fixtureState.root, "outside"))).toBe(false);
+			} finally {
+				rmSync(fixtureState.root, { recursive: true, force: true });
+			}
+		});
+	}
+
 	test.skipIf(process.platform === "win32")(
 		"rejects a staging parent that escapes dist through a symlink",
 		() => {
