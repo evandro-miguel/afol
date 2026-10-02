@@ -4,7 +4,7 @@ id: RULE-011
 theme: maintenance-cadence
 version: 1.0
 created: 2026-06-27
-updated_at: '2026-06-27T00:00:00Z'
+updated_at: '2026-09-21T22:40:00Z'
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
@@ -15,8 +15,9 @@ before project state becomes stale or misleading.
 
 ## Applies When
 
-Use this rule for maintenance, health review, memory/library review, workbench
-backlog, cleanup, archive, update, benchmark, and closure work.
+Use this rule for a maintenance, health, memory/library, backlog, cleanup,
+archive, or update review. An ordinary benchmark run or task closure does not
+by itself require maintenance.
 
 ## Required Behavior
 

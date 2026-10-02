@@ -4,7 +4,7 @@ id: RULE-010
 theme: benchmark-quality-contract
 version: 1.1
 created: 2026-06-09
-updated_at: '2026-06-20T00:00:00Z'
+updated_at: '2026-09-21T22:40:00Z'
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
@@ -21,6 +21,8 @@ Use this rule for benchmarks, live-agent tests, and performance measurements.
 
 - Plan, task, report, and evidence files must exist at closure.
 - Self-reported success is invalid without final artifact proof.
+- Acceptance is an independent check of the project's frozen checks and
+  artifacts, not the run's own success report.
 - Hard-run acceptance needs artifact inspection plus tool-call/accounting logs.
 - Benchmark prompts must not dictate tool usage; harness owns tool selection.
 - Every tool/progress event must be logged.
@@ -28,6 +30,8 @@ Use this rule for benchmarks, live-agent tests, and performance measurements.
 ## Isolation
 
 - Child benchmark tasks must prove fixture-local provenance.
+- Record the absolute task-local executable used for each command. Inherited
+  PATH is not attribution.
 - Shared/global evidence is invalid for isolated benchmark tasks.
 - Diverged target branches publish through an executor branch, not force push.
 
@@ -35,6 +39,9 @@ Use this rule for benchmarks, live-agent tests, and performance measurements.
 
 - Providers need rate-accounting tests and configured caps.
 - Token/request/RPM/RPD budgets must be explicit in benchmark config.
+- Before freezing a run, verify the exact model and effort with the harness
+  that will execute it. A model change starts a new baseline. Keep old
+  receipts under their original identity.
 - New providers start with config plus implementation-plan artifact naming
   runtime, model, and caps.
 

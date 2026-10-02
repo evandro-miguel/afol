@@ -74,6 +74,7 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
   - Do not redefine feature philosophy here; use this file to plan execution of already-defined intent.
   - This plan must describe the direct execution path for the requested work, not pre-planning or generic research tasks.
   - Brainstorm, explorer-check, and research artifacts are optional sidecars only when they are the requested deliverable or the smallest blocking proof before safe execution.
+  - Sessions are optional for ordinary work. When this work has an associated session, keep this plan and all durable work artifacts under its configured `paths.wb_dir/<session-id>`; use `<session>/artifacts/` for needed supplementary artifacts with distinct task-purpose names and exclusive creation. Temporary paths are for disposable scratch only.
 
 ## Planning Inputs
 

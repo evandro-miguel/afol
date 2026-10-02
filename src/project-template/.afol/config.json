@@ -81,7 +81,7 @@
   "rules": {
     "resolver": {
       "max_chars_per_rule": 2000,
-      "max_chars_total": 4000
+      "max_chars_total": 5000
     }
   },
   "hooks": {

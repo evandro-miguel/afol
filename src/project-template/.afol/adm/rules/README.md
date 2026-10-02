@@ -4,7 +4,7 @@ id: readme
 theme: rules
 status: active
 created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-06-27T00:00:00Z'
+updated_at: '2026-09-21T00:00:00Z'
 ---
 
 # Rules
@@ -34,22 +34,28 @@ updated_at: '2026-06-27T00:00:00Z'
 ## Quick Reference
 
 ```bash
-# Inspect state
-afol status
+# Inspect state; one active session resolves without --session
+afol s
 
-# Create governed execution
-afol new <theme> --feature-id <feature-id> --parent-spec <spec-id>
-afol start --session <session-id> --task-id T-01
+# One-shot task
+afol qt <theme> -t "<task>" -c "<check>"
 
-# Record evidence and close
-afol evidence --session <session-id> --task-id T-01 --command "<cmd>" --result passed
-afol done --session <session-id> --task-id T-01
-afol close --session <session-id>
+# Governed implementation binds a spec
+afol n <theme> -F <feature-id> -P <spec-id>
+
+# Active session
+afol st T-01
+afol d T-01 -x "<check>"
+afol c
 
 # Validate
-afol validate project --json
-afol verify-tasks --strict
+afol v project
+afol vt --strict
 ```
+
+With one active session, omit `--session` and `-S`; add `-S <session-id>` only
+to target an explicit session. `afol evidence` stays diagnostic and is not a
+required hop before done.
 
 ---
 
