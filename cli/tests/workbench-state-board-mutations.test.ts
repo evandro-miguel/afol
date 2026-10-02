@@ -50,52 +50,51 @@ function writeCliProjectContract(root: string): void {
 }
 
 describe("workbench State Board task mutations", () => {
-	test.each([
-		"start",
-		"carry-open",
-		"repeat-close",
-	])("rejects %s before mutating a State Board without Notes", (operation) => {
-		const root = mkRoot("missing-notes");
-		try {
-			writeCliProjectContract(root);
-			const created = newWorkstream(root, "missing-notes", {
-				tasks: ["retain attempt and destination metadata"],
-				featureId: "F-04",
-				parentSpec: "notes-column-fixture",
-			});
-			let before = readFileSync(created.taskPath, "utf8").replace(
-				/^(\|[^|\n]+\|[^|\n]+\|[^|\n]+\|)[^|\n]*\|$/gm,
-				"$1",
-			);
-			if (operation === "repeat-close") {
-				const closedAt = new Date().toISOString();
-				before = before
-					.replace(
-						/^status: .*$/m,
-						`status: "closed"\nclosed_at: "${closedAt}"`,
-					)
-					.replace(/^updated_at: .*$/m, `updated_at: "${closedAt}"`);
+	test.each(["start", "carry-open", "repeat-close"])(
+		"rejects %s before mutating a State Board without Notes",
+		(operation) => {
+			const root = mkRoot("missing-notes");
+			try {
+				writeCliProjectContract(root);
+				const created = newWorkstream(root, "missing-notes", {
+					tasks: ["retain attempt and destination metadata"],
+					featureId: "F-04",
+					parentSpec: "notes-column-fixture",
+				});
+				let before = readFileSync(created.taskPath, "utf8").replace(
+					/^(\|[^|\n]+\|[^|\n]+\|[^|\n]+\|)[^|\n]*\|$/gm,
+					"$1",
+				);
+				if (operation === "repeat-close") {
+					const closedAt = new Date().toISOString();
+					before = before
+						.replace(
+							/^status: .*$/m,
+							`status: "closed"\nclosed_at: "${closedAt}"`,
+						)
+						.replace(/^updated_at: .*$/m, `updated_at: "${closedAt}"`);
+				}
+				writeFileSync(created.taskPath, before);
+				const planBefore = readFileSync(created.planPath, "utf8");
+				expect(verifyTaskText(before, created.taskPath).totalTasks).toBe(1);
+				const mutate = () =>
+					operation === "start"
+						? startTask(root, { session: created.session, taskId: "T-01" })
+						: closeSession(root, created.session, {
+								carryOpen: true,
+								reason: "defer work",
+							});
+				expect(mutate).toThrow("State Board requires a Notes column");
+				expect(readFileSync(created.taskPath, "utf8")).toBe(before);
+				expect(readFileSync(created.planPath, "utf8")).toBe(planBefore);
+				expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+					created.session,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
 			}
-			writeFileSync(created.taskPath, before);
-			const planBefore = readFileSync(created.planPath, "utf8");
-			expect(verifyTaskText(before, created.taskPath).totalTasks).toBe(1);
-			const mutate = () =>
-				operation === "start"
-					? startTask(root, { session: created.session, taskId: "T-01" })
-					: closeSession(root, created.session, {
-							carryOpen: true,
-							reason: "defer work",
-						});
-			expect(mutate).toThrow("State Board requires a Notes column");
-			expect(readFileSync(created.taskPath, "utf8")).toBe(before);
-			expect(readFileSync(created.planPath, "utf8")).toBe(planBefore);
-			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
-				created.session,
-			);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+		},
+	);
 
 	test("keeps legacy headingless task tables when a fenced example contains a State Board heading", () => {
 		const root = mkRoot("legacy-fenced-heading");

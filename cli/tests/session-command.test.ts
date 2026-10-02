@@ -895,64 +895,64 @@ describe("afol session command", () => {
 		}
 	});
 
-	test.each([
-		"approved",
-		"rejected",
-	] as const)("archive records a terminal %s learning review", async (decision) => {
-		const root = createProjectRoot(`archive-learning-${decision}`);
-		try {
-			createClosedSession(root, "LEARNING");
-			enableLearningCandidate(root, "LEARNING");
-			recordLearningReview(root, "LEARNING", decision);
-			const status = learningReviewStatus(root, "LEARNING");
-			expect(status.terminal).toBe(true);
-			const io = captureIo();
-			const archiveCode = await runSessionCommand(
-				"archive",
-				["LEARNING", "--reason", "retention", "--json"],
-				root,
-				io.io,
-			);
-			expect(archiveCode).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
-				data: {
-					archived: Array<{
-						learning_review:
-							| "no_candidate"
-							| { candidates: Array<{ id: string; fingerprint: string }> };
-					}>;
-				};
-			};
-			const review = payload.data.archived[0]?.learning_review;
-			expect(review).toMatchObject({
-				candidates: [
-					{
-						id: status.required[0]?.id,
-						fingerprint: status.required[0]?.fingerprint,
-					},
-				],
-			});
-			const archiveEvent = readEventLedgerRecords(root).find(
-				(record) => record.type === "workbench.archive",
-			);
-			expect(archiveEvent?.detail).toMatchObject({
-				learning_review: review,
-			});
-			const reviewJournal = readAdoptionReviewEvents(root);
-			const restore = captureIo();
-			expect(
-				await runSessionCommand(
-					"restore",
-					["LEARNING", "--reason", "retention exception", "--json"],
+	test.each(["approved", "rejected"] as const)(
+		"archive records a terminal %s learning review",
+		async (decision) => {
+			const root = createProjectRoot(`archive-learning-${decision}`);
+			try {
+				createClosedSession(root, "LEARNING");
+				enableLearningCandidate(root, "LEARNING");
+				recordLearningReview(root, "LEARNING", decision);
+				const status = learningReviewStatus(root, "LEARNING");
+				expect(status.terminal).toBe(true);
+				const io = captureIo();
+				const archiveCode = await runSessionCommand(
+					"archive",
+					["LEARNING", "--reason", "retention", "--json"],
 					root,
-					restore.io,
-				),
-			).toBe(0);
-			expect(readAdoptionReviewEvents(root)).toEqual(reviewJournal);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+					io.io,
+				);
+				expect(archiveCode).toBe(0);
+				const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+					data: {
+						archived: Array<{
+							learning_review:
+								| "no_candidate"
+								| { candidates: Array<{ id: string; fingerprint: string }> };
+						}>;
+					};
+				};
+				const review = payload.data.archived[0]?.learning_review;
+				expect(review).toMatchObject({
+					candidates: [
+						{
+							id: status.required[0]?.id,
+							fingerprint: status.required[0]?.fingerprint,
+						},
+					],
+				});
+				const archiveEvent = readEventLedgerRecords(root).find(
+					(record) => record.type === "workbench.archive",
+				);
+				expect(archiveEvent?.detail).toMatchObject({
+					learning_review: review,
+				});
+				const reviewJournal = readAdoptionReviewEvents(root);
+				const restore = captureIo();
+				expect(
+					await runSessionCommand(
+						"restore",
+						["LEARNING", "--reason", "retention exception", "--json"],
+						root,
+						restore.io,
+					),
+				).toBe(0);
+				expect(readAdoptionReviewEvents(root)).toEqual(reviewJournal);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	test("archive reblocks a candidate after its fingerprint changes", async () => {
 		const root = createProjectRoot("archive-learning-edited");
