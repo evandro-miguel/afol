@@ -571,22 +571,51 @@ export function verifyStagedRelease(
 	};
 }
 
-function publishStage(tempDir: string, stageDir: string): void {
+function assertStageTarget(stageDir: string): void {
+	if (!existsSync(stageDir)) return;
+	const target = lstatSync(stageDir);
+	if (target.isSymbolicLink()) {
+		throw new Error(`release stage is a symlink: ${stageDir}`);
+	}
+	if (!target.isDirectory()) {
+		throw new Error(`release stage is not a directory: ${stageDir}`);
+	}
+}
+
+function publishStage(tempDir: string, stageDir: string, cwd: string): void {
 	const parent = resolve(stageDir, "..");
 	const backup = `${stageDir}.previous-${process.pid}-${Date.now()}`;
 	let movedExisting = false;
+	let published = false;
 	try {
+		assertStageTarget(stageDir);
 		if (existsSync(stageDir)) {
-			if (lstatSync(stageDir).isSymbolicLink()) {
-				throw new Error(`release stage is a symlink: ${stageDir}`);
+			try {
+				verifyStagedRelease({ cwd, stageDir });
+			} catch (error) {
+				throw new Error(
+					`refusing to replace an unverified release stage: ${stageDir}: ${error instanceof Error ? error.message : String(error)}`,
+					{ cause: error },
+				);
 			}
 			renameSync(stageDir, backup);
 			movedExisting = true;
 		}
 		renameSync(tempDir, stageDir);
+		published = true;
 		syncDirectoryDurablyIfSupported(parent);
 		if (movedExisting) rmSync(backup, { recursive: true });
 	} catch (error) {
+		if (published) {
+			const retainedBackup =
+				movedExisting && existsSync(backup)
+					? `; previous stage backup remains at ${backup} (cleanup may be incomplete)`
+					: "";
+			throw new Error(
+				`release stage was published at ${stageDir}, but finalization failed${retainedBackup}: ${error instanceof Error ? error.message : String(error)}`,
+				{ cause: error },
+			);
+		}
 		if (!existsSync(stageDir) && movedExisting && existsSync(backup)) {
 			renameSync(backup, stageDir);
 		}
@@ -611,6 +640,7 @@ export function stageRelease(
 	if (!isDescendant(distRoot, stageDir)) {
 		throw new Error("release stage must stay inside dist");
 	}
+	assertStageTarget(stageDir);
 	if (!isDescendant(cwd, complianceDir) || !existsSync(complianceDir)) {
 		throw new Error(`missing release compliance bundle: ${complianceDir}`);
 	}
@@ -654,13 +684,12 @@ export function stageRelease(
 	);
 
 	const stageParent = resolve(stageDir, "..");
-	assertNoExistingSymlinks(distRoot, stageParent);
+	assertNoExistingSymlinks(cwd, stageParent);
 	mkdirSync(stageParent, { recursive: true });
-	if (!isDescendant(realpathSync(distRoot), realpathSync(stageParent))) {
+	const realDist = realpathSync(distRoot);
+	const realParent = realpathSync(stageParent);
+	if (realParent !== realDist && !isDescendant(realDist, realParent)) {
 		throw new Error("release stage parent escapes dist");
-	}
-	if (existsSync(stageDir) && lstatSync(stageDir).isSymbolicLink()) {
-		throw new Error(`release stage is a symlink: ${stageDir}`);
 	}
 	const tempDir = mkdtempSync(join(stageParent, ".afol-linux-x64-"));
 	try {
@@ -712,7 +741,7 @@ export function stageRelease(
 		});
 		syncDirectoryDurablyIfSupported(tempDir);
 		verifyStagedRelease({ cwd, stageDir: tempDir });
-		publishStage(tempDir, stageDir);
+		publishStage(tempDir, stageDir, cwd);
 		return {
 			stageDir,
 			assetName: ASSET_NAME,

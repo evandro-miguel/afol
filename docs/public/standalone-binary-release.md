@@ -72,6 +72,17 @@ bun run release:archive -- --stage-dir dist/release/afol-linux-x64
 (cd dist/release && sha256sum --check afol-linux-x64.tar.gz.sha256)
 ```
 
+An existing destination is replaced only when it verifies as a complete prior
+release stage under the current contract. Files, unrecognized directories, and
+modified stages remain untouched. Choose a fresh `--stage-dir` under `dist` when
+an existing destination cannot be verified.
+
+If final directory synchronization or backup cleanup fails after replacement,
+the command exits unsuccessfully and reports the published stage and any retained
+backup path. Inspect the reported paths before retrying; a backup left by failed
+cleanup may be incomplete. A failed durability check never counts as release
+approval.
+
 These commands prepare local release files. They do not publish an asset or
 create a release tag.
 

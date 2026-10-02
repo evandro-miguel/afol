@@ -1306,7 +1306,7 @@ describe("observation-ingest", () => {
 		}
 	});
 
-	test("status is read-only (no writes)", () => {
+	test("status preserves database, WAL, and journal bytes", () => {
 		const root = fixtureRoot();
 		seedCompleteEvidence(root, "S-01");
 
@@ -1334,12 +1334,23 @@ describe("observation-ingest", () => {
 		const obsAfter = journalAfter.filter((e) => e.event_type === "observation");
 		expect(obsAfter).toHaveLength(1);
 
-		// Calling status does not write — observation count from DB remains same
-		// (DB projection is rebuilt separately; journal is the source of truth)
-		const status1 = getEvolutionStatus(db, PROJECT_ID);
-		const status2 = getEvolutionStatus(db, PROJECT_ID);
-		expect(status2.observation_count).toBe(status1.observation_count);
-		db.close();
+		const paths = [
+			evolutionDbPath(root),
+			`${evolutionDbPath(root)}-wal`,
+			productionDayJournalPath(root),
+			observationJournalPath(root),
+		];
+		const snapshot = () =>
+			paths.map((path) => (existsSync(path) ? readFileSync(path) : null));
+		const beforeStatus = snapshot();
+		try {
+			const status1 = getEvolutionStatus(db, PROJECT_ID);
+			const status2 = getEvolutionStatus(db, PROJECT_ID);
+			expect(status2.observation_count).toBe(status1.observation_count);
+			expect(snapshot()).toEqual(beforeStatus);
+		} finally {
+			db.close();
+		}
 	});
 });
 
