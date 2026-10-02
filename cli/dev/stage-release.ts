@@ -586,23 +586,36 @@ function publishStage(tempDir: string, stageDir: string, cwd: string): void {
 	const parent = resolve(stageDir, "..");
 	const backup = `${stageDir}.previous-${process.pid}-${Date.now()}`;
 	let movedExisting = false;
+	let published = false;
 	try {
 		assertStageTarget(stageDir);
 		if (existsSync(stageDir)) {
 			try {
 				verifyStagedRelease({ cwd, stageDir });
-			} catch {
+			} catch (error) {
 				throw new Error(
-					`refusing to replace an unverified release stage: ${stageDir}`,
+					`refusing to replace an unverified release stage: ${stageDir}: ${error instanceof Error ? error.message : String(error)}`,
+					{ cause: error },
 				);
 			}
 			renameSync(stageDir, backup);
 			movedExisting = true;
 		}
 		renameSync(tempDir, stageDir);
+		published = true;
 		syncDirectoryDurablyIfSupported(parent);
 		if (movedExisting) rmSync(backup, { recursive: true });
 	} catch (error) {
+		if (published) {
+			const retainedBackup =
+				movedExisting && existsSync(backup)
+					? `; previous stage backup remains at ${backup} (cleanup may be incomplete)`
+					: "";
+			throw new Error(
+				`release stage was published at ${stageDir}, but finalization failed${retainedBackup}: ${error instanceof Error ? error.message : String(error)}`,
+				{ cause: error },
+			);
+		}
 		if (!existsSync(stageDir) && movedExisting && existsSync(backup)) {
 			renameSync(backup, stageDir);
 		}

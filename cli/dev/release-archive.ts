@@ -364,11 +364,14 @@ export async function packageStagedReleaseArchive({
 }
 
 async function main(args: string[]): Promise<void> {
-	let stageDir = DEFAULT_STAGE_DIR;
+	let stageDir: string | undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (arg !== "--stage-dir") {
 			throw new Error(`unknown release archive option: ${arg}`);
+		}
+		if (stageDir !== undefined) {
+			throw new Error("--stage-dir may only be specified once");
 		}
 		const value = args[index + 1];
 		if (!value || value.startsWith("--")) {
@@ -377,7 +380,9 @@ async function main(args: string[]): Promise<void> {
 		stageDir = value;
 		index += 1;
 	}
-	const result = await packageStagedReleaseArchive({ stageDir });
+	const result = await packageStagedReleaseArchive({
+		stageDir: stageDir ?? DEFAULT_STAGE_DIR,
+	});
 	console.log(
 		`release archive ready: ${relative(process.cwd(), result.archivePath)} sha256=${result.archiveSha256} files=${result.files.length}`,
 	);
