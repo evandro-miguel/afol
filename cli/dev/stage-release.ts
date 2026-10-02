@@ -536,6 +536,13 @@ export function verifyStagedRelease(
 	const provenance = readJson(join(realStageDir, "provenance.json"));
 	const security = readJson(join(realStageDir, "security-scan.json"));
 	if (
+		typeof manifest.source_commit_sha !== "string" ||
+		!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(manifest.source_commit_sha) ||
+		manifest.source_commit_sha !== provenance.commit_sha
+	) {
+		throw new Error("release stage manifest does not bind its source commit");
+	}
+	if (
 		provenance.artifact !== ASSET_NAME ||
 		provenance.size_bytes !== statSync(assetPath).size ||
 		security.target === null ||

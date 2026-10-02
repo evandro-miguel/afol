@@ -121,6 +121,8 @@ verifies every listed file, then runs the stage verifier before executing the
 candidate. It follows at most five HTTPS redirects with credentials omitted
 and no authorization, cookie, or referrer headers; signed redirect URLs are
 never printed. The supplied base URL is also omitted from output.
+Each manifest, file, or archive request has a 60-second deadline shared across
+its redirects and response-body read.
 
 Directory mode requires the host to preserve the staged directory tree so paths
 such as `licenses/AFOL-LICENSE.txt` resolve beneath the base URL. A host that
@@ -136,13 +138,15 @@ bun run smoke:release-install -- \
 ```
 
 The archive URL is also a placeholder. Archive mode checks the caller-pinned
-archive hash before reading it, validates every entry path and file hash, then
-writes only regular files into the owned temporary stage. The stage verifier
-checks the complete result before execution. Archive mode follows the same
-bounded HTTPS redirects as directory mode. The archive producer puts staged
-files at the archive root and writes an adjacent SHA-256 file; the caller pins
-that archive hash explicitly. The downloader does not use the archive
-library's extraction-to-disk path.
+archive hash before decompression, caps expanded TAR data at 1,000,000,000
+bytes before parsing, and rejects a nested gzip layer before Bun's archive
+parser can decompress it without that cap. It validates every entry path and
+file hash, then writes only regular files into the owned temporary stage. The
+stage verifier checks the complete result before execution. Archive mode
+follows the same bounded HTTPS redirects as directory mode. The archive
+producer puts staged files at the archive root and writes an adjacent SHA-256
+file; the caller pins that archive hash explicitly. The downloader does not use
+the archive library's extraction-to-disk path.
 
 There are currently no published standalone asset URLs or approved real
 compliance bundle. Synthetic fixture tests do not prove a published download.

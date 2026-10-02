@@ -93,6 +93,8 @@ function fixture(): {
 		license: string;
 		dependencies?: Record<string, string>;
 		optionalDependencies?: Record<string, string>;
+		peerDependencies?: Record<string, string>;
+		peerDependenciesMeta?: Record<string, { optional: boolean }>;
 	}> = [
 		{
 			path: "node_modules/diff",
@@ -101,7 +103,10 @@ function fixture(): {
 			version: "9.0.0",
 			license: "BSD-3-Clause",
 			dependencies: { "nested-lib": "^1.0.0", shared: "^1.0.0" },
-			optionalDependencies: { "missing-optional": "^1.0.0" },
+			optionalDependencies: {
+				"missing-optional": "^1.0.0",
+				"transitive-optional": "^1.0.0",
+			},
 		},
 		{
 			path: "node_modules/valibot",
@@ -110,6 +115,8 @@ function fixture(): {
 			version: "1.4.2",
 			license: "MIT",
 			dependencies: { "nested-lib": "^2.0.0", shared: "^2.0.0" },
+			peerDependencies: { typescript: "^5.0.0" },
+			peerDependenciesMeta: { typescript: { optional: true } },
 		},
 		{
 			path: "node_modules/root-optional",
@@ -117,6 +124,13 @@ function fixture(): {
 			name: "root-optional",
 			version: "1.0.0",
 			license: "ISC",
+		},
+		{
+			path: "node_modules/diff/node_modules/transitive-optional",
+			lockKey: "diff/transitive-optional",
+			name: "transitive-optional",
+			version: "1.0.0",
+			license: "MIT",
 		},
 		{
 			path: "node_modules/diff/node_modules/nested-lib",
@@ -146,6 +160,13 @@ function fixture(): {
 			version: "2.0.0",
 			license: "Apache-2.0",
 		},
+		{
+			path: "node_modules/valibot/node_modules/typescript",
+			lockKey: "valibot/typescript",
+			name: "typescript",
+			version: "5.4.5",
+			license: "Apache-2.0",
+		},
 	];
 	for (const item of installedPackages) {
 		const packageDir = join(root, item.path);
@@ -158,6 +179,12 @@ function fixture(): {
 			...(item.optionalDependencies
 				? { optionalDependencies: item.optionalDependencies }
 				: {}),
+			...(item.peerDependencies
+				? { peerDependencies: item.peerDependencies }
+				: {}),
+			...(item.peerDependenciesMeta
+				? { peerDependenciesMeta: item.peerDependenciesMeta }
+				: {}),
 		});
 	}
 	const lockPackages: Record<string, unknown> = {};
@@ -166,6 +193,12 @@ function fixture(): {
 		if (item.dependencies) info.dependencies = item.dependencies;
 		if (item.optionalDependencies) {
 			info.optionalDependencies = item.optionalDependencies;
+		}
+		if (item.peerDependencies) info.peerDependencies = item.peerDependencies;
+		if (item.peerDependenciesMeta) {
+			info.optionalPeers = Object.entries(item.peerDependenciesMeta)
+				.filter(([, metadata]) => metadata.optional)
+				.map(([name]) => name);
 		}
 		lockPackages[item.lockKey] = [
 			`${item.name}@${item.version}`,
@@ -495,6 +528,49 @@ describe("release staging", () => {
 		}
 	});
 
+	test("binds the stage manifest source commit to provenance", async () => {
+		const outcomes: boolean[][] = [];
+		for (const mutation of ["missing", "malformed", "different"] as const) {
+			const fixtureState = fixture();
+			try {
+				const stage = stageRelease({ cwd: fixtureState.root });
+				const manifestPath = join(stage.stageDir, "manifest.json");
+				const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+				if (mutation === "missing") delete manifest.source_commit_sha;
+				else if (mutation === "malformed")
+					manifest.source_commit_sha = "a".repeat(39);
+				else manifest.source_commit_sha = "b".repeat(40);
+				writeJson(manifestPath, manifest);
+				let verifierRejected = false;
+				try {
+					verifyStagedRelease({
+						cwd: fixtureState.root,
+						stageDir: stage.stageDir,
+					});
+				} catch {
+					verifierRejected = true;
+				}
+				let archiveRejected = false;
+				try {
+					await packageStagedReleaseArchive({
+						cwd: fixtureState.root,
+						stageDir: stage.stageDir,
+					});
+				} catch {
+					archiveRejected = true;
+				}
+				outcomes.push([verifierRejected, archiveRejected]);
+			} finally {
+				rmSync(fixtureState.root, { recursive: true, force: true });
+			}
+		}
+		expect(outcomes).toEqual([
+			[true, true],
+			[true, true],
+			[true, true],
+		]);
+	});
+
 	test("archives the exact verified stage reproducibly without overwriting outputs", async () => {
 		const firstFixture = fixture();
 		const secondFixture = fixture();
@@ -616,7 +692,77 @@ describe("release staging", () => {
 				"root-optional",
 				"shared",
 				"shared",
+				"transitive-optional",
+				"typescript",
 				"valibot",
+			]);
+			const packageIds = new Map(
+				(
+					sbom.packages as Array<{
+						name: string;
+						versionInfo?: string;
+						SPDXID: string;
+					}>
+				).map((pkg) => [`${pkg.name}@${pkg.versionInfo ?? ""}`, pkg.SPDXID]),
+			);
+			const relationships = sbom.relationships as Array<{
+				spdxElementId: string;
+				relationshipType: string;
+				relatedSpdxElement: string;
+			}>;
+			const packageId = (name: string, version: string) => {
+				const id = packageIds.get(`${name}@${version}`);
+				if (!id) throw new Error(`missing SPDX package ${name}@${version}`);
+				return id;
+			};
+			const relationship = (
+				spdxElementId: string,
+				relationshipType: string,
+				relatedSpdxElement: string,
+			) => ({ spdxElementId, relationshipType, relatedSpdxElement });
+			expect(relationships).toContainEqual(
+				relationship(
+					"SPDXRef-Package-AFOL",
+					"DEPENDS_ON",
+					packageId("diff", "9.0.0"),
+				),
+			);
+			expect(relationships).toContainEqual(
+				relationship(
+					packageId("diff", "9.0.0"),
+					"DEPENDS_ON",
+					packageId("nested-lib", "1.0.0"),
+				),
+			);
+			expect(relationships).toContainEqual(
+				relationship(
+					packageId("root-optional", "1.0.0"),
+					"OPTIONAL_DEPENDENCY_OF",
+					"SPDXRef-Package-AFOL",
+				),
+			);
+			expect(relationships).toContainEqual(
+				relationship(
+					packageId("transitive-optional", "1.0.0"),
+					"OPTIONAL_DEPENDENCY_OF",
+					packageId("diff", "9.0.0"),
+				),
+			);
+			expect(relationships).toContainEqual(
+				relationship(
+					packageId("typescript", "5.4.5"),
+					"OPTIONAL_DEPENDENCY_OF",
+					packageId("valibot", "1.4.2"),
+				),
+			);
+			expect(
+				relationships.filter((item) => item.relationshipType === "CONTAINS"),
+			).toEqual([
+				relationship(
+					"SPDXRef-Package-AFOL",
+					"CONTAINS",
+					"SPDXRef-Package-Bun-runtime",
+				),
 			]);
 			const nested = sbom.packages.filter(
 				(pkg: { name: string }) => pkg.name === "nested-lib",

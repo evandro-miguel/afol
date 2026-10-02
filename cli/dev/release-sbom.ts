@@ -66,6 +66,11 @@ type RuntimePackage = {
 
 type RuntimeRelationship = {
 	spdxElementId: string;
+	relationshipType:
+		| "DESCRIBES"
+		| "DEPENDS_ON"
+		| "OPTIONAL_DEPENDENCY_OF"
+		| "CONTAINS";
 	relatedSpdxElement: string;
 };
 
@@ -581,10 +586,15 @@ function installedRuntimePackages(
 			);
 		}
 		if (!prior) packages.set(key, { name, version, license, spdxId: id });
-		relationships.set(`${dependency.parentId}\u0000${id}`, {
-			spdxElementId: dependency.parentId,
-			relatedSpdxElement: id,
-		});
+		const relationshipType: RuntimeRelationship["relationshipType"] =
+			dependency.optional ? "OPTIONAL_DEPENDENCY_OF" : "DEPENDS_ON";
+		const relationship = dependency.optional
+			? { spdxElementId: id, relatedSpdxElement: dependency.parentId }
+			: { spdxElementId: dependency.parentId, relatedSpdxElement: id };
+		relationships.set(
+			`${relationshipType}\u0000${relationship.spdxElementId}\u0000${relationship.relatedSpdxElement}`,
+			{ ...relationship, relationshipType },
+		);
 		const locationKey = `${key}\u0000${installed.metadataPath}`;
 		if (visitedLocations.has(locationKey)) continue;
 		visitedLocations.add(locationKey);
@@ -651,7 +661,8 @@ function installedRuntimePackages(
 		relationships: [...relationships.values()].sort(
 			(left, right) =>
 				left.spdxElementId.localeCompare(right.spdxElementId) ||
-				left.relatedSpdxElement.localeCompare(right.relatedSpdxElement),
+				left.relatedSpdxElement.localeCompare(right.relatedSpdxElement) ||
+				left.relationshipType.localeCompare(right.relationshipType),
 		),
 	};
 }
@@ -727,9 +738,7 @@ export function buildReleaseSpdxSbom({
 			],
 		});
 	}
-	const relationships: Array<
-		RuntimeRelationship & { relationshipType: string }
-	> = [
+	const relationships: RuntimeRelationship[] = [
 		{
 			spdxElementId: "SPDXRef-DOCUMENT",
 			relationshipType: "DESCRIBES",
@@ -740,14 +749,13 @@ export function buildReleaseSpdxSbom({
 			relationshipType: "CONTAINS",
 			relatedSpdxElement: runtimeId,
 		},
-		...runtime.relationships.map((relationship) => ({
-			...relationship,
-			relationshipType: "CONTAINS",
-		})),
-	].sort(
+		...runtime.relationships,
+	];
+	relationships.sort(
 		(left, right) =>
 			left.spdxElementId.localeCompare(right.spdxElementId) ||
-			left.relatedSpdxElement.localeCompare(right.relatedSpdxElement),
+			left.relatedSpdxElement.localeCompare(right.relatedSpdxElement) ||
+			left.relationshipType.localeCompare(right.relationshipType),
 	);
 	return {
 		spdxVersion: "SPDX-2.3",

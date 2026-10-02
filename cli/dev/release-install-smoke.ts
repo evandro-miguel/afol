@@ -17,6 +17,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { verifyStagedRelease } from "./stage-release";
 
 const ASSET_NAME = "afol-linux-x64";
@@ -24,7 +25,9 @@ const MAX_MANIFEST_BYTES = 1_000_000;
 const MAX_RELEASE_FILE_BYTES = 1_000_000_000;
 const MAX_RELEASE_ARCHIVE_BYTES = 1_000_000_000;
 const MAX_RELEASE_TOTAL_BYTES = 1_000_000_000;
+const MAX_RELEASE_ARCHIVE_EXPANDED_BYTES = MAX_RELEASE_TOTAL_BYTES;
 const MAX_REDIRECTS = 5;
+const DEFAULT_RESOURCE_TIMEOUT_MS = 60_000;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -53,6 +56,9 @@ type SmokeOptions = {
 	expectedArchiveSha256?: string;
 	cwd?: string;
 	fetchImpl?: ReleaseSmokeFetch;
+	resourceTimeoutMs?: number;
+	maxArchiveExpandedBytes?: number;
+	now?: () => number;
 };
 
 type VerifiedRelease = {
@@ -223,130 +229,219 @@ function fileUrl(baseUrl: URL, path: string): URL {
 	return new URL(encoded, baseUrl);
 }
 
+function resourceTimeoutMs(options: SmokeOptions): number {
+	const timeout = options.resourceTimeoutMs ?? DEFAULT_RESOURCE_TIMEOUT_MS;
+	if (
+		!Number.isSafeInteger(timeout) ||
+		timeout < 1 ||
+		timeout > DEFAULT_RESOURCE_TIMEOUT_MS
+	) {
+		throw new Error("release download timeout is outside its permitted range");
+	}
+	return timeout;
+}
+
+function archiveExpansionLimit(options: SmokeOptions): number {
+	const limit =
+		options.maxArchiveExpandedBytes ?? MAX_RELEASE_ARCHIVE_EXPANDED_BYTES;
+	if (
+		!Number.isSafeInteger(limit) ||
+		limit < 1 ||
+		limit > MAX_RELEASE_ARCHIVE_EXPANDED_BYTES
+	) {
+		throw new Error(
+			"release archive expansion limit is outside its permitted range",
+		);
+	}
+	return limit;
+}
+
+function cancelWithoutWaiting(
+	stream: { cancel(reason?: unknown): Promise<unknown> } | null | undefined,
+): void {
+	if (!stream) return;
+	try {
+		void Promise.resolve(stream.cancel()).catch(() => {});
+	} catch {}
+}
+
 async function readResponse(
 	fetchImpl: ReleaseSmokeFetch,
 	url: URL,
 	maxBytes: number,
+	timeoutMs: number,
+	now: () => number = Date.now,
 ): Promise<Uint8Array> {
 	let requestUrl = url;
 	let response: Response | undefined;
-	for (
-		let redirectCount = 0;
-		redirectCount <= MAX_REDIRECTS;
-		redirectCount += 1
-	) {
-		try {
-			response = await fetchImpl(requestUrl, {
-				cache: "no-store",
-				credentials: "omit",
-				headers: {},
-				redirect: "manual",
-				referrerPolicy: "no-referrer",
-			});
-		} catch {
-			throw new Error("release download request failed");
+	let cancelActive = () => cancelWithoutWaiting(response?.body);
+	let releaseReader = () => {};
+	const controller = new AbortController();
+	const deadlineAt = now() + timeoutMs;
+	const timeoutError = new Error("release download timed out");
+	let timedOut = false;
+	let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+	const deadline = new Promise<never>((_resolve, reject) => {
+		timeoutHandle = setTimeout(() => {
+			timedOut = true;
+			controller.abort();
+			reject(timeoutError);
+		}, timeoutMs);
+	});
+	const expireIfNeeded = () => {
+		if (now() >= deadlineAt) {
+			timedOut = true;
+			controller.abort();
+			throw timeoutError;
 		}
-		if (response.status < 300 || response.status >= 400) break;
-		if (redirectCount === MAX_REDIRECTS) {
-			throw new Error("release download exceeded the redirect limit");
-		}
-		const location = response.headers.get("location");
-		if (!location) throw new Error("release download redirect has no target");
-		let redirectUrl: URL;
-		try {
-			redirectUrl = new URL(location, requestUrl);
-		} catch {
-			throw new Error("release download redirect target is invalid");
-		}
-		if (
-			redirectUrl.protocol !== "https:" ||
-			redirectUrl.username.length > 0 ||
-			redirectUrl.password.length > 0 ||
-			redirectUrl.hash.length > 0
+	};
+	const beforeDeadline = async <T>(operation: () => Promise<T>): Promise<T> => {
+		expireIfNeeded();
+		const result = await Promise.race([operation(), deadline]);
+		expireIfNeeded();
+		return result;
+	};
+	try {
+		for (
+			let redirectCount = 0;
+			redirectCount <= MAX_REDIRECTS;
+			redirectCount += 1
 		) {
+			const request = Promise.resolve().then(() =>
+				fetchImpl(requestUrl, {
+					cache: "no-store",
+					credentials: "omit",
+					headers: {},
+					redirect: "manual",
+					referrerPolicy: "no-referrer",
+					signal: controller.signal,
+				}),
+			);
+			try {
+				response = await beforeDeadline(() => request);
+			} catch (error) {
+				if (error === timeoutError || timedOut) {
+					void request
+						.then((lateResponse) => cancelWithoutWaiting(lateResponse.body))
+						.catch(() => {});
+					throw timeoutError;
+				}
+				throw new Error("release download request failed");
+			}
+			if (response.status < 300 || response.status >= 400) break;
+			if (redirectCount === MAX_REDIRECTS) {
+				throw new Error("release download exceeded the redirect limit");
+			}
+			const location = response.headers.get("location");
+			if (!location) {
+				throw new Error("release download redirect has no target");
+			}
+			let redirectUrl: URL;
+			try {
+				redirectUrl = new URL(location, requestUrl);
+			} catch {
+				throw new Error("release download redirect target is invalid");
+			}
+			if (
+				redirectUrl.protocol !== "https:" ||
+				redirectUrl.username.length > 0 ||
+				redirectUrl.password.length > 0 ||
+				redirectUrl.hash.length > 0
+			) {
+				throw new Error(
+					"release download redirect must remain HTTPS without credentials",
+				);
+			}
+			cancelWithoutWaiting(response.body);
+			response = undefined;
+			requestUrl = redirectUrl;
+		}
+		if (!response?.ok || response?.redirected) {
 			throw new Error(
-				"release download redirect must remain HTTPS without credentials",
+				`release download failed${response ? ` with HTTP ${response.status}` : ""}`,
 			);
 		}
-		requestUrl = redirectUrl;
-	}
-	if (!response?.ok || response?.redirected) {
-		throw new Error(
-			`release download failed${response ? ` with HTTP ${response.status}` : ""}`,
-		);
-	}
-	if (response.url) {
-		let finalUrl: URL;
-		try {
-			finalUrl = new URL(response.url);
-		} catch {
-			throw new Error("release download returned an invalid response URL");
-		}
-		if (
-			finalUrl.protocol !== "https:" ||
-			finalUrl.username.length > 0 ||
-			finalUrl.password.length > 0 ||
-			finalUrl.hash.length > 0
-		) {
-			throw new Error("release download response is not an allowed HTTPS URL");
-		}
-	}
-	const contentLength = response.headers.get("content-length");
-	if (contentLength !== null) {
-		const declaredBytes = Number(contentLength);
-		if (!Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
+		if (response.url) {
+			let finalUrl: URL;
 			try {
-				await response.body?.cancel();
-			} catch {}
-			throw new Error("release download has an invalid content length");
+				finalUrl = new URL(response.url);
+			} catch {
+				throw new Error("release download returned an invalid response URL");
+			}
+			if (
+				finalUrl.protocol !== "https:" ||
+				finalUrl.username.length > 0 ||
+				finalUrl.password.length > 0 ||
+				finalUrl.hash.length > 0
+			) {
+				throw new Error(
+					"release download response is not an allowed HTTPS URL",
+				);
+			}
 		}
-		if (declaredBytes > maxBytes) {
+		const contentLength = response.headers.get("content-length");
+		if (contentLength !== null) {
+			const declaredBytes = Number(contentLength);
+			if (!Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
+				throw new Error("release download has an invalid content length");
+			}
+			if (declaredBytes > maxBytes) {
+				throw new Error("release download exceeded the permitted file size");
+			}
+		}
+		const reader = response.body?.getReader();
+		if (!reader) {
+			expireIfNeeded();
+			return new Uint8Array();
+		}
+		cancelActive = () => cancelWithoutWaiting(reader);
+		releaseReader = () => {
 			try {
-				await response.body?.cancel();
+				reader.releaseLock();
 			} catch {}
-			throw new Error("release download exceeded the permitted file size");
-		}
-	}
-	const reader = response.body?.getReader();
-	if (!reader) return new Uint8Array();
-	const chunks: Uint8Array[] = [];
-	let totalBytes = 0;
-	let exceededLimit = false;
-	try {
+		};
+		const chunks: Uint8Array[] = [];
+		let totalBytes = 0;
+		let exceededLimit = false;
 		while (true) {
-			const { done, value } = await reader.read();
+			let result: Awaited<ReturnType<typeof reader.read>>;
+			try {
+				result = await beforeDeadline(() => reader.read());
+			} catch (error) {
+				if (error === timeoutError || timedOut) throw timeoutError;
+				throw new Error("release download response body could not be read");
+			}
+			const { done, value } = result;
 			if (done) break;
 			if (value.byteLength > maxBytes - totalBytes) {
 				exceededLimit = true;
-				try {
-					await reader.cancel();
-				} catch {}
 				break;
 			}
 			chunks.push(value.slice());
 			totalBytes += value.byteLength;
 		}
-	} catch {
-		try {
-			await reader.cancel();
-		} catch {}
-		throw new Error("release download response body could not be read");
+		if (exceededLimit) {
+			throw new Error("release download exceeded the permitted file size");
+		}
+		expireIfNeeded();
+		const bytes = new Uint8Array(totalBytes);
+		let offset = 0;
+		for (const chunk of chunks) {
+			bytes.set(chunk, offset);
+			offset += chunk.byteLength;
+		}
+		if (bytes.byteLength > maxBytes) {
+			throw new Error("release download response body could not be read");
+		}
+		return bytes;
+	} catch (error) {
+		cancelActive();
+		if (error === timeoutError || timedOut) throw timeoutError;
+		throw error;
 	} finally {
-		reader.releaseLock();
+		if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+		releaseReader();
 	}
-	if (exceededLimit) {
-		throw new Error("release download exceeded the permitted file size");
-	}
-	const bytes = new Uint8Array(totalBytes);
-	let offset = 0;
-	for (const chunk of chunks) {
-		bytes.set(chunk, offset);
-		offset += chunk.byteLength;
-	}
-	if (bytes.byteLength > maxBytes) {
-		throw new Error("release download response body could not be read");
-	}
-	return bytes;
 }
 
 function writeOwnedFile(
@@ -383,6 +478,7 @@ async function downloadVerifiedStage(
 	ownedRoot: string,
 ): Promise<VerifiedRelease> {
 	const baseUrl = parseBaseUrl(options.baseUrl ?? "");
+	const timeoutMs = resourceTimeoutMs(options);
 	if (!validSha256(options.expectedArtifactSha256)) {
 		throw new Error(
 			"HTTPS release smoke requires an expected artifact SHA-256",
@@ -399,6 +495,8 @@ async function downloadVerifiedStage(
 		fetchImpl,
 		fileUrl(baseUrl, "manifest.json"),
 		MAX_MANIFEST_BYTES,
+		timeoutMs,
+		options.now,
 	);
 	const manifest = parseManifest(new TextDecoder().decode(manifestBytes));
 	assertPinnedRelease(
@@ -426,6 +524,8 @@ async function downloadVerifiedStage(
 			fetchImpl,
 			fileUrl(baseUrl, entry.path),
 			MAX_RELEASE_FILE_BYTES,
+			timeoutMs,
+			options.now,
 		);
 		writeOwnedFile(stageDir, entry, bytes);
 	}
@@ -457,11 +557,15 @@ async function downloadArchiveStage(
 			"archive release smoke requires a full expected source commit SHA",
 		);
 	}
+	const timeoutMs = resourceTimeoutMs(options);
+	const maxExpandedBytes = archiveExpansionLimit(options);
 
 	const archiveBytes = await readResponse(
 		options.fetchImpl ?? fetch,
 		archiveUrl,
 		MAX_RELEASE_ARCHIVE_BYTES,
+		timeoutMs,
+		options.now,
 	);
 	if (sha256(archiveBytes) !== options.expectedArchiveSha256) {
 		throw new Error(
@@ -469,9 +573,25 @@ async function downloadArchiveStage(
 		);
 	}
 
+	let archiveContents: Uint8Array;
+	try {
+		archiveContents = gunzipSync(archiveBytes, {
+			maxOutputLength: maxExpandedBytes,
+		});
+	} catch (error) {
+		if (isRecord(error) && error.code === "ERR_BUFFER_TOO_LARGE") {
+			throw new Error("release archive expands beyond the permitted size");
+		}
+		throw new Error("downloaded release archive is invalid");
+	}
+	if (archiveContents[0] === 0x1f && archiveContents[1] === 0x8b) {
+		throw new Error(
+			"release archive contains unsupported nested gzip compression",
+		);
+	}
 	let archiveFiles: Map<string, File>;
 	try {
-		archiveFiles = await new Bun.Archive(archiveBytes).files();
+		archiveFiles = await new Bun.Archive(archiveContents).files();
 	} catch {
 		throw new Error("downloaded release archive is invalid");
 	}
