@@ -163,8 +163,9 @@ function findProjectByIdOrName(
 
 function requireValidCatalog(
 	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
+	now: Date,
 ): ProjectBenchmarkCatalogResolution {
-	const validation = validateProjectBenchmarkCatalog(catalog);
+	const validation = validateProjectBenchmarkCatalog(catalog, now);
 	if (!catalog.axes) {
 		return {
 			ok: false,
@@ -303,6 +304,7 @@ export async function runProjectBenchmarkCommand(
 	projectRoot: string,
 	io: CommandIo = DEFAULT_IO,
 	ctx: OperationContext = defaultOperationContext(),
+	now: Date = new Date(),
 ): Promise<number> {
 	const action = actionInput || "list";
 	let parsed: ParsedArgs;
@@ -322,7 +324,7 @@ export async function runProjectBenchmarkCommand(
 	const sourceCatalog = rawCatalog;
 
 	if (action === "validate") {
-		const validation = validateProjectBenchmarkCatalog(rawCatalog);
+		const validation = validateProjectBenchmarkCatalog(rawCatalog, now);
 		const ok =
 			validation.ok && (!parsed.strict || validation.warning_count === 0);
 		const error = ok
@@ -407,7 +409,7 @@ export async function runProjectBenchmarkCommand(
 		}
 	}
 
-	const catalog = requireValidCatalog(sourceCatalog);
+	const catalog = requireValidCatalog(sourceCatalog, now);
 	if (!catalog.ok) {
 		const { error } = catalog;
 		if (parsed.json) {
@@ -428,7 +430,7 @@ export async function runProjectBenchmarkCommand(
 	}
 
 	if (action === "list") {
-		const scores = scoreProjectBenchmarks(catalog.projects, catalog.axes);
+		const scores = scoreProjectBenchmarks(catalog.projects, catalog.axes, now);
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.list",
@@ -463,7 +465,7 @@ export async function runProjectBenchmarkCommand(
 			}
 			return 1;
 		}
-		const score = scoreProjectBenchmark(project, catalog.axes);
+		const score = scoreProjectBenchmark(project, catalog.axes, now);
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.show",
@@ -495,7 +497,11 @@ export async function runProjectBenchmarkCommand(
 			}
 			return 1;
 		}
-		const matrix = buildProjectBenchmarkMatrix(catalog.projects, catalog.axes);
+		const matrix = buildProjectBenchmarkMatrix(
+			catalog.projects,
+			catalog.axes,
+			now,
+		);
 		const projects = parsed.axis
 			? matrix.projects
 					.filter((project) => (project.axes[parsed.axis as string] ?? 0) > 0)
@@ -536,7 +542,7 @@ export async function runProjectBenchmarkCommand(
 			catalog.projects,
 			catalog.axes,
 			catalog.validation,
-			{ check: parsed.check },
+			{ check: parsed.check, now },
 		);
 		if (parsed.json) {
 			const jsonResult = withCatalogSource(result, catalog.catalog.source);
@@ -605,6 +611,7 @@ export async function runProjectBenchmarkCommand(
 		const references = rankProjectBenchmarkRecommendations(
 			axis,
 			catalog.projects,
+			now,
 		).slice(0, 5);
 		const recommendations: string[] = [];
 		for (const entry of references) {

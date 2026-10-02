@@ -169,6 +169,7 @@ function contractFor(
 function evaluationWindow(
 	contract: EvaluationContractV1 | null,
 	commit: ApplyJournalEvent | null = null,
+	anchorSequence?: number,
 ): {
 	start: number;
 	end: number;
@@ -178,6 +179,7 @@ function evaluationWindow(
 	const end = Math.max(
 		baselineEnd,
 		commit?.binding.evaluation_anchor_production_day_sequence ?? 0,
+		anchorSequence ?? 0,
 	);
 	return {
 		start: end + 1,
@@ -309,6 +311,115 @@ function baseResult(
 	};
 }
 
+function previewBoundEvaluationUnlocked(input: {
+	root: string;
+	mutationId: string;
+	projectId: string;
+	contract: EvaluationContractV1;
+	anchorSequence?: number;
+	applyCommitDigest?: string | null;
+}): EvaluationResult {
+	const resolvedConfig = resolveEvolutionConfig(readProjectConfig(input.root));
+	const eventsDir = resolvedConfig.paths.evolutionEventsDir;
+	const journalEvents = readObservationJournal(
+		input.root,
+		input.projectId,
+		eventsDir,
+	);
+	const all = journalEvents
+		.map(observationFromEvent)
+		.filter((item): item is ObservationRecord => item !== null);
+	const window = evaluationWindow(input.contract, null, input.anchorSequence);
+	const post = all.filter(
+		(observation) =>
+			observation.journal_sequence >
+				input.contract.baseline.anchor_journal_sequence &&
+			observation.task_type === input.contract.task_type &&
+			observation.production_day_sequence >= window.start &&
+			observation.production_day_sequence <= window.end,
+	);
+	const matching = post.filter(
+		(observation) => observation.fingerprint === input.contract.cluster_id,
+	);
+	const productionDays = readProductionDayJournal(
+		input.root,
+		input.projectId,
+		resolvedConfig.timezone,
+		resolvedConfig.paths.evolutionEventsDir,
+	);
+	const successfulOutcomes = successfulCompletionOutcomes({
+		root: input.root,
+		projectId: input.projectId,
+		taskType: input.contract.task_type,
+		productionDays,
+		window,
+	});
+	const productionDayCount = new Set(
+		productionDays
+			.filter((event) => event.payload.project_id === input.projectId)
+			.map((event) => event.payload.local_date),
+	).size;
+	const fullWindow = productionDayCount >= window.end;
+	const outcomeObservations = [...post, ...successfulOutcomes];
+	const comparableSessions = new Set(
+		outcomeObservations.map((observation) => observation.session_id),
+	).size;
+	const cohort: ComparableCohort = {
+		task_type: input.contract.task_type,
+		observations: outcomeObservations,
+		minimum_data: EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
+		distinct_production_days: new Set(
+			outcomeObservations.map(
+				(observation) => observation.production_day_sequence,
+			),
+		).size,
+		comparable:
+			comparableSessions >= EVALUATION_MINIMUM_COMPARABLE_SESSIONS &&
+			fullWindow,
+	};
+	const currentScorecard = scorecardFromObservations(
+		outcomeObservations,
+		cohort.distinct_production_days,
+	);
+	const comparison = compareScorecards(
+		input.contract.baseline.scorecard,
+		currentScorecard,
+		cohort,
+	);
+	let state: EvaluationState = "canary";
+	let reason = "evaluation window or comparable sessions are incomplete";
+	if (matching.length > 0) {
+		state = "regressed";
+		reason = "matching recurrence has immediate regressed precedence";
+	} else if (!fullWindow) {
+		state = "canary";
+		reason = "evaluation production-day window is incomplete";
+	} else if (comparableSessions < EVALUATION_MINIMUM_COMPARABLE_SESSIONS) {
+		state = "needs_more_data";
+		reason = "fewer than three comparable sessions are available";
+	} else if (comparison.accepted) {
+		state = "stable";
+		reason = comparison.reason;
+	} else if (comparison.comparable) {
+		state = "needs_more_data";
+		reason = comparison.reason;
+	}
+	return {
+		project_id: input.projectId,
+		mutation_id: input.mutationId,
+		state,
+		reason,
+		apply_commit_digest: input.applyCommitDigest ?? null,
+		production_day_window: window,
+		comparable_sessions: comparableSessions,
+		matching_observations: matching.length,
+		scorecard_comparison: comparisonSummary(
+			comparison,
+			state === "regressed" ? 1 : 0,
+		),
+	};
+}
+
 function previewProposalEvaluationUnlocked(
 	root: string,
 	mutationId: string,
@@ -355,103 +466,19 @@ function previewProposalEvaluationUnlocked(
 			commit,
 			null,
 		);
-	const journalEvents = readObservationJournal(
+	return previewBoundEvaluationUnlocked({
 		root,
-		resolvedProjectId,
-		eventsDir,
-	);
-	const all = journalEvents
-		.map(observationFromEvent)
-		.filter((item): item is ObservationRecord => item !== null);
-	const window = evaluationWindow(contract, commit);
-	const post = all.filter(
-		(observation) =>
-			observation.journal_sequence >
-				contract.baseline.anchor_journal_sequence &&
-			observation.task_type === contract.task_type &&
-			observation.production_day_sequence >= window.start &&
-			observation.production_day_sequence <= window.end,
-	);
-	const matching = post.filter(
-		(observation) => observation.fingerprint === contract.cluster_id,
-	);
-	const productionDays = readProductionDayJournal(
-		root,
-		resolvedProjectId,
-		resolvedConfig.timezone,
-		resolvedConfig.paths.evolutionEventsDir,
-	);
-	const successfulOutcomes = successfulCompletionOutcomes({
-		root,
+		mutationId,
 		projectId: resolvedProjectId,
-		taskType: contract.task_type,
-		productionDays,
-		window,
+		contract,
+		...(commit.binding.evaluation_anchor_production_day_sequence === undefined
+			? {}
+			: {
+					anchorSequence:
+						commit.binding.evaluation_anchor_production_day_sequence,
+				}),
+		applyCommitDigest: commit.event_digest,
 	});
-	const productionDayCount = new Set(
-		productionDays
-			.filter((event) => event.payload.project_id === resolvedProjectId)
-			.map((event) => event.payload.local_date),
-	).size;
-	const fullWindow = productionDayCount >= window.end;
-	const outcomeObservations = [...post, ...successfulOutcomes];
-	const comparableSessions = new Set(
-		outcomeObservations.map((observation) => observation.session_id),
-	).size;
-	const cohort: ComparableCohort = {
-		task_type: contract.task_type,
-		observations: outcomeObservations,
-		minimum_data: EVALUATION_MINIMUM_COMPARABLE_SESSIONS,
-		distinct_production_days: new Set(
-			outcomeObservations.map(
-				(observation) => observation.production_day_sequence,
-			),
-		).size,
-		comparable:
-			comparableSessions >= EVALUATION_MINIMUM_COMPARABLE_SESSIONS &&
-			fullWindow,
-	};
-	const currentScorecard = scorecardFromObservations(
-		outcomeObservations,
-		cohort.distinct_production_days,
-	);
-	const comparison = compareScorecards(
-		contract.baseline.scorecard,
-		currentScorecard,
-		cohort,
-	);
-	let state: EvaluationState = "canary";
-	let reason = "evaluation window or comparable sessions are incomplete";
-	if (matching.length > 0) {
-		state = "regressed";
-		reason = "matching recurrence has immediate regressed precedence";
-	} else if (!fullWindow) {
-		state = "canary";
-		reason = "evaluation production-day window is incomplete";
-	} else if (comparableSessions < EVALUATION_MINIMUM_COMPARABLE_SESSIONS) {
-		state = "needs_more_data";
-		reason = "fewer than three comparable sessions are available";
-	} else if (comparison.accepted) {
-		state = "stable";
-		reason = comparison.reason;
-	} else if (comparison.comparable) {
-		state = "needs_more_data";
-		reason = comparison.reason;
-	}
-	return {
-		project_id: resolvedProjectId,
-		mutation_id: mutationId,
-		state,
-		reason,
-		apply_commit_digest: commit.event_digest,
-		production_day_window: window,
-		comparable_sessions: comparableSessions,
-		matching_observations: matching.length,
-		scorecard_comparison: comparisonSummary(
-			comparison,
-			state === "regressed" ? 1 : 0,
-		),
-	};
 }
 
 export function previewProposalEvaluation(
@@ -461,6 +488,30 @@ export function previewProposalEvaluation(
 ): EvaluationResult {
 	return withEvaluationLock(root, () =>
 		previewProposalEvaluationUnlocked(root, mutationId, projectId),
+	);
+}
+
+export function previewEvaluationContract(input: {
+	root: string;
+	proposalId: string;
+	projectId: string;
+	contract: EvaluationContractV1;
+	anchorProductionDaySequence: number;
+}): EvaluationResult {
+	assertEvaluationContract(input.contract);
+	if (
+		!Number.isSafeInteger(input.anchorProductionDaySequence) ||
+		input.anchorProductionDaySequence < 0
+	)
+		throw new Error("assisted evaluation anchor is invalid");
+	return withEvaluationLock(input.root, () =>
+		previewBoundEvaluationUnlocked({
+			root: input.root,
+			mutationId: input.proposalId,
+			projectId: projectIdFor(input.root, input.projectId),
+			contract: input.contract,
+			anchorSequence: input.anchorProductionDaySequence,
+		}),
 	);
 }
 

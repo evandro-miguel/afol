@@ -64,6 +64,7 @@ export function boundedSpawn(
 		cwd: options.cwd,
 		maxBuffer: options.maxBuffer,
 		stdio: options.stdio,
+		shell: false,
 	});
 	const wallMs = Date.now() - startedAt;
 

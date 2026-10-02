@@ -6,7 +6,7 @@ import { runValidationCommands } from "./command-runner";
 import { outputJson, outputJsonWithStatus, registrySummary } from "./output";
 import {
 	baselineFilename,
-	formatMutationCalibrationReason,
+	formatCalibrationReason,
 	loadRegistry,
 	readGitRepositoryId,
 	validateRegistryContract,
@@ -324,21 +324,24 @@ function resolveBenchmarkScenario(
 	throw new Error(`Unknown --scenario-id value: ${scenarioId}`);
 }
 
-function collectProfileCompatibilityNotes(
+export function collectProfileCompatibilityNotes(
 	scenario: Scenario,
 	baseline: Baseline | undefined,
 	scenarioBaseline: ScenarioBaseline | undefined,
 	execution: ReturnType<typeof runScenarioCommand> | null,
 ): string[] {
-	if (scenario.pack_id !== "mutation-safety" || !baseline) {
+	if (!baseline) {
 		return [];
 	}
 	if (baseline.calibration_status === "pending") {
 		return [
-			`baseline-incompatible:calibration-pending:${formatMutationCalibrationReason(baseline.calibration_reason)}`,
-			MUTATION_PROFILE_RECOVERY_NOTE,
+			`baseline-incompatible:calibration-pending:${formatCalibrationReason(baseline.calibration_reason)}`,
+			...(scenario.pack_id === "mutation-safety"
+				? [MUTATION_PROFILE_RECOVERY_NOTE]
+				: []),
 		];
 	}
+	if (scenario.pack_id !== "mutation-safety") return [];
 	if (!execution) {
 		return [];
 	}

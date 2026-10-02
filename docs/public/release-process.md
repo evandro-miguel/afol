@@ -16,8 +16,9 @@ Use the short-lived branch flow:
 5. Merge only after review, then tag the reviewed `main` commit when a source
    release is authorized.
 
-There is no hosted CI workflow. An absent hosted run is not a pass, failure,
-or product-status signal; local exact-SHA validation is the release evidence.
+Hosted CI validates pull requests and `main`, but local validation against the
+exact candidate SHA remains the canonical release evidence. A green hosted run
+does not satisfy scanner, provenance, publication, or installation gates.
 
 ## Source validation
 

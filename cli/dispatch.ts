@@ -181,6 +181,16 @@ const SUBCOMMAND_HANDLERS = {
 		const { runReceiptCommand } = await import("./commands/receipt");
 		return runReceiptCommand(resolution.action, resolution.args, root);
 	},
+	artifact: async (resolution, root, operationCtx) => {
+		const { runArtifactCommand } = await import("./commands/artifact");
+		return runArtifactCommand(
+			resolution.action,
+			resolution.args,
+			root,
+			undefined,
+			operationCtx,
+		);
+	},
 	hydrate: async (resolution, root, _operationCtx) => {
 		const { runHydrateCommand } = await import("./commands/hydrate");
 		const hydrateArgs = resolution.action

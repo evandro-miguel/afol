@@ -429,22 +429,23 @@ describe("parseDoneArgs", () => {
 				"260530_2256_cli-native",
 				"T-01",
 				"--test-shell",
-				"true # 'valid shell comment",
+				"echo checked # 'valid shell comment",
 			],
 			process.cwd(),
 		);
-		expect(parsed.testShellCommand).toBe("true # 'valid shell comment");
-		const commentOnly = parseDoneArgs(
-			[
-				"--session",
-				"260530_2256_cli-native",
-				"T-01",
-				"--test-shell",
-				"# comment",
-			],
-			process.cwd(),
-		);
-		expect(commentOnly.testShellCommand).toBe("# comment");
+		expect(parsed.testShellCommand).toBe("echo checked # 'valid shell comment");
+		expect(() =>
+			parseDoneArgs(
+				[
+					"--session",
+					"260530_2256_cli-native",
+					"T-01",
+					"--test-shell",
+					"# comment",
+				],
+				process.cwd(),
+			),
+		).toThrow("shell no-op");
 	});
 
 	test("supports --test-shell", () => {

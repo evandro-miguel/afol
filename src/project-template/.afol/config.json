@@ -18,6 +18,7 @@
     "hooks_dir": ".afol/adm/hooks",
     "skills_dir": ".agents/skills",
     "wb_dir": ".afol/wb",
+    "records_dir": ".afol/records",
     "active_session_file": ".afol/wb/.active_session",
     "tmp_dir": ".afol/tmp",
     "data_dir": ".afol/data",

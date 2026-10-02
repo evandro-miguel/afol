@@ -112,13 +112,31 @@ describe("public content audit", () => {
 		expect(result.output).toContain("runtime-state: unexpected-root-directory");
 	});
 
-	test("rejects non-public docs and hosted workflows", () => {
+	test("rejects non-public docs and unapproved hosted workflows", () => {
 		write("docs/internal/plan.md", "# Internal\n");
-		write(".github/workflows/ci.yml", "name: ci\n");
+		write(".github/workflows/random.yml", "name: random\n");
 		const result = audit();
 		expect(result.exitCode).toBe(1);
 		expect(result.output).toContain("docs/internal: non-public-docs-path");
-		expect(result.output).toContain(".github/workflows: hosted-workflow-path");
+		expect(result.output).toContain(
+			".github/workflows/random.yml: hosted-workflow-path",
+		);
+	});
+
+	test("allows only an explicitly approved hosted workflow", () => {
+		write(
+			"scripts/public-files.json",
+			`${JSON.stringify({ allowed_workflows: [".github/workflows/ci.yml"] })}\n`,
+		);
+		write(".github/workflows/ci.yml", "name: CI\n");
+		expect(audit().exitCode).toBe(0);
+
+		write(".github/workflows/deploy.yml", "name: deploy\n");
+		const result = audit();
+		expect(result.exitCode).toBe(1);
+		expect(result.output).toContain(
+			".github/workflows/deploy.yml: hosted-workflow-path",
+		);
 	});
 
 	test("rejects stale public-release terminology", () => {

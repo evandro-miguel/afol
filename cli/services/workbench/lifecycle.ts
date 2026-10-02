@@ -740,6 +740,11 @@ function parseTaskRowsFromContent(
 	const seenTaskIds = new Set<string>();
 	const rows: IndexedTaskRow[] = [];
 	for (const task of parsed.tasks) {
+		if (task.columns.notesColumn === null) {
+			throw new Error(
+				`State Board requires a Notes column for lifecycle changes in ${taskPath}`,
+			);
+		}
 		if (seenTaskIds.has(task.task_id)) {
 			throw new Error(`Duplicate task id ${task.task_id} in ${taskPath}`);
 		}
@@ -2658,6 +2663,7 @@ export function closeSession(
 			throw new Error(`Session folder not found: ${session}`);
 		}
 		const state = readTaskLifecycleState(paths.taskPath, session);
+		let taskRows = readTaskRows(paths.taskPath);
 		let closeEventRecorded: boolean;
 		if (state.kind === "closed") {
 			markPlanMetadataClosed(paths.planPath, session, state.closedAt);
@@ -2675,7 +2681,6 @@ export function closeSession(
 			: "missing";
 		let summarySource: CloseSessionReport["summary_source"] = "state";
 		let summary = options.summary?.trim() ?? "";
-		let taskRows = readTaskRows(paths.taskPath);
 		const originalTask = readFileSync(paths.taskPath, "utf8");
 		const originalPlan = existsSync(paths.planPath)
 			? readFileSync(paths.planPath, "utf8")
@@ -2746,6 +2751,8 @@ export function closeSession(
 						blockingRows,
 						carryReason,
 					);
+					continuationCarryRows = blockingRows;
+					continuationCarryReason = carryReason;
 					continuation = newWorkstream(root, carry.theme, carry.metadata, {
 						deferNewSessionAuxiliary: true,
 					});
@@ -2773,7 +2780,16 @@ export function closeSession(
 					const labels = blockingRows
 						.map((row) => `${row.taskId}:${row.state}`)
 						.join(", ");
-					throw new Error(`Session ${session} has blocking tasks: ${labels}`);
+					const first = blockingRows[0];
+					const next =
+						first?.state === "pending"
+							? `afol st ${first.taskId}`
+							: first
+								? `afol d ${first.taskId} -x "<cmd>"`
+								: "afol s";
+					throw new Error(
+						`Session ${session} has blocking tasks: ${labels}. hint="${next}"`,
+					);
 				}
 			} else if (options.carryOpen) {
 				recoveredContinuation =

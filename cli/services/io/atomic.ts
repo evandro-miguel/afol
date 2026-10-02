@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
+	chmodSync,
+	chownSync,
 	existsSync,
 	mkdirSync,
 	renameSync,
@@ -28,6 +30,14 @@ export function atomicWriteText(
 	atomicWrite(path, content, options);
 }
 
+export function atomicWriteTextPreservingMetadata(
+	path: string,
+	content: string,
+	metadata: { mode: number; uid: number; gid: number },
+): void {
+	atomicWrite(path, content, metadata);
+}
+
 export function atomicWriteBytes(
 	path: string,
 	content: Uint8Array,
@@ -39,7 +49,12 @@ export function atomicWriteBytes(
 function atomicWrite(
 	path: string,
 	content: string | Uint8Array,
-	options: { syncDirectory?: boolean } = {},
+	options: {
+		syncDirectory?: boolean;
+		mode?: number;
+		uid?: number;
+		gid?: number;
+	} = {},
 ): void {
 	const dir = dirname(path);
 	mkdirSync(dir, { recursive: true });
@@ -48,7 +63,17 @@ function atomicWrite(
 		`.${sanitizeTempLabel(basename(path)).slice(0, 64)}.${process.pid}.${randomUUID()}.tmp`,
 	);
 	try {
-		writeFileSync(tempPath, content, { flag: "wx" });
+		writeFileSync(tempPath, content, {
+			flag: "wx",
+			...(options.mode === undefined ? {} : { mode: options.mode & 0o7777 }),
+		});
+		if (
+			options.uid !== undefined &&
+			options.gid !== undefined &&
+			process.platform !== "win32"
+		)
+			chownSync(tempPath, options.uid, options.gid);
+		if (options.mode !== undefined) chmodSync(tempPath, options.mode & 0o7777);
 		syncFileDurably(tempPath);
 		renameSync(tempPath, path);
 		if (options.syncDirectory !== false) {

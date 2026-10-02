@@ -17,6 +17,7 @@ import {
 	applyMigrations,
 	buildSuggestionCandidate,
 	deriveSuggestionCandidates,
+	EVOLUTION_SCHEMA_VERSION,
 	evolutionDbPath,
 	normalizeObservationRecord,
 	openEvolutionDb,
@@ -425,7 +426,7 @@ describe("evolution suggestion model", () => {
 							user_version: number;
 						}
 					).user_version,
-				).toBe(10);
+				).toBe(EVOLUTION_SCHEMA_VERSION);
 			} finally {
 				upgraded.close();
 			}

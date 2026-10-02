@@ -31,11 +31,19 @@ bun run validate:release
 ```
 
 Security checks include Gitleaks and OSV Scanner. Do not commit generated drift.
+Release scans require `AFOL_OSV_SCANNER_PATH` and `AFOL_GITLEAKS_PATH` to name
+absolute paths to operator-approved readable regular scanner files. Release
+mode rejects symbolic-link path components and changing file identities,
+records executable hashes, and executes verified immutable copies. It has no
+PATH fallback. `bun run security:scan:release` validates this contract and
+writes `dist/security-scan.release.json`; a scanner's `--version` alone does
+not validate it.
 Documentation changes should preserve working relative links and valid Markdown
 structure. Release evidence is produced locally against the exact candidate
 SHA. The alpha is source-only: a source tag does not imply a standalone binary
-or registry package. This repository has no hosted CI workflow, so no hosted
-status is claimed.
+or registry package. Hosted CI supplies regression evidence but not release
+authorization; see the [continuous integration contract](docs/public/ci.md)
+and ADR-007.
 
 ## Security and privacy
 

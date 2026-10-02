@@ -6,6 +6,7 @@ Public product docs for AFOL. Start at the root [README](../../README.md).
 | --- | --- |
 | [Getting started](getting-started.md) | Run the source alpha, init, and record an evidenced task |
 | [Command reference](command-reference.md) | Lifecycle, updates, stability |
+| [Continuous integration](ci.md) | Hosted regression checks and local release boundary |
 | [Architecture](architecture.md) | CLI, template, and project-state boundaries |
 | [Architecture decisions](adr/README.md) | Public ADRs |
 | [Security model](security-model.md) | What AFOL does and does not protect |
@@ -13,6 +14,7 @@ Public product docs for AFOL. Start at the root [README](../../README.md).
 | [Evolution journal recovery](evolution-journal-recovery.md) | Canonical journal dates, blocked analysis, and source-vs-derived recovery |
 | [Upgrade and rollback](upgrade-and-rollback.md) | Update or roll back a source checkout and its template |
 | [Release process](release-process.md) | Source-only release and local validation |
+| [Standalone binary preparation](standalone-binary-release.md) | Future compliance, staging, and isolated install verification |
 | [Publishing checklist](publishing.md) | Reviewed source release checklist |
 | [Codex and Antigravity integration](provider-integrations.md) | Canonical `AGENTS.md` and the optional workspace rule |
 | [Known limitations](known-limitations.md) | Alpha scope |

@@ -447,22 +447,21 @@ status: draft
 			body: "The prose says afol ux user journey without documenting a command.",
 			expected: [],
 		},
-	])("extracts $name without indexing prose or unknown commands", ({
-		body,
-		expected,
-		id: fixtureId,
-	}) => {
-		const id = `fixture-extraction-${fixtureId}_spec-child_01`;
-		write(
-			`.afol/adm/specs/${id}.md`,
-			`\n---\ndoc_type: spec-child\nid: ${id}\ntheme: UX extraction\nstatus: active\nroadmap_feature: F-TEST\nparent_spec: fixture-parent_spec_01\n---\n\n# Extraction fixture\n\n${body}\n`,
-		);
+	])(
+		"extracts $name without indexing prose or unknown commands",
+		({ body, expected, id: fixtureId }) => {
+			const id = `fixture-extraction-${fixtureId}_spec-child_01`;
+			write(
+				`.afol/adm/specs/${id}.md`,
+				`\n---\ndoc_type: spec-child\nid: ${id}\ntheme: UX extraction\nstatus: active\nroadmap_feature: F-TEST\nparent_spec: fixture-parent_spec_01\n---\n\n# Extraction fixture\n\n${body}\n`,
+			);
 
-		const entry = loadUxRegistry(root).entries.find(
-			(candidate) => candidate.id === id,
-		);
-		expect(entry?.commands).toEqual([...expected]);
-	});
+			const entry = loadUxRegistry(root).entries.find(
+				(candidate) => candidate.id === id,
+			);
+			expect(entry?.commands).toEqual([...expected]);
+		},
+	);
 
 	test("previews spec-linked UX journey registration", async () => {
 		const captured = captureIo();

@@ -138,16 +138,15 @@ describe("evolution suggestion decision authority", () => {
 		).toThrow("does not match mutation");
 	});
 
-	test.each([
-		"skipped",
-		"accepted",
-		"rejected",
-	] as const)("accepts the %s action", (action) => {
-		const authority = dispatchSuggestionDecision({
-			...BASE,
-			action,
-			...(action === "rejected" ? { reason: "wrong priority" } : {}),
-		});
-		expect(suggestionDecisionForAuthority(authority).action).toBe(action);
-	});
+	test.each(["skipped", "accepted", "rejected"] as const)(
+		"accepts the %s action",
+		(action) => {
+			const authority = dispatchSuggestionDecision({
+				...BASE,
+				action,
+				...(action === "rejected" ? { reason: "wrong priority" } : {}),
+			});
+			expect(suggestionDecisionForAuthority(authority).action).toBe(action);
+		},
+	);
 });

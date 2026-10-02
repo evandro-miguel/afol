@@ -17,6 +17,7 @@ import {
 import {
 	type Baseline,
 	BENCHMARK_RESULT_SCHEMA_VERSION,
+	type BenchmarkScenarioSource,
 	type HotPathDerivedPath,
 	type HotPathScenarioConfig,
 	type HotPathScenarioMode,
@@ -228,6 +229,7 @@ function parseHotPathScenario(
 function parseScenario(
 	data: Record<string, unknown>,
 	sourcePath: string,
+	executionSource: BenchmarkScenarioSource,
 ): Scenario {
 	const scenario: Scenario = {
 		schema_version: asString(
@@ -249,6 +251,7 @@ function parseScenario(
 			data.deterministic_metrics,
 			`${sourcePath}.deterministic_metrics`,
 		),
+		execution_source: executionSource,
 	};
 	const hotPath = parseHotPathScenario(data, sourcePath);
 	if (data.acceptance !== undefined) {
@@ -632,9 +635,22 @@ function loadRegistryMetadata(registry: Record<string, unknown>): {
 }
 
 const BUILTIN_CATALOG_PREFIX = "benchmarks/catalog/";
+const CATALOG_RELATIVE_PREFIX = ".afol/data/benchmarks/catalog/";
+
+function builtinAssetPath(relativePath: string): string {
+	if (!relativePath.startsWith(CATALOG_RELATIVE_PREFIX)) {
+		throw new Error(`Invalid benchmark catalog path: ${relativePath}`);
+	}
+	return `${BUILTIN_CATALOG_PREFIX}${relativePath.slice(CATALOG_RELATIVE_PREFIX.length)}`;
+}
+
+function builtinAssetBytes(relativePath: string): Buffer | undefined {
+	const entry = BUILTIN_ASSET_FILES[builtinAssetPath(relativePath)];
+	return entry ? Buffer.from(entry.contentBase64, "base64") : undefined;
+}
 
 function loadBuiltinCatalogJson(relativePath: string): Record<string, unknown> {
-	const assetPath = `${BUILTIN_CATALOG_PREFIX}${relativePath.replace(`${REGISTRY_RELATIVE_PATH.slice(0, -"registry.json".length)}`, "")}`;
+	const assetPath = builtinAssetPath(relativePath);
 	const entry = BUILTIN_ASSET_FILES[assetPath];
 	if (!entry) {
 		throw new Error(`Missing builtin benchmark catalog file: ${assetPath}`);
@@ -681,7 +697,33 @@ export function loadRegistry(projectRoot: string): RegistrySnapshot {
 			.sort()
 			.map((entry) => {
 				const relativePath = `${packRelativePath}/${entry}`;
-				return parseScenario(loadCatalogJson(relativePath), relativePath);
+				if (useProjectCatalog) {
+					// Parse and classify from one byte snapshot so a replacement after
+					// validation cannot change the command that gets executed.
+					const scenarioBytes = readFileSync(join(projectRoot, relativePath));
+					const parsed: unknown = JSON.parse(scenarioBytes.toString("utf8"));
+					if (!isObject(parsed)) {
+						throw new Error(
+							`Invalid JSON object: ${join(projectRoot, relativePath)}`,
+						);
+					}
+					const embeddedBytes = builtinAssetBytes(relativePath);
+					const executionSource: BenchmarkScenarioSource =
+						embeddedBytes !== undefined &&
+						Buffer.compare(scenarioBytes, embeddedBytes) === 0
+							? "builtin-copy"
+							: "project";
+					const scenario = parseScenario(parsed, relativePath, executionSource);
+					scenario.execution_source_path = relativePath;
+					return scenario;
+				}
+				const scenario = parseScenario(
+					loadCatalogJson(relativePath),
+					relativePath,
+					"builtin",
+				);
+				scenario.execution_source_path = relativePath;
+				return scenario;
 			});
 		scenariosByPack[pack.pack_id] = scenarios;
 	}
@@ -710,6 +752,7 @@ export function loadRegistry(projectRoot: string): RegistrySnapshot {
 	const snapshot: RegistrySnapshot = {
 		schema_version: VALIDATION_SCHEMA_VERSION,
 		projectRoot,
+		source: useProjectCatalog ? "project" : "builtin",
 		packs,
 		scenariosByPack,
 		baselinesByPack,
@@ -1390,19 +1433,22 @@ export function validateBenchmarkProvenance(
 	now: Date = new Date(),
 ): string[] {
 	const prefix = `${scenario.pack_id}:${scenario.scenario_id}`;
-	const measurement = scenario.measurement;
-	if (measurement === undefined) {
-		if (scenario.pack_id === "evolution-core") {
-			return [`benchmark-provenance-missing:${prefix}:measurement`];
-		}
-		return [];
-	}
 	const issues: string[] = [];
 	if (baseline.baseline_id !== scenario.baseline_id) {
 		issues.push(`benchmark-provenance-mismatch:${prefix}:baseline_id`);
 	}
 	if (baseline.pack_id !== scenario.pack_id) {
 		issues.push(`benchmark-provenance-mismatch:${prefix}:pack_id`);
+	}
+	const measurement = scenario.measurement;
+	if (measurement === undefined) {
+		if (
+			scenario.pack_id === "evolution-core" &&
+			baseline.calibration_status !== "pending"
+		) {
+			issues.push(`benchmark-provenance-missing:${prefix}:measurement`);
+		}
+		return issues;
 	}
 	if (measurement.status !== "observed") {
 		issues.push(
@@ -1568,15 +1614,59 @@ function isSyntheticProfileValue(value: string): boolean {
 	);
 }
 
-const MUTATION_CALIBRATION_REASON_MAX_LENGTH = 64;
-const MUTATION_CALIBRATION_REASON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const CALIBRATION_REASON_MAX_LENGTH = 64;
+const CALIBRATION_REASON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PENDING_BASELINE_OBSERVED_FIELDS = [
+	"timing_p50_ms",
+	"timing_p95_ms",
+	"sample_count",
+	"warmup_count",
+	"git_commit",
+	"source_repository",
+	"timestamp",
+	"provenance",
+	"host_profile_id",
+	"os",
+	"arch",
+	"cpu_class",
+	"bun_version",
+	"runtime_version",
+	"execution_mode",
+	"artifact_mode",
+	"artifact_sha256",
+	"scenarios",
+] as const;
 
-export function formatMutationCalibrationReason(
-	value: string | undefined,
-): string {
+export function validatePendingBaselineContract(
+	baseline: Baseline,
+	issuePrefix: string,
+): string[] {
+	const issues: string[] = [];
+	if (
+		typeof baseline.calibration_reason !== "string" ||
+		baseline.calibration_reason.trim() === ""
+	) {
+		issues.push(`${issuePrefix}-calibration-reason-required`);
+	} else if (
+		baseline.calibration_reason.length > CALIBRATION_REASON_MAX_LENGTH ||
+		!CALIBRATION_REASON_PATTERN.test(baseline.calibration_reason)
+	) {
+		issues.push(`${issuePrefix}-calibration-reason-format-invalid`);
+	} else if (isSyntheticProfileValue(baseline.calibration_reason)) {
+		issues.push(`${issuePrefix}-calibration-reason-placeholder`);
+	}
+	for (const field of PENDING_BASELINE_OBSERVED_FIELDS) {
+		if (baseline[field] !== undefined) {
+			issues.push(`${issuePrefix}-pending-observed-field:${field}`);
+		}
+	}
+	return issues;
+}
+
+export function formatCalibrationReason(value: string | undefined): string {
 	return typeof value === "string" &&
-		value.length <= MUTATION_CALIBRATION_REASON_MAX_LENGTH &&
-		MUTATION_CALIBRATION_REASON_PATTERN.test(value)
+		value.length <= CALIBRATION_REASON_MAX_LENGTH &&
+		CALIBRATION_REASON_PATTERN.test(value)
 		? value
 		: "reason-invalid";
 }
@@ -1596,44 +1686,9 @@ export function validateMutationBaselineContract(
 		}
 	}
 	if (baseline.calibration_status === "pending") {
-		if (
-			typeof baseline.calibration_reason !== "string" ||
-			baseline.calibration_reason.trim() === ""
-		) {
-			issues.push("mutation-baseline-calibration-reason-required");
-		} else if (
-			baseline.calibration_reason.length >
-				MUTATION_CALIBRATION_REASON_MAX_LENGTH ||
-			!MUTATION_CALIBRATION_REASON_PATTERN.test(baseline.calibration_reason)
-		) {
-			issues.push("mutation-baseline-calibration-reason-format-invalid");
-		} else if (isSyntheticProfileValue(baseline.calibration_reason)) {
-			issues.push("mutation-baseline-calibration-reason-placeholder");
-		}
-		for (const field of [
-			"timing_p50_ms",
-			"timing_p95_ms",
-			"sample_count",
-			"warmup_count",
-			"git_commit",
-			"source_repository",
-			"timestamp",
-			"provenance",
-			"host_profile_id",
-			"os",
-			"arch",
-			"cpu_class",
-			"bun_version",
-			"runtime_version",
-			"execution_mode",
-			"artifact_mode",
-			"artifact_sha256",
-			"scenarios",
-		] as const) {
-			if (baseline[field] !== undefined) {
-				issues.push(`mutation-baseline-pending-observed-field:${field}`);
-			}
-		}
+		issues.push(
+			...validatePendingBaselineContract(baseline, "mutation-baseline"),
+		);
 		return issues;
 	}
 	if (baseline.calibration_reason !== undefined) {
@@ -1841,6 +1896,10 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 					scenarios,
 					baseline,
 				),
+			);
+		} else if (baseline.calibration_status === "pending") {
+			issues.push(
+				...validatePendingBaselineContract(baseline, `${packId}-baseline`),
 			);
 		}
 		for (const scenario of scenarios) {

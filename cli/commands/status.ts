@@ -334,14 +334,20 @@ function compactFieldLines(values: string[]): string[] {
 	return omitted > 0 ? [...lines, `- omitted=${omitted}`] : lines;
 }
 
-function safeNextActionWithoutSession(openSessions: string[]): string {
-	if (openSessions.length === 0) {
-		return QT_START_ACTION;
+function unboundNextAction(root: string): string {
+	let open: string | undefined;
+	try {
+		for (const id of collectSessionIds(root)) {
+			if (sessionLifecycleState(root, id) !== "open") continue;
+			if (open) return "afol ss list";
+			open = id;
+		}
+	} catch {
+		return "afol ss list";
 	}
-	if (openSessions.length === 1) {
-		return `afol ss switch ${openSessions[0]}`;
-	}
-	return "afol ss list";
+	return open
+		? `afol ss switch ${open}`
+		: 'afol qt <theme> -t "<task>" -c "<cmd>"';
 }
 
 function extractFieldList(
@@ -666,17 +672,23 @@ function readStatusSnapshot(
 		if (taskId) {
 			throw taskNotFoundError(taskId, null);
 		}
-		const openSessions = collectOpenWorkbenchSessions(project.root);
+		const openSessions = (() => {
+			try {
+				return collectOpenWorkbenchSessions(project.root);
+			} catch {
+				return [];
+			}
+		})();
 		const visibleOpenSessions = openSessions.slice(0, COMPACT_LIST_LIMIT);
 		return {
 			status: "none",
 			task: "none",
+			safeNextAction: unboundNextAction(project.root),
 			filesWritten: ["none"],
 			validationOrChecks: mergeStatusEntries(["none"], []),
 			blockers: ["none"],
 			next: mergeStatusEntries(["none"], []),
 			warnings,
-			safeNextAction: safeNextActionWithoutSession(openSessions),
 			...(openSessions.length > 1
 				? {
 						openSessions: visibleOpenSessions,

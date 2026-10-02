@@ -69,6 +69,7 @@ import {
 	parseNewArgs,
 	parseSessionTaskArgs,
 	parseVerifyArgs,
+	peekDoneTaskIdFromArgv,
 } from "./workbench/args";
 import {
 	formatHintLine,
@@ -165,6 +166,7 @@ export async function runNewCommand(
 		}
 		const creationStatus =
 			created.warnings.length > 0 ? "created_with_warnings" : "created";
+		const nextCommand = nextCommandHint("new", { taskId: "T-01" });
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -178,6 +180,7 @@ export async function runNewCommand(
 							pending_spec_resolution_hint: governance.pendingSpec
 								? governance.resolutionHint
 								: "",
+							next_command: nextCommand,
 						},
 						{ action: "workbench.new" },
 					),
@@ -204,6 +207,7 @@ export async function runNewCommand(
 					`hint: ${governance.resolutionHint.replace("<session>", created.session)}`,
 				);
 			}
+			lines.push(formatHintLine(nextCommand));
 			console.log(lines.join("\n"));
 		}
 		return 0;
@@ -269,6 +273,7 @@ export async function runStartCommand(
 				...(args.includes("--session") ? { session: parsed.session } : {}),
 			}),
 		);
+		const nextCommand = nextCommandHint("start", { taskId: parsed.taskId });
 		if (parsed.compact && !parsed.brief && !parsed.json) {
 			const lines = [
 				startedLabel,
@@ -276,6 +281,9 @@ export async function runStartCommand(
 				...warnings.map((warning) => `warning: ${warning}`),
 			];
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			if (parsed.taskIds.length === 1) {
+				lines.push(formatHintLine(nextCommand));
+			}
 			console.log(lines.join("\n"));
 			return 0;
 		}
@@ -287,6 +295,9 @@ export async function runStartCommand(
 					...warnings.map((warning) => `warning: ${warning}`),
 				];
 				appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+				if (parsed.taskIds.length === 1) {
+					lines.push(formatHintLine(nextCommand));
+				}
 				console.log(lines.join("\n"));
 			}
 			if (parsed.json) {
@@ -299,6 +310,7 @@ export async function runStartCommand(
 								tasks: parsed.taskIds,
 								status: "in_progress",
 								warnings,
+								next_command: nextCommand,
 								...pendingSpecFields(root, parsed.session, parsed.taskId),
 							},
 							{ action: "workbench.start" },
@@ -327,6 +339,7 @@ export async function runStartCommand(
 							status: "in_progress",
 							warnings,
 							briefing,
+							next_command: nextCommand,
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.start" },
@@ -346,6 +359,7 @@ export async function runStartCommand(
 			} else {
 				lines.push(...formatStartBriefing(briefing));
 			}
+			lines.push(formatHintLine(nextCommand));
 			console.log(lines.join("\n"));
 		}
 		return 0;
@@ -379,6 +393,7 @@ export async function runEvidenceCommand(
 			provenance: "declared",
 			approvalContext: ctx,
 		});
+		const nextCommand = nextCommandHint("evidence", { taskId: parsed.taskId });
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -392,6 +407,7 @@ export async function runEvidenceCommand(
 								? "committed_with_warnings"
 								: "committed",
 							warnings: record.warnings ?? [],
+							next_command: nextCommand,
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.evidence" },
@@ -404,6 +420,7 @@ export async function runEvidenceCommand(
 				...(record.warnings ?? []).map((warning) => `warning: ${warning}`),
 			);
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			lines.push(formatHintLine(nextCommand));
 			console.log(lines.join("\n"));
 		}
 		return 0;
@@ -1021,10 +1038,13 @@ function doneRecoveryData(
 		failedStep: string;
 		status: string;
 		evidenceIds?: string[];
+		argv?: readonly string[];
 	},
 ): DoneRecoveryData {
-	const taskIds = parsed?.taskIds ?? [];
-	const taskId = parsed?.taskId ?? taskIds[0] ?? null;
+	const peekedTaskId =
+		parsed === undefined ? peekDoneTaskIdFromArgv(options.argv ?? []) : null;
+	const taskIds = parsed?.taskIds ?? (peekedTaskId ? [peekedTaskId] : []);
+	const taskId = parsed?.taskId ?? taskIds[0] ?? peekedTaskId ?? null;
 	return {
 		session: parsed?.session ?? null,
 		task_id: taskId,
@@ -1441,6 +1461,7 @@ async function runDoneBatch(
 				}
 				return 1;
 			}
+			const nextCommand = nextCommandHint("done", { taskId: parsed.taskId });
 			if (parsed.json) {
 				output.stdout(
 					stringifyEnvelope(
@@ -1452,6 +1473,7 @@ async function runDoneBatch(
 								evidence_ids: evidenceIds,
 								evidence_count: evidenceIds.length,
 								warnings,
+								next_command: nextCommand,
 							},
 							{ action: "workbench.done" },
 						),
@@ -1539,6 +1561,7 @@ export async function runDoneCommand(
 			return result.exitCode;
 		}
 		const completionWarnings = result.warnings;
+		const nextCommand = nextCommandHint("done", { taskId: doneArgs.taskId });
 		if (doneArgs.json) {
 			output.stdout(
 				stringifyEnvelope(
@@ -1559,6 +1582,7 @@ export async function runDoneCommand(
 										evidence_count: result.evidenceIds?.length ?? 0,
 									}
 								: {}),
+							next_command: nextCommand,
 							...pendingSpecFields(root, doneArgs.session, doneArgs.taskId),
 						},
 						{ action: "workbench.done" },
@@ -1577,6 +1601,7 @@ export async function runDoneCommand(
 			}
 			lines.push(...completionWarnings.map((warning) => `warning: ${warning}`));
 			appendPendingSpecWarning(lines, root, doneArgs.session, doneArgs.taskId);
+			lines.push(formatHintLine(nextCommand));
 			output.stdout(lines.join("\n"));
 		}
 		return 0;
@@ -1585,6 +1610,7 @@ export async function runDoneCommand(
 			const data = doneRecoveryData(parsed, {
 				failedStep: parsed === undefined ? "parse" : "completion",
 				status: "failed",
+				argv: args,
 			});
 			if (error instanceof TaskCompletionBusyError) {
 				output.stdout(

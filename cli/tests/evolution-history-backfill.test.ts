@@ -140,7 +140,7 @@ describe("evolve backfill", () => {
 					offset: 1,
 					limit: 1,
 					returned: 1,
-					available: 4,
+					available: 5,
 					has_more: true,
 				},
 				coverage: {
@@ -150,7 +150,7 @@ describe("evolve backfill", () => {
 					legacy_evidence_unverified: 1,
 					open: 1,
 					corrupt: 1,
-					eligible: 4,
+					eligible: 5,
 				},
 				observations: {
 					derived_total: 1,
@@ -202,7 +202,7 @@ describe("evolve backfill", () => {
 		}
 	});
 
-	test("includes completed legacy sessions but excludes genuinely open sessions", async () => {
+	test("includes completed legacy and valid open sessions while excluding corrupt sessions", async () => {
 		const root = fixture();
 		try {
 			const out = sink();
@@ -216,13 +216,36 @@ describe("evolve backfill", () => {
 			).toBe(0);
 			const payload = JSON.parse(out.stdout.join("\n")).data;
 			expect(payload.pagination).toMatchObject({
-				available: 4,
-				has_more: false,
+				available: 5,
+				has_more: true,
 			});
 			expect(payload.sources.sessions[0]).toMatchObject({
 				session_id: "S-legacy",
 				adoption: "blocked",
 				skip_reasons: ["legacy_evidence_unverified", "adoption_blocked"],
+			});
+			const openOut = sink();
+			expect(
+				await runEvolveCommand(
+					"backfill",
+					["--offset", "4", "--limit", "1", "--json"],
+					root,
+					openOut.io,
+				),
+			).toBe(0);
+			const openPayload = JSON.parse(openOut.stdout.join("\n")).data;
+			expect(openPayload).toMatchObject({
+				pagination: { available: 5, has_more: false },
+				sources: {
+					sessions: [
+						{
+							session_id: "S-open",
+							observation: { pending: 0, observed: 0 },
+							adoption: "blocked",
+							skip_reasons: expect.arrayContaining(["open_session"]),
+						},
+					],
+				},
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });

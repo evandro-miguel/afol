@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 
-export const EVOLUTION_SCHEMA_VERSION = 10;
+export const EVOLUTION_SCHEMA_VERSION = 11;
 
 const MIGRATIONS = [
 	{
@@ -445,6 +445,24 @@ DROP TABLE issue_clusters_v8;
 CREATE INDEX issue_clusters_active_suggestion_idx
  ON issue_clusters(project_id,priority DESC,occurrence_count DESC,fingerprint)
  WHERE state IN ('observed', 'candidate', 'recurring', 'reopened');
+`,
+	},
+	{
+		version: 11,
+		sql: `
+CREATE TABLE IF NOT EXISTS history_backfill_cursors (
+	project_id TEXT NOT NULL,
+	session_id TEXT NOT NULL CHECK (length(trim(session_id)) > 0),
+	extractor_version TEXT NOT NULL CHECK (length(trim(extractor_version)) > 0),
+	source_hash TEXT NOT NULL CHECK (length(trim(source_hash)) > 0),
+	status TEXT NOT NULL CHECK (status IN ('pending', 'complete')),
+	byte_offset INTEGER NOT NULL CHECK (byte_offset >= 0),
+	updated_at TEXT NOT NULL,
+	PRIMARY KEY (project_id, session_id, extractor_version)
+);
+
+CREATE INDEX IF NOT EXISTS history_backfill_cursors_project_status_idx
+	ON history_backfill_cursors(project_id, extractor_version, status, updated_at);
 `,
 	},
 ] as const;

@@ -282,7 +282,6 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 		if (inCodeBlock) {
 			continue;
 		}
-
 		const legacyMatch = line.match(LEGACY_TASK_RE);
 		if (legacyMatch?.[1] && legacyMatch[2]) {
 			tasks.push({

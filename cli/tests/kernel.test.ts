@@ -323,6 +323,7 @@ describe("kernel front-door", () => {
 			["./commands/adapter", ["runAdapterCommand"]],
 			["./commands/adm", ["runAdmCommand"]],
 			["./commands/adr", ["runAdrCommand"]],
+			["./commands/artifact", ["runArtifactCommand"]],
 			["./commands/bench", ["runBenchCommand"]],
 			["./commands/bootstrap", ["runBootstrapCommand"]],
 			[
@@ -1875,6 +1876,10 @@ describe("kernel front-door", () => {
 			const proc = runKernel(root, ["new", "--help"]);
 
 			expect(proc.status).toBe(0);
+			expect(proc.stdout as string).toContain("Usage: afol new");
+			expect(proc.stdout as string).toContain(
+				'Usage: afol n <theme> -t "<task>"',
+			);
 			expect(proc.stdout as string).toContain("Command: new");
 			expect(proc.stdout as string).toContain("--intent");
 			expect(proc.stderr as string).toBe("");
@@ -1889,20 +1894,25 @@ describe("kernel front-door", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-lifecycle-help-"));
 		try {
 			for (const [command, expected] of [
-				["start", "Command: start"],
-				["close", "Command: close"],
+				["start", "Usage: afol start"],
+				["close", "Usage: afol close"],
 			] as const) {
 				for (const flag of ["-h", "--help"]) {
 					const proc = runKernel(root, [command, flag]);
 					expect(proc.status).toBe(0);
 					expect(proc.stdout as string).toContain(expected);
+					expect(proc.stdout as string).toContain(`Command: ${command}`);
 					expect(proc.stderr as string).toBe("");
 					expect(proc.stdout as string).not.toContain("task started:");
 					expect(proc.stdout as string).not.toContain("session closed:");
 				}
 			}
 			const closeHelp = runKernel(root, ["close", "--help"]);
-			expect(closeHelp.stdout as string).toContain("[--session <session-id>]");
+			expect(closeHelp.stdout as string).toContain("Usage: afol c");
+			expect(closeHelp.stdout as string).toContain(
+				"Usage: afol close [--session <session-id>]",
+			);
+			expect(closeHelp.stdout as string).toContain("Command: close");
 			expect(closeHelp.stdout as string).toContain("-m|--summary <text>");
 			expect(closeHelp.stdout as string).toContain("--allow-no-report");
 			expect(closeHelp.stdout as string).toContain("--reason <text>");

@@ -20,6 +20,34 @@ export type SafeSourceReadHooks = {
 	afterOpen?: () => void;
 };
 
+export type BoundedSourceRange = {
+	offset: number;
+	maxBytes: number;
+};
+
+export type BoundedSourceFileContents = {
+	bytes: Buffer;
+	text: string;
+};
+
+export type SafeSourceIdentity = {
+	dev: string;
+	ino: string;
+	size: string;
+	mtime_ms: string;
+	ctime_ms: string;
+};
+
+function sourceIdentity(stat: Stats): SafeSourceIdentity {
+	return {
+		dev: String(stat.dev),
+		ino: String(stat.ino),
+		size: String(stat.size),
+		mtime_ms: String(stat.mtimeMs),
+		ctime_ms: String(stat.ctimeMs),
+	};
+}
+
 function isMissing(error: unknown): boolean {
 	return (
 		typeof error === "object" &&
@@ -101,13 +129,13 @@ function countCandidates(text: string): number {
 	return text.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
 }
 
-/** Read a bounded regular source using a descriptor and re-check its identity. */
-export function readBoundedSourceFile(
+/** Read bounded UTF-8 source bytes using a descriptor and re-check its identity. */
+export function readBoundedSourceFileWithBytes(
 	path: string,
 	label: string,
 	limits: BoundedSourceLimits,
 	hooks?: SafeSourceReadHooks,
-): string | null {
+): BoundedSourceFileContents | null {
 	if (
 		!Number.isSafeInteger(limits.maxBytes) ||
 		limits.maxBytes < 0 ||
@@ -157,12 +185,93 @@ export function readBoundedSourceFile(
 		if (!after || !sameFile(before, after))
 			throw new Error(`${label} changed during read`);
 
-		const text = buffer.subarray(0, offset).toString("utf8");
+		const bytes = buffer.subarray(0, offset);
+		let text: string;
+		try {
+			text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+				bytes,
+			);
+		} catch {
+			throw new Error(`${label} is not valid UTF-8`);
+		}
 		if (countLines(text) > limits.maxLines)
 			throw new Error(`${label} exceeds the line limit`);
 		if (countCandidates(text) > limits.maxCandidates)
 			throw new Error(`${label} exceeds the candidate limit`);
-		return text;
+		return { bytes, text };
+	} finally {
+		closeSync(fd);
+	}
+}
+
+/** Read a bounded regular UTF-8 source and return its decoded text. */
+export function readBoundedSourceFile(
+	path: string,
+	label: string,
+	limits: BoundedSourceLimits,
+	hooks?: SafeSourceReadHooks,
+): string | null {
+	return (
+		readBoundedSourceFileWithBytes(path, label, limits, hooks)?.text ?? null
+	);
+}
+
+/** Read one bounded byte range without following the final path component. */
+export function readBoundedSourceRange(
+	path: string,
+	label: string,
+	range: BoundedSourceRange,
+): {
+	bytes: Buffer;
+	totalBytes: number;
+	sourceIdentity: SafeSourceIdentity;
+} {
+	if (
+		!Number.isSafeInteger(range.offset) ||
+		range.offset < 0 ||
+		!Number.isSafeInteger(range.maxBytes) ||
+		range.maxBytes < 1
+	)
+		throw new Error("source range limits are invalid");
+	const before = assertSafeSourceFile(path, label);
+	if (!before) throw new Error(`${label} is unavailable`);
+	const totalBytes = Number(before.size);
+	if (range.offset > totalBytes)
+		throw new Error(`${label} byte offset exceeds the source size`);
+	const length = Math.min(range.maxBytes, totalBytes - range.offset);
+	const flags =
+		fsConstants.O_RDONLY |
+		(process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0));
+	const fd = openSync(path, flags);
+	try {
+		const opened = fstatSync(fd);
+		if (
+			!opened.isFile() ||
+			Number(opened.nlink) !== 1 ||
+			!sameFile(before, opened)
+		)
+			throw new Error(`${label} changed during read`);
+		const buffer = Buffer.allocUnsafe(length);
+		let offset = 0;
+		while (offset < length) {
+			const count = readSync(
+				fd,
+				buffer,
+				offset,
+				length - offset,
+				range.offset + offset,
+			);
+			if (count === 0) break;
+			offset += count;
+		}
+		const after = assertSafeSourceFile(path, label, false);
+		if (!after || !sameFile(before, after))
+			throw new Error(`${label} changed during read`);
+		return {
+			bytes: buffer.subarray(0, offset),
+			totalBytes,
+			sourceIdentity: sourceIdentity(opened),
+		};
 	} finally {
 		closeSync(fd);
 	}

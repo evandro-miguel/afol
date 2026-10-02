@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -10,7 +11,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { splitCommandLine } from "../core/command-line";
+import { splitCommandLine } from "../commands/workbench/verify";
+import { newWorkstream, sessionPaths } from "../services/workbench/lifecycle";
+import {
+	removeBinding,
+	resolveSession,
+} from "../services/workbench/session-context";
 
 const kernelPath = join(process.cwd(), "cli/main.ts");
 
@@ -64,8 +70,27 @@ function commandFailure(result: ProcessResult): string {
 	].join("\n");
 }
 
+function collectChildOutput(child: ReturnType<typeof spawn>): Promise<{
+	code: number | null;
+	stdout: string;
+	stderr: string;
+}> {
+	let stdout = "";
+	let stderr = "";
+	child.stdout?.on("data", (chunk: Buffer) => {
+		stdout += chunk.toString();
+	});
+	child.stderr?.on("data", (chunk: Buffer) => {
+		stderr += chunk.toString();
+	});
+	return new Promise((resolve, reject) => {
+		child.once("error", reject);
+		child.once("exit", (code) => resolve({ code, stdout, stderr }));
+	});
+}
+
 describe("installed scaffold workflow examples", () => {
-	test("executes AGENTS lifecycle examples through the local Bun CLI", () => {
+	test("executes AGENTS lifecycle examples through the local Bun CLI", async () => {
 		const root = mkdtempSync(join(tmpdir(), "afol-scaffold-workflow-"));
 		try {
 			const git = runGit(root, ["init", "-q"]);
@@ -91,6 +116,14 @@ describe("installed scaffold workflow examples", () => {
 				commandFailure(noSessionValidation),
 			).toBe(0);
 			expect(sessionDirectories(root)).toHaveLength(0);
+			const savedSession = process.env.AFOL_SESSION;
+			delete process.env.AFOL_SESSION;
+			try {
+				expect(resolveSession(root, {})).toBeNull();
+			} finally {
+				if (savedSession === undefined) delete process.env.AFOL_SESSION;
+				else process.env.AFOL_SESSION = savedSession;
+			}
 
 			const commands = extractScaffoldCommands(installedGuide);
 			const runnableCommands = commands.filter(
@@ -133,16 +166,191 @@ describe("installed scaffold workflow examples", () => {
 			expect(evidence).toContain('"command":"test -d .afol"');
 			expect(evidence).toContain('"exit_code":0');
 
-			const artifactDirectory = join(root, ".afol", "wb", session, "artifacts");
+			const savedReviewEnv = process.env.AFOL_SESSION;
+			delete process.env.AFOL_SESSION;
+			const explicitReview = resolveSession(root, { explicit: session });
+			if (savedReviewEnv === undefined) delete process.env.AFOL_SESSION;
+			else process.env.AFOL_SESSION = savedReviewEnv;
+			expect(explicitReview).toEqual({ session, source: "explicit" });
+			if (!explicitReview)
+				throw new Error("Expected explicit closed-session review routing.");
+			const sessionPath = sessionPaths(root, explicitReview.session);
+			const artifactDirectory = join(sessionPath.sessionDir, "artifacts");
 			mkdirSync(artifactDirectory, { recursive: true });
-			const artifactPath = join(artifactDirectory, "closed-review.md");
+			const originalArtifactPath = join(
+				artifactDirectory,
+				"T-01-original-review.md",
+			);
 			const originalArtifact = "original closed-session review\n";
-			writeFileSync(artifactPath, originalArtifact, { flag: "wx" });
+			writeFileSync(originalArtifactPath, originalArtifact, { flag: "wx" });
 			expect(() =>
-				writeFileSync(artifactPath, "replacement review\n", { flag: "wx" }),
+				writeFileSync(originalArtifactPath, "replacement review\n", {
+					flag: "wx",
+				}),
 			).toThrow();
-			expect(readFileSync(artifactPath, "utf8")).toBe(originalArtifact);
+			expect(readFileSync(originalArtifactPath, "utf8")).toBe(originalArtifact);
+			const taskBeforeReview = readFileSync(sessionPath.taskPath);
+			const reportPath = join(
+				sessionPath.sessionDir,
+				`${session}_report_01.md`,
+			);
+			const reportBeforeReview = readFileSync(reportPath);
+			const evidenceBeforeReview = readFileSync(sessionPath.evidencePath);
+			const eventLedgerPath = join(
+				root,
+				".afol",
+				"data",
+				"events",
+				"events.jsonl",
+			);
+			const eventLedgerBeforeReview = existsSync(eventLedgerPath)
+				? readFileSync(eventLedgerPath)
+				: null;
+
+			const gatePath = join(root, "artifact-writers.start");
+			const readyPaths = ["agent-a", "agent-b"].map((agent) =>
+				join(root, `${agent}.ready`),
+			);
+			const sharedArtifactPath = join(artifactDirectory, "T-01-review.md");
+			const writerResults = ["agent-a", "agent-b"].map((agent) => {
+				const readyPath = join(root, `${agent}.ready`);
+				const retryName = `T-01-review-${agent}.md`;
+				const script = [
+					'const { existsSync, writeFileSync } = require("node:fs");',
+					'const { join } = require("node:path");',
+					`const artifactDirectory = ${JSON.stringify(artifactDirectory)};`,
+					`const readyPath = ${JSON.stringify(readyPath)};`,
+					`const gatePath = ${JSON.stringify(gatePath)};`,
+					`const agent = ${JSON.stringify(agent)};`,
+					`const retryName = ${JSON.stringify(retryName)};`,
+					"writeFileSync(readyPath, 'ready\\n', { flag: 'wx' });",
+					"const wait = new Int32Array(new SharedArrayBuffer(4));",
+					"const deadline = Date.now() + 10000;",
+					"while (!existsSync(gatePath) && Date.now() < deadline) Atomics.wait(wait, 0, 0, 5);",
+					"if (!existsSync(gatePath)) process.exit(2);",
+					"const sharedPath = join(artifactDirectory, 'T-01-review.md');",
+					"try {",
+					"  writeFileSync(sharedPath, agent + '\\n', { flag: 'wx' });",
+					"  process.stdout.write(JSON.stringify({ kind: 'created', agent, name: 'T-01-review.md' }));",
+					"} catch (error) {",
+					"  if (error.code !== 'EEXIST') throw error;",
+					"  writeFileSync(join(artifactDirectory, retryName), agent + '\\n', { flag: 'wx' });",
+					"  process.stdout.write(JSON.stringify({ kind: 'collision', agent, code: error.code, name: retryName }));",
+					"}",
+				].join("\n");
+				const child = spawn(process.execPath, ["-e", script], {
+					cwd: root,
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+				return collectChildOutput(child);
+			});
+			const readyDeadline = Date.now() + 10000;
+			while (
+				!readyPaths.every((path) => existsSync(path)) &&
+				Date.now() < readyDeadline
+			) {
+				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+			}
+			const bothWritersReady = readyPaths.every((path) => existsSync(path));
+			writeFileSync(gatePath, "start\n", { flag: "wx" });
+			const childResults = await Promise.all(writerResults);
+			expect(bothWritersReady).toBe(true);
+			expect(childResults.map((result) => result.code)).toEqual([0, 0]);
+			expect(childResults.map((result) => result.stderr)).toEqual(["", ""]);
+			const outcomes = childResults.map(
+				(result) =>
+					JSON.parse(result.stdout) as {
+						kind: "created" | "collision";
+						agent: string;
+						code?: string;
+						name: string;
+					},
+			);
+			expect(outcomes.map((outcome) => outcome.kind).sort()).toEqual([
+				"collision",
+				"created",
+			]);
+			const winner = outcomes.find((outcome) => outcome.kind === "created");
+			const loser = outcomes.find((outcome) => outcome.kind === "collision");
+			expect(winner?.name).toBe("T-01-review.md");
+			expect(loser?.code).toBe("EEXIST");
+			expect(loser?.name).toMatch(/^T-01-review-agent-[ab]\.md$/);
+			if (!winner || !loser)
+				throw new Error("Expected one winner and one collision.");
+			expect(readFileSync(sharedArtifactPath, "utf8").trim()).toBe(
+				winner.agent,
+			);
+			expect(
+				readFileSync(join(artifactDirectory, loser.name), "utf8").trim(),
+			).toBe(loser.agent);
+			expect(readFileSync(originalArtifactPath, "utf8")).toBe(originalArtifact);
+			expect(readFileSync(sessionPath.taskPath)).toEqual(taskBeforeReview);
+			expect(readFileSync(reportPath)).toEqual(reportBeforeReview);
+			expect(readFileSync(sessionPath.evidencePath)).toEqual(
+				evidenceBeforeReview,
+			);
+			if (eventLedgerBeforeReview !== null) {
+				expect(readFileSync(eventLedgerPath)).toEqual(eventLedgerBeforeReview);
+			}
+			expect(readdirSync(artifactDirectory).sort()).toEqual(
+				["T-01-original-review.md", "T-01-review.md", loser.name].sort(),
+			);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("CI requires an explicit or environment session before artifact routing", () => {
+		const root = mkdtempSync(join(tmpdir(), "afol-scaffold-ci-artifacts-"));
+		const savedSession = process.env.AFOL_SESSION;
+		const savedAfolCi = process.env.AFOL_CI;
+		const savedCi = process.env.CI;
+		try {
+			const git = runGit(root, ["init", "-q"]);
+			expect(git.status, commandFailure(git)).toBe(0);
+			const initialized = runKernel(root, ["init"]);
+			expect(initialized.status, commandFailure(initialized)).toBe(0);
+
+			const opened = newWorkstream(root, "ci artifact routing", {
+				noSpecRequiredReason: "CI artifact routing fixture",
+			});
+			removeBinding(root, opened.session);
+			writeFileSync(opened.activeSessionPath, `${opened.session}\n`, "utf8");
+			const paths = sessionPaths(root, opened.session);
+			const artifactDirectory = join(paths.sessionDir, "artifacts");
+			delete process.env.AFOL_SESSION;
+			delete process.env.AFOL_CI;
+			delete process.env.CI;
+			expect(resolveSession(root, {})).toEqual({
+				session: opened.session,
+				source: "global",
+			});
+
+			for (const ciVariable of ["CI", "AFOL_CI"] as const) {
+				delete process.env.CI;
+				delete process.env.AFOL_CI;
+				process.env[ciVariable] = "1";
+				expect(resolveSession(root, {})).toBeNull();
+				expect(resolveSession(root, { explicit: opened.session })).toEqual({
+					session: opened.session,
+					source: "explicit",
+				});
+				process.env.AFOL_SESSION = opened.session;
+				expect(resolveSession(root, {})).toEqual({
+					session: opened.session,
+					source: "env",
+				});
+				delete process.env.AFOL_SESSION;
+			}
+
+			expect(existsSync(artifactDirectory)).toBe(false);
+		} finally {
+			if (savedSession === undefined) delete process.env.AFOL_SESSION;
+			else process.env.AFOL_SESSION = savedSession;
+			if (savedAfolCi === undefined) delete process.env.AFOL_CI;
+			else process.env.AFOL_CI = savedAfolCi;
+			if (savedCi === undefined) delete process.env.CI;
+			else process.env.CI = savedCi;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

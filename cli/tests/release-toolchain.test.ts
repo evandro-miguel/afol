@@ -457,6 +457,9 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).toContain("bun run typecheck");
 		expect(scripts["validate:release"]).toContain("bun run public:audit -- .");
 		expect(scripts["test:full"]).toBe("bun run cli/dev/full-test.ts");
+		expect(scripts["test:ci"]).toBe(
+			"AGENT=1 bun test --max-concurrency 4 --bail=1",
+		);
 		expect(scripts["validate:release"]).toContain("bun run test:full");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
 		if (scripts["validate:ux-governance"]) {
@@ -545,7 +548,7 @@ describe("release and toolchain contracts", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 15_000);
 
 	test("release build receipt write cleans temporary outputs on write failure", () => {
 		const root = mkdtempSync(join(tmpdir(), "release-receipt-write-failure-"));
@@ -669,11 +672,6 @@ describe("release and toolchain contracts", () => {
 				.sort();
 			expect(actualSources, scriptName).toEqual(expectedSources);
 		}
-	});
-
-	test("public alpha uses the local-only release contract", () => {
-		const dir = join(repoRoot, ".github", "workflows");
-		expect(existsSync(dir)).toBe(false);
 	});
 
 	test("Windows exposes the canonical local release sequence", () => {

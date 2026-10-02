@@ -111,7 +111,7 @@ describe("verify-tasks command", () => {
 				"utf8",
 			);
 
-			const proc = runKernel(root, ["verify-tasks", "--strict"]);
+			const proc = runKernel(root, ["verify-tasks", ".afol/wb", "--strict"]);
 
 			expect(proc.status).toBe(1);
 			expect(proc.stderr as string).toBe("");

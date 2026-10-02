@@ -35,9 +35,86 @@ import {
 	createPreference,
 	recordPreferenceEvidence,
 } from "../services/evolution/preferences";
+import { withSessionLock } from "../services/io/session-lock";
 import { removeEvolutionTestRoot } from "./evolution-test-support";
 
 const PROJECT_ID = "6b7d91ca-496b-4f0c-8537-5c4993810d15";
+const PREFERENCE_CHILD = "--afol-evolution-preference-child";
+
+if (process.argv[2] === PREFERENCE_CHILD) {
+	const mode = process.argv[3];
+	const root = process.cwd();
+	let exitCode = 0;
+	switch (mode) {
+		case "lock-first":
+			withSessionLock(root, "__evolution-journal__", () => {
+				writeFileSync(join(root, "first.ready"), "1");
+				while (!existsSync(join(root, "release"))) Bun.sleepSync(10);
+			});
+			break;
+		case "lock-second":
+			withSessionLock(root, "__evolution-journal__", () => {
+				writeFileSync(join(root, "second.entered"), "1");
+			});
+			break;
+		case "overlap-append": {
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				while (!existsSync(join(root, "start"))) Bun.sleepSync(2);
+				appendProductionDayAllocation({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					timezone: "UTC",
+					sessionId: "S-overlap",
+					evidenceId: "E-overlap",
+				});
+				writeFileSync(join(root, "results", "append.ok"), "1");
+			} catch (error) {
+				writeFileSync(join(root, "results", "append.error"), String(error));
+				exitCode = 1;
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		case "overlap-preference": {
+			const db = openEvolutionDb(evolutionDbPath(root));
+			try {
+				while (!existsSync(join(root, "start"))) Bun.sleepSync(2);
+				const authority = dispatchPreferenceDecision({
+					projectId: PROJECT_ID,
+					preferenceId: "P-overlap",
+					action: "create",
+					provenance: "explicit",
+					operationContext: defaultOperationContext(),
+					decisionId: "D-P-overlap",
+				});
+				createPreference({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					id: "P-overlap",
+					statement: "serialized preference",
+					provenance: "explicit",
+					timezone: "UTC",
+					authority,
+					sourceRefs: [{ id: "S-overlap", kind: "session" }],
+				});
+				writeFileSync(join(root, "results", "preference.ok"), "1");
+			} catch (error) {
+				writeFileSync(join(root, "results", "preference.error"), String(error));
+				exitCode = 1;
+			} finally {
+				db.close();
+			}
+			break;
+		}
+		default:
+			throw new Error(`unknown evolution preference child mode: ${mode}`);
+	}
+	process.exit(exitCode);
+}
 
 function issueAuthority(binding: PreferenceMutationBinding) {
 	return dispatchPreferenceDecision({
@@ -349,19 +426,20 @@ describe("Evolution preference authority round 3", () => {
 		const firstReady = join(root, "first.ready");
 		const release = join(root, "release");
 		const secondEntered = join(root, "second.entered");
-		const lockModule = join(import.meta.dir, "../services/io/session-lock");
-		const script = (ready: string, gate: string, entered?: string) =>
-			`import { existsSync, writeFileSync } from "node:fs"; import { withSessionLock } from ${JSON.stringify(lockModule)}; withSessionLock(${JSON.stringify(root)}, "__evolution-journal__", () => { writeFileSync(${JSON.stringify(ready)}, "1"); while (!existsSync(${JSON.stringify(gate)})) Bun.sleepSync(10); ${entered ? `writeFileSync(${JSON.stringify(entered)}, "1");` : ""} });`;
-		const first = Bun.spawn(["bun", "-e", script(firstReady, release)], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
+		const first = Bun.spawn(
+			[process.execPath, import.meta.filename, PREFERENCE_CHILD, "lock-first"],
+			{
+				cwd: root,
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
 		const deadline = Date.now() + 5_000;
 		while (!existsSync(firstReady) && Date.now() < deadline) Bun.sleepSync(10);
 		expect(existsSync(firstReady)).toBe(true);
 		const second = Bun.spawn(
-			["bun", "-e", script(secondEntered, firstReady, secondEntered)],
-			{ stdout: "pipe", stderr: "pipe" },
+			[process.execPath, import.meta.filename, PREFERENCE_CHILD, "lock-second"],
+			{ cwd: root, stdout: "pipe", stderr: "pipe" },
 		);
 		try {
 			Bun.sleepSync(100);
@@ -552,12 +630,6 @@ describe("Evolution preference authority round 3", () => {
 		const resultDir = join(root, "results");
 		mkdirSync(resultDir, { recursive: true });
 		const dbPath = evolutionDbPath(root);
-		const modulePath = join(import.meta.dir, "../services/evolution");
-		const authorityPath = join(
-			import.meta.dir,
-			"../services/evolution/preference-authority",
-		);
-		const contextPath = join(import.meta.dir, "../core/operation-context");
 		const evidenceDir = join(root, ".afol/wb/S-overlap");
 		mkdirSync(evidenceDir, { recursive: true });
 		writeFileSync(
@@ -572,16 +644,24 @@ describe("Evolution preference authority round 3", () => {
 				exit_code: 0,
 			})}\n`,
 		);
-		const appendScript = `import { existsSync, writeFileSync } from "node:fs"; import { appendProductionDayAllocation, openEvolutionDb, evolutionDbPath } from ${JSON.stringify(modulePath)}; const root=${JSON.stringify(root)}; while (!existsSync(${JSON.stringify(start)})) Bun.sleepSync(2); const db=openEvolutionDb(evolutionDbPath(root)); try { appendProductionDayAllocation({root,db,projectId:${JSON.stringify(PROJECT_ID)},timezone:"UTC",sessionId:"S-overlap",evidenceId:"E-overlap"}); writeFileSync(${JSON.stringify(join(resultDir, "append.ok"))},"1"); } catch (error) { writeFileSync(${JSON.stringify(join(resultDir, "append.error"))},String(error)); process.exitCode=1; } finally { db.close(); }`;
-		const preferenceScript = `import { existsSync, writeFileSync } from "node:fs"; import { openEvolutionDb, evolutionDbPath } from ${JSON.stringify(modulePath)}; import { dispatchPreferenceDecision } from ${JSON.stringify(authorityPath)}; import { defaultOperationContext } from ${JSON.stringify(contextPath)}; import { createPreference } from ${JSON.stringify(join(import.meta.dir, "../services/evolution/preferences"))}; const root=${JSON.stringify(root)}; while (!existsSync(${JSON.stringify(start)})) Bun.sleepSync(2); const db=openEvolutionDb(evolutionDbPath(root)); try { const authority=dispatchPreferenceDecision({projectId:${JSON.stringify(PROJECT_ID)},preferenceId:"P-overlap",action:"create",provenance:"explicit",operationContext:defaultOperationContext(),decisionId:"D-P-overlap"}); createPreference({root,db,projectId:${JSON.stringify(PROJECT_ID)},id:"P-overlap",statement:"serialized preference",provenance:"explicit",timezone:"UTC",authority,sourceRefs:[{id:"S-overlap",kind:"session"}]}); writeFileSync(${JSON.stringify(join(resultDir, "preference.ok"))},"1"); } catch (error) { writeFileSync(${JSON.stringify(join(resultDir, "preference.error"))},String(error)); process.exitCode=1; } finally { db.close(); }`;
-		const appendChild = Bun.spawn(["bun", "-e", appendScript], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const preferenceChild = Bun.spawn(["bun", "-e", preferenceScript], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
+		const appendChild = Bun.spawn(
+			[
+				process.execPath,
+				import.meta.filename,
+				PREFERENCE_CHILD,
+				"overlap-append",
+			],
+			{ cwd: root, stdout: "pipe", stderr: "pipe" },
+		);
+		const preferenceChild = Bun.spawn(
+			[
+				process.execPath,
+				import.meta.filename,
+				PREFERENCE_CHILD,
+				"overlap-preference",
+			],
+			{ cwd: root, stdout: "pipe", stderr: "pipe" },
+		);
 		try {
 			writeFileSync(start, "1");
 			expect(await appendChild.exited).toBe(0);

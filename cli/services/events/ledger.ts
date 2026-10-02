@@ -1077,6 +1077,31 @@ export function readEventLedgerRecordsMatching(
 	return inspection.records;
 }
 
+/**
+ * Read the full ledger text under the canonical resource lock after the same
+ * validation pass as record reads. Byte-offset paging callers use this so a
+ * resumed page observes exactly the validated bytes the ledger guarantees.
+ */
+export function readValidatedEventLedgerText(
+	root: string,
+	limits: BoundedSourceLimits = EVENT_LEDGER_LIMITS,
+): string | null {
+	const path = resolveEventLedgerPath(root);
+	return withResourceLocks(root, [path], () => {
+		if (resolveEventLedgerPath(root) !== path)
+			throw new EventLedgerValidationError(
+				unreadableInspection("EVENT_LEDGER_UNREADABLE"),
+			);
+		const text = readBoundedSourceFile(path, EVENT_LEDGER_LABEL, limits);
+		const inspection =
+			text === null
+				? inspectEventLedgerTextInternal("", false)
+				: inspectEventLedgerTextInternal(text, false);
+		if (!inspection.ok) throw new EventLedgerValidationError(inspection);
+		return text;
+	});
+}
+
 export function formatEventLedgerValidation(
 	validation: EventLedgerValidation,
 ): string {

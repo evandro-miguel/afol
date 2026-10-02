@@ -1,11 +1,9 @@
 import type { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { withSessionLock } from "../io/session-lock";
-import { readProjectConfig } from "../project/paths";
 import {
 	assertSafeEvolutionProjectRoot,
 	assertSafeEvolutionTarget,
-	evolutionDbPath,
 	openEvolutionDb,
 	withEvolutionDbSnapshot,
 } from "./db";
@@ -38,7 +36,7 @@ import {
 	assertEvolutionProjectionCheckpoint,
 	repairEvolutionProjectionCheckpointTail,
 } from "./projection-checkpoint";
-import { resolveEvolutionConfig } from "./runtime-config";
+import { resolveEvolutionRuntime } from "./runtime-config";
 import {
 	readSuggestionReceiptJournal,
 	rebuildSuggestionReceiptProjection,
@@ -88,16 +86,15 @@ type ResolvedInput = {
 
 function resolveInput(input: EvolutionDerivedStateInput): ResolvedInput {
 	assertSafeEvolutionProjectRoot(input.root);
-	const config = resolveEvolutionConfig(readProjectConfig(input.root));
-	const projectId = input.projectId ?? config.projectId;
+	const runtime = resolveEvolutionRuntime(input.root);
+	const projectId = input.projectId ?? runtime.projectId;
 	if (!projectId) throw new Error("evolution project identity is required");
 	return {
 		root: input.root,
 		projectId,
-		dbPath:
-			input.dbPath ?? evolutionDbPath(input.root, config.paths.evolutionDb),
-		eventsDir: input.eventsDir ?? config.paths.evolutionEventsDir,
-		timezone: input.timezone ?? config.timezone,
+		dbPath: input.dbPath ?? runtime.dbPath,
+		eventsDir: input.eventsDir ?? runtime.eventsDir,
+		timezone: input.timezone ?? runtime.timezone,
 	};
 }
 

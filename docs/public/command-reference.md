@@ -14,24 +14,31 @@ Start hints preserve explicit sessions and selected task ranges. Replace
 `<cmd>` with an executable verification command, such as `bun test`; `-x`
 executes that command and does not accept a textual test result as evidence.
 
+Happy path (omit `--session`/`-S` when an active or bound session resolves):
+
 ```text
 afol init
-afol status
+afol s
 afol qt <theme> -t "<task>" -c "<check>"
+afol n <theme> -F <F-id> -P <spec-id> -t "<task>"
 afol st T-01
 afol d T-01 -x "<check>"
 afol c
 ```
 
-With one active session resolving, omit `--session` and `-S`; `-x` is the
-short form of `done --test`, which runs argv-only verification and records
-observed evidence without shell parsing. `done --test-shell` runs one shell
-command for a local operator only; never use it for agent or remote/provider
-execution. Completion without observed evidence is rejected. `afol evidence`
-records a separate diagnostic receipt and is not a required hop before done.
+`qt` is the 1-hop micro path (create → start → one verify → done → close).
+`n` → `st` → `d -x` → `c` is the governed path. `d -x` / `done --test` is the
+agent-facing default: argv-only verification plus observed evidence, no shell
+parsing. `true`, `:`, and other shell no-ops cannot authorize done. Missing
+`-x` is rejected. `done --test-shell` is local-operator-only; never use it for
+agent or remote/provider execution.
 
-Multi-agent and CI runs that must not depend on the active-session pointer
-pass an explicit session:
+`e` is diagnostic only (a separate evidence receipt without completing). Do not
+teach `e` on the happy path. CI requires an explicit `-S <session-id>` or
+`AFOL_SESSION`; it never relies on the active-session pointer. Multi-agent
+ambiguity requires an explicit session as well.
+
+Explicit-session examples:
 
 ```text
 afol st T-01 -S <session-id>
@@ -100,6 +107,103 @@ unknown digest receives full rule bodies. Change the epoch after compaction
 or any loss of the acknowledged context. A null digest cannot be acknowledged.
 `--persist-rule-injection` optionally records delivery diagnostics under the
 existing local approval boundary; persistence is not proof of consumer memory.
+
+## Evolution history
+
+```text
+afol evolve backfill [--offset <n>] [--limit <1-10>] [--json]
+afol evolve backfill --run [--offset <n>] [--limit <1-10>] [--json]
+```
+
+Backfill previews one bounded page by default. `--run` ingests that page of
+history into evolution state; repeat the command to resume oversized
+telemetry pages. It reads open, closed, and archived session artifacts without
+changing task state or completing sessions. Production days still require a
+complete workbench session and observed passing completion evidence; failure
+evidence alone never allocates one. AFOL does not execute models.
+
+Session artifact inspection includes live and archived sessions. If the same
+session ID appears in both locations, the JSON response reports it in
+`conflicts` and marks coverage `partial`; selecting that session explicitly
+fails until the duplicate is resolved. Whole-artifact evidence hashes the
+original valid UTF-8 bytes, and malformed UTF-8 is refused.
+
+## Standalone artifacts
+
+Save an artifact to a standalone record, discover available records, then list
+or read an owner-relative artifact without creating Evolution projections:
+
+```text
+afol artifact save --kind report --text "Review notes" --record <record-id> --json
+afol evolve artifacts --records --limit <n> --json
+afol evolve artifacts --records --records-cursor <token> --limit <n> --json
+afol evolve artifacts --record <record-id> --json
+afol evolve artifacts --record <record-id> --limit <n> --file-cursor <token> --json
+afol evolve artifacts --record <record-id> --artifact <path> --json
+afol evolve artifacts --record <record-id> --artifact <path> \
+  --page-cursor <token> --json
+afol evolve artifacts --record <record-id> --artifact <path> --byte-offset <n> --json
+afol evolve artifacts --record <record-id> --search <literal> --json
+afol evolve artifacts --record <record-id> --search <literal> \
+  --search-cursor <token> --json
+```
+
+To copy an explicitly reviewed file from temporary storage, confirm its
+SHA-256 and owner, then use `artifact save --file <path> --source-digest <sha256>`
+with one explicit `--session <id>` or `--record <id>` and a stable
+`--request-id <id>`. The source digest is checked before writing; the artifact
+and receipt retain the source path/digest, and the original is preserved.
+Repeating the same request returns the same artifact. Unknown-owner files
+remain review candidates; AFOL never infers their migration destination.
+Archived sources can be copied to a related record; archived snapshots remain
+immutable. Capture performs no secondary indexing (`index=not_requested`);
+read directly by the receipt path when Evolution projections are unavailable.
+
+Record file listings use `files_page` and `files_cursor` to continue through
+the bounded owner inventory. The cursor binds the record, page size, and file
+metadata snapshot; owner or source changes require a fresh listing. A directed
+safe owner-relative file can be read without scanning its siblings. Such a
+response sets `coverage.inventory_scanned` to `false` and reports partial
+inventory coverage while retaining the selected page's own coverage.
+
+Search has a 512 KiB per-response work budget. `read_bytes` counts complete
+source bytes read, `scanned_bytes` counts complete source bytes decoded and
+searched, and `work_bytes` is their sum. `search.cursor` continues at a file
+boundary and binds the record, query, and file metadata snapshot. The response
+also reports cumulative `total_*_bytes` across that cursor chain. A file too
+large to fit one response is skipped; its omission remains explicit and keeps
+the final result partial. Unsupported inventory entries also keep coverage
+partial.
+
+Reads preserve raw byte anchors and digests while redacting the presented text.
+Search checks the redacted presentation. Requested page sizes clamp to at least
+four bytes, offsets must be UTF-8 boundaries, and offsets at the end of
+nonempty files are refused. Invalid UTF-8 sources and sources larger than the
+1 MiB redaction-context budget are withheld with partial coverage. The initial
+page reuses its complete redacted source snapshot for evidence promotion, and
+page work budgets account for the full-context read and scan separately from
+returned page bytes. Session artifact catalog work is capped at 4,096 units
+across selected sessions per response, counting each owner plus its inventoried
+entries. Larger catalogs are refused instead of being reported as complete.
+`source_catalog` reports sessions considered, owners scanned, owner entries
+scanned, and total work units. Root session-name discovery remains a separate
+metadata scan. `--page-cursor` continues a content page; `--cursor` remains the
+session-history cursor.
+
+Assisted changes use an explicit version-bound review cycle. Prepare an
+external-authored packet with `evolve proposal prepare --packet <path>
+--dry-run`, inspect the exact stored operations with `evolve proposal show`,
+then approve the displayed version before `evolve proposal apply`. Daily
+suggestion acceptance only acknowledges its receipt; it does not approve a
+scoped mutation. `evolve proposal evaluate <id> --version <sha256>` is
+read-only; `--record` writes an evaluation receipt and requires a trusted local
+interactive active task. `evolve proposal revoke` retires the exact version's
+adopted context guidance. It does not undo code or skill file changes.
+
+Proposal packets accept legacy v1 session references and owner-based v2
+session or standalone-record references emitted by `evolve artifacts`.
+Preparation revalidates each referenced source and refuses changed content;
+record evidence does not create a synthetic session or an evaluation cohort.
 
 ## Stability
 

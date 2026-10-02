@@ -25,6 +25,7 @@ const scenario: Scenario = {
 	scenario_id: "test-delivery",
 	scenario_version: "1.0.0",
 	pack_id: "runtime-live-agent",
+	execution_source: "project",
 	result_schema: "2.0.0",
 	oracle: "independent-checks-and-artifacts",
 	thresholds: {

@@ -32,6 +32,11 @@ identity verification.
 
 Release-affecting changes must pass the local Gitleaks and OSV Scanner gates,
 produce checksum-bound provenance, and complete the clean-checkout Linux x64
-smoke. These are local exact-SHA gates; no hosted workflow or publication
-status is implied. Missing scanners or unresolved findings block the
-candidate.
+smoke. Hosted CI and GitHub repository security features add regression and
+repository-level defenses, but they do not replace these local exact-SHA gates
+or imply release authorization. Missing scanners or unresolved findings block
+the candidate.
+
+Release scanners use the explicit absolute paths `AFOL_OSV_SCANNER_PATH` and
+`AFOL_GITLEAKS_PATH`, with verified immutable executable copies and no PATH
+fallback. See [the contributor scanner contract](CONTRIBUTING.md#required-checks).

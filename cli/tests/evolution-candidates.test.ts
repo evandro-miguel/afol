@@ -268,6 +268,50 @@ describe("evolve candidates", () => {
 		}
 	});
 
+	test("keeps a second problem and recommendation pair in the same session", async () => {
+		const root = fixture();
+		try {
+			const taskPath = join(root, ".afol", "wb", "S-01", "S-01_task_01.md");
+			writeFileSync(
+				taskPath,
+				`${readFileSync(taskPath, "utf8").replace("Decision:", "Note:")}\nProblem: The preview dropped the second lesson.\nRecommendation: Keep every labeled statement available.\nDestination: library\n\nProblem: The review journal write raced.\nRecommendation: Keep the writer under the shared lock.\nDestination: memory\n`,
+			);
+			const out = sink();
+			expect(
+				await runEvolveCommand(
+					"candidates",
+					["--session", "S-01", "--json"],
+					root,
+					out.io,
+				),
+			).toBe(0);
+			const result = JSON.parse(out.stdout.join("\n")).data;
+			expect(result.list).toMatchObject({ returned: 2, available: 2 });
+			expect(result.candidates).toHaveLength(2);
+			expect(
+				new Set(
+					result.candidates.map((candidate: { id: string }) => candidate.id),
+				).size,
+			).toBe(2);
+			expect(
+				result.candidates.map(
+					(candidate: { problem: string }) => candidate.problem,
+				),
+			).toEqual([
+				"the preview dropped the second lesson.",
+				"the review journal write raced.",
+			]);
+			expect(
+				result.candidates.map(
+					(candidate: { destination: string }) => candidate.destination,
+				),
+			).toEqual(["library", "memory"]);
+			expect(learningReviewStatus(root, "S-01").required).toHaveLength(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("collects indented continuations for structured adoption material", async () => {
 		const root = fixture();
 		try {

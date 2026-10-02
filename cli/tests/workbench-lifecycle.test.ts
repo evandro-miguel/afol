@@ -63,15 +63,74 @@ import {
 } from "../services/workbench/lifecycle";
 import {
 	bindSession,
+	compensateCarriedContinuationBinding,
 	readSessionContext,
 	resolveSession,
 } from "../services/workbench/session-context";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import { sessionPaths } from "../services/workbench/session-reader";
 import {
 	briefingUnavailableFor,
 	buildStartBriefing,
 } from "../services/workbench/start-briefing";
 import { appendVerificationRunTerminal } from "../services/workbench/verification-runs";
 import { verifyWorkbenchTasks } from "../services/workbench/verify";
+
+type WorkbenchChildMode =
+	| "diagnostic"
+	| "preflight"
+	| "skipped"
+	| "signal"
+	| "sequence"
+	| "fencing"
+	| "stale"
+	| "batch-fencing";
+const WORKBENCH_CHILD = "--afol-workbench-child";
+
+if (process.argv[2] === WORKBENCH_CHILD) {
+	const root = process.cwd();
+	switch (process.argv[3] as WorkbenchChildMode) {
+		case "diagnostic": {
+			const diagnostic = `I008_CHILD_DIAGNOSTIC_${"secret".repeat(120)}`;
+			process.stdout.write(diagnostic);
+			process.stderr.write(diagnostic);
+			process.exit(7);
+			break;
+		}
+		case "preflight":
+			writeFileSync(join(root, "should-not-run"), "bad");
+			break;
+		case "skipped":
+			writeFileSync(join(root, "skipped-step.txt"), "bad");
+			break;
+		case "signal": {
+			const output = "RAW_CHILD_OUTPUT_SHOULD_NOT_PERSIST";
+			process.stdout.write(output);
+			process.stderr.write(output);
+			process.kill(process.pid, "SIGTERM");
+			break;
+		}
+		case "sequence":
+			writeFileSync(join(root, "first-verification-started"), "started");
+			Bun.sleepSync(300);
+			break;
+		case "fencing":
+			writeFileSync(join(root, "fenced-child.pid"), String(process.pid));
+			Bun.sleepSync(5_000);
+			break;
+		case "stale":
+			writeFileSync(join(root, "stale-verification-started"), "started");
+			Bun.sleepSync(300);
+			break;
+		case "batch-fencing":
+			writeFileSync(join(root, "batch-fenced-child.pid"), String(process.pid));
+			Bun.sleepSync(5_000);
+			break;
+		default:
+			throw new Error(`unknown workbench child mode: ${process.argv[3]}`);
+	}
+	process.exit(0);
+}
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
@@ -98,10 +157,13 @@ function recordObservedCompletion(root: string, input: RecordEvidenceInput) {
 		`${input.session}_task_01.md`,
 	);
 	const state = (): string => {
-		const match = readFileSync(taskPath, "utf8").match(
-			new RegExp(`^\\|\\s*${input.taskId}\\s*\\|\\s*([^|]+)\\|`, "m"),
-		);
-		return match?.[1]?.trim() ?? "";
+		const row = readFileSync(taskPath, "utf8")
+			.split("\n")
+			.find(
+				(line) =>
+					line.startsWith("|") && line.split("|")[1]?.trim() === input.taskId,
+			);
+		return row?.split("|")[2]?.trim() ?? "";
 	};
 	if (state() === "pending") {
 		startTask(root, input);
@@ -145,6 +207,10 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
 	});
+}
+
+function workbenchChildCommand(mode: WorkbenchChildMode): string {
+	return `${JSON.stringify(process.execPath)} ${JSON.stringify(import.meta.filename)} ${WORKBENCH_CHILD} ${mode}`;
 }
 
 function initGitRepo(root: string): void {
@@ -576,6 +642,32 @@ describe("workbench lifecycle service", () => {
 			expect(result.completed).toBe(2);
 			expect(result.openTasks).toHaveLength(0);
 			expect(result.issues).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recordObservedCompletion ignores non-canonical task-like lines", () => {
+		const root = mkRoot("completion-canonical-row");
+		try {
+			const created = newWorkstream(root, "canonical task row");
+			const taskDoc = readFileSync(created.taskPath, "utf8");
+			writeFileSync(
+				created.taskPath,
+				`not a task row | T-01 | done | misleading |\n${taskDoc}`,
+				"utf8",
+			);
+
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | tested_needs_spec_validation |",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1260,10 +1352,6 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "done child diagnostic");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const rawChildDiagnostic = `I008_CHILD_DIAGNOSTIC_${"secret".repeat(120)}`;
-			const codePoints = Array.from(rawChildDiagnostic, (char) =>
-				char.charCodeAt(0),
-			);
-			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.exit(7)`;
 			const proc = runKernel(root, [
 				"done",
 				"--session",
@@ -1271,7 +1359,7 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				`bun -e ${JSON.stringify(script)}`,
+				workbenchChildCommand("diagnostic"),
 				"--json",
 			]);
 
@@ -2069,6 +2157,7 @@ describe("workbench lifecycle service", () => {
 				`afol d -S ${created.session} T-01 -x`,
 			);
 			expect((proc.stdout as string).length).toBeLessThan(200);
+			expect(proc.stdout as string).toContain('hint="afol d T-01 -x');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2089,7 +2178,9 @@ describe("workbench lifecycle service", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const lines = (proc.stdout as string).trim().split("\n");
+			const stdout = proc.stdout as string;
+			expect(stdout).toContain('hint="afol d T-01 -x');
+			const lines = stdout.trim().split("\n");
 			expect(lines[0]).toBe("task started: T-01");
 			expect(lines.some((line) => line.startsWith("briefing:"))).toBe(true);
 			expect(lines.some((line) => line.startsWith("resume:"))).toBe(true);
@@ -2117,9 +2208,11 @@ describe("workbench lifecycle service", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const lines = (proc.stdout as string).trim().split("\n");
+			const stdout = proc.stdout as string;
+			expect(stdout).toContain('hint="afol d T-01 -x');
+			const lines = stdout.trim().split("\n");
 			expect(lines[0]).toBe("task started: T-01");
-			const briefing = JSON.parse(lines.slice(1).join("\n")) as {
+			const briefing = JSON.parse(lines.slice(1, -1).join("\n")) as {
 				schema: string;
 				warnings: unknown[];
 				questions: unknown[];
@@ -2419,6 +2512,7 @@ describe("workbench lifecycle service", () => {
 				`afol d -S ${created.session} T-01 -x`,
 			);
 			expect((proc.stdout as string).length).toBeLessThan(200);
+			expect(proc.stdout as string).toContain('hint="afol d T-01 -x');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -3248,6 +3342,321 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("closeSession carries open tasks into one governed continuation", () => {
+		const root = mkRoot("close-carry-open");
+		try {
+			const created = newWorkstream(root, "carry-open", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["finished work", "blocked work"],
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-02",
+				state: "problem",
+				reason: "external dependency is unavailable",
+			});
+
+			const result = closeSession(root, created.session, {
+				carryOpen: true,
+				reason: "continue after dependency recovery",
+			});
+			const continuationId = result.continuation;
+			expect(continuationId).toBeTruthy();
+			if (!continuationId)
+				throw new Error("Expected a carry-open continuation.");
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-02 | moved |",
+			);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				`destination=${continuationId} reason=continue after dependency recovery`,
+			);
+			const report = readFileSync(join(root, result.report.path ?? ""), "utf8");
+			expect(report).toContain("- T-02: moved");
+			const continuation = sessionPaths(root, continuationId);
+			const continuationTask = readFileSync(continuation.taskPath, "utf8");
+			expect(continuationTask).toContain('feature_id: "F-30"');
+			expect(continuationTask).toContain('parent_spec: "carry-open-spec"');
+			expect(continuationTask).toContain(
+				`continuation_of: "${created.session}"`,
+			);
+			expect(continuationTask).toContain('carry_open_tasks: "T-02"');
+			expect(continuationTask).toContain("| T-01 | pending |");
+			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+				continuationId,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("failed carry-open close preserves the continuation and retry reuses it", () => {
+		const root = mkRoot("close-carry-open-compensation");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const created = newWorkstream(root, "carry-open-compensation", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["invalid completion", "deferred work"],
+			});
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, { session: created.session, branch, worktree: root });
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const validEvidence = readFileSync(created.evidencePath, "utf8");
+			writeFileSync(created.evidencePath, "{invalid evidence}\n", "utf8");
+			rebuildWorkBenchIndex(root);
+			expect(validateWorkBenchIndex(root).ok).toBe(true);
+			const eventsBefore = readLocalStateEvents(root);
+			const closeArgs = [
+				"close",
+				"--session",
+				created.session,
+				"--carry-open",
+				"--reason",
+				"wait for dependency",
+				"--json",
+			];
+			const close = runKernel(root, closeArgs);
+			expect(close.status).toBe(2);
+			const sourceAfterFailure = readFileSync(created.taskPath, "utf8");
+			const continuationId = sourceAfterFailure.match(
+				/^\| T-02 \| moved \|[^|]*\|[^|]*destination=([^\s|]+)/m,
+			)?.[1];
+			expect(continuationId).toBeTruthy();
+			if (!continuationId) throw new Error("Expected a linked continuation.");
+			const continuation = sessionPaths(root, continuationId);
+			expect(sourceAfterFailure).toContain(
+				`destination=${continuationId} reason=wait for dependency`,
+			);
+			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+				continuationId,
+			);
+			expect(readFileSync(continuation.taskPath, "utf8")).toContain(
+				`continuation_of: "${created.session}"`,
+			);
+			expect(readFileSync(continuation.taskPath, "utf8")).toContain(
+				'status: "active"',
+			);
+			expect(readLocalStateEvents(root)).toEqual(eventsBefore);
+			expect(resolveSession(root, {})).toEqual({
+				session: continuationId,
+				source: "context",
+			});
+			const indexValidation = validateWorkBenchIndex(root);
+			if (!indexValidation.ok) throw new Error(indexValidation.message);
+
+			writeFileSync(created.evidencePath, validEvidence, "utf8");
+			const retry = runKernel(root, closeArgs);
+			expect(retry.status).toBe(0);
+			const retryData = parseEnvelope(retry.stdout as string).data as {
+				continuation?: string;
+			};
+			expect(retryData.continuation).toBe(continuationId);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+			expect(existsSync(continuation.sessionDir)).toBe(true);
+			expect(resolveSession(root, {})).toEqual({
+				session: continuationId,
+				source: "context",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close carry-open binds the continuation and removes the source context", () => {
+		const root = mkRoot("close-carry-open-context");
+		try {
+			writeCliProjectContract(root);
+			initGitRepo(root);
+			const created = newWorkstream(root, "carry-open-context", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["completed", "deferred"],
+			});
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, { session: created.session, branch, worktree: root });
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const close = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--carry-open",
+				"--reason",
+				"dependency pending",
+				"--json",
+			]);
+			expect(close.status).toBe(0);
+			const continuation = (
+				parseEnvelope(close.stdout as string).data as {
+					continuation: string;
+				}
+			).continuation;
+			expect(resolveSession(root, {})).toEqual({
+				session: continuation,
+				source: "context",
+			});
+			expect(
+				readSessionContext(root).bindings.map((entry) => entry.session),
+			).toEqual([continuation]);
+			expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+				continuation,
+			);
+			const repeated = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--carry-open",
+				"--reason",
+				"dependency pending",
+				"--json",
+			]);
+			expect(repeated.status).toBe(0);
+			expect(
+				(
+					parseEnvelope(repeated.stdout as string).data as {
+						continuation?: string;
+					}
+				).continuation,
+			).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("carry-open binding compensation preserves a concurrent replacement", () => {
+		const root = mkRoot("carry-open-context-interleave");
+		try {
+			initGitRepo(root);
+			const branch = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+			}).stdout.trim();
+			bindSession(root, { session: "source", branch, worktree: root });
+			const continuation = bindSession(root, {
+				session: "continuation",
+				branch,
+				worktree: root,
+			});
+			bindSession(root, { session: "other", branch, worktree: root });
+			compensateCarriedContinuationBinding(root, {
+				sourceSession: "source",
+				continuation,
+			});
+			expect(
+				readSessionContext(root).bindings.map((entry) => entry.session),
+			).toEqual(["other"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close carry-open recovers an already-created continuation after a crash", () => {
+		const root = mkRoot("close-carry-open-recovery");
+		try {
+			const created = newWorkstream(root, "carry-open-recovery", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["deferred"],
+			});
+			const continuation = newWorkstream(
+				root,
+				"carry-open-recovery continuation",
+				{
+					continuationOf: created.session,
+					carryOpenTasks: ["T-01"],
+					featureId: "F-30",
+					parentSpec: "carry-open-spec",
+					tasks: ["T-01: deferred"],
+				},
+			);
+			const source = readFileSync(created.taskPath, "utf8").replace(
+				/^\| T-01 \|.*$/m,
+				`| T-01 | moved | agent | deferred destination=${continuation.session} reason=dependency pending |`,
+			);
+			writeFileSync(created.taskPath, source, "utf8");
+
+			const result = closeSession(root, created.session, {
+				carryOpen: true,
+				reason: "dependency pending",
+			});
+			expect(result.continuation).toBe(continuation.session);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close carry-open rejects an unrelated continuation destination", () => {
+		const root = mkRoot("close-carry-open-recovery-mismatch");
+		try {
+			const created = newWorkstream(root, "carry-open-recovery", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["deferred"],
+			});
+			const unrelated = newWorkstream(root, "unrelated", {
+				featureId: "F-30",
+				parentSpec: "carry-open-spec",
+				tasks: ["unrelated task"],
+			});
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8").replace(
+					/^\| T-01 \|.*$/m,
+					`| T-01 | moved | agent | deferred destination=${unrelated.session} reason=dependency pending |`,
+				),
+				"utf8",
+			);
+
+			expect(() =>
+				closeSession(root, created.session, {
+					carryOpen: true,
+					reason: "dependency pending",
+				}),
+			).toThrow(
+				"Carry-open recovery continuation linkage does not match source.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("close command cleans matching context only after durable close", () => {
 		const root = mkRoot("close-context-cleanup");
 		try {
@@ -4954,7 +5363,7 @@ describe("sequential done verification runs", () => {
 				"-T",
 				"T-01",
 				"-x",
-				`bun -e "require('node:fs').writeFileSync('${marker}', 'bad')"`,
+				workbenchChildCommand("preflight"),
 				"-x",
 				"bun --version",
 				"--json",
@@ -5157,7 +5566,7 @@ describe("sequential done verification runs", () => {
 				"--test",
 				'bun -e "process.exit(3)"',
 				"--test",
-				`bun -e "require('node:fs').writeFileSync('${skippedPath}', 'bad')"`,
+				workbenchChildCommand("skipped"),
 				"--json",
 			]);
 
@@ -5201,8 +5610,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence signal");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const rawOutput = "RAW_CHILD_OUTPUT_SHOULD_NOT_PERSIST";
-			const codePoints = Array.from(rawOutput, (char) => char.charCodeAt(0));
-			const script = `const value=String.fromCharCode(${codePoints.join(",")}); process.stdout.write(value); process.stderr.write(value); process.kill(process.pid, "SIGTERM")`;
 			const proc = runKernel(root, [
 				"done",
 				"-S",
@@ -5210,7 +5617,7 @@ describe("sequential done verification runs", () => {
 				"-T",
 				"T-01",
 				"-x",
-				`bun -e ${JSON.stringify(script)}`,
+				workbenchChildCommand("signal"),
 				"-x",
 				"bun --version",
 				"--json",
@@ -5403,7 +5810,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence process race");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const marker = join(root, "first-verification-started");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "started"); setTimeout(() => {}, 300);`;
 			const baseArgs = [
 				kernelPath,
 				"done",
@@ -5417,7 +5823,7 @@ describe("sequential done verification runs", () => {
 				[
 					...baseArgs,
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("sequence"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -5437,7 +5843,7 @@ describe("sequential done verification runs", () => {
 				[
 					...baseArgs,
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("sequence"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -5490,7 +5896,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence fencing loss");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const marker = join(root, "fenced-child.pid");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setTimeout(() => {}, 5000);`;
 			const child = spawn(
 				"bun",
 				[
@@ -5501,7 +5906,7 @@ describe("sequential done verification runs", () => {
 					"-T",
 					"T-01",
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("fencing"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -5578,7 +5983,6 @@ describe("sequential done verification runs", () => {
 			const created = newWorkstream(root, "done sequence stale conflict");
 			startTask(root, { session: created.session, taskId: "T-01" });
 			const marker = join(root, "stale-verification-started");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "started"); setTimeout(() => {}, 300);`;
 			const child = spawn(
 				"bun",
 				[
@@ -5589,7 +5993,7 @@ describe("sequential done verification runs", () => {
 					"-T",
 					"T-01",
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("stale"),
 					"-x",
 					"bun --version",
 					"--json",
@@ -6692,7 +7096,6 @@ describe("task completion authorization and transitions", () => {
 			startTask(root, { session: created.session, taskId: "T-01" });
 			startTask(root, { session: created.session, taskId: "T-02" });
 			const marker = join(root, "batch-fenced-child.pid");
-			const script = `require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setTimeout(() => {}, 5000);`;
 			const child = spawn(
 				"bun",
 				[
@@ -6703,7 +7106,7 @@ describe("task completion authorization and transitions", () => {
 					"-T",
 					"T-01..T-02",
 					"-x",
-					`bun -e ${JSON.stringify(script)}`,
+					workbenchChildCommand("batch-fencing"),
 					"--json",
 				],
 				{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },

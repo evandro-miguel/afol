@@ -14,6 +14,7 @@ import {
 	runVerificationAsync,
 	splitCommandLine,
 } from "../commands/workbench/verify";
+import { TRUSTED_BUN_CONFIG_PATH } from "../services/benchmark/trusted-bun";
 import { sha256 } from "../services/evolution/imports/digest";
 import { HOT_PATH_BENCHMARK_MARKER } from "../services/hot-path/instrumentation";
 import {
@@ -56,6 +57,7 @@ function runScenario(config: HotPathScenarioConfig) {
 			baseline_id: "workbench-parity-v1",
 			deterministic_metrics: { duration_ms: 0 },
 			implementation_status: "implemented",
+			execution_source: "builtin",
 			runner: "hot-path",
 			hot_path: {
 				...config,
@@ -101,7 +103,14 @@ describe("F-32 hot-path benchmark runner", () => {
 				"/repo/cli/main.ts",
 				["status", "--json"],
 			),
-		).toEqual(["/usr/local/bin/bun", "/repo/cli/main.ts", "status", "--json"]);
+		).toEqual([
+			"/usr/local/bin/bun",
+			"--no-env-file",
+			`--config=${TRUSTED_BUN_CONFIG_PATH}`,
+			"/repo/cli/main.ts",
+			"status",
+			"--json",
+		]);
 	});
 
 	test("compiled runtime re-executes the current binary without the embedded entrypoint", () => {
@@ -129,6 +138,7 @@ describe("F-32 hot-path benchmark runner", () => {
 			baseline_id: "cli-kernel-local-v1",
 			deterministic_metrics: { duration_ms: 0 },
 			implementation_status: "implemented",
+			execution_source: "builtin",
 			runner: "hot-path",
 			hot_path: { operation: "status", mode: "default" },
 		};
@@ -273,40 +283,36 @@ describe("F-32 hot-path benchmark runner", () => {
 		}
 	});
 
-	test.each([
-		"status",
-		"start",
-		"done",
-		"close",
-	] as const)("default %s records no derived work or telemetry", (operation) => {
-		const result = runScenario({ operation, mode: "default" });
-		expect(result.passed).toBe(true);
-		expect(result.metrics.derived_work_calls).toBe(0);
-		expect(result.metrics.telemetry_append_count).toBe(0);
-		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
-		expect(result.profile.execution_mode).toBe("source");
-		expect(result.profile.artifact_mode).toBe("source");
-		expect(result.profile.artifact_sha256).toBe("source");
-		if (operation !== "status") {
-			expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
-		}
-	});
+	test.each(["status", "start", "done", "close"] as const)(
+		"default %s records no derived work or telemetry",
+		(operation) => {
+			const result = runScenario({ operation, mode: "default" });
+			expect(result.passed).toBe(true);
+			expect(result.metrics.derived_work_calls).toBe(0);
+			expect(result.metrics.telemetry_append_count).toBe(0);
+			expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+			expect(result.profile.execution_mode).toBe("source");
+			expect(result.profile.artifact_mode).toBe("source");
+			expect(result.profile.artifact_sha256).toBe("source");
+			if (operation !== "status") {
+				expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
+			}
+		},
+	);
 
-	test.each([
-		"status",
-		"start",
-		"done",
-		"close",
-	] as const)("explicit-derived %s reports derived work", (operation) => {
-		const derived_path = operation === "status" ? "health" : "rebuild";
-		const result = runScenario({
-			operation,
-			mode: "explicit-derived",
-			derived_path,
-		});
-		expect(result.passed).toBe(true);
-		expect(result.metrics.derived_work_calls).toBeGreaterThan(0);
-		expect(result.metrics.telemetry_append_count).toBe(0);
-		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
-	});
+	test.each(["status", "start", "done", "close"] as const)(
+		"explicit-derived %s reports derived work",
+		(operation) => {
+			const derived_path = operation === "status" ? "health" : "rebuild";
+			const result = runScenario({
+				operation,
+				mode: "explicit-derived",
+				derived_path,
+			});
+			expect(result.passed).toBe(true);
+			expect(result.metrics.derived_work_calls).toBeGreaterThan(0);
+			expect(result.metrics.telemetry_append_count).toBe(0);
+			expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+		},
+	);
 });

@@ -164,6 +164,18 @@ describe("help formatter", () => {
 		expect(unknown).toBeNull();
 	});
 
+	test("evolve help describes read-only evaluation and exact context revocation", () => {
+		const help = formatCommandHelp("evolve", kernelRegistry);
+		expect(help).toContain(
+			"proposal evaluate <proposal-id> --version <sha256> [--json] [read]",
+		);
+		expect(help).toContain(
+			"proposal evaluate <proposal-id> --version <sha256> --record [--json] [write]",
+		);
+		expect(help).toContain("Retire exact applied context guidance");
+		expect(help).toContain("never rolls back code or skill file changes");
+	});
+
 	test("formats fleet command help", () => {
 		const help = formatCommandHelp("fleet", kernelRegistry);
 
@@ -260,11 +272,11 @@ describe("help formatter", () => {
 				const spec = kernelRegistry.commands.find(
 					(entry) => entry.kind === kind,
 				);
-				if (spec) {
+				if (spec && spec.kind !== "verifyTasks") {
 					directHelpCommands.push(spec);
 				}
 			}
-			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length);
+			expect(directHelpCommands.length).toBe(DIRECT_DISPATCH_KINDS.length - 1);
 			for (const spec of directHelpCommands) {
 				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
 					cwd: tempRoot,
@@ -275,6 +287,11 @@ describe("help formatter", () => {
 				expect(result.status).toBe(0);
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain(`Command: ${spec.command}`);
+				if (!["new", "start", "close"].includes(spec.command)) {
+					expect(result.stdout.trim()).toBe(
+						formatCommandHelp(spec.command)?.trim() ?? "",
+					);
+				}
 				expect(result.stdout.trim()).toBe(
 					formatCommandHelp(spec.command)?.trim() ?? "",
 				);
@@ -287,6 +304,30 @@ describe("help formatter", () => {
 			expect(shortStartHelp.status).toBe(0);
 			expect(shortStartHelp.stderr).toBe("");
 			expect(shortStartHelp.stdout).toContain("Command: start");
+			expect(shortStartHelp.stdout).toContain("Usage: afol start");
+			expect(shortStartHelp.stdout).toContain("Usage: afol st T-01");
+			expect(shortStartHelp.stdout).toContain("Usage: afol start");
+			const catalogStartHelp = spawnSync("bun", [cliPath, "help", "start"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(catalogStartHelp.status).toBe(0);
+			expect(catalogStartHelp.stdout).toBe(shortStartHelp.stdout);
+			const newHelp = spawnSync("bun", [cliPath, "n", "--help"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(newHelp.status).toBe(0);
+			expect(newHelp.stdout).toContain('Usage: afol n <theme> -t "<task>"');
+			const closeHelp = spawnSync("bun", [cliPath, "c", "--help"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(closeHelp.status).toBe(0);
+			expect(closeHelp.stdout).toContain("Usage: afol c");
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],
@@ -852,6 +893,7 @@ describe("help formatter", () => {
 			description: "Inspect local project indexes",
 			category: "inspect",
 			guidance: [
+				"ls is local-state, not session list. Use afol ss to list sessions.",
 				"Run rebuild before validation when indexes may be stale.",
 				"Use --verbose only when the full index snapshot is needed.",
 			],

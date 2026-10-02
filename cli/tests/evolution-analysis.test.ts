@@ -993,6 +993,14 @@ describe("evolution analysis previews", () => {
 		}
 	});
 
+	test("after-merge avoids Git options unavailable on supported installations", () => {
+		const source = readFileSync(
+			join(import.meta.dir, "../commands/evolve.ts"),
+			"utf8",
+		);
+		expect(source).not.toContain('"--no-lazy-fetch"');
+	});
+
 	test("bounds proposals and critical alerts without mutating input", () => {
 		const candidates = Array.from({ length: 8 }, (_, index) =>
 			candidate(index),
