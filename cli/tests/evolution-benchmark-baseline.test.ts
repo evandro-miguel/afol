@@ -145,10 +145,17 @@ describe("evolution benchmark baseline refresh", () => {
 		).toEqual(["evolution-core-baseline-calibration-reason-format-invalid"]);
 		expect(
 			validatePendingBaselineContract(
-				{ ...baseline, git_commit: "0123456789ab" },
+				{
+					...baseline,
+					git_commit: "0123456789ab",
+					source_root_commit: "0123456789abcdef0123456789abcdef01234567",
+				},
 				"evolution-core-baseline",
 			),
-		).toEqual(["evolution-core-baseline-pending-observed-field:git_commit"]);
+		).toEqual([
+			"evolution-core-baseline-pending-observed-field:git_commit",
+			"evolution-core-baseline-pending-observed-field:source_root_commit",
+		]);
 	});
 
 	test("reports pending non-mutation baselines as incompatible", () => {
