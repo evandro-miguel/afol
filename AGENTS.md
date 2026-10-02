@@ -19,9 +19,10 @@ documentation, and local release tooling.
 ## Local validation
 
 ADR-007 separates hosted regression evidence from exact-SHA local release
-validation. Pull requests receive `quality`, `tests`, and `core-smoke`; pushes
-to `main` also receive `deep-validation`. Run the narrowest relevant checks,
-then the full local gate when release readiness is in scope:
+validation. Pull requests receive `quality`, `tests`, and `core-smoke`; pull
+requests targeting `main` and pushes to `main` also receive `deep-validation`.
+Run the narrowest relevant checks, then the full local gate when release
+readiness is in scope:
 
 ```bash
 bun install --frozen-lockfile

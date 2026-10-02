@@ -5,12 +5,14 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import { packageStagedReleaseArchive } from "../dev/release-archive";
 import { runReleaseInstallSmoke } from "../dev/release-install-smoke";
 import { stageRelease } from "../dev/stage-release";
@@ -32,6 +34,20 @@ function writeJson(path: string, value: unknown): void {
 
 function shellQuote(value: string): string {
 	return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function wait(milliseconds: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function ownedSmokeRoots(): string[] {
+	return readdirSync(tmpdir(), { withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isDirectory() && entry.name.startsWith("afol-binary-install-"),
+		)
+		.map((entry) => entry.name)
+		.sort();
 }
 
 function fixture(options: { tamperStagedArtifactOnInit?: boolean } = {}): {
@@ -348,6 +364,242 @@ describe("standalone release install smoke", () => {
 	);
 
 	test.skipIf(!linuxX64)(
+		"rejects gzip expansion over the configured archive limit before parsing",
+		async () => {
+			const state = fixture();
+			try {
+				const compressed = gzipSync(Buffer.alloc(128_000, 0x61));
+				const { fetchImpl, requests } = archiveFetch(compressed);
+				await expect(
+					runReleaseInstallSmoke({
+						archiveUrl: ARCHIVE_URL,
+						expectedArchiveSha256: sha256(compressed),
+						expectedArtifactSha256: state.artifactSha256,
+						expectedSourceCommitSha: SOURCE_COMMIT_SHA,
+						maxArchiveExpandedBytes: 1_024,
+						fetchImpl,
+					}),
+				).rejects.toThrow("release archive expands beyond the permitted size");
+				expect(requests).toHaveLength(1);
+				expect(existsSync(state.markerPath)).toBe(false);
+			} finally {
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test.skipIf(!linuxX64)(
+		"rejects nested gzip archives before Bun can decompress them without the expansion limit",
+		async () => {
+			const state = fixture();
+			try {
+				const compressedInner = await new Bun.Archive(
+					{ "payload.txt": Buffer.alloc(128_000, 0x61) },
+					{ compress: "gzip" },
+				).bytes();
+				const compressedOuter = gzipSync(compressedInner);
+				const { fetchImpl, requests } = archiveFetch(compressedOuter);
+				await expect(
+					runReleaseInstallSmoke({
+						archiveUrl: ARCHIVE_URL,
+						expectedArchiveSha256: sha256(compressedOuter),
+						expectedArtifactSha256: state.artifactSha256,
+						expectedSourceCommitSha: SOURCE_COMMIT_SHA,
+						maxArchiveExpandedBytes: 1_024,
+						fetchImpl,
+					}),
+				).rejects.toThrow(
+					"release archive contains unsupported nested gzip compression",
+				);
+				expect(requests).toHaveLength(1);
+				expect(existsSync(state.markerPath)).toBe(false);
+			} finally {
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test.skipIf(!linuxX64)(
+		"shares one deadline across redirect headers and cancels late responses",
+		async () => {
+			const state = fixture();
+			const requests: URL[] = [];
+			const signals: AbortSignal[] = [];
+			let redirectBodyCancelled = false;
+			let lateResponseBodyCancelled = false;
+			let finishLateResponse!: (response: Response) => void;
+			const lateResponse = new Promise<Response>((resolve) => {
+				finishLateResponse = resolve;
+			});
+			const fetchImpl: FixtureFetch = async (input, init) => {
+				requests.push(input);
+				const signal = init?.signal;
+				if (!(signal instanceof AbortSignal)) {
+					throw new Error("release download did not pass its abort signal");
+				}
+				signals.push(signal);
+				if (requests.length === 1) {
+					return new Response(
+						new ReadableStream({
+							cancel() {
+								redirectBodyCancelled = true;
+							},
+						}),
+						{
+							status: 302,
+							headers: {
+								location: "https://cdn.example.invalid/releases/manifest.json",
+							},
+						},
+					);
+				}
+				return lateResponse;
+			};
+			const beforeRoots = ownedSmokeRoots();
+			try {
+				await expect(
+					runReleaseInstallSmoke({
+						baseUrl: BASE_URL,
+						expectedArtifactSha256: state.artifactSha256,
+						expectedSourceCommitSha: SOURCE_COMMIT_SHA,
+						resourceTimeoutMs: 30,
+						fetchImpl,
+					}),
+				).rejects.toThrow("release download timed out");
+				finishLateResponse(
+					new Response(
+						new ReadableStream({
+							cancel() {
+								lateResponseBodyCancelled = true;
+							},
+						}),
+						{ status: 503 },
+					),
+				);
+				await wait(0);
+				expect(requests).toHaveLength(2);
+				expect(signals[1]).toBe(signals[0]);
+				expect(signals[0]?.aborted).toBe(true);
+				expect(redirectBodyCancelled).toBe(true);
+				expect(lateResponseBodyCancelled).toBe(true);
+				expect(ownedSmokeRoots()).toEqual(beforeRoots);
+			} finally {
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test.skipIf(!linuxX64)(
+		"bounds a stalled response body read and does not await cancellation",
+		async () => {
+			const state = fixture();
+			let signal: AbortSignal | undefined;
+			let cancelRequested = false;
+			let finishRead!: () => void;
+			const readComplete = new Promise<void>((resolve) => {
+				finishRead = resolve;
+			});
+			let readCount = 0;
+			const body = {
+				getReader: () => ({
+					read: async () => {
+						if (readCount > 0) return { done: true };
+						readCount += 1;
+						await wait(60);
+						finishRead();
+						return { done: false, value: new TextEncoder().encode("stalled") };
+					},
+					cancel: () => {
+						cancelRequested = true;
+						return new Promise<void>(() => {});
+					},
+					releaseLock: () => {},
+				}),
+			} as unknown as ReadableStream<Uint8Array>;
+			const response = {
+				status: 200,
+				ok: true,
+				redirected: false,
+				url: BASE_URL,
+				headers: new Headers(),
+				body,
+			} as Response;
+			const fetchImpl: FixtureFetch = async (_input, init) => {
+				signal = init?.signal as AbortSignal | undefined;
+				return response;
+			};
+			try {
+				await expect(
+					runReleaseInstallSmoke({
+						baseUrl: BASE_URL,
+						expectedArtifactSha256: state.artifactSha256,
+						expectedSourceCommitSha: SOURCE_COMMIT_SHA,
+						resourceTimeoutMs: 20,
+						fetchImpl,
+					}),
+				).rejects.toThrow("release download timed out");
+				await readComplete;
+				expect(signal?.aborted).toBe(true);
+				expect(cancelRequested).toBe(true);
+			} finally {
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test.skipIf(!linuxX64)(
+		"checks the deadline before starting a body read that could reject",
+		async () => {
+			const state = fixture();
+			const timeoutMs = 5_000;
+			let fakeNow = 0;
+			let readCount = 0;
+			let lateRead: Promise<{ done: boolean; value?: Uint8Array }> | undefined;
+			const reader = {
+				read: () => {
+					readCount += 1;
+					lateRead = Promise.reject(new Error("expired body read rejection"));
+					return lateRead;
+				},
+				cancel: () => new Promise<void>(() => {}),
+				releaseLock: () => {},
+			};
+			const body = {
+				getReader: () => reader,
+			} as unknown as ReadableStream<Uint8Array>;
+			const response = {
+				status: 200,
+				ok: true,
+				redirected: false,
+				url: BASE_URL,
+				headers: new Headers(),
+				get body() {
+					fakeNow = timeoutMs + 1;
+					return body;
+				},
+			} as Response;
+			const fetchImpl: FixtureFetch = async () => response;
+			try {
+				await expect(
+					runReleaseInstallSmoke({
+						baseUrl: BASE_URL,
+						expectedArtifactSha256: state.artifactSha256,
+						expectedSourceCommitSha: SOURCE_COMMIT_SHA,
+						resourceTimeoutMs: timeoutMs,
+						now: () => fakeNow,
+						fetchImpl,
+					}),
+				).rejects.toThrow("release download timed out");
+				lateRead?.catch(() => {});
+				expect(readCount).toBe(0);
+			} finally {
+				lateRead?.catch(() => {});
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	test.skipIf(!linuxX64)(
 		"downloads every pinned manifest file and accepts bounded HTTPS CDN redirects",
 		async () => {
 			const state = fixture();
@@ -474,14 +726,23 @@ describe("standalone release install smoke", () => {
 		async () => {
 			const state = fixture();
 			const requests: URL[] = [];
+			let bodyCancelled = false;
 			const fetchImpl: FixtureFetch = async (input) => {
 				requests.push(input);
-				return new Response(null, {
-					status: 302,
-					headers: {
-						location: "http://invalid.example.invalid/?token=synthetic-secret",
+				return new Response(
+					new ReadableStream({
+						cancel() {
+							bodyCancelled = true;
+						},
+					}),
+					{
+						status: 302,
+						headers: {
+							location:
+								"http://invalid.example.invalid/?token=synthetic-secret",
+						},
 					},
-				});
+				);
 			};
 			try {
 				let failure: Error | undefined;
@@ -498,6 +759,7 @@ describe("standalone release install smoke", () => {
 				expect(failure?.message).toContain("redirect must remain HTTPS");
 				expect(failure?.message).not.toContain("synthetic-secret");
 				expect(requests).toHaveLength(1);
+				expect(bodyCancelled).toBe(true);
 				expect(existsSync(state.markerPath)).toBe(false);
 			} finally {
 				rmSync(state.root, { recursive: true, force: true });
