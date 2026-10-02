@@ -86,6 +86,19 @@
 		"oxlint": "^1.86.0",
 		"typescript": "7.0.2"
 	},
+	"knip": {
+		"ignoreBinaries": [
+			"^rg$",
+			"^script$",
+			"^mkfifo$",
+			"^bootstrap$",
+			"^evolve$",
+			"^st$",
+			"^log$",
+			"^new$",
+			"^evidence$"
+		]
+	},
 	"overrides": {
 		"fast-uri": "3.1.8"
 	}

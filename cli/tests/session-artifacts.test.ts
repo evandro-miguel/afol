@@ -51,24 +51,23 @@ afterEach(() => {
 });
 
 describe("bounded session artifact location checks", () => {
-	test.each([
-		"tmp",
-		".tmp",
-		".afol/tmp",
-	])("rejects an explicitly associated report in %s", (directory) => {
-		const root = fixture();
-		const id = session(root);
-		put(root, `${directory}/result.md`, artifact(id));
-		const before = readFileSync(join(root, `${directory}/result.md`), "utf8");
-		const check = inspectSessionArtifactLocations(root);
-		expect(check.ok).toBe(false);
-		expect(check.message).toContain(
-			`${directory}/result.md -> .afol/wb/${id}/`,
-		);
-		expect(readFileSync(join(root, `${directory}/result.md`), "utf8")).toBe(
-			before,
-		);
-	});
+	test.each(["tmp", ".tmp", ".afol/tmp"])(
+		"rejects an explicitly associated report in %s",
+		(directory) => {
+			const root = fixture();
+			const id = session(root);
+			put(root, `${directory}/result.md`, artifact(id));
+			const before = readFileSync(join(root, `${directory}/result.md`), "utf8");
+			const check = inspectSessionArtifactLocations(root);
+			expect(check.ok).toBe(false);
+			expect(check.message).toContain(
+				`${directory}/result.md -> .afol/wb/${id}/`,
+			);
+			expect(readFileSync(join(root, `${directory}/result.md`), "utf8")).toBe(
+				before,
+			);
+		},
+	);
 
 	test("does not force sessions or infer ownership from filenames", () => {
 		const root = fixture();
@@ -80,19 +79,19 @@ describe("bounded session artifact location checks", () => {
 		expect(existsSync(join(root, ".afol/wb"))).toBe(false);
 	});
 
-	test.each([
-		"workbench_task",
-		"workbench_log",
-	])("detects a misplaced managed %s document", (type) => {
-		const root = fixture();
-		const id = session(root);
-		put(
-			root,
-			"tmp/work.md",
-			artifact(id).replace("doc_type: report", `doc_type: ${type}`),
-		);
-		expect(inspectSessionArtifactLocations(root).ok).toBe(false);
-	});
+	test.each(["workbench_task", "workbench_log"])(
+		"detects a misplaced managed %s document",
+		(type) => {
+			const root = fixture();
+			const id = session(root);
+			put(
+				root,
+				"tmp/work.md",
+				artifact(id).replace("doc_type: report", `doc_type: ${type}`),
+			);
+			expect(inspectSessionArtifactLocations(root).ok).toBe(false);
+		},
+	);
 
 	test("uses explicit artifact ownership across multiple sessions, not the global pointer", () => {
 		const root = fixture();
@@ -118,20 +117,23 @@ describe("bounded session artifact location checks", () => {
 	test.each([
 		"Unrelated notes without frontmatter.\n",
 		"---\nstatus: active\n---\n# Legacy notes\n",
-	])("does not establish session ownership from an unverified task filename: %s", (content) => {
-		const root = fixture();
-		const id = "260926_0000_unverified";
-		put(root, `.afol/wb/${id}/${id}_task_01.md`, content);
-		put(
-			root,
-			`.afol/wb/${id}/${id}_report_01.md`,
-			"# Report\n\n## Evidence\n\n`tmp/output.log`\n",
-		);
-		put(root, "tmp/report.md", artifact(id));
-		const check = inspectSessionArtifactLocations(root);
-		expect(check.ok).toBe(true);
-		expect(check.message).toContain("unassigned/legacy");
-	});
+	])(
+		"does not establish session ownership from an unverified task filename: %s",
+		(content) => {
+			const root = fixture();
+			const id = "260926_0000_unverified";
+			put(root, `.afol/wb/${id}/${id}_task_01.md`, content);
+			put(
+				root,
+				`.afol/wb/${id}/${id}_report_01.md`,
+				"# Report\n\n## Evidence\n\n`tmp/output.log`\n",
+			);
+			put(root, "tmp/report.md", artifact(id));
+			const check = inspectSessionArtifactLocations(root);
+			expect(check.ok).toBe(true);
+			expect(check.message).toContain("unassigned/legacy");
+		},
+	);
 
 	test("supports customized roots and artifacts inside a workbench beneath tmp", () => {
 		const root = fixture("tmp/work", ".scratch");
