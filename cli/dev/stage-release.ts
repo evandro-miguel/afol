@@ -51,6 +51,16 @@ export type StageReleaseResult = {
 	files: string[];
 };
 
+export type VerifyStagedReleaseOptions = {
+	cwd?: string;
+	stageDir: string;
+};
+
+export type VerifyStagedReleaseResult = StageReleaseResult & {
+	provenance: JsonRecord;
+	manifestSha256: string;
+};
+
 function sha256(bytes: Uint8Array | string): string {
 	return createHash("sha256").update(bytes).digest("hex");
 }
@@ -153,6 +163,7 @@ function assertEvidence(
 	provenance: JsonRecord,
 	security: JsonRecord,
 	artifactHash: string,
+	actualLockHash?: string,
 ): void {
 	if (
 		stringField(provenance, "sha256", "provenance artifact hash") !==
@@ -178,6 +189,22 @@ function assertEvidence(
 	if (securityTarget.commit_sha !== provenance.commit_sha) {
 		throw new Error("security report does not bind the source commit");
 	}
+	const provenanceLockHash = stringField(
+		provenance,
+		"lock_sha256",
+		"provenance lockfile hash",
+	);
+	if (
+		provenance.lockfile !== "bun.lock" ||
+		securityTarget.lockfile !== "bun.lock" ||
+		!/^[a-f0-9]{64}$/u.test(provenanceLockHash) ||
+		securityTarget.lock_sha256 !== provenanceLockHash
+	) {
+		throw new Error("release evidence does not bind bun.lock");
+	}
+	if (actualLockHash !== undefined && provenanceLockHash !== actualLockHash) {
+		throw new Error("release provenance does not bind the current bun.lock");
+	}
 	if (!Array.isArray(security.scans)) {
 		throw new Error("security report is missing scans");
 	}
@@ -198,15 +225,95 @@ function assertEvidence(
 	}
 }
 
+function assertSbom(
+	value: unknown,
+	artifactHash: string,
+	provenance: JsonRecord,
+): JsonRecord[] {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		throw new Error("staged SBOM is invalid");
+	}
+	const sbom = value as JsonRecord;
+	if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages)) {
+		throw new Error("staged SBOM is missing SPDX package data");
+	}
+	const packages = sbom.packages.map((item) => {
+		if (!item || typeof item !== "object" || Array.isArray(item)) {
+			throw new Error("staged SBOM contains an invalid package");
+		}
+		return item as JsonRecord;
+	});
+	const ids = new Set<string>();
+	for (const item of packages) {
+		const id = stringField(item, "SPDXID", "SBOM package SPDXID");
+		if (ids.has(id))
+			throw new Error(`staged SBOM has duplicate package id: ${id}`);
+		ids.add(id);
+		stringField(item, "name", "SBOM package name");
+		stringField(item, "versionInfo", "SBOM package version");
+		const license = stringField(
+			item,
+			"licenseDeclared",
+			"SBOM package license",
+		);
+		if (license === "NOASSERTION") {
+			throw new Error(
+				`staged SBOM has no declared license: ${String(item.name)}`,
+			);
+		}
+	}
+	const applications = packages.filter(
+		(item) => item.primaryPackagePurpose === "APPLICATION",
+	);
+	const application = applications[0];
+	if (
+		applications.length !== 1 ||
+		!application ||
+		application.name !== provenance.package_name ||
+		application.versionInfo !== provenance.version ||
+		application.SPDXID !== "SPDXRef-Package-AFOL"
+	) {
+		throw new Error("staged SBOM does not bind the AFOL package");
+	}
+	const checksums = application.checksums;
+	if (
+		!Array.isArray(checksums) ||
+		!checksums.some(
+			(item) =>
+				!!item &&
+				typeof item === "object" &&
+				(item as JsonRecord).algorithm === "SHA256" &&
+				(item as JsonRecord).checksumValue === artifactHash,
+		)
+	) {
+		throw new Error("staged SBOM does not bind the artifact");
+	}
+	const bunPackages = packages.filter(
+		(item) => item.primaryPackagePurpose === "RUNTIME",
+	);
+	const bunPackage = bunPackages[0];
+	if (
+		bunPackages.length !== 1 ||
+		!bunPackage ||
+		bunPackage.SPDXID !== "SPDXRef-Package-Bun-runtime" ||
+		bunPackage.name !== "Bun runtime" ||
+		bunPackage.versionInfo !== provenance.bun
+	) {
+		throw new Error("staged SBOM does not bind the Bun runtime");
+	}
+	return packages;
+}
+
 function approvedLicenseFiles(
 	complianceDir: string,
 	provenance: JsonRecord,
 	artifactHash: string,
-): { review: JsonRecord; files: string[] } {
+	sbomPackages: JsonRecord[],
+): { review: JsonRecord; files: string[]; hashes: Map<string, string> } {
 	const reviewName = "compliance-review.json";
 	const review = readJson(join(complianceDir, reviewName));
 	if (
-		review.schema !== "afol.release-compliance/v1" ||
+		review.schema !== "afol.release-compliance/v2" ||
 		review.status !== "approved"
 	) {
 		throw new Error("compliance review is not approved");
@@ -234,25 +341,227 @@ function approvedLicenseFiles(
 		throw new Error("compliance review has no license files");
 	}
 	const reviewed = review.license_files.map((value) => {
-		if (
-			typeof value !== "string" ||
-			value.length === 0 ||
-			value.includes("\\") ||
-			value.split("/").some((part) => !part || part === "." || part === "..")
-		) {
-			throw new Error("compliance review has an invalid license path");
+		if (!value || typeof value !== "object" || Array.isArray(value)) {
+			throw new Error("compliance review has an invalid license file");
 		}
-		return value;
+		const file = value as JsonRecord;
+		const path = stringField(file, "path", "reviewed license path");
+		const hash = stringField(file, "sha256", "reviewed license hash");
+		if (
+			path === reviewName ||
+			path.startsWith("/") ||
+			path.includes("\\") ||
+			path.split("/").some((part) => !part || part === "." || part === "..") ||
+			!/^[a-f0-9]{64}$/u.test(hash)
+		) {
+			throw new Error("compliance review has an invalid license file");
+		}
+		return { path, sha256: hash };
 	});
-	const actual = listRegularFiles(complianceDir).filter(
-		(path) => path !== reviewName,
-	);
-	if (JSON.stringify(reviewed.sort()) !== JSON.stringify(actual)) {
+	const reviewedPaths = reviewed.map((file) => file.path);
+	if (new Set(reviewedPaths).size !== reviewedPaths.length) {
+		throw new Error("compliance review has duplicate license paths");
+	}
+	const actual = listRegularFiles(complianceDir)
+		.filter((path) => path !== reviewName)
+		.sort();
+	if (JSON.stringify([...reviewedPaths].sort()) !== JSON.stringify(actual)) {
 		throw new Error(
 			"reviewed license set does not match the compliance bundle",
 		);
 	}
-	return { review, files: [reviewName, ...actual].sort() };
+	const hashes = new Map<string, string>();
+	for (const file of reviewed) {
+		if (sha256(readFileSync(join(complianceDir, file.path))) !== file.sha256) {
+			throw new Error("reviewed license hash does not match");
+		}
+		hashes.set(file.path, file.sha256);
+	}
+	hashes.set(reviewName, sha256(readFileSync(join(complianceDir, reviewName))));
+	const packageNoticesValue = review.package_notice_files;
+	if (
+		!packageNoticesValue ||
+		typeof packageNoticesValue !== "object" ||
+		Array.isArray(packageNoticesValue)
+	) {
+		throw new Error("compliance review has no package notice mapping");
+	}
+	const packageNotices = packageNoticesValue as JsonRecord;
+	const packageIds = sbomPackages.map((item) =>
+		stringField(item, "SPDXID", "SBOM package SPDXID"),
+	);
+	if (
+		JSON.stringify(Object.keys(packageNotices).sort()) !==
+		JSON.stringify([...packageIds].sort())
+	) {
+		throw new Error(
+			"compliance review package notice coverage does not match the SBOM",
+		);
+	}
+	for (const packageId of packageIds) {
+		const noticePaths = packageNotices[packageId];
+		if (
+			!Array.isArray(noticePaths) ||
+			noticePaths.length === 0 ||
+			noticePaths.some(
+				(path) =>
+					typeof path !== "string" || !hashes.has(path) || path === reviewName,
+			) ||
+			new Set(noticePaths).size !== noticePaths.length
+		) {
+			throw new Error(
+				`compliance review has invalid notice coverage for ${packageId}`,
+			);
+		}
+	}
+	return { review, files: [reviewName, ...actual].sort(), hashes };
+}
+
+function safeRelativeFilePath(path: unknown): path is string {
+	return (
+		typeof path === "string" &&
+		path.length > 0 &&
+		!path.startsWith("/") &&
+		!path.includes("\\") &&
+		!path.split("/").some((part) => !part || part === "." || part === "..")
+	);
+}
+
+export function verifyStagedRelease(
+	options: VerifyStagedReleaseOptions,
+): VerifyStagedReleaseResult {
+	const cwd = resolve(options.cwd ?? process.cwd());
+	const distRoot = assertReleaseArtifactOutputRoot(cwd);
+	const stageDir = resolve(cwd, options.stageDir);
+	if (!isDescendant(distRoot, stageDir)) {
+		throw new Error("release stage must stay inside dist");
+	}
+	assertNoExistingSymlinks(distRoot, stageDir);
+	if (!existsSync(stageDir) || !lstatSync(stageDir).isDirectory()) {
+		throw new Error(`missing release stage directory: ${stageDir}`);
+	}
+	const realStageDir = realpathSync(stageDir);
+	if (!isDescendant(realpathSync(distRoot), realStageDir)) {
+		throw new Error("release stage escapes dist");
+	}
+	const manifestPath = join(realStageDir, "manifest.json");
+	assertRegularFile(manifestPath, "release stage manifest");
+	const manifestBytes = readFileSync(manifestPath);
+	let manifest: JsonRecord;
+	try {
+		const parsed: unknown = JSON.parse(manifestBytes.toString("utf8"));
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+			throw new Error("invalid release JSON");
+		}
+		manifest = parsed as JsonRecord;
+	} catch {
+		throw new Error(`invalid release JSON: ${manifestPath}`);
+	}
+	if (
+		manifest.schema !== "afol.release-stage/v1" ||
+		manifest.asset !== ASSET_NAME
+	) {
+		throw new Error("release stage manifest is invalid");
+	}
+	const artifactHash = stringField(
+		manifest,
+		"artifact_sha256",
+		"release stage artifact hash",
+	);
+	if (!/^[a-f0-9]{64}$/u.test(artifactHash)) {
+		throw new Error("release stage manifest has an invalid artifact hash");
+	}
+	if (!Array.isArray(manifest.files)) {
+		throw new Error("release stage manifest is missing its file list");
+	}
+	const expectedPaths: string[] = [];
+	for (const value of manifest.files) {
+		if (!value || typeof value !== "object" || Array.isArray(value)) {
+			throw new Error("release stage manifest has an invalid file entry");
+		}
+		const entry = value as JsonRecord;
+		const path = entry.path;
+		const hash = entry.sha256;
+		const size = entry.size_bytes;
+		if (
+			!safeRelativeFilePath(path) ||
+			path === "manifest.json" ||
+			typeof hash !== "string" ||
+			!/^[a-f0-9]{64}$/u.test(hash) ||
+			!Number.isSafeInteger(size) ||
+			(size as number) < 0
+		) {
+			throw new Error("release stage manifest has an invalid file entry");
+		}
+		expectedPaths.push(path);
+	}
+	if (
+		new Set(expectedPaths).size !== expectedPaths.length ||
+		JSON.stringify([...expectedPaths].sort()) !== JSON.stringify(expectedPaths)
+	) {
+		throw new Error(
+			"release stage manifest file list is not unique and sorted",
+		);
+	}
+	const actualFiles = listRegularFiles(realStageDir).sort();
+	const completePaths = [...expectedPaths, "manifest.json"].sort();
+	if (JSON.stringify(actualFiles) !== JSON.stringify(completePaths)) {
+		throw new Error("release stage files do not match the manifest");
+	}
+	for (const value of manifest.files) {
+		const entry = value as JsonRecord;
+		const path = entry.path as string;
+		const target = join(realStageDir, ...path.split("/"));
+		assertRegularFile(target, `staged file ${path}`);
+		if (
+			sha256(readFileSync(target)) !== entry.sha256 ||
+			statSync(target).size !== entry.size_bytes
+		) {
+			throw new Error(
+				`release stage file does not match the manifest: ${path}`,
+			);
+		}
+	}
+	const assetPath = join(realStageDir, ASSET_NAME);
+	assertRegularFile(assetPath, "staged release asset");
+	const stagedArtifactHash = sha256(readFileSync(assetPath));
+	if (
+		stagedArtifactHash !== artifactHash ||
+		statSync(assetPath).size < 1 ||
+		readFileSync(join(realStageDir, `${ASSET_NAME}.sha256`), "utf8") !==
+			`${artifactHash}  ${ASSET_NAME}\n`
+	) {
+		throw new Error("staged release asset checksum does not match");
+	}
+	const provenance = readJson(join(realStageDir, "provenance.json"));
+	const security = readJson(join(realStageDir, "security-scan.json"));
+	if (
+		provenance.artifact !== ASSET_NAME ||
+		provenance.size_bytes !== statSync(assetPath).size ||
+		security.target === null ||
+		typeof security.target !== "object" ||
+		Array.isArray(security.target) ||
+		(security.target as JsonRecord).artifact !== ASSET_NAME
+	) {
+		throw new Error("staged release evidence does not bind the staged asset");
+	}
+	assertEvidence(provenance, security, artifactHash);
+	const sbom = readJson(join(realStageDir, "sbom.spdx.json"));
+	const sbomPackages = assertSbom(sbom, artifactHash, provenance);
+	approvedLicenseFiles(
+		join(realStageDir, "licenses"),
+		provenance,
+		artifactHash,
+		sbomPackages,
+	);
+	return {
+		stageDir: realStageDir,
+		assetName: ASSET_NAME,
+		artifactSha256: artifactHash,
+		files: actualFiles,
+		provenance,
+		manifestSha256: sha256(manifestBytes),
+	};
 }
 
 function publishStage(tempDir: string, stageDir: string): void {
@@ -304,16 +613,37 @@ export function stageRelease(
 	}
 	const provenancePath = `${artifact.artifactPath}.provenance.json`;
 	const securityPath = join(cwd, "dist/security-scan.release.json");
+	const lockPath = join(cwd, "bun.lock");
 	assertRegularFile(provenancePath, "release provenance");
 	assertRegularFile(securityPath, "release security report");
+	assertRegularFile(lockPath, "Bun dependency lockfile");
 	const artifactHash = sha256(readFileSync(artifact.artifactPath));
+	const lockHash = sha256(readFileSync(lockPath));
 	const provenance = readJson(provenancePath);
 	const security = readJson(securityPath);
-	assertEvidence(provenance, security, artifactHash);
+	assertEvidence(provenance, security, artifactHash, lockHash);
+	const sbom = buildReleaseSpdxSbom({
+		cwd,
+		assetName: ASSET_NAME,
+		artifactSha256: artifactHash,
+		provenance: {
+			package_name: stringField(provenance, "package_name", "package name"),
+			version: stringField(provenance, "version", "package version"),
+			bun: stringField(provenance, "bun", "Bun runtime version"),
+			generated_at: stringField(
+				provenance,
+				"generated_at",
+				"provenance generation time",
+			),
+			commit_sha: stringField(provenance, "commit_sha", "source commit"),
+		} satisfies ReleaseSbomProvenance,
+	});
+	const sbomPackages = assertSbom(sbom, artifactHash, provenance);
 	const compliance = approvedLicenseFiles(
 		complianceDir,
 		provenance,
 		artifactHash,
+		sbomPackages,
 	);
 
 	const stageParent = resolve(stageDir, "..");
@@ -342,25 +672,7 @@ export function stageRelease(
 			...security,
 			target: { ...target, artifact: ASSET_NAME },
 		});
-		writeJson(
-			join(tempDir, "sbom.spdx.json"),
-			buildReleaseSpdxSbom({
-				cwd,
-				assetName: ASSET_NAME,
-				artifactSha256: artifactHash,
-				provenance: {
-					package_name: stringField(provenance, "package_name", "package name"),
-					version: stringField(provenance, "version", "package version"),
-					bun: stringField(provenance, "bun", "Bun runtime version"),
-					generated_at: stringField(
-						provenance,
-						"generated_at",
-						"provenance generation time",
-					),
-					commit_sha: stringField(provenance, "commit_sha", "source commit"),
-				} satisfies ReleaseSbomProvenance,
-			}),
-		);
+		writeJson(join(tempDir, "sbom.spdx.json"), sbom);
 		const licensesDir = join(tempDir, "licenses");
 		mkdirSync(licensesDir);
 		chmodSync(licensesDir, 0o755);
@@ -368,7 +680,16 @@ export function stageRelease(
 			const targetPath = join(licensesDir, name);
 			mkdirSync(dirname(targetPath), { recursive: true });
 			chmodSync(dirname(targetPath), 0o755);
+			const expectedHash = compliance.hashes.get(name);
+			if (!expectedHash) {
+				throw new Error(`missing reviewed hash for compliance file: ${name}`);
+			}
 			copyDurably(join(complianceDir, name), targetPath);
+			if (sha256(readFileSync(targetPath)) !== expectedHash) {
+				throw new Error(
+					`staged compliance file does not match approval: ${name}`,
+				);
+			}
 		}
 		const stagedFiles = listRegularFiles(tempDir).sort();
 		writeJson(join(tempDir, "manifest.json"), {
@@ -383,6 +704,7 @@ export function stageRelease(
 			})),
 		});
 		syncDirectoryDurablyIfSupported(tempDir);
+		verifyStagedRelease({ cwd, stageDir: tempDir });
 		publishStage(tempDir, stageDir);
 		return {
 			stageDir,
@@ -404,14 +726,35 @@ function valueAfter(args: string[], index: number, flag: string): string {
 
 function main(args: string[]): void {
 	const options: StageReleaseOptions = {};
+	let verifyStageDir: string | undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
-		if (arg === "--artifact") options.artifact = valueAfter(args, index++, arg);
+		if (arg === "--verify-stage") {
+			if (verifyStageDir !== undefined) {
+				throw new Error("--verify-stage may only be specified once");
+			}
+			verifyStageDir = valueAfter(args, index++, arg);
+		} else if (arg === "--artifact")
+			options.artifact = valueAfter(args, index++, arg);
 		else if (arg === "--stage-dir")
 			options.stageDir = valueAfter(args, index++, arg);
 		else if (arg === "--compliance-dir")
 			options.complianceDir = valueAfter(args, index++, arg);
 		else throw new Error(`unknown release stage option: ${arg}`);
+	}
+	if (verifyStageDir !== undefined) {
+		if (
+			options.artifact !== undefined ||
+			options.stageDir !== undefined ||
+			options.complianceDir !== undefined
+		) {
+			throw new Error("--verify-stage cannot be combined with stage options");
+		}
+		const result = verifyStagedRelease({ stageDir: verifyStageDir });
+		console.log(
+			`release stage verified: ${relative(process.cwd(), result.stageDir)} files=${result.files.length} sha256=${result.artifactSha256}`,
+		);
+		return;
 	}
 	const result = stageRelease(options);
 	console.log(
