@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import * as nodeFs from "node:fs";
 import {
 	cpSync,
 	existsSync,
@@ -21,6 +22,7 @@ import {
 	writeReleaseSbomDraft,
 } from "../dev/release-sbom";
 import { stageRelease, verifyStagedRelease } from "../dev/stage-release";
+import * as durableSync from "../services/io/durable-sync";
 
 function sha256(bytes: Uint8Array | string): string {
 	return createHash("sha256").update(bytes).digest("hex");
@@ -311,6 +313,165 @@ function snapshotFiles(root: string): Record<string, string> {
 }
 
 describe("release staging", () => {
+	for (const failure of ["checksum link", "directory sync"] as const) {
+		test(`rolls back owned archive outputs after ${failure} fails`, async () => {
+			const state = fixture();
+			stageRelease({ cwd: state.root });
+			const stageBefore = snapshotFiles(state.stageDir);
+			const outputDir = join(state.root, "dist/release");
+			const archivePath = join(outputDir, "afol-linux-x64.tar.gz");
+			const checksumPath = `${archivePath}.sha256`;
+			const originalLink = nodeFs.linkSync;
+			const originalSync = durableSync.syncDirectoryDurablyIfSupported;
+			const injected = new Error(`simulated ${failure} failure`);
+			let triggered = false;
+			const linkSpy = spyOn(nodeFs, "linkSync").mockImplementation(
+				(source, target) => {
+					if (failure === "checksum link" && target === checksumPath) {
+						triggered = true;
+						writeFileSync(checksumPath, "concurrent writer's checksum\n");
+						throw injected;
+					}
+					return originalLink(source, target);
+				},
+			);
+			const syncSpy = spyOn(
+				durableSync,
+				"syncDirectoryDurablyIfSupported",
+			).mockImplementation((path, options) => {
+				if (failure === "directory sync" && path === outputDir) {
+					expect(existsSync(archivePath)).toBe(true);
+					expect(existsSync(checksumPath)).toBe(true);
+					triggered = true;
+					throw injected;
+				}
+				return originalSync(path, options);
+			});
+			try {
+				await expect(
+					packageStagedReleaseArchive({
+						cwd: state.root,
+						stageDir: state.stageDir,
+					}),
+				).rejects.toBe(injected);
+				expect(triggered).toBe(true);
+				expect(existsSync(archivePath)).toBe(false);
+				if (failure === "checksum link") {
+					expect(readFileSync(checksumPath, "utf8")).toBe(
+						"concurrent writer's checksum\n",
+					);
+					expect(readdirSync(outputDir).sort()).toEqual([
+						"afol-linux-x64",
+						"afol-linux-x64.tar.gz.sha256",
+					]);
+				} else {
+					expect(readdirSync(outputDir)).toEqual(["afol-linux-x64"]);
+				}
+				expect(snapshotFiles(state.stageDir)).toEqual(stageBefore);
+			} finally {
+				linkSpy.mockRestore();
+				syncSpy.mockRestore();
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		});
+	}
+
+	for (const failure of ["directory sync", "backup cleanup"] as const) {
+		test(`reports the published stage and retained backup after ${failure} fails`, () => {
+			const state = fixture();
+			stageRelease({ cwd: state.root });
+			const before = snapshotFiles(state.stageDir);
+			const parent = join(state.stageDir, "..");
+			const originalSync = durableSync.syncDirectoryDurablyIfSupported;
+			const originalRemove = nodeFs.rmSync;
+			const injected = new Error(`simulated ${failure} EIO`);
+			let triggered = false;
+			const syncSpy = spyOn(
+				durableSync,
+				"syncDirectoryDurablyIfSupported",
+			).mockImplementation((path, options) => {
+				if (
+					failure === "directory sync" &&
+					path === join(state.root, "dist/release")
+				) {
+					triggered = true;
+					throw injected;
+				}
+				return originalSync(path, options);
+			});
+			const removeSpy = spyOn(nodeFs, "rmSync").mockImplementation(
+				(path, options) => {
+					if (
+						failure === "backup cleanup" &&
+						String(path).startsWith(`${state.stageDir}.previous-`)
+					) {
+						triggered = true;
+						throw injected;
+					}
+					return originalRemove(path, options);
+				},
+			);
+			try {
+				let error: unknown;
+				try {
+					stageRelease({ cwd: state.root });
+				} catch (caught) {
+					error = caught;
+				}
+				expect(triggered).toBe(true);
+				const backups = readdirSync(parent).filter((name) =>
+					name.startsWith("afol-linux-x64.previous-"),
+				);
+				expect(backups).toHaveLength(1);
+				expect(snapshotFiles(state.stageDir)).toEqual(before);
+				expect(snapshotFiles(join(parent, backups[0] as string))).toEqual(
+					before,
+				);
+				expect(
+					verifyStagedRelease({ cwd: state.root, stageDir: state.stageDir })
+						.artifactSha256,
+				).toBe(state.artifactHash);
+				expect(error).toBeInstanceOf(Error);
+				expect((error as Error).message).toContain(
+					`release stage was published at ${state.stageDir}`,
+				);
+				expect((error as Error).message).toContain(
+					join(state.root, "dist/release", backups[0] as string),
+				);
+				expect((error as Error).cause).toBe(injected);
+			} finally {
+				syncSpy.mockRestore();
+				removeSpy.mockRestore();
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		});
+	}
+
+	test("rejects duplicate archive destinations before publishing files", () => {
+		const state = fixture();
+		try {
+			stageRelease({ cwd: state.root });
+			const result = spawnSync(
+				process.execPath,
+				[
+					join(import.meta.dir, "../dev/release-archive.ts"),
+					"--stage-dir",
+					state.stageDir,
+					"--stage-dir",
+					state.stageDir,
+				],
+				{ cwd: state.root, encoding: "utf8" },
+			);
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("--stage-dir may only be specified once");
+			expect(readdirSync(join(state.root, "dist/release"))).toEqual([
+				"afol-linux-x64",
+			]);
+		} finally {
+			rmSync(state.root, { recursive: true, force: true });
+		}
+	});
+
 	test("accepts mixed-case reviewed license paths with deterministic sorting", () => {
 		const fixtureState = fixture();
 		try {
@@ -976,6 +1137,9 @@ describe("release staging", () => {
 			const before = snapshotFiles(fixtureState.stageDir);
 			expect(() => stageRelease({ cwd: fixtureState.root })).toThrow(
 				"refusing to replace an unverified release stage",
+			);
+			expect(() => stageRelease({ cwd: fixtureState.root })).toThrow(
+				"missing release stage manifest",
 			);
 			expect(snapshotFiles(fixtureState.stageDir)).toEqual(before);
 			expect(readdirSync(join(fixtureState.stageDir, ".."))).toEqual([

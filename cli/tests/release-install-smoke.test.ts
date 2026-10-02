@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
+import * as nodeFs from "node:fs";
 import {
 	chmodSync,
 	existsSync,
@@ -253,6 +254,38 @@ function archiveFetch(
 const linuxX64 = process.platform === "linux" && process.arch === "x64";
 
 describe("standalone release install smoke", () => {
+	test.skipIf(!linuxX64)(
+		"rejects provenance corrupted during installation before executing the candidate",
+		async () => {
+			const state = fixture();
+			const rootsBefore = ownedSmokeRoots();
+			const originalCopy = nodeFs.copyFileSync;
+			let corrupted = false;
+			const copySpy = spyOn(nodeFs, "copyFileSync").mockImplementation(
+				(source, target, mode) => {
+					originalCopy(source, target, mode);
+					if (source === join(state.stageDir, "provenance.json")) {
+						writeFileSync(target, "corrupted copied provenance\n");
+						corrupted = true;
+					}
+				},
+			);
+			try {
+				await expect(
+					runReleaseInstallSmoke({ cwd: state.root, stageDir: state.stageDir }),
+				).rejects.toThrow(
+					"copied release provenance does not match its verified SHA-256",
+				);
+				expect(corrupted).toBe(true);
+				expect(existsSync(state.markerPath)).toBe(false);
+				expect(ownedSmokeRoots()).toEqual(rootsBefore);
+			} finally {
+				copySpy.mockRestore();
+				rmSync(state.root, { recursive: true, force: true });
+			}
+		},
+	);
+
 	test.skipIf(!linuxX64)(
 		"runs the verified candidate lifecycle and preserves the example project",
 		async () => {
