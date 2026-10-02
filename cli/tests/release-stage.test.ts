@@ -948,6 +948,150 @@ describe("release staging", () => {
 		}
 	});
 
+	test("stages and replaces a release directly under dist", () => {
+		const fixtureState = fixture();
+		try {
+			const options = { cwd: fixtureState.root, stageDir: "dist/candidate" };
+			const first = stageRelease(options);
+			expect(first.stageDir).toBe(join(fixtureState.root, "dist/candidate"));
+			expect(verifyStagedRelease(options).artifactSha256).toBe(
+				fixtureState.artifactHash,
+			);
+			const before = snapshotFiles(first.stageDir);
+			stageRelease(options);
+			expect(snapshotFiles(first.stageDir)).toEqual(before);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves an unrecognized directory at the stage destination", () => {
+		const fixtureState = fixture();
+		try {
+			mkdirSync(fixtureState.stageDir, { recursive: true });
+			writeFileSync(
+				join(fixtureState.stageDir, "notes.txt"),
+				"user-owned bytes\n",
+			);
+			const before = snapshotFiles(fixtureState.stageDir);
+			expect(() => stageRelease({ cwd: fixtureState.root })).toThrow(
+				"refusing to replace an unverified release stage",
+			);
+			expect(snapshotFiles(fixtureState.stageDir)).toEqual(before);
+			expect(readdirSync(join(fixtureState.stageDir, ".."))).toEqual([
+				"afol-linux-x64",
+			]);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	test("preserves a modified prior stage instead of deleting extra files", () => {
+		const fixtureState = fixture();
+		try {
+			stageRelease({ cwd: fixtureState.root });
+			writeFileSync(
+				join(fixtureState.stageDir, "notes.txt"),
+				"user-owned bytes\n",
+			);
+			const before = snapshotFiles(fixtureState.stageDir);
+			expect(() => stageRelease({ cwd: fixtureState.root })).toThrow(
+				"refusing to replace an unverified release stage",
+			);
+			expect(snapshotFiles(fixtureState.stageDir)).toEqual(before);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	test("replaces a verified prior stage with a different source and artifact", () => {
+		const fixtureState = fixture();
+		try {
+			stageRelease({ cwd: fixtureState.root });
+			const artifact = Buffer.from("new deterministic binary\n");
+			const artifactHash = sha256(artifact);
+			const commitSha = "b".repeat(40);
+			writeFileSync(join(fixtureState.root, "dist/afol"), artifact);
+			const provenancePath = join(
+				fixtureState.root,
+				"dist/afol.provenance.json",
+			);
+			const provenance = JSON.parse(readFileSync(provenancePath, "utf8"));
+			writeJson(provenancePath, {
+				...provenance,
+				sha256: artifactHash,
+				size_bytes: artifact.byteLength,
+				commit_sha: commitSha,
+			});
+			const securityPath = join(
+				fixtureState.root,
+				"dist/security-scan.release.json",
+			);
+			const security = JSON.parse(readFileSync(securityPath, "utf8"));
+			writeJson(securityPath, {
+				...security,
+				target: {
+					...security.target,
+					artifact_sha256: artifactHash,
+					commit_sha: commitSha,
+				},
+			});
+			const reviewPath = join(
+				fixtureState.root,
+				"release/compliance/linux-x64/compliance-review.json",
+			);
+			const review = JSON.parse(readFileSync(reviewPath, "utf8"));
+			writeJson(reviewPath, {
+				...review,
+				artifact_sha256: artifactHash,
+				source_commit_sha: commitSha,
+			});
+			const stage = stageRelease({ cwd: fixtureState.root });
+			expect(stage.artifactSha256).toBe(artifactHash);
+			expect(stage.artifactSha256).not.toBe(fixtureState.artifactHash);
+			const verified = verifyStagedRelease({
+				cwd: fixtureState.root,
+				stageDir: stage.stageDir,
+			});
+			expect(verified.provenance.commit_sha).toBe(commitSha);
+		} finally {
+			rmSync(fixtureState.root, { recursive: true, force: true });
+		}
+	});
+
+	for (const stageDir of ["dist/release/candidate", "dist/afol"]) {
+		test(`preserves an existing file at ${stageDir}`, () => {
+			const fixtureState = fixture();
+			try {
+				const target = join(fixtureState.root, stageDir);
+				mkdirSync(join(target, ".."), { recursive: true });
+				if (!existsSync(target)) writeFileSync(target, "user-owned bytes\n");
+				const before = readFileSync(target);
+				expect(() =>
+					stageRelease({ cwd: fixtureState.root, stageDir }),
+				).toThrow("release stage is not a directory");
+				expect(readFileSync(target)).toEqual(before);
+				expect(existsSync(fixtureState.stageDir)).toBe(false);
+			} finally {
+				rmSync(fixtureState.root, { recursive: true, force: true });
+			}
+		});
+	}
+
+	for (const stageDir of ["dist", "outside/candidate"]) {
+		test(`rejects a stage outside strict dist containment: ${stageDir}`, () => {
+			const fixtureState = fixture();
+			try {
+				expect(() =>
+					stageRelease({ cwd: fixtureState.root, stageDir }),
+				).toThrow("release stage must stay inside dist");
+				expect(existsSync(join(fixtureState.root, "outside"))).toBe(false);
+			} finally {
+				rmSync(fixtureState.root, { recursive: true, force: true });
+			}
+		});
+	}
+
 	test.skipIf(process.platform === "win32")(
 		"rejects a staging parent that escapes dist through a symlink",
 		() => {
