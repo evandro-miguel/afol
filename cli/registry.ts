@@ -523,7 +523,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 				usage: 'reverify -S <id> -T <id> -x "<cmd>" [--json]',
 				sideEffect: "append",
 				description:
-					"Run and append observed evidence for a closed terminal task without reopening it",
+					"Run and append observed evidence for a done task in a closed, unarchived session without reopening it",
 			},
 			{
 				usage:

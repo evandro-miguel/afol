@@ -12,6 +12,23 @@ import type {
 
 type JsonObject = Record<string, unknown>;
 
+const CODEX_READER_OPTIONS = {
+	opaquePayloadRecordTypes: new Set(["event_msg", "turn_context"]),
+};
+
+function readProviderJsonl(
+	source: ImportSource,
+	provider: "codex" | "pi",
+	state: JsonlReaderState,
+) {
+	return readJsonl(
+		source.path,
+		state,
+		source.limits,
+		provider === "codex" ? CODEX_READER_OPTIONS : undefined,
+	);
+}
+
 function object(value: unknown): JsonObject | undefined {
 	return value && typeof value === "object" && !Array.isArray(value)
 		? (value as JsonObject)
@@ -34,6 +51,105 @@ function stringValue(value: unknown): string | undefined {
 	if (typeof value !== "string") return undefined;
 	const trimmed = value.trim();
 	return trimmed ? trimmed : undefined;
+}
+
+function directSessionId(raw: JsonObject): string | undefined {
+	const message = object(raw.message);
+	return (
+		stringValue(
+			first(
+				raw,
+				"session_id",
+				"sessionId",
+				"conversation_id",
+				"conversationId",
+			),
+		) ??
+		stringValue(
+			message &&
+				first(
+					message,
+					"session_id",
+					"sessionId",
+					"conversation_id",
+					"conversationId",
+				),
+		)
+	);
+}
+
+function codexRecordView(
+	raw: JsonObject,
+	currentSessionId?: string,
+): { record: JsonObject; currentSessionId: string | undefined } {
+	const recordType = stringValue(raw.type);
+	const payload = object(raw.payload);
+	const payloadType = stringValue(payload?.type);
+	const explicitSessionId = directSessionId(raw);
+	const sessionFromMetadata =
+		recordType === "session_meta" ? stringValue(payload?.id) : undefined;
+	const nextSessionId =
+		recordType === "session_meta"
+			? (sessionFromMetadata ?? explicitSessionId)
+			: currentSessionId;
+	const sessionId =
+		recordType === "session_meta"
+			? (sessionFromMetadata ?? explicitSessionId ?? currentSessionId)
+			: (explicitSessionId ?? currentSessionId);
+	const record: JsonObject = { ...raw };
+	// Correlation is derived from the envelope, never trusted from source metadata.
+	delete record.tool_call_id;
+	if (sessionId) record.session_id = sessionId;
+	if (recordType === "event_msg" || recordType === "turn_context")
+		delete record.payload;
+	if (payload && recordType) {
+		delete record.payload;
+		if (payloadType) record.payload_type = payloadType;
+
+		if (recordType === "response_item") {
+			if (
+				payloadType?.endsWith("_call") ||
+				payloadType?.endsWith("_call_output") ||
+				payloadType === "tool_output"
+			) {
+				const callId = stringValue(payload.call_id);
+				if (callId && Buffer.byteLength(callId, "utf8") <= 256)
+					record.tool_call_id = `TCID-${digestJson(["codex", sessionId ?? null, callId])}`;
+			}
+			if (payloadType === "message") {
+				const message = object(payload.message);
+				const role = stringValue(payload.role) ?? stringValue(message?.role);
+				const content =
+					first(payload, "content", "text") ??
+					(message && first(message, "content", "text", "body")) ??
+					payload.message;
+				if (role) record.role = role;
+				if (content !== undefined) record.content = content;
+			} else if (
+				payloadType?.endsWith("_call_output") ||
+				payloadType === "tool_output"
+			) {
+				const role = stringValue(payload.role) ?? "tool";
+				const content = first(payload, "output", "result", "content", "text");
+				if (role) record.role = role;
+				if (content !== undefined) record.content = content;
+			} else if (
+				payloadType?.endsWith("_call") ||
+				payloadType === "tool_call"
+			) {
+				const role = stringValue(payload.role) ?? "assistant";
+				const name = first(payload, "name", "tool_name", "recipient");
+				const args = first(payload, "arguments", "input", "content", "text");
+				const content = {
+					...(name !== undefined ? { name } : {}),
+					...(args !== undefined ? { arguments: args } : {}),
+				};
+				if (role) record.role = role;
+				if (Object.keys(content).length > 0) record.content = content;
+			}
+		}
+	}
+	return { record, currentSessionId: nextSessionId };
 }
 
 function textValue(value: unknown): string {
@@ -147,6 +263,13 @@ function redactRecord(record: NormalizedRecord): NormalizedRecord {
 			/^[a-f0-9]{7,64}$/i.test(value)
 		)
 			metadata[key] = value;
+		else if (
+			record.provider === "codex" &&
+			key === "tool_call_id" &&
+			typeof value === "string" &&
+			/^TCID-[a-f0-9]{64}$/.test(value)
+		)
+			metadata[key] = value;
 	}
 	const role = ["assistant", "developer", "system", "tool", "user"].includes(
 		record.role ?? "",
@@ -190,9 +313,15 @@ async function detect(
 	let seen = 0;
 	let hasConversationMarker = false;
 	let hasMessageShape = false;
-	for await (const entry of readJsonl(source.path, state, source.limits)) {
+	let currentSessionId: string | undefined;
+	for await (const entry of readProviderJsonl(source, provider, state)) {
 		seen += 1;
-		const raw = entry.value;
+		const adapted =
+			provider === "codex"
+				? codexRecordView(entry.value, currentSessionId)
+				: { record: entry.value, currentSessionId };
+		currentSessionId = adapted.currentSessionId;
+		const raw = adapted.record;
 		if (
 			first(
 				raw,
@@ -227,13 +356,19 @@ async function preview(
 	const state: JsonlReaderState = { bytes: 0, lines: 0, contentDigest: "" };
 	const sessions = new Set<string>();
 	let records = 0;
-	for await (const entry of readJsonl(source.path, state, source.limits)) {
+	let currentSessionId: string | undefined;
+	for await (const entry of readProviderJsonl(source, provider, state)) {
 		records += 1;
+		const adapted =
+			provider === "codex"
+				? codexRecordView(entry.value, currentSessionId)
+				: { record: entry.value, currentSessionId };
+		currentSessionId = adapted.currentSessionId;
 		const record = normalizedRecord(
 			provider,
 			"jsonl-v1",
 			entry.line,
-			entry.value,
+			adapted.record,
 		);
 		if (record.sessionId) sessions.add(record.sessionId);
 	}
@@ -273,8 +408,20 @@ function adapter(provider: "codex" | "pi"): ImportAdapter {
 				lines: 0,
 				contentDigest: "",
 			};
-			for await (const entry of readJsonl(source.path, state, source.limits))
-				yield normalizedRecord(provider, "jsonl-v1", entry.line, entry.value);
+			let currentSessionId: string | undefined;
+			for await (const entry of readProviderJsonl(source, provider, state)) {
+				const adapted =
+					provider === "codex"
+						? codexRecordView(entry.value, currentSessionId)
+						: { record: entry.value, currentSessionId };
+				currentSessionId = adapted.currentSessionId;
+				yield normalizedRecord(
+					provider,
+					"jsonl-v1",
+					entry.line,
+					adapted.record,
+				);
+			}
 		},
 	};
 }

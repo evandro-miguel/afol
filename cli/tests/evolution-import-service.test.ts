@@ -105,6 +105,111 @@ describe.skipIf(process.platform === "win32")("external import service", () => {
 		}
 	});
 
+	test("groups modern Codex envelope records under the session metadata id", async () => {
+		const { root, source } = fixture();
+		const sessionId = "synthetic-codex-session";
+		writeFileSync(
+			source,
+			`${[
+				{
+					timestamp: "2026-10-20T12:00:00.000Z",
+					type: "session_meta",
+					payload: {
+						id: sessionId,
+						cwd: "/synthetic/private/project",
+					},
+				},
+				{
+					timestamp: "2026-10-20T12:00:01.000Z",
+					type: "response_item",
+					payload: {
+						type: "message",
+						role: "user",
+						content: [{ type: "input_text", text: "synthetic question" }],
+					},
+				},
+				{
+					timestamp: "2026-10-20T12:00:02.000Z",
+					type: "response_item",
+					payload: {
+						type: "message",
+						role: "assistant",
+						content: [{ type: "output_text", text: "synthetic answer" }],
+					},
+				},
+			]
+				.map((record) => JSON.stringify(record))
+				.join("\n")}\n`,
+		);
+		try {
+			const preview = await previewExternalImport(root, "codex", {
+				provider: "codex",
+				path: source,
+				projectId: PROJECT_ID,
+			});
+
+			expect(preview).toMatchObject({ records: 3, sessions: 1 });
+			expect(preview.sessionRecords).toHaveLength(1);
+			expect(preview.sessionRecords[0]).toMatchObject({ record_count: 3 });
+			expect(JSON.stringify(preview)).not.toContain(
+				"/synthetic/private/project",
+			);
+			expect(JSON.stringify(preview)).not.toContain("synthetic answer");
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("persists pseudonymous Codex tool correlations with out-of-order results", async () => {
+		const { root, source } = fixture();
+		const rows = [
+			{ type: "session_meta", payload: { id: "synthetic-tool-session" } },
+			...["private-call-a", "private-call-b"].map((call_id) => ({
+				type: "response_item",
+				payload: {
+					type: "function_call",
+					name: "same_tool",
+					arguments: "{}",
+					call_id,
+				},
+			})),
+			...["private-call-b", "private-call-a"].map((call_id) => ({
+				type: "response_item",
+				payload: {
+					type: "function_call_output",
+					output: "same result",
+					call_id,
+				},
+			})),
+		];
+		writeFileSync(source, rows.map((row) => JSON.stringify(row)).join("\n"));
+		try {
+			const result = await confirmExternalImport({
+				root,
+				provider: "codex",
+				source: { provider: "codex", path: source, projectId: PROJECT_ID },
+				projectId: PROJECT_ID,
+			});
+			const serialized = readFileSync(
+				join(result.artifactPath, "segments.jsonl"),
+				"utf8",
+			);
+			const segments = serialized
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
+			const ids = segments.map((segment) => segment.metadata.tool_call_id);
+			expect(ids[1]).toMatch(/^TCID-[a-f0-9]{64}$/);
+			expect(ids[2]).toMatch(/^TCID-[a-f0-9]{64}$/);
+			expect(ids[1]).not.toBe(ids[2]);
+			expect(ids[3]).toBe(ids[2]);
+			expect(ids[4]).toBe(ids[1]);
+			expect(serialized.includes("private-call-")).toBe(false);
+		} finally {
+			removeEvolutionTestRoot(root);
+		}
+	});
+
 	test("counts the synthesized unscoped session in preview and manifest", async () => {
 		const { root, source } = fixture();
 		writeFileSync(

@@ -55,6 +55,257 @@ describe("external import core", () => {
 		expect(pi.contentDigest).toMatch(/^[a-f0-9]{64}$/);
 	});
 
+	test("normalizes modern Codex envelopes and bounded context events", async () => {
+		const root = await tempRoot();
+		const path = join(root, "modern-codex.jsonl");
+		const sessionId = "synthetic-codex-session";
+		const widePayload = (prefix: string, count: number) =>
+			Object.fromEntries(
+				Array.from({ length: count }, (_, index) => [
+					`${prefix}_${index}`,
+					"synthetic context",
+				]),
+			);
+		const sourceRecords = [
+			{
+				timestamp: "2026-10-20T12:00:00.000Z",
+				type: "session_meta",
+				payload: {
+					id: sessionId,
+					cwd: "/synthetic/private/project",
+					model_provider: "synthetic",
+				},
+			},
+			{
+				timestamp: "2026-10-20T12:00:01.000Z",
+				type: "turn_context",
+				payload: widePayload("turn_context_field", 1748),
+			},
+			{
+				timestamp: "2026-10-20T12:00:02.000Z",
+				type: "event_msg",
+				payload: { type: "task_started", ...widePayload("event_field", 884) },
+			},
+			{
+				timestamp: "2026-10-20T12:00:03.000Z",
+				type: "response_item",
+				payload: {
+					type: "message",
+					role: "user",
+					content: [{ type: "input_text", text: "synthetic question" }],
+				},
+			},
+			{
+				timestamp: "2026-10-20T12:00:04.000Z",
+				type: "response_item",
+				payload: {
+					type: "function_call",
+					name: "synthetic_tool",
+					arguments: '{"query":"synthetic request"}',
+					call_id: "synthetic-call-1",
+				},
+			},
+			{
+				timestamp: "2026-10-20T12:00:05.000Z",
+				type: "response_item",
+				payload: {
+					type: "function_call_output",
+					output: "synthetic tool result",
+					call_id: "synthetic-call-1",
+				},
+			},
+		];
+		await writeFile(
+			path,
+			`${sourceRecords.map((record) => JSON.stringify(record)).join("\n")}\n`,
+		);
+
+		const detection = await codexAdapter.detect({ provider: "codex", path });
+		const preview = await codexAdapter.preview({ provider: "codex", path });
+		const records = [];
+		for await (const record of codexAdapter.normalize({
+			provider: "codex",
+			path,
+		}))
+			records.push(record);
+
+		expect(detection.confidence).toBeGreaterThanOrEqual(0.5);
+		expect(preview).toMatchObject({
+			records: 6,
+			sessions: 1,
+			redaction: "before-return",
+		});
+		expect(records.map((record) => record.kind)).toEqual([
+			"event",
+			"event",
+			"event",
+			"message",
+			"message",
+			"message",
+		]);
+		expect(records.map((record) => record.sessionId)).toEqual(
+			Array(6).fill(sessionId),
+		);
+		expect(records[3]).toMatchObject({
+			role: "user",
+			text: "synthetic question",
+		});
+		expect(records[4]).toMatchObject({ role: "assistant" });
+		expect(records[4]?.text).toContain("synthetic_tool");
+		expect(records[5]).toMatchObject({
+			role: "tool",
+			text: "synthetic tool result",
+		});
+		const serialized = JSON.stringify(records);
+		expect(serialized).not.toContain("/synthetic/private/project");
+		expect(serialized).not.toContain("turn_context_field_0");
+		expect(serialized).not.toContain("event_field_0");
+	});
+
+	test("correlates Codex tool results out of order without exposing call ids", async () => {
+		const root = await tempRoot();
+		const path = join(root, "tool-correlation.jsonl");
+		const rows = ["session-a", "session-b"].flatMap((id) => [
+			{ type: "session_meta", payload: { id } },
+			...["raw-call-a", "raw-call-b"].map((call_id) => ({
+				type: "response_item",
+				payload: {
+					type: "function_call",
+					name: "same_tool",
+					arguments: "{}",
+					call_id,
+				},
+			})),
+			...["raw-call-b", "raw-call-a"].map((call_id) => ({
+				type: "response_item",
+				payload: {
+					type: "function_call_output",
+					output: "same result",
+					call_id,
+				},
+			})),
+		]);
+		await writeFile(path, rows.map((row) => JSON.stringify(row)).join("\n"));
+		const records = [];
+		for await (const record of codexAdapter.normalize({
+			provider: "codex",
+			path,
+		}))
+			records.push(record);
+		const redacted = records.map((record) => codexAdapter.redact(record));
+		for (const view of [records, redacted]) {
+			const ids = view.map((record) => record.metadata.tool_call_id);
+			expect(ids[1]).toMatch(/^TCID-[a-f0-9]{64}$/);
+			expect(ids[2]).toMatch(/^TCID-[a-f0-9]{64}$/);
+			expect(ids[1]).not.toBe(ids[2]);
+			expect(ids[3]).toBe(ids[2]);
+			expect(ids[4]).toBe(ids[1]);
+			expect(ids[6]).not.toBe(ids[1]);
+			expect(ids[8]).toBe(ids[7]);
+			expect(ids[9]).toBe(ids[6]);
+			expect(JSON.stringify(view).includes("raw-call-")).toBe(false);
+		}
+		expect(redacted[1]?.metadata.tool_call_id).toBe(
+			records[1]?.metadata.tool_call_id,
+		);
+	});
+
+	test("omits invalid and unrelated Codex tool correlation identifiers", async () => {
+		const root = await tempRoot();
+		const path = join(root, "invalid-tool-correlation.jsonl");
+		const rows = [undefined, null, "", 42, {}, "x".repeat(257)].map(
+			(call_id) => ({
+				type: "response_item",
+				tool_call_id: `TCID-${"a".repeat(64)}`,
+				payload: {
+					type: "function_call",
+					name: "tool",
+					arguments: "{}",
+					call_id,
+				},
+			}),
+		);
+		await writeFile(path, rows.map((row) => JSON.stringify(row)).join("\n"));
+		for await (const record of codexAdapter.normalize({
+			provider: "codex",
+			path,
+		})) {
+			expect(record.metadata).not.toHaveProperty("tool_call_id");
+			expect(codexAdapter.redact(record).metadata).not.toHaveProperty(
+				"tool_call_id",
+			);
+		}
+	});
+
+	test("drops opaque Codex payloads regardless of their JSON shape", async () => {
+		const root = await tempRoot();
+		const path = join(root, "opaque-payload-shapes.jsonl");
+		const shapes = [
+			Array.from({ length: 300 }, () => ({ marker: "opaque-shape-canary" })),
+			"opaque-shape-canary",
+			null,
+		];
+		const rows = ["event_msg", "turn_context"].flatMap((type) =>
+			shapes.map((payload) => ({ type, payload })),
+		);
+		await writeFile(path, rows.map((row) => JSON.stringify(row)).join("\n"));
+		const records = [];
+		for await (const record of codexAdapter.normalize({
+			provider: "codex",
+			path,
+		}))
+			records.push(record);
+		expect(records).toHaveLength(6);
+		expect(records.every((record) => record.kind === "event")).toBe(true);
+		expect(JSON.stringify(records).includes("opaque-shape-canary")).toBe(false);
+		for (const record of records)
+			expect(record.metadata).not.toHaveProperty("payload");
+	});
+
+	test("keeps response-item payloads under the existing field limit", async () => {
+		const root = await tempRoot();
+		const path = join(root, "oversized-response-item.jsonl");
+		const payload = Object.fromEntries(
+			Array.from({ length: 300 }, (_, index) => [`field_${index}`, "value"]),
+		);
+		await writeFile(
+			path,
+			`${JSON.stringify({
+				type: "response_item",
+				payload: {
+					type: "message",
+					role: "user",
+					content: "bounded",
+					...payload,
+				},
+			})}\n`,
+		);
+
+		await expect(
+			codexAdapter.preview({ provider: "codex", path }),
+		).rejects.toThrow(/field count/);
+	});
+
+	test("keeps opaque Codex context payloads under the existing depth limit", async () => {
+		const root = await tempRoot();
+		const path = join(root, "deep-context.jsonl");
+		await writeFile(
+			path,
+			`${JSON.stringify({
+				type: "turn_context",
+				payload: { context: { nested: { value: "bounded" } } },
+			})}\n`,
+		);
+
+		await expect(
+			codexAdapter.preview({
+				provider: "codex",
+				path,
+				limits: { maxDepth: 1 },
+			}),
+		).rejects.toThrow(/depth/);
+	});
+
 	test("preview and record digests are deterministic", async () => {
 		const root = await tempRoot();
 		const path = join(root, "stable.jsonl");

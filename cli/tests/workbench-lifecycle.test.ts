@@ -7814,7 +7814,39 @@ describe("durable lifecycle auxiliary failures", () => {
 					result: "passed",
 					exitCode: 0,
 				}),
-			).toThrow("not closed");
+			).toThrow(
+				`Session ${created.session} is not closed; reverify requires the target task to be done and the session to be closed and unarchived.`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("refuses reverification when a closed session task is not done", () => {
+		const root = mkRoot("closed-reverify-moved-task");
+		try {
+			const created = newWorkstream(root, "closed reverify moved task", {
+				noSpecRequiredReason: "fixture",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "moved",
+			});
+			closeSession(root, created.session);
+
+			expect(isSessionClosed(root, created.session)).toBe(true);
+			expect(() =>
+				recordClosedTaskReverification(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result: "passed",
+					exitCode: 0,
+				}),
+			).toThrow(
+				"Task T-01 is moved; reverify requires the target task state to be done.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -661,7 +661,7 @@
         {
           "usage": "reverify -S <id> -T <id> -x \"<cmd>\" [--json]",
           "side_effect": "append",
-          "description": "Run and append observed evidence for a closed terminal task without reopening it"
+          "description": "Run and append observed evidence for a done task in a closed, unarchived session without reopening it"
         },
         {
           "usage": "transition-admit -S <id> -T <id> --policy no-op-evidence-v1 --issue <url> --approval \"<text>\" [--dry-run|--confirm] [--json]",

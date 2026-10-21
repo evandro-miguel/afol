@@ -1742,7 +1742,7 @@ export function assertClosedTaskReverificationEligible(
 	}
 	if (!isSessionClosed(root, input.session)) {
 		throw new Error(
-			`Session ${input.session} is not closed; reverify is only for closed tasks.`,
+			`Session ${input.session} is not closed; reverify requires the target task to be done and the session to be closed and unarchived.`,
 		);
 	}
 	if (readArchivedSessionState(root, input.session).archived) {
@@ -1754,7 +1754,7 @@ export function assertClosedTaskReverificationEligible(
 	const task = ensureTaskExists(paths.taskPath, input.session, input.taskId);
 	if (task.state !== "done") {
 		throw new Error(
-			`Task ${input.taskId} is ${task.state}; reverify only accepts closed done tasks.`,
+			`Task ${input.taskId} is ${task.state}; reverify requires the target task state to be done.`,
 		);
 	}
 }

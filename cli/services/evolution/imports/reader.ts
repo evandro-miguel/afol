@@ -19,6 +19,11 @@ type FileIdentity = {
 	nlink: number;
 };
 
+export type JsonlReaderOptions = {
+	/** Payloads with these top-level record types are opaque to normalization. */
+	opaquePayloadRecordTypes?: ReadonlySet<string>;
+};
+
 function mergedLimits(limits?: Partial<ImportLimits>): ImportLimits {
 	return { ...DEFAULT_IMPORT_LIMITS, ...limits };
 }
@@ -52,22 +57,46 @@ function checkShape(
 	limits: ImportLimits,
 	depth = 0,
 	fieldCount = { value: 0 },
+	opaquePayloadRecordTypes?: ReadonlySet<string>,
+	exemptFieldCount = false,
 ): void {
 	if (depth > limits.maxDepth)
 		throw new Error("import record exceeds maximum object depth");
 	if (Array.isArray(value)) {
-		for (const item of value) checkShape(item, limits, depth + 1, fieldCount);
+		for (const item of value)
+			checkShape(
+				item,
+				limits,
+				depth + 1,
+				fieldCount,
+				opaquePayloadRecordTypes,
+				exemptFieldCount,
+			);
 		return;
 	}
 	if (value && typeof value === "object") {
 		const entries = Object.entries(value);
-		fieldCount.value += entries.length;
+		if (!exemptFieldCount) fieldCount.value += entries.length;
 		if (fieldCount.value > limits.maxFields)
 			throw new Error("import record exceeds maximum field count");
+		const recordType =
+			depth === 0 && typeof (value as Record<string, unknown>).type === "string"
+				? ((value as Record<string, unknown>).type as string)
+				: undefined;
 		for (const [key, item] of entries) {
 			if (Buffer.byteLength(key, "utf8") > limits.maxLineBytes)
 				throw new Error("import field name is too large");
-			checkShape(item, limits, depth + 1, fieldCount);
+			checkShape(
+				item,
+				limits,
+				depth + 1,
+				fieldCount,
+				opaquePayloadRecordTypes,
+				exemptFieldCount ||
+					(key === "payload" &&
+						recordType !== undefined &&
+						opaquePayloadRecordTypes?.has(recordType) === true),
+			);
 		}
 	}
 }
@@ -76,6 +105,7 @@ export async function* readJsonl(
 	path: string,
 	state: JsonlReaderState,
 	limitsInput?: Partial<ImportLimits>,
+	options: JsonlReaderOptions = {},
 ): AsyncGenerator<{ line: number; value: Record<string, unknown> }> {
 	const isWindowsDrivePath = /^[A-Za-z]:[\\/]/.test(path);
 	if (
@@ -151,7 +181,13 @@ export async function* readJsonl(
 						throw new Error(
 							`JSONL record at line ${state.lines} must be an object`,
 						);
-					checkShape(value, limits);
+					checkShape(
+						value,
+						limits,
+						0,
+						{ value: 0 },
+						options.opaquePayloadRecordTypes,
+					);
 					yield { line: state.lines, value: value as Record<string, unknown> };
 				}
 				newline = carry.indexOf("\n");
@@ -174,7 +210,13 @@ export async function* readJsonl(
 				throw new Error(
 					`JSONL record at line ${state.lines} must be an object`,
 				);
-			checkShape(value, limits);
+			checkShape(
+				value,
+				limits,
+				0,
+				{ value: 0 },
+				options.opaquePayloadRecordTypes,
+			);
 			yield { line: state.lines, value: value as Record<string, unknown> };
 		}
 		state.contentDigest = digest.digest("hex");

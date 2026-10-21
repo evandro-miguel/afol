@@ -164,6 +164,11 @@ describe("help formatter", () => {
 		expect(unknown).toBeNull();
 	});
 
+	test("evidence reverify help states its closed-session and done-task requirements", () => {
+		const help = formatCommandHelp("evidence", kernelRegistry);
+		expect(help).toContain("done task in a closed, unarchived session");
+	});
+
 	test("evolve help describes read-only evaluation and exact context revocation", () => {
 		const help = formatCommandHelp("evolve", kernelRegistry);
 		expect(help).toContain(
