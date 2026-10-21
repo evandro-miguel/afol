@@ -283,40 +283,36 @@ describe("F-32 hot-path benchmark runner", () => {
 		}
 	});
 
-	test.each([
-		"status",
-		"start",
-		"done",
-		"close",
-	] as const)("default %s records no derived work or telemetry", (operation) => {
-		const result = runScenario({ operation, mode: "default" });
-		expect(result.passed).toBe(true);
-		expect(result.metrics.derived_work_calls).toBe(0);
-		expect(result.metrics.telemetry_append_count).toBe(0);
-		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
-		expect(result.profile.execution_mode).toBe("source");
-		expect(result.profile.artifact_mode).toBe("source");
-		expect(result.profile.artifact_sha256).toBe("source");
-		if (operation !== "status") {
-			expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
-		}
-	});
+	test.each(["status", "start", "done", "close"] as const)(
+		"default %s records no derived work or telemetry",
+		(operation) => {
+			const result = runScenario({ operation, mode: "default" });
+			expect(result.passed).toBe(true);
+			expect(result.metrics.derived_work_calls).toBe(0);
+			expect(result.metrics.telemetry_append_count).toBe(0);
+			expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+			expect(result.profile.execution_mode).toBe("source");
+			expect(result.profile.artifact_mode).toBe("source");
+			expect(result.profile.artifact_sha256).toBe("source");
+			if (operation !== "status") {
+				expect(result.metrics.canonical_write_count).toBeGreaterThan(0);
+			}
+		},
+	);
 
-	test.each([
-		"status",
-		"start",
-		"done",
-		"close",
-	] as const)("explicit-derived %s reports derived work", (operation) => {
-		const derived_path = operation === "status" ? "health" : "rebuild";
-		const result = runScenario({
-			operation,
-			mode: "explicit-derived",
-			derived_path,
-		});
-		expect(result.passed).toBe(true);
-		expect(result.metrics.derived_work_calls).toBeGreaterThan(0);
-		expect(result.metrics.telemetry_append_count).toBe(0);
-		expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
-	});
+	test.each(["status", "start", "done", "close"] as const)(
+		"explicit-derived %s reports derived work",
+		(operation) => {
+			const derived_path = operation === "status" ? "health" : "rebuild";
+			const result = runScenario({
+				operation,
+				mode: "explicit-derived",
+				derived_path,
+			});
+			expect(result.passed).toBe(true);
+			expect(result.metrics.derived_work_calls).toBeGreaterThan(0);
+			expect(result.metrics.telemetry_append_count).toBe(0);
+			expect(result.metrics.instrumented_duration_ms).toBeGreaterThan(0);
+		},
+	);
 });
