@@ -161,7 +161,12 @@ export function parseEventStream(
 				: typeof event.id === "string"
 					? event.id
 					: null;
-		const key = id === null ? null : `${event.type}:${id}`;
+		// Progress snapshots reuse an item ID as its payload changes. Only the
+		// terminal receipts below contribute token and tool measurements.
+		const key =
+			id === null || event.type === "item.updated"
+				? null
+				: `${event.type}:${id}`;
 		if (key) {
 			const encoded = JSON.stringify(event);
 			const previous = seen.get(key);

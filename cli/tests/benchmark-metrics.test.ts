@@ -109,6 +109,35 @@ describe("benchmark observed metrics", () => {
 		expect(result.tokens.total).toBe(120);
 	});
 
+	test("accepts successive progress snapshots for one item without corrupting terminal receipts", () => {
+		const result = parseEventStream(
+			events(
+				{
+					type: "item.updated",
+					item: {
+						id: "todo1",
+						type: "todo_list",
+						items: [{ text: "Work", completed: false }],
+					},
+				},
+				{
+					type: "item.updated",
+					item: {
+						id: "todo1",
+						type: "todo_list",
+						items: [{ text: "Work", completed: true }],
+					},
+				},
+				command("tool1"),
+				turn("t1", { input_tokens: 100, output_tokens: 20 }),
+			),
+		);
+		expect(result.issues).not.toContain("conflicting-event-id");
+		expect(result.tokens.total).toBe(120);
+		expect(result.tools.total_calls).toBe(1);
+		expect(result.tools.error_count).toBe(0);
+	});
+
 	test("keeps messages outside tool totals and includes MCP and file edits", () => {
 		const result = parseEventStream(
 			events(
