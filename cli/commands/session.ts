@@ -14,6 +14,7 @@ import {
 } from "../core/operation-context";
 import { atomicWriteText } from "../services/io/atomic";
 import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
+import { collectSessionIds } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
 	archiveSessions as archiveWorkbenchSessions,
@@ -38,6 +39,11 @@ import {
 	withSessionContextLock,
 } from "../services/workbench/session-context";
 import { type CommandIo, DEFAULT_IO } from "./io";
+import {
+	ARCHIVE_CANDIDATE_PAGE_LIMIT,
+	type ParsedSessionArgs as ParsedArgs,
+	parseSessionArgs as parseArgs,
+} from "./session-args";
 
 type ActionResult = {
 	data: Record<string, unknown>;
@@ -124,25 +130,8 @@ const RADAR_TEXT_WARNING_LIMIT = 3;
 const RADAR_JSON_TASK_LIMIT = 25;
 const RADAR_JSON_WARNING_LIMIT = 10;
 const RADAR_JSON_SESSION_LIMIT = 20;
-const ARCHIVE_CANDIDATE_PAGE_LIMIT = 10;
 
 let radarReaderOverride: CoordinationRadarReader | null = null;
-
-type ParsedArgs = {
-	json: boolean;
-	dryRun: boolean;
-	debug: boolean;
-	strict: boolean;
-	branch: string | null;
-	actor: string | null;
-	reason: string | null;
-	olderThanDays: number;
-	candidates: boolean;
-	archiveOffset: number;
-	archiveLimit: number;
-	session: string | null;
-	positional: string[];
-};
 
 function severityWeight(value: string): number {
 	if (value === "critical") {
@@ -335,130 +324,6 @@ function currentGitWorktree(root: string): string | null {
 	return worktree.length > 0 ? worktree : null;
 }
 
-function parseArgs(args: string[]): ParsedArgs {
-	let json = false;
-	let dryRun = false;
-	let debug = false;
-	let strict = false;
-	let branch: string | null = null;
-	let actor: string | null = null;
-	let reason: string | null = null;
-	let olderThanDays = 90;
-	let candidates = false;
-	let archiveOffset = 0;
-	let archiveLimit = ARCHIVE_CANDIDATE_PAGE_LIMIT;
-	let session: string | null = null;
-	const positional: string[] = [];
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
-		if (!arg) {
-			continue;
-		}
-		if (arg === "--json" || arg === "-j") {
-			json = true;
-			continue;
-		}
-		if (arg === "--dry-run") {
-			dryRun = true;
-			continue;
-		}
-		if (arg === "--debug") {
-			debug = true;
-			continue;
-		}
-		if (arg === "--strict") {
-			strict = true;
-			continue;
-		}
-		if (arg === "--session") {
-			const value = args[index + 1];
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --session in session.");
-			}
-			session = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--branch") {
-			const value = args[index + 1];
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --branch in session.");
-			}
-			branch = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--actor") {
-			const value = args[index + 1];
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --actor in session.");
-			}
-			actor = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--reason") {
-			const value = args[index + 1];
-			if (!value || value.startsWith("-")) {
-				throw new Error("Missing value for --reason in session.");
-			}
-			reason = value;
-			index += 1;
-			continue;
-		}
-		if (arg === "--older-than-days") {
-			const value = args[index + 1];
-			const parsed = value === undefined ? Number.NaN : Number(value);
-			if (!Number.isFinite(parsed) || parsed < 0) {
-				throw new Error("--older-than-days must be a non-negative number.");
-			}
-			olderThanDays = parsed;
-			index += 1;
-			continue;
-		}
-		if (arg === "--candidates") {
-			candidates = true;
-			continue;
-		}
-		if (arg === "--offset") {
-			const value = args[index + 1];
-			const parsed = value === undefined ? Number.NaN : Number(value);
-			if (!Number.isInteger(parsed) || parsed < 0) {
-				throw new Error("--offset must be a non-negative integer.");
-			}
-			archiveOffset = parsed;
-			index += 1;
-			continue;
-		}
-		if (arg === "--limit") {
-			const value = args[index + 1];
-			const parsed = value === undefined ? Number.NaN : Number(value);
-			if (!Number.isInteger(parsed) || parsed <= 0) {
-				throw new Error("--limit must be a positive integer.");
-			}
-			archiveLimit = parsed;
-			index += 1;
-			continue;
-		}
-		positional.push(arg);
-	}
-	return {
-		json,
-		dryRun,
-		debug,
-		strict,
-		branch,
-		actor,
-		reason,
-		olderThanDays,
-		candidates,
-		archiveOffset,
-		archiveLimit,
-		session,
-		positional,
-	};
-}
-
 function emit(
 	result: ActionResult,
 	action: string,
@@ -519,6 +384,33 @@ function displayWorktreePath(
 	return relative(projectRoot, worktree).replace(/\\/g, "/") || ".";
 }
 
+const OPEN_SESSION_LIST_LIMIT = 5;
+
+/**
+ * Open means the canonical task file still has an open lifecycle; historical
+ * closed and corrupt directories must not count.
+ */
+export function collectOpenWorkbenchSessions(projectRoot: string): string[] {
+	return collectSessionIds(projectRoot).filter((session) => {
+		try {
+			return sessionLifecycleState(projectRoot, session) === "open";
+		} catch {
+			return false;
+		}
+	});
+}
+
+function formatOpenSessionsLine(sessions: string[]): string | null {
+	if (sessions.length === 0) {
+		return null;
+	}
+	const visible = sessions.slice(0, OPEN_SESSION_LIST_LIMIT).join(", ");
+	const omitted = sessions.length - OPEN_SESSION_LIST_LIMIT;
+	return omitted > 0
+		? `  open sessions: ${visible} (omitted=${omitted})`
+		: `  open sessions: ${visible}`;
+}
+
 function listSessions(projectRoot: string, debug: boolean): ActionResult {
 	const currentBranch = currentGitBranch(projectRoot);
 	const currentWorktree = currentGitWorktree(projectRoot);
@@ -564,6 +456,8 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			(currentWorktree !== null && binding.worktree === currentWorktree),
 		is_global_active: globalActiveSession === binding.session,
 	}));
+	const openSessions = collectOpenWorkbenchSessions(projectRoot);
+	const openSessionsLine = formatOpenSessionsLine(openSessions);
 	return {
 		data: {
 			current_branch: currentBranch,
@@ -579,6 +473,11 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			effective_session: effective?.session ?? null,
 			effective_source: effective?.source ?? null,
 			context_file_state: contextFileState,
+			open_sessions: openSessions.slice(0, OPEN_SESSION_LIST_LIMIT),
+			open_sessions_omitted: Math.max(
+				0,
+				openSessions.length - OPEN_SESSION_LIST_LIMIT,
+			),
 			bindings,
 		},
 		lines: [
@@ -588,6 +487,7 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 			`  global active: ${globalActiveSession ?? "(none)"}${globalActiveState && globalActiveState !== "open" ? ` (ignored: ${globalActiveState})` : ""}`,
 			`  context session: ${contextSession ?? "(none)"}${contextSessionState && contextSessionState !== "open" ? ` (ignored: ${contextSessionState})` : ""}`,
 			`  effective session: ${effective ? `${effective.session} (${effective.source})` : "(none)"}`,
+			...(openSessionsLine ? [openSessionsLine] : []),
 			...(contextFileState === "corrupt"
 				? [
 						"  context file: corrupt (bindings unavailable; switch repairs it, and new repairs it in a Git context)",

@@ -704,8 +704,7 @@ function replayObservationProjection(
 ): void {
 	validateObservationProductionDays(db, projectId, events);
 	applyMigrations(db);
-	db.exec("BEGIN IMMEDIATE");
-	try {
+	db.transaction(() => {
 		db.query("DELETE FROM recurrence_decisions WHERE project_id = ?").run(
 			projectId,
 		);
@@ -714,13 +713,7 @@ function replayObservationProjection(
 		for (const event of events) insertEvent(db, event, thresholds);
 		if (events.length > 0) writeProjectionWatermark(db, "observation", path);
 		else clearProjectionWatermark(db, "observation");
-		db.exec("COMMIT");
-	} catch (error) {
-		try {
-			db.exec("ROLLBACK");
-		} catch {}
-		throw error;
-	}
+	}).immediate();
 }
 
 function appendUnlocked(input: AppendObservationJournalInput): {

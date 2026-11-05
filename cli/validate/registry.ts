@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import { boundedSpawn } from "../core/subprocess";
 import { BUILTIN_ASSET_FILES } from "../generated/builtin-assets";
 import { kernelRegistry } from "../registry";
+import { parseAcceptanceContract } from "../services/benchmark/acceptance";
 import {
 	asNumberRecord,
 	asOptionalNumber,
@@ -253,6 +254,9 @@ function parseScenario(
 		execution_source: executionSource,
 	};
 	const hotPath = parseHotPathScenario(data, sourcePath);
+	if (data.acceptance !== undefined) {
+		scenario.acceptance = parseAcceptanceContract(data.acceptance);
+	}
 	if (hotPath !== undefined) {
 		scenario.runner = "hot-path";
 		scenario.hot_path = hotPath;
@@ -345,6 +349,10 @@ function parseScenario(
 			measurementRaw.source_repository,
 			`${sourcePath}.measurement.source_repository`,
 		);
+		const sourceRootCommit = asOptionalString(
+			measurementRaw.source_root_commit,
+			`${sourcePath}.measurement.source_root_commit`,
+		);
 		const timestamp = asOptionalString(
 			measurementRaw.timestamp,
 			`${sourcePath}.measurement.timestamp`,
@@ -356,6 +364,9 @@ function parseScenario(
 		if (gitCommit !== undefined) measurement.git_commit = gitCommit;
 		if (sourceRepository !== undefined) {
 			measurement.source_repository = sourceRepository;
+		}
+		if (sourceRootCommit !== undefined) {
+			measurement.source_root_commit = sourceRootCommit;
 		}
 		if (timestamp !== undefined) measurement.timestamp = timestamp;
 		scenario.measurement = measurement;
@@ -435,6 +446,10 @@ function parseBaseline(
 		data.source_repository,
 		`${sourcePath}.source_repository`,
 	);
+	const sourceRootCommit = asOptionalString(
+		data.source_root_commit,
+		`${sourcePath}.source_root_commit`,
+	);
 	const timestamp = asOptionalString(data.timestamp, `${sourcePath}.timestamp`);
 	const provenance = asOptionalString(
 		data.provenance,
@@ -445,6 +460,9 @@ function parseBaseline(
 	if (gitCommit !== undefined) baseline.git_commit = gitCommit;
 	if (sourceRepository !== undefined) {
 		baseline.source_repository = sourceRepository;
+	}
+	if (sourceRootCommit !== undefined) {
+		baseline.source_root_commit = sourceRootCommit;
 	}
 	if (timestamp !== undefined) baseline.timestamp = timestamp;
 	if (provenance !== undefined) baseline.provenance = provenance;
@@ -1364,6 +1382,35 @@ export function readGitRepositoryId(projectRoot: string): string | undefined {
 	return remote.ok ? normalizeGitRepositoryId(remote.stdout) : undefined;
 }
 
+// A repository URL can be reused after a public export replaces its history.
+// External history is a historical reference, not locally verified evidence.
+function readSourceHistoryScope(
+	projectRoot: string,
+	rootCommit: string | undefined,
+): "local" | "external" | "invalid" | "unknown" {
+	if (rootCommit === undefined) return "local";
+	if (!/^[a-f0-9]{40}$/i.test(rootCommit)) return "invalid";
+	const roots = runBoundedGit(projectRoot, [
+		"rev-list",
+		"--max-parents=0",
+		"HEAD",
+	]);
+	if (!roots.ok) return "unknown";
+	if (roots.stdout.trim().split(/\r?\n/).includes(rootCommit)) return "local";
+	if (readGitProvenance(projectRoot, rootCommit).exists) {
+		const parents = runBoundedGit(projectRoot, [
+			"rev-list",
+			"--parents",
+			"-n",
+			"1",
+			rootCommit,
+		]);
+		if (!parents.ok) return "unknown";
+		if (parents.stdout.trim() !== rootCommit) return "invalid";
+	}
+	return "external";
+}
+
 function validateTimestamp(
 	value: string | undefined,
 	label: string,
@@ -1488,6 +1535,19 @@ export function validateBenchmarkProvenance(
 	) {
 		issues.push(`benchmark-provenance-mismatch:${prefix}:source_repository`);
 	}
+	if (measurement.source_root_commit !== baseline.source_root_commit) {
+		issues.push(`benchmark-provenance-mismatch:${prefix}:source_root_commit`);
+	}
+	for (const [label, rootCommit] of [
+		["measurement", measurement.source_root_commit],
+		["baseline", baseline.source_root_commit],
+	] as const) {
+		if (rootCommit !== undefined && !/^[a-f0-9]{40}$/i.test(rootCommit)) {
+			issues.push(
+				`benchmark-provenance-source-root-invalid:${prefix}:${label}`,
+			);
+		}
+	}
 	if (baseline.provenance === undefined) {
 		issues.push(`benchmark-provenance-missing:${prefix}:baseline.provenance`);
 	} else if (
@@ -1564,11 +1624,25 @@ export function validateBenchmarkProvenance(
 			readGitRepositoryId(projectRoot) === normalizedMeasurementRepository
 		) {
 			git = readGitProvenance(projectRoot, commit);
-			if (!git.exists) {
+			const historyScope = readSourceHistoryScope(
+				projectRoot,
+				baseline.source_root_commit,
+			);
+			if (historyScope === "invalid") {
+				issues.push(
+					`benchmark-provenance-source-root-invalid:${prefix}:baseline`,
+				);
+			}
+			if (git.ancestor && historyScope === "external") {
+				issues.push(
+					`benchmark-provenance-mismatch:${prefix}:source_root_commit`,
+				);
+			}
+			if (!git.exists && historyScope !== "external") {
 				issues.push(
 					`benchmark-provenance-commit-not-found:${prefix}:${commit}`,
 				);
-			} else if (!git.ancestor) {
+			} else if (git.exists && !git.ancestor) {
 				issues.push(
 					`benchmark-provenance-commit-not-ancestor:${prefix}:${commit}`,
 				);
@@ -1619,6 +1693,7 @@ const PENDING_BASELINE_OBSERVED_FIELDS = [
 	"warmup_count",
 	"git_commit",
 	"source_repository",
+	"source_root_commit",
 	"timestamp",
 	"provenance",
 	"host_profile_id",
@@ -1737,9 +1812,21 @@ export function validateMutationBaselineContract(
 		}
 		const git = readGitProvenance(projectRoot, baseline.git_commit);
 		const localRepository = readGitRepositoryId(projectRoot);
+		const historyScope = readSourceHistoryScope(
+			projectRoot,
+			baseline.source_root_commit,
+		);
+		if (historyScope === "invalid") {
+			issues.push("mutation-baseline-source-root-invalid");
+		}
+		if (git.ancestor && historyScope === "external") {
+			issues.push("mutation-baseline-source-root-mismatch");
+		}
 		if (
 			!git.exists &&
-			(sourceRepository === undefined || localRepository === sourceRepository)
+			(sourceRepository === undefined ||
+				localRepository === sourceRepository) &&
+			(historyScope !== "external" || sourceRepository === undefined)
 		) {
 			issues.push("mutation-baseline-git-commit-not-found");
 		} else if (!git.ancestor) {
@@ -1857,7 +1944,11 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 					`scenario-schema-version-mismatch:${packId}:${scenario.scenario_id}:${scenario.schema_version}`,
 				);
 			}
-			if (scenario.result_schema !== BENCHMARK_RESULT_SCHEMA_VERSION) {
+			const resultSchema =
+				packId === "runtime-live-agent"
+					? "2.0.0"
+					: BENCHMARK_RESULT_SCHEMA_VERSION;
+			if (scenario.result_schema !== resultSchema) {
 				issues.push(
 					`scenario-schema-mismatch:${packId}:${scenario.scenario_id}`,
 				);

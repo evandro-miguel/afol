@@ -95,7 +95,6 @@ describe("workbench State Board task mutations", () => {
 			}
 		},
 	);
-
 	test("keeps legacy headingless task tables when a fenced example contains a State Board heading", () => {
 		const root = mkRoot("legacy-fenced-heading");
 		try {

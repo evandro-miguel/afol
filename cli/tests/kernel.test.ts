@@ -381,8 +381,21 @@ describe("kernel front-door", () => {
 				["resolveValidateInvocation", "runValidationCommand"],
 			],
 		] as const;
+		const dispatchSource = readFileSync(
+			join(process.cwd(), "cli/dispatch.ts"),
+			"utf8",
+		);
+		const directDispatchSource = readFileSync(
+			join(process.cwd(), "cli/direct-dispatch.ts"),
+			"utf8",
+		);
+		for (const handlerSource of [dispatchSource, directDispatchSource]) {
+			expect(handlerSource).not.toMatch(
+				/import\s+(?!type\b)[^;]*\bfrom\s+["']\.\/commands\//,
+			);
+		}
 		const lazyModules = [
-			...source.matchAll(
+			...`${source}\n${dispatchSource}\n${directDispatchSource}`.matchAll(
 				/await import\(\s*"(\.\/(?:commands\/[^"]+|validate\/command))"\s*\)/g,
 			),
 		].map((match) => match[1]);
@@ -407,14 +420,31 @@ describe("kernel front-door", () => {
 			const lines = (proc.stdout as string).trim().split("\n");
 			expect(lines.length).toBeLessThanOrEqual(71);
 			expect(proc.stdout as string).toContain("Usage: afol");
-			expect(proc.stdout as string).toContain("Commands");
-			expect(proc.stdout as string).toContain("s/status");
 			expect(proc.stdout as string).toContain(
-				"s/status[read] - project status",
+				"Agent fast path (active session)",
 			);
-			expect(proc.stdout as string).toContain("v/validate");
-			expect(proc.stdout as string).toContain("n/new");
-			expect(proc.stdout as string).toContain("bench");
+			expect(proc.stdout as string).toContain(
+				'afol qt <theme> -t "<task>" -c "<check>"',
+			);
+			expect(proc.stdout as string).toContain(
+				'afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+			);
+			for (const name of [
+				"s/status",
+				"n/new",
+				"qt/quick-task",
+				"st/start",
+				"d/done",
+				"c/close",
+				"v/validate",
+			]) {
+				expect(proc.stdout as string).toContain(name);
+			}
+			expect(proc.stdout as string).toContain(
+				"Full catalog: afol help --for execution|planning|maintenance",
+			);
+			expect(proc.stdout as string).not.toContain("Commands");
+			expect(proc.stdout as string).not.toContain("bench");
 			expect(proc.stdout as string).toContain("help --verbose|<command>");
 			expect(proc.stdout as string).toContain("a=afol");
 		} finally {
@@ -1797,7 +1827,7 @@ describe("kernel front-door", () => {
 			]) {
 				const proc = runKernel(root, args);
 				expect(proc.status).toBe(0);
-				expect(proc.stdout as string).toContain("Usage: afol verify-tasks");
+				expect(proc.stdout as string).toContain("Command: verify-tasks");
 				expect(proc.stdout as string).not.toContain("LEGACY:");
 			}
 		} finally {
@@ -1871,6 +1901,7 @@ describe("kernel front-door", () => {
 					const proc = runKernel(root, [command, flag]);
 					expect(proc.status).toBe(0);
 					expect(proc.stdout as string).toContain(expected);
+					expect(proc.stdout as string).toContain(`Command: ${command}`);
 					expect(proc.stderr as string).toBe("");
 					expect(proc.stdout as string).not.toContain("task started:");
 					expect(proc.stdout as string).not.toContain("session closed:");
@@ -1882,6 +1913,7 @@ describe("kernel front-door", () => {
 				"Usage: afol close [--session <session-id>]",
 			);
 			expect(closeHelp.stdout as string).toContain("Command: close");
+			expect(closeHelp.stdout as string).toContain("-m|--summary <text>");
 			expect(closeHelp.stdout as string).toContain("--allow-no-report");
 			expect(closeHelp.stdout as string).toContain("--reason <text>");
 			expect(closeHelp.stdout as string).toContain("--json");

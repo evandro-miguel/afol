@@ -191,6 +191,14 @@ export async function runNewCommand(
 				`session created: ${created.session}`,
 				`status: ${creationStatus}`,
 				`governance_status: ${governance.governanceStatus}`,
+				formatHintLine(
+					nextCommandHint(
+						"new",
+						envSession && envSession !== created.session
+							? { session: created.session }
+							: {},
+					),
+				),
 			];
 			lines.push(...created.warnings.map((warning) => `warning: ${warning}`));
 			if (governance.pendingSpec) {
@@ -259,14 +267,23 @@ export async function runStartCommand(
 			parsed.taskIds.length === 1
 				? `task started: ${parsed.taskId}`
 				: `tasks started: ${parsed.taskIds.length} (${formatTaskSelection(parsed.taskIds)})`;
+		const nextHint = formatHintLine(
+			nextCommandHint("start", {
+				taskId: formatTaskSelection(parsed.taskIds),
+				...(args.includes("--session") ? { session: parsed.session } : {}),
+			}),
+		);
 		const nextCommand = nextCommandHint("start", { taskId: parsed.taskId });
 		if (parsed.compact && !parsed.brief && !parsed.json) {
 			const lines = [
 				startedLabel,
+				nextHint,
 				...warnings.map((warning) => `warning: ${warning}`),
 			];
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
-			lines.push(formatHintLine(nextCommand));
+			if (parsed.taskIds.length === 1) {
+				lines.push(formatHintLine(nextCommand));
+			}
 			console.log(lines.join("\n"));
 			return 0;
 		}
@@ -274,10 +291,13 @@ export async function runStartCommand(
 			if (!parsed.json) {
 				const lines = [
 					startedLabel,
+					nextHint,
 					...warnings.map((warning) => `warning: ${warning}`),
 				];
 				appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
-				lines.push(formatHintLine(nextCommand));
+				if (parsed.taskIds.length === 1) {
+					lines.push(formatHintLine(nextCommand));
+				}
 				console.log(lines.join("\n"));
 			}
 			if (parsed.json) {
@@ -426,7 +446,7 @@ function requiredEvidenceOption(
 	return value;
 }
 
-export async function runEvidenceReverifyCommand(
+async function runEvidenceReverifyCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
@@ -500,7 +520,7 @@ export async function runEvidenceReverifyCommand(
 	}
 }
 
-export async function runEvidenceTransitionAdmitCommand(
+async function runEvidenceTransitionAdmitCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
@@ -743,7 +763,7 @@ function parseEvidenceAdmitArgs(
 	};
 }
 
-export async function runEvidenceAdmitCommand(
+async function runEvidenceAdmitCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
@@ -1465,7 +1485,6 @@ async function runDoneBatch(
 						`tasks done: ${parsed.taskIds.length} (${formatTaskSelection(parsed.taskIds)})`,
 						`authorizing evidence: ${evidenceIds.length}`,
 						...warnings.map((warning) => `warning: ${warning}`),
-						formatHintLine(nextCommand),
 					].join("\n"),
 				);
 			}

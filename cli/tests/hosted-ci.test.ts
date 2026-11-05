@@ -74,7 +74,7 @@ describe("hosted CI contract", () => {
 			"push",
 		]);
 		expect(workflow.on?.pull_request).toBeNull();
-		expect(workflow.on?.push?.branches).toEqual(["main"]);
+		expect(workflow.on?.push?.branches).toEqual(["main_dev", "main"]);
 		expect(workflow.permissions).toEqual({ contents: "read" });
 		expect(workflow.concurrency).toEqual({
 			"cancel-in-progress": true,
@@ -155,7 +155,10 @@ describe("hosted CI contract", () => {
 			"bun run smoke:example",
 		]);
 		expect(jobs["deep-validation"]?.if).toBe(
-			"(github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main')",
+			[
+				"$",
+				"{{ (github.event_name == 'pull_request' && (github.base_ref == 'main_dev' || github.base_ref == 'main')) || (github.event_name == 'push' && (github.ref == 'refs/heads/main_dev' || github.ref == 'refs/heads/main')) }}",
+			].join(""),
 		);
 		expect(jobs["deep-validation"]?.needs).toEqual([
 			"quality",

@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches:
+      - main_dev
       - main
 
 permissions:
@@ -85,7 +86,7 @@ jobs:
 
   deep-validation:
     name: deep-validation
-    if: (github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: ${{ (github.event_name == 'pull_request' && (github.base_ref == 'main_dev' || github.base_ref == 'main')) || (github.event_name == 'push' && (github.ref == 'refs/heads/main_dev' || github.ref == 'refs/heads/main')) }}
     needs:
       - quality
       - tests

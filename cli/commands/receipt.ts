@@ -35,6 +35,10 @@ export async function runReceiptCommand(
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
 	try {
+		if (!action)
+			throw new Error(
+				"Missing receipt action. Usage: afol receipt ingest --file <receipt.json>; afol help receipt",
+			);
 		if (action !== "ingest")
 			throw new Error(`Unknown receipt action: ${action}`);
 		const file = parseIngestArgs(args);

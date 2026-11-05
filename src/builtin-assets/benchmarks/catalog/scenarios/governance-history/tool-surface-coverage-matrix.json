@@ -109,15 +109,14 @@
 			"skill list [--json] [--verbose]",
 			"skill show <name> [--json]",
 			"skill search <query> [--json]",
-			"close [-m|--summary <text>]",
-			"close --session <session-id> [-m|--summary <text>]",
+			"close [--session <session-id>] [-m|--summary <text>]",
 			"close --allow-no-report --reason <text>",
 			"close --carry-open --reason <text>",
 			"close --admit-legacy-baseline",
 			"close --json",
 			"file append|patch --path <path> --dry-run",
 			"file append|patch --path <path>",
-			"file mv|move --from <path> --to <path>",
+			"file mv|move --path <path> --to <path>",
 			"file ar|archive --path <path>",
 			"file ud|undo --mutation-id <id>",
 			"update check",
@@ -243,7 +242,8 @@
 			"evolve proposal evaluate <proposal-id> --version <sha256> [--json]",
 			"evolve proposal evaluate <proposal-id> --version <sha256> --record [--json]",
 			"evolve proposal revoke <proposal-id> --version <sha256> --reason <text> [--json]",
-			"done -- <argv...>"
+			"done -- <argv...>",
+			"ctx bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]"
 		],
 		"journeys": [
 			"afol-command-user-flow-matrix",

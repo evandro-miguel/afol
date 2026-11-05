@@ -398,7 +398,7 @@ describe("evolution analysis previews", () => {
 						{ stdout: (value) => output.push(value), stderr: () => {} },
 						operationContext,
 					),
-				).toBe(0);
+				).toBe(1);
 				payloads.push(JSON.parse(output[0] ?? "{}").data);
 			}
 			const firstPayload = payloads[0];
@@ -1109,9 +1109,10 @@ describe("evolution analysis previews", () => {
 					{ stdout: (value) => output.push(value), stderr: () => {} },
 					agentOperationContext(),
 				);
-				expect(exitCode).toBe(0);
+				expect(exitCode).toBe(1);
 				const data = JSON.parse(output[0] ?? "{}").data;
 				expect(data.mode).toBe(mode);
+				expect(data.status).toBe("blocked");
 				expect(JSON.stringify(data).length).toBeLessThan(4_000);
 			}
 			expect(existsSync(join(root, ".afol", "state", "evolution.db"))).toBe(
@@ -1134,7 +1135,7 @@ describe("evolution analysis previews", () => {
 				{ stdout: (value) => output.push(value), stderr: () => {} },
 				agentOperationContext(),
 			);
-			expect(exitCode).toBe(0);
+			expect(exitCode).toBe(1);
 			const payload = JSON.parse(output[0] ?? "{}");
 			expect(payload.data.status).toBe("blocked");
 			expect(payload.data.recovery_action).toBe("afol evolve status --json");

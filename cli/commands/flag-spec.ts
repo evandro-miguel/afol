@@ -31,6 +31,10 @@ export type FlagDef<S> =
 			key?: Extract<keyof S, string>;
 			/** Treat a value starting with "-" as missing. */
 			rejectDashValue?: boolean;
+			/** Preserve parsers that treat an empty string as a supplied value. */
+			allowEmptyValue?: boolean;
+			/** Override the missing-value error for domain-specific validation. */
+			missingValueError?: string;
 			/** Runs after the missing-value gate, before storing. May throw. */
 			validate?: (state: S, raw: string) => void;
 			/** Overrides default storing for value kinds. */
@@ -114,11 +118,18 @@ export function parseFlagSpec<S extends object>(
 			return state;
 		}
 		const raw = args[index + 1];
-		if (!raw || (def.rejectDashValue === true && raw.startsWith("-"))) {
+		if (
+			raw === undefined ||
+			(raw === "" && def.allowEmptyValue !== true) ||
+			(def.rejectDashValue === true && raw.startsWith("-"))
+		) {
 			const name = def.useMatchedNameInError
 				? arg
 				: (def.errorName ?? def.names[0]);
-			throw new Error(`Missing value for ${name} in ${program.context}.`);
+			throw new Error(
+				def.missingValueError ??
+					`Missing value for ${name} in ${program.context}.`,
+			);
 		}
 		index += 1;
 		def.validate?.(state, raw);

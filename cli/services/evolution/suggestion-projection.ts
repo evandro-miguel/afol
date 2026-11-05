@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { digestJson as digest } from "./imports/digest";
 import {
 	OBSERVATION_FINGERPRINT_VERSION,
 	type ObservationRecord,
@@ -15,20 +15,6 @@ import type { SuggestionReceipt } from "./suggestion-receipt";
 export const MAX_ACTIVE_CLUSTERS = 256;
 export const MAX_OBSERVATIONS_PER_CLUSTER = 8;
 export const MAX_FEEDBACK_RECEIPTS_PER_STATUS = 32;
-
-function stableJson(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-			.join(",")}}`;
-	return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
-}
 
 function parseRefs(value: unknown): Array<Record<string, string>> {
 	try {

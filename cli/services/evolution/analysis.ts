@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { readProjectConfig } from "../project/paths";
 import { recurrenceThresholdsFromSettings } from "./config";
@@ -10,6 +9,7 @@ import {
 	openEvolutionDbSnapshot,
 } from "./db";
 import { checkEvolutionDbHealth, type EvolutionDbHealth } from "./health";
+import { digestJson as digest, stableJson } from "./imports/digest";
 import { productionDayJournalPath } from "./journal";
 import { observationJournalPath } from "./observation-journal";
 import {
@@ -185,20 +185,6 @@ export type EvolutionAnalysis = {
 	legacy_cluster_count: number;
 	digest: string;
 };
-
-function stableJson(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-			.join(",")}}`;
-	return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
-}
 
 function number(value: unknown, fallback = 0): number {
 	return typeof value === "number" && Number.isFinite(value) ? value : fallback;

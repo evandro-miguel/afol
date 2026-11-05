@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
 import {
 	chmodSync,
 	mkdirSync,
@@ -1527,6 +1528,11 @@ describe("local-state project indexer", () => {
 			writeFileSync(join(root, "ignored.txt"), "ignored", "utf8");
 			mkdirSync(join(root, "ignored-dir"), { recursive: true });
 			writeFileSync(join(root, "ignored-dir", "nested.txt"), "ignored", "utf8");
+			writeFileSync(
+				join(root, "ignored-dir", "tracked.txt"),
+				"tracked",
+				"utf8",
+			);
 			writeFileSync(join(root, "tracked.txt"), "tracked", "utf8");
 			writeFileSync(join(root, "tracked-ignored.txt"), "tracked", "utf8");
 
@@ -1538,15 +1544,53 @@ describe("local-state project indexer", () => {
 				spawnSync("git", ["add", "-f", "tracked-ignored.txt"], { cwd: root })
 					.status,
 			).toBe(0);
+			expect(
+				spawnSync("git", ["add", "-f", "ignored-dir/tracked.txt"], {
+					cwd: root,
+				}).status,
+			).toBe(0);
 
 			const snapshot = rebuildFilesIndex(root);
 			const paths = snapshot.files.map((entry) => entry.path);
 			expect(paths).toContain("tracked.txt");
 			expect(paths).toContain("tracked-ignored.txt");
+			expect(paths).toContain("ignored-dir/tracked.txt");
 			expect(paths).toContain("a.txt");
 			expect(paths).not.toContain("ignored.txt");
 			expect(paths).not.toContain("ignored-dir/nested.txt");
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index prunes ignored directories before attempting an unreadable traversal", () => {
+		const root = buildFixture();
+		const blocked = join(root, "ignored-runtime");
+		const readdir = fs.readdirSync;
+		let blockedReads = 0;
+		let readSpy: ReturnType<typeof spyOn> | undefined;
+		try {
+			writeFileSync(join(root, ".gitignore"), "ignored-runtime/\n", "utf8");
+			mkdirSync(blocked);
+			writeFileSync(join(root, "kept.txt"), "safe source", "utf8");
+			expect(spawnSync("git", ["init", "-q"], { cwd: root }).status).toBe(0);
+			readSpy = spyOn(fs, "readdirSync").mockImplementation(((
+				...args: Parameters<typeof readdir>
+			) => {
+				if (String(args[0]) === blocked) {
+					blockedReads += 1;
+					throw Object.assign(new Error("Fixture permission denied"), {
+						code: "EACCES",
+					});
+				}
+				return Reflect.apply(readdir, fs, args);
+			}) as typeof readdir);
+			const snapshot = rebuildFilesIndex(root);
+			expect(snapshot.files.map((entry) => entry.path)).toContain("kept.txt");
+			expect(validateFilesIndex(root).ok).toBe(true);
+			expect(blockedReads).toBe(0);
+		} finally {
+			readSpy?.mockRestore();
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

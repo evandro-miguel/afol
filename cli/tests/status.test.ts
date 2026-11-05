@@ -302,6 +302,38 @@ function createNoSessionFixture(): string {
 	return root;
 }
 
+const QT_START_ACTION = 'afol qt <theme> -t "<task>" -c "<cmd>"';
+
+function createOpenSession(root: string, session: string): void {
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		["---", "task_id: T-01", "status: in_progress", "---", ""].join("\n"),
+		"utf8",
+	);
+}
+
+function createClosedSession(root: string, session: string): void {
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		[
+			"---",
+			'doc_type: "workbench_task"',
+			`id: "${session}_task_01"`,
+			`session_id: "${session}"`,
+			'status: "closed"',
+			'created_at: "2026-09-01T09:00:00.000Z"',
+			'updated_at: "2026-09-02T09:00:00.000Z"',
+			'closed_at: "2026-09-02T09:00:00.000Z"',
+			"---",
+		].join("\n"),
+		"utf8",
+	);
+}
+
 describe("status command", () => {
 	test("prints compact STATUS block with required fields", () => {
 		const root = createFixture();
@@ -338,6 +370,181 @@ describe("status command", () => {
 			expect(runStatusCommand(root, [], captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("SESSIONS: 0");
 			expect(healthCalls).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("no-session status hints quick-task when no open sessions exist", () => {
+		const root = createNoSessionFixture();
+		try {
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			const text = captured.stdout[0] ?? "";
+			expect(text.split("\n")).toContain(
+				`SAFE_NEXT_ACTION: ${QT_START_ACTION}`,
+			);
+			expect(text).not.toContain("afol ss");
+
+			const json = captureIo();
+			expect(runStatusCommand(root, ["--json"], json.io)).toBe(0);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				data?: {
+					safe_next_action?: string;
+					open_sessions?: string[];
+					open_sessions_omitted?: number;
+				};
+			};
+			expect(payload.data?.safe_next_action).toBe(QT_START_ACTION);
+			expect(payload.data?.open_sessions).toBeUndefined();
+			expect(payload.data?.open_sessions_omitted).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("no-session status hints switch when exactly one open session exists", () => {
+		const root = createNoSessionFixture();
+		const session = "260921_1000_one-open-session";
+		try {
+			createOpenSession(root, session);
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			const text = captured.stdout[0] ?? "";
+			const lines = text.split("\n");
+			expect(lines).toContain(`SAFE_NEXT_ACTION: afol ss switch ${session}`);
+			expect(text).not.toContain("afol ss list");
+			expect(lines.filter((line) => line.startsWith("OPEN_SESSIONS:"))).toEqual(
+				[],
+			);
+
+			const json = captureIo();
+			expect(runStatusCommand(root, ["--json"], json.io)).toBe(0);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				data?: { safe_next_action?: string };
+			};
+			expect(payload.data?.safe_next_action).toBe(`afol ss switch ${session}`);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("no-session status caps open session ids and points at the session list", () => {
+		const root = createNoSessionFixture();
+		const sessions = [
+			"260921_1001_open-a",
+			"260921_1002_open-b",
+			"260921_1003_open-c",
+			"260921_1004_open-d",
+			"260921_1005_open-e",
+			"260921_1006_open-f",
+			"260921_1007_open-g",
+		];
+		try {
+			for (const session of sessions) {
+				createOpenSession(root, session);
+			}
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			const text = captured.stdout[0] ?? "";
+			const lines = text.split("\n");
+			expect(lines).toContain(
+				`OPEN_SESSIONS: ${sessions.slice(0, 5).join(", ")} (omitted=2)`,
+			);
+			expect(text).not.toContain(sessions[5]);
+			expect(lines).toContain("SAFE_NEXT_ACTION: afol ss list");
+			expect(text).not.toContain("afol ss switch");
+
+			const json = captureIo();
+			expect(runStatusCommand(root, ["--json"], json.io)).toBe(0);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				data?: {
+					safe_next_action?: string;
+					open_sessions?: string[];
+					open_sessions_omitted?: number;
+				};
+			};
+			expect(payload.data?.safe_next_action).toBe("afol ss list");
+			expect(payload.data?.open_sessions).toEqual(sessions.slice(0, 5));
+			expect(payload.data?.open_sessions_omitted).toBe(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closed sessions do not redirect the no-session start hint", () => {
+		const root = createNoSessionFixture();
+		try {
+			createClosedSession(root, "260901_0900_closed-hist");
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			expect(captured.stdout[0]?.split("\n")).toContain(
+				`SAFE_NEXT_ACTION: ${QT_START_ACTION}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("compact fields cap at five entries with an omitted count", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const entries = (label: string, count: number): string[] =>
+				Array.from(
+					{ length: count },
+					(_value, index) => `- ${label}-${index + 1}`,
+				);
+			writeFileSync(
+				join(root, ".afol", "wb", sessionId, `${sessionId}_task_01.md`),
+				[
+					"---",
+					"task_id: T-01",
+					"status: in_progress",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					...entries("file", 7),
+					"VALIDATION_OR_CHECKS:",
+					...entries("check", 6),
+					"BLOCKERS:",
+					...entries("blocker", 8),
+					"NEXT:",
+					...entries("next", 9),
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			const text = captured.stdout[0] ?? "";
+			const lines = text.split("\n");
+			expect(lines).toContain("- omitted=2");
+			expect(lines).toContain("- omitted=1");
+			expect(lines).toContain("- omitted=3");
+			expect(lines).toContain("- omitted=4");
+			expect(lines).toContain("- file-5");
+			expect(text).not.toContain("- file-6");
+			expect(text).not.toContain("- next-9");
+
+			const json = captureIo();
+			expect(runStatusCommand(root, ["--json"], json.io)).toBe(0);
+			const payload = JSON.parse(json.stdout[0] ?? "{}") as {
+				data?: Record<string, unknown>;
+			};
+			const data = payload.data ?? {};
+			expect(data.files_written).toEqual([
+				"file-1",
+				"file-2",
+				"file-3",
+				"file-4",
+				"file-5",
+			]);
+			expect(data.files_written_omitted).toBe(2);
+			expect(data.validation_or_checks_omitted).toBe(1);
+			expect(data.blockers_omitted).toBe(3);
+			expect(data.next_omitted).toBe(4);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

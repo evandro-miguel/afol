@@ -31,6 +31,14 @@ selecting another session or when binding is ambiguous.
 Pass the session explicitly or run `afol catchup --fix` after inspecting the
 reported binding issue.
 
+## Evolution analysis is blocked
+
+`afol evolve` compact analysis returns exit 1 when evolution input state is
+unavailable. Use `afol evolve status --json` to distinguish invalid canonical
+journal or evidence from a missing derived database. Do not rebuild the
+database to repair source data; see
+[Evolution journal recovery](evolution-journal-recovery.md).
+
 ## Evolution projection needs repair
 
 When `afol evolve status --json` reports `rebuild_required` and the canonical
@@ -42,8 +50,9 @@ afol evolve repair --json
 ```
 
 A non-interactive caller exits 2 with `approval-required`. The refusal is
-intentional. Run that command in a trusted local terminal. Change the evolution
-database and the canonical journal only through this command.
+intentional. Run that command in a trusted local terminal. Repair rebuilds the
+derived projection from a valid canonical journal; it does not repair invalid
+source evidence or rewrite the canonical journal.
 
 After the command exits 0, verify the projection:
 

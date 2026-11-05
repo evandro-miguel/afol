@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { digestJson as digest, stableJson } from "./imports/digest";
 
 export const OBSERVATION_FINGERPRINT_VERSION = 2;
 export const RECURRENCE_MINIMUM_OCCURRENCES = 3;
@@ -163,20 +163,6 @@ function redact(value: unknown): string {
 
 function normalizePath(value: unknown): string {
 	return redact(value).replaceAll("\\", "/");
-}
-
-function stableJson(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-	if (value && typeof value === "object")
-		return `{${Object.entries(value as Record<string, unknown>)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-			.join(",")}}`;
-	return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-	return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
 function boundedText(value: string, field: string): string {

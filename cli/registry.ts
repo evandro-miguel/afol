@@ -248,7 +248,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		description: "Start a workbench task",
 		category: "workflow",
 		guidance: [
-			"Prefer: afol st T-01 when an active or bound session resolves.",
+			"Fast path: afol st T-01 (active/bound session); use -S only for an explicit session.",
 			"Task selectors accept comma lists and ascending ranges.",
 		],
 		subcommands: [
@@ -641,18 +641,15 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 		sideEffect: "write",
 		description: "Close the active session",
 		category: "workflow",
-		guidance: ["Prefer: afol c when an active or bound session resolves."],
+		guidance: [
+			"Fast path: afol c. Omit --session when an active/bound session resolves.",
+		],
 		subcommands: [
 			{
-				usage: "[-m|--summary <text>]",
+				usage: "[--session <session-id>] [-m|--summary <text>]",
 				sideEffect: "write",
 				description:
-					"Close the active or bound session after its tasks are complete",
-			},
-			{
-				usage: "--session <session-id> [-m|--summary <text>]",
-				sideEffect: "write",
-				description: "Close a specific session after its tasks are complete",
+					"Close the active or bound session, or a specific session, after tasks are complete",
 			},
 			{
 				usage: "--allow-no-report --reason <text>",
@@ -716,7 +713,7 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 				description: "Append text with backup and mutation journal",
 			},
 			{
-				usage: "mv|move --from <path> --to <path>",
+				usage: "mv|move --path <path> --to <path>",
 				sideEffect: "write",
 				description: "Move file with backup and mutation journal",
 			},
@@ -992,8 +989,14 @@ const COMMAND_SPECS: readonly CommandSpecInput[] = Object.freeze([
 			{
 				usage: "bundle --persist-rule-injection",
 				sideEffect: "generated",
+				description: "Record delivery diagnostics; local approval required",
+			},
+			{
+				usage:
+					"bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
+				sideEffect: "read",
 				description:
-					"Persist first-use rule injection state with local approval",
+					"Acknowledge base_digest for this consumer; reset epoch after context loss",
 			},
 			{
 				usage: "section --ref <ref>",

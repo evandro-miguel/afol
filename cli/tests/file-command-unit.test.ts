@@ -171,6 +171,21 @@ function createActiveMutationTask(
 }
 
 describe("file args", () => {
+	test("file move help documents the parser-supported source flag", () => {
+		const result = spawnSync(
+			process.execPath,
+			[join(process.cwd(), "cli", "main.ts"), "file", "--help"],
+			{ cwd: process.cwd(), encoding: "utf8" },
+		);
+
+		expect(result.status).toBe(0);
+		expect(result.stdout).toContain("mv|move --path <path> --to <path>");
+		expect(result.stdout).not.toContain("--from");
+		expect(
+			parseMoveArgs(["--path", "source.txt", "--to", "target.txt"]),
+		).toMatchObject({ path: "source.txt", destinationPath: "target.txt" });
+	});
+
 	test("parsePatchArgs preserves explicit path and append text", () => {
 		const parsed = parsePatchArgs([
 			"--path",

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { symlinkTestSupport } from "../../../tests/symlink-test-support";
 import { codexAdapter, piAdapter } from "./adapters.ts";
+import { digestJson, stableJson } from "./digest.ts";
 import { type JsonlReaderState, readJsonl } from "./reader.ts";
 import { redactImported } from "./redaction.ts";
 
@@ -77,6 +78,20 @@ describe("external import core", () => {
 		}))
 			secondRecords.push(record);
 		expect(firstRecords[0]?.recordDigest).toBe(secondRecords[0]?.recordDigest);
+	});
+
+	test("stable digest preserves canonical bytes and undefined behavior", () => {
+		const value = { z: undefined, a: { b: 2, a: 1 }, list: [undefined, null] };
+		const serialized = stableJson(value);
+
+		expect(serialized).toBe('{"a":{"a":1,"b":2},"list":[,null],"z":undefined}');
+		expect(Buffer.from(serialized, "utf8").toString("hex")).toBe(
+			"7b2261223a7b2261223a312c2262223a327d2c226c697374223a5b2c6e756c6c5d2c227a223a756e646566696e65647d",
+		);
+		expect(digestJson(value)).toBe(
+			"5c36598833f3272dca0b1d21e32732f660b84ce967f8be874d6bf8f4be3d931a",
+		);
+		expect(stableJson(undefined)).toBeUndefined();
 	});
 
 	test.skipIf(process.platform !== "win32")(
