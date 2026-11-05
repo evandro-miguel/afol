@@ -81,6 +81,7 @@ export type RuleSelectionContext = {
 
 export type RuleInjectionResult = {
 	identity: string;
+	base_digest: string | null;
 	state_path: string;
 	first_use: boolean;
 	injected: RuleInjectionPayload[];
@@ -101,6 +102,9 @@ export type ResolveRuleInjectionOptions = {
 	scope?: string;
 	workType?: string;
 	filePath?: string;
+	consumer?: string;
+	contextEpoch?: string;
+	acknowledgedRules?: string;
 };
 
 export class RuleInjectionError extends Error {
@@ -278,6 +282,8 @@ function buildIdentity(options: {
 	role: string;
 	surface: string;
 	filePath: string | null;
+	consumer?: string;
+	contextEpoch?: string;
 }): string {
 	const parts = [
 		`session:${normalizeSessionOrTask(options.session)}`,
@@ -287,6 +293,9 @@ function buildIdentity(options: {
 	];
 	if (options.filePath) {
 		parts.push(`file:${options.filePath}`);
+	}
+	if (options.consumer && options.contextEpoch) {
+		parts.push(`consumer:${options.consumer}`, `epoch:${options.contextEpoch}`);
 	}
 	return parts.join("|");
 }
@@ -310,15 +319,6 @@ function readRuleContent(projectRoot: string, path: string): string | null {
 
 function contentFingerprint(content: string): string {
 	return createHash("sha256").update(content).digest("hex");
-}
-
-function usedCharsForIdentity(
-	identityState: RuleInjectionIdentityState | undefined,
-): number {
-	return Object.values(identityState?.rules ?? {}).reduce(
-		(total, record) => total + record.char_count,
-		0,
-	);
 }
 
 function matchingInjectableRules(
@@ -359,6 +359,29 @@ function injectionMetadata(
 	session: string;
 	task: string;
 } {
+	if (Boolean(options.consumer) !== Boolean(options.contextEpoch)) {
+		throw new RuleInjectionError(
+			"--consumer and --context-epoch must be supplied together.",
+		);
+	}
+	for (const value of [options.consumer, options.contextEpoch]) {
+		if (
+			value !== undefined &&
+			!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value)
+		) {
+			throw new RuleInjectionError(
+				"Consumer and context epoch must be 1-128 identifier characters.",
+			);
+		}
+	}
+	if (
+		options.acknowledgedRules &&
+		(!options.consumer || !/^[a-f0-9]{64}$/.test(options.acknowledgedRules))
+	) {
+		throw new RuleInjectionError(
+			"--ack-rules requires a SHA-256 base digest, --consumer and --context-epoch.",
+		);
+	}
 	const context = deriveRuleSelectionContext(options);
 	const resolverConfig = getRuleResolverConfig(projectRoot);
 	const { relative } = statePath(projectRoot);
@@ -375,6 +398,8 @@ function injectionMetadata(
 		filePath: context.filePath,
 		...(session !== "none" ? { session } : {}),
 		...(task !== "none" ? { task } : {}),
+		...(options.consumer ? { consumer: options.consumer } : {}),
+		...(options.contextEpoch ? { contextEpoch: options.contextEpoch } : {}),
 	});
 	return {
 		context,
@@ -395,6 +420,7 @@ export function resolveRuleInjectionShape(
 	const metadata = injectionMetadata(projectRoot, options);
 	return {
 		identity: metadata.identity,
+		base_digest: null,
 		state_path: metadata.relativeStatePath,
 		first_use: false,
 		injected: [],
@@ -417,18 +443,13 @@ export function resolveRuleInjection(
 	const state = readState(projectRoot);
 	const existing = state.identities[identity];
 	const injected: RuleInjectionPayload[] = [];
-	const alreadyInjected: RuleInjectionReference[] = [];
 	const omitted: RuleInjectionOmission[] = [];
-	let usedChars = usedCharsForIdentity(existing);
+	let usedChars = 0;
 
 	for (const rule of matchingInjectableRules(projectRoot, context)) {
 		const reference = ruleRef(rule);
-		const existingRecord = existing?.rules[rule.id];
 		const content = readRuleContent(projectRoot, rule.path);
 		if (content === null) {
-			if (existingRecord) {
-				usedChars = Math.max(0, usedChars - existingRecord.char_count);
-			}
 			const reason = `rule markdown file missing (${rule.path})`;
 			if (rule.required) {
 				throw new RuleInjectionError(`${rule.id}: ${reason}`);
@@ -437,19 +458,6 @@ export function resolveRuleInjection(
 			continue;
 		}
 		const charCount = content.length;
-		const contentHash = contentFingerprint(content);
-		if (
-			existingRecord &&
-			existingRecord.path === rule.path &&
-			existingRecord.char_count === charCount &&
-			existingRecord.content_hash === contentHash
-		) {
-			alreadyInjected.push(reference);
-			continue;
-		}
-		if (existingRecord) {
-			usedChars = Math.max(0, usedChars - existingRecord.char_count);
-		}
 		if (charCount > resolverConfig.maxCharsPerRule) {
 			const reason = `rule exceeds max_chars_per_rule (${charCount}/${resolverConfig.maxCharsPerRule})`;
 			if (rule.required) {
@@ -470,12 +478,23 @@ export function resolveRuleInjection(
 		injected.push({ ...reference, char_count: charCount, content });
 	}
 
+	// Only the consumer's acknowledgement proves possession of this exact base.
+	// Persisted delivery records are diagnostic, never model-memory evidence.
+	const baseDigest =
+		options.consumer && options.contextEpoch
+			? contentFingerprint(JSON.stringify({ identity, rules: injected }))
+			: null;
+	const acknowledged =
+		baseDigest !== null && options.acknowledgedRules === baseDigest;
 	return {
 		identity,
+		base_digest: baseDigest,
 		state_path: relativeStatePath,
 		first_use: !existing,
-		injected,
-		already_injected: alreadyInjected,
+		injected: acknowledged ? [] : injected,
+		already_injected: acknowledged
+			? injected.map(({ content: _content, ...reference }) => reference)
+			: [],
 		omitted: omitted,
 		budget: {
 			max_chars_per_rule: resolverConfig.maxCharsPerRule,
@@ -512,131 +531,42 @@ export function resolveContextRules(
 	}
 }
 
-export function resolveAndRecordRuleInjection(
+export function recordRuleInjection(
 	projectRoot: string,
 	options: ResolveRuleInjectionOptions,
-): RuleInjectionResult {
-	const {
-		context,
-		identity,
-		relativeStatePath,
-		resolverConfig,
-		role,
-		surface,
-	} = injectionMetadata(projectRoot, options);
-	return withSessionLock(projectRoot, RULE_INJECTION_LOCK_NAME, () => {
+	result: RuleInjectionResult,
+): void {
+	const { context, identity, role, surface } = injectionMetadata(
+		projectRoot,
+		options,
+	);
+	withSessionLock(projectRoot, RULE_INJECTION_LOCK_NAME, () => {
 		const state = readState(projectRoot);
 		const now = new Date().toISOString();
 		const existing = state.identities[identity];
-		const firstUse = !existing;
-		const identityState: RuleInjectionIdentityState = existing ?? {
+		const rules: Record<string, RuleInjectionRecord> = {};
+		for (const rule of result.injected) {
+			rules[rule.id] = {
+				path: rule.path,
+				char_count: rule.char_count,
+				content_hash: contentFingerprint(rule.content),
+				injected_at: now,
+			};
+		}
+		for (const rule of result.already_injected) {
+			const prior = existing?.rules[rule.id];
+			if (prior) rules[rule.id] = prior;
+		}
+		state.identities[identity] = {
 			session: normalizeSessionOrTask(options.session),
 			task: normalizeSessionOrTask(options.task),
 			role,
 			surface,
 			file_path: context.filePath,
-			first_seen_at: now,
+			first_seen_at: existing?.first_seen_at ?? now,
 			last_seen_at: now,
-			rules: {},
+			rules,
 		};
-		const injected: RuleInjectionPayload[] = [];
-		const alreadyInjected: RuleInjectionReference[] = [];
-		const omitted: RuleInjectionOmission[] = [];
-		let usedChars = usedCharsForIdentity(identityState);
-
-		for (const rule of matchingInjectableRules(projectRoot, context)) {
-			const reference = ruleRef(rule);
-			const existingRecord = identityState.rules[rule.id];
-			const content = readRuleContent(projectRoot, rule.path);
-			if (content === null) {
-				if (existingRecord) {
-					usedChars = Math.max(0, usedChars - existingRecord.char_count);
-					delete identityState.rules[rule.id];
-				}
-				const reason = `rule markdown file missing (${rule.path})`;
-				if (rule.required) {
-					throw new RuleInjectionError(`${rule.id}: ${reason}`);
-				}
-				omitted.push({ ...reference, reason });
-				continue;
-			}
-			const charCount = content.length;
-			const contentHash = contentFingerprint(content);
-			if (
-				existingRecord &&
-				existingRecord.path === rule.path &&
-				existingRecord.char_count === charCount &&
-				existingRecord.content_hash === contentHash
-			) {
-				alreadyInjected.push(reference);
-				continue;
-			}
-			if (existingRecord) {
-				usedChars = Math.max(0, usedChars - existingRecord.char_count);
-			}
-			if (charCount > resolverConfig.maxCharsPerRule) {
-				const reason = `rule exceeds max_chars_per_rule (${charCount}/${resolverConfig.maxCharsPerRule})`;
-				if (rule.required) {
-					throw new RuleInjectionError(`${rule.id}: ${reason}`);
-				}
-				omitted.push({ ...reference, char_count: charCount, reason });
-				continue;
-			}
-			if (usedChars + charCount > resolverConfig.maxCharsTotal) {
-				const reason = `rule exceeds max_total_chars (${usedChars + charCount}/${resolverConfig.maxCharsTotal})`;
-				if (rule.required) {
-					throw new RuleInjectionError(`${rule.id}: ${reason}`);
-				}
-				omitted.push({ ...reference, char_count: charCount, reason });
-				continue;
-			}
-			identityState.rules[rule.id] = {
-				path: rule.path,
-				char_count: charCount,
-				content_hash: contentHash,
-				injected_at: now,
-			};
-			usedChars += charCount;
-			injected.push({ ...reference, char_count: charCount, content });
-		}
-
-		identityState.last_seen_at = now;
-		state.identities[identity] = identityState;
-		writeState(projectRoot, state);
-
-		return {
-			identity,
-			state_path: relativeStatePath,
-			first_use: firstUse,
-			injected,
-			already_injected: alreadyInjected,
-			omitted: omitted,
-			budget: {
-				max_chars_per_rule: resolverConfig.maxCharsPerRule,
-				max_total_chars: resolverConfig.maxCharsTotal,
-				used_chars: usedChars,
-			},
-		};
-	});
-}
-
-export function forgetRecordedRuleInjections(
-	projectRoot: string,
-	identity: string,
-	ruleIds: readonly string[],
-): void {
-	if (ruleIds.length === 0) {
-		return;
-	}
-	withSessionLock(projectRoot, RULE_INJECTION_LOCK_NAME, () => {
-		const state = readState(projectRoot);
-		const identityState = state.identities[identity];
-		if (!identityState) {
-			return;
-		}
-		for (const ruleId of ruleIds) {
-			delete identityState.rules[ruleId];
-		}
 		writeState(projectRoot, state);
 	});
 }

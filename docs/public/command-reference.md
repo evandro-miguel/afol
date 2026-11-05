@@ -9,6 +9,11 @@ Everyday aliases: `s` status, `n` new, `st` start, `d` done, `c` close,
 
 ## Lifecycle
 
+Human-readable `new` and `start` output includes a short next-command hint.
+Start hints preserve explicit sessions and selected task ranges. Replace
+`<cmd>` with an executable verification command, such as `bun test`; `-x`
+executes that command and does not accept a textual test result as evidence.
+
 Happy path (omit `--session`/`-S` when an active or bound session resolves):
 
 ```text
@@ -29,8 +34,17 @@ parsing. `true`, `:`, and other shell no-ops cannot authorize done. Missing
 agent or remote/provider execution.
 
 `e` is diagnostic only (a separate evidence receipt without completing). Do not
-teach `e` on the happy path. Pass `-S <session-id>` only for CI or multi-agent
-when the session is ambiguous.
+teach `e` on the happy path. CI requires an explicit `-S <session-id>` or
+`AFOL_SESSION`; it never relies on the active-session pointer. Multi-agent
+ambiguity requires an explicit session as well.
+
+Explicit-session examples:
+
+```text
+afol st T-01 -S <session-id>
+afol d T-01 -x "<check>" -S <session-id>
+afol c -S <session-id>
+```
 
 ## Materialized state
 
@@ -58,6 +72,41 @@ afol update preview
 afol update apply --dry-run
 afol catchup --fix
 ```
+
+## Context and project checks
+
+For external runtime benchmarks, see [benchmark evidence](benchmark-evidence.md)
+for versioned metrics and independent acceptance checks used by
+`afol validate bench --pack runtime-live-agent --json`.
+
+`afol ctx build` creates the section index. `afol ctx bundle --json --full`
+returns the complete selected context. The `compact` mode is a summary only;
+load balanced or larger context before executing. Missing tasks and other
+context gaps remain visible in every mode. Required rule bodies are never
+trimmed to meet the bundle budget: `CTX_BUDGET_INSUFFICIENT` reports the
+estimated size when the remaining content cannot fit. Token budgets are
+estimates, not provider-reported token usage.
+
+AFOL includes its own integrity checks. Declare stack-specific checks through
+matching project hooks in `.afol/adm/hooks/index.json`, using
+`contributions.validation_commands` (for example, `python -m pytest`). Hooks
+can scope checks by surface, role, and work type. AFOL does not assume Bun or
+execute these commands while building context. Unmatched skills are omitted.
+
+Rule bodies are returned on every request unless the consumer acknowledges
+the exact current base:
+
+```text
+afol ctx bundle --json --consumer agent-a --context-epoch conversation-1
+afol ctx bundle --json --consumer agent-a --context-epoch conversation-1 --ack-rules <base_digest>
+```
+
+Use the returned `rule_injection.base_digest` only after incorporating all
+returned rules. A different consumer, new context epoch, changed rule, or
+unknown digest receives full rule bodies. Change the epoch after compaction
+or any loss of the acknowledged context. A null digest cannot be acknowledged.
+`--persist-rule-injection` optionally records delivery diagnostics under the
+existing local approval boundary; persistence is not proof of consumer memory.
 
 ## Evolution history
 

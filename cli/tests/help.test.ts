@@ -14,7 +14,7 @@ import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
-const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 610;
+const ROOT_HELP_OUTPUT_TOKEN_BUDGET = 550;
 
 function estimateOutputTokens(output: string): number {
 	return Math.ceil(Buffer.byteLength(output, "utf8") / 4);
@@ -32,31 +32,36 @@ describe("help formatter", () => {
 		expect(help.split("\n").length).toBeLessThanOrEqual(71);
 		expect(help).toContain("Usage: afol");
 		expect(help).toContain("Agent fast path (active session)");
+		expect(help).toContain('afol qt <theme> -t "<task>" -c "<check>"');
 		expect(help).toContain(
 			'afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
 		);
-		expect(help).toContain("Commands");
 		expect(help).toContain("\n  s/status");
-		expect(help).toContain("s/status");
-		expect(help).toContain("s/status[read] - project status");
-		expect(help).toContain("v/validate");
-		expect(help).toContain("v/validate[read] - validation gates");
-		expect(help).toContain("n/new");
-		expect(help).toContain("hk/hook");
-		expect(help).toContain("bench");
-		expect(help).toContain("pb/project-benchmark");
-		expect(help).toContain("evolve[read] - evolution status");
+		for (const name of [
+			"s/status",
+			"n/new",
+			"qt/quick-task",
+			"st/start",
+			"d/done",
+			"c/close",
+			"v/validate",
+		]) {
+			expect(help).toContain(name);
+		}
 		expect(help).toContain(
-			"pb/project-benchmark[generated] - compare references",
+			"Full catalog: afol help --for execution|planning|maintenance",
 		);
-		expect(help).toContain("fleet[write] - fleet state");
+		expect(help).toContain("afol help <command>");
+		expect(help).toContain("Flags");
 		expect(help).toContain("Side effects");
 		expect(help).toContain("read=none");
 		expect(help).toContain("write=state");
 		expect(help).toContain("  help --verbose|<command>");
 		expect(help).toContain("a=afol");
-		expect(help).not.toContain("do/doctor");
-		expect(help).not.toContain("ma/maintenance");
+		expect(help).not.toContain("Commands");
+		expect(help).not.toContain("hk/hook");
+		expect(help).not.toContain("pb/project-benchmark");
+		expect(help).not.toContain("fleet[write]");
 	});
 
 	test("keeps root help within the agent output token budget", () => {
@@ -99,13 +104,28 @@ describe("help formatter", () => {
 		expect(maintenance).not.toContain("n/new");
 	});
 
-	test("lists every top-level command with a short compact description", () => {
+	test("keeps every registry command out of default root help", () => {
 		const help = formatHelpText(kernelRegistry);
 
-		for (const spec of kernelRegistry.commands) {
+		const listed = kernelRegistry.commands.filter((spec) => {
 			const alias = spec.aliases[0];
 			const name = alias ? `${alias}/${spec.command}` : spec.command;
-			expect(help).toContain(`${name}[${spec.sideEffect}] - `);
+			return help.includes(`${name}[${spec.sideEffect}] - `);
+		});
+		expect(listed).toEqual([]);
+	});
+
+	test("lists each intent's full command set with compact descriptions", () => {
+		const intents = ["planning", "execution", "maintenance"] as const;
+		for (const intent of intents) {
+			const help = formatHelpText(kernelRegistry, { intent });
+			const catalog = buildCommandCatalog(kernelRegistry, { intent });
+			expect(catalog.length).toBeGreaterThan(0);
+			for (const entry of catalog) {
+				const alias = entry.aliases[0];
+				const name = alias ? `${alias}/${entry.command}` : entry.command;
+				expect(help).toContain(`${name}[${entry.sideEffect}] - `);
+			}
 		}
 	});
 
@@ -267,6 +287,14 @@ describe("help formatter", () => {
 				expect(result.status).toBe(0);
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain(`Command: ${spec.command}`);
+				if (!["new", "start", "close"].includes(spec.command)) {
+					expect(result.stdout.trim()).toBe(
+						formatCommandHelp(spec.command)?.trim() ?? "",
+					);
+				}
+				expect(result.stdout.trim()).toBe(
+					formatCommandHelp(spec.command)?.trim() ?? "",
+				);
 			}
 			const shortStartHelp = spawnSync("bun", [cliPath, "st", "--help"], {
 				cwd: tempRoot,
@@ -275,6 +303,8 @@ describe("help formatter", () => {
 			});
 			expect(shortStartHelp.status).toBe(0);
 			expect(shortStartHelp.stderr).toBe("");
+			expect(shortStartHelp.stdout).toContain("Command: start");
+			expect(shortStartHelp.stdout).toContain("Usage: afol start");
 			expect(shortStartHelp.stdout).toContain("Usage: afol st T-01");
 			expect(shortStartHelp.stdout).toContain("Usage: afol start");
 			const catalogStartHelp = spawnSync("bun", [cliPath, "help", "start"], {
@@ -284,6 +314,20 @@ describe("help formatter", () => {
 			});
 			expect(catalogStartHelp.status).toBe(0);
 			expect(catalogStartHelp.stdout).toBe(shortStartHelp.stdout);
+			const newHelp = spawnSync("bun", [cliPath, "n", "--help"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(newHelp.status).toBe(0);
+			expect(newHelp.stdout).toContain('Usage: afol n <theme> -t "<task>"');
+			const closeHelp = spawnSync("bun", [cliPath, "c", "--help"], {
+				cwd: tempRoot,
+				encoding: "utf8",
+				shell: false,
+			});
+			expect(closeHelp.status).toBe(0);
+			expect(closeHelp.stdout).toContain("Usage: afol c");
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],
@@ -777,8 +821,15 @@ describe("help formatter", () => {
 					usage: "bundle --persist-rule-injection",
 					sideEffect: "generated",
 					requires_approval: true,
+					description: "Record delivery diagnostics; local approval required",
+				},
+				{
+					usage:
+						"bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
+					sideEffect: "read",
+					requires_approval: false,
 					description:
-						"Persist first-use rule injection state with local approval",
+						"Acknowledge base_digest for this consumer; reset epoch after context loss",
 				},
 				{
 					usage: "section --ref <ref>",

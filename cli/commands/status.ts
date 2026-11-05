@@ -35,6 +35,7 @@ import {
 	resolveSession as resolveEffectiveSession,
 } from "../services/workbench/session-context";
 import { type CommandIo, DEFAULT_IO } from "./io";
+import { collectOpenWorkbenchSessions } from "./session";
 
 type StatusSnapshot = {
 	status: string;
@@ -51,6 +52,8 @@ type StatusSnapshot = {
 	taskFilePath?: string;
 	problemReason?: string;
 	safeNextAction?: string;
+	openSessions?: string[];
+	openSessionsOmitted?: number;
 	sessionCount?: number | null;
 	sessionHealth?: string[];
 	catchup: CatchupReport | undefined;
@@ -70,9 +73,13 @@ type StatusJsonData = {
 	status: string;
 	task: string;
 	files_written: string[];
+	files_written_omitted: number;
 	validation_or_checks: string[];
+	validation_or_checks_omitted: number;
 	blockers: string[];
+	blockers_omitted: number;
 	next: string[];
+	next_omitted: number;
 	session_count: number | null;
 	session_health_warnings: string[];
 	paths: {
@@ -86,7 +93,11 @@ type StatusJsonData = {
 	warnings: string[];
 	problem_reason?: string;
 	safe_next_action?: string;
+	open_sessions?: string[];
+	open_sessions_omitted?: number;
 };
+
+const COMPACT_LIST_LIMIT = 5;
 
 const FIELD_HEADERS = [
 	"STATUS",
@@ -305,6 +316,21 @@ function compactProblemReason(
 
 function compactSafeNextAction(next: string[]): string | undefined {
 	return compactSafeAction(next);
+}
+
+function capList(values: string[]): { entries: string[]; omitted: number } {
+	return {
+		entries: values.slice(0, COMPACT_LIST_LIMIT),
+		omitted: Math.max(0, values.length - COMPACT_LIST_LIMIT),
+	};
+}
+
+function compactFieldLines(values: string[]): string[] {
+	const lines = values
+		.slice(0, COMPACT_LIST_LIMIT)
+		.map((entry) => `- ${entry}`);
+	const omitted = values.length - COMPACT_LIST_LIMIT;
+	return omitted > 0 ? [...lines, `- omitted=${omitted}`] : lines;
 }
 
 function unboundNextAction(root: string): string {
@@ -645,6 +671,14 @@ function readStatusSnapshot(
 		if (taskId) {
 			throw taskNotFoundError(taskId, null);
 		}
+		const openSessions = (() => {
+			try {
+				return collectOpenWorkbenchSessions(project.root);
+			} catch {
+				return [];
+			}
+		})();
+		const visibleOpenSessions = openSessions.slice(0, COMPACT_LIST_LIMIT);
 		return {
 			status: "none",
 			task: "none",
@@ -654,6 +688,13 @@ function readStatusSnapshot(
 			blockers: ["none"],
 			next: mergeStatusEntries(["none"], []),
 			warnings,
+			...(openSessions.length > 1
+				? {
+						openSessions: visibleOpenSessions,
+						openSessionsOmitted:
+							openSessions.length - visibleOpenSessions.length,
+					}
+				: {}),
 			configPath: project.configPath,
 			configSource: project.configSource,
 			lockPath,
@@ -735,19 +776,28 @@ function formatCompact(snapshot: StatusSnapshot): string {
 		`STATUS: ${snapshot.status}`,
 		`TASK: ${snapshot.task}`,
 		"FILES_WRITTEN:",
-		...snapshot.filesWritten.map((entry) => `- ${entry}`),
+		...compactFieldLines(snapshot.filesWritten),
 		"VALIDATION_OR_CHECKS:",
-		...snapshot.validationOrChecks.map((entry) => `- ${entry}`),
+		...compactFieldLines(snapshot.validationOrChecks),
 		"BLOCKERS:",
-		...snapshot.blockers.map((entry) => `- ${entry}`),
+		...compactFieldLines(snapshot.blockers),
 		"NEXT:",
-		...snapshot.next.map((entry) => `- ${entry}`),
+		...compactFieldLines(snapshot.next),
 	];
 	if (snapshot.problemReason) {
 		lines.push(`PROBLEM_REASON: ${snapshot.problemReason}`);
 	}
 	if (snapshot.safeNextAction) {
 		lines.push(`SAFE_NEXT_ACTION: ${snapshot.safeNextAction}`);
+	}
+	if (snapshot.openSessions && snapshot.openSessions.length > 0) {
+		const visible = snapshot.openSessions.join(", ");
+		const omitted = snapshot.openSessionsOmitted ?? 0;
+		lines.push(
+			omitted > 0
+				? `OPEN_SESSIONS: ${visible} (omitted=${omitted})`
+				: `OPEN_SESSIONS: ${visible}`,
+		);
 	}
 	if (snapshot.warnings.length > 0) {
 		lines.push("WARNINGS:");
@@ -816,14 +866,22 @@ export function runStatusCommand(
 	}
 
 	if (parsed.json) {
+		const filesWritten = capList(snapshot.filesWritten);
+		const validationOrChecks = capList(snapshot.validationOrChecks);
+		const blockers = capList(snapshot.blockers);
+		const next = capList(snapshot.next);
 		const data: StatusJsonData = {
 			status: snapshot.status,
 			task: snapshot.task,
-			files_written: snapshot.filesWritten,
-			validation_or_checks: snapshot.validationOrChecks,
+			files_written: filesWritten.entries,
+			files_written_omitted: filesWritten.omitted,
+			validation_or_checks: validationOrChecks.entries,
+			validation_or_checks_omitted: validationOrChecks.omitted,
 			warnings: snapshot.warnings,
-			blockers: snapshot.blockers,
-			next: snapshot.next,
+			blockers: blockers.entries,
+			blockers_omitted: blockers.omitted,
+			next: next.entries,
+			next_omitted: next.omitted,
 			session_count: snapshot.sessionCount ?? null,
 			session_health_warnings: snapshot.sessionHealth ?? [],
 			paths: {
@@ -852,6 +910,10 @@ export function runStatusCommand(
 		}
 		if (snapshot.safeNextAction) {
 			data.safe_next_action = snapshot.safeNextAction;
+		}
+		if (snapshot.openSessions) {
+			data.open_sessions = snapshot.openSessions;
+			data.open_sessions_omitted = snapshot.openSessionsOmitted ?? 0;
 		}
 
 		const output = stringifyEnvelope(

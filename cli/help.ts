@@ -32,7 +32,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	start: "start task",
 	done: "complete task",
 	log: "append log",
-	"quick-task": "one-task lifecycle",
+	"quick-task": "task lifecycle",
 	governance: "spec gaps",
 	evidence: "record/admit evidence",
 	legacy: "legacy reconcile/close",
@@ -52,7 +52,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	render: "memory render alias",
 	library: "inspect library",
 	memory: "inspect memory",
-	evolve: "evolution status",
+	evolve: "analyze evolution",
 	adm: "inspect adm",
 	spec: "inspect specs",
 	adr: "manage ADRs",
@@ -378,10 +378,34 @@ export function formatCommandHelp(
 	].join("\n");
 }
 
+const ROOT_FAST_PATH_LINES: readonly string[] = [
+	"Usage: afol [command] [options]",
+	"",
+	"Agent fast path (active session)",
+	'  afol qt <theme> -t "<task>" -c "<check>"',
+	'  afol st T-01 -> afol d T-01 -x "<check>" -> afol c',
+	"  s/status  n/new  qt/quick-task  st/start  d/done  c/close  v/validate",
+	"",
+	"Full catalog: afol help --for execution|planning|maintenance",
+	"  afol help <command> documents one command",
+	"",
+	"Flags",
+	"  -j, --json  JSON",
+	"  --for <intent>  planning|execution|maintenance",
+	"  --verbose  details",
+	"  help --verbose|<command>",
+	"  a=afol",
+	"Side effects",
+	"  read=none; generated=derived; append=rows; write=state",
+];
+
 export function formatHelpText(
 	registry = kernelRegistry,
 	options: HelpFormatOptions = {},
 ): string {
+	if (!options.intent && !options.verbose) {
+		return ROOT_FAST_PATH_LINES.join("\n");
+	}
 	const grouped = new Map<CommandCategory | "uncategorized", CommandSpec[]>();
 	for (const category of CATEGORY_ORDER) {
 		grouped.set(category, []);

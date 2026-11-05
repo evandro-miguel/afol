@@ -79,7 +79,7 @@
       "name": "maintenance-cadence",
       "path": "RULE-011-maintenance-cadence.md",
       "surfaces": ["maintenance", "memory", "library", "workbench", "governance"],
-      "work_types": ["maintenance", "cleanup", "validation", "benchmark"],
+      "work_types": ["maintenance", "cleanup", "validation"],
       "priority": 85
     },
     {

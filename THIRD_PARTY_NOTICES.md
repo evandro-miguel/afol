@@ -14,7 +14,6 @@ remain under their own licenses.
 
 | Package | License |
 | --- | --- |
-| citty | MIT |
 | knip | ISC |
 | oxlint | MIT |
 | TypeScript | Apache-2.0 |

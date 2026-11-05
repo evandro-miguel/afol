@@ -183,6 +183,12 @@ describe("installed scaffold workflow examples", () => {
 			);
 			const originalArtifact = "original closed-session review\n";
 			writeFileSync(originalArtifactPath, originalArtifact, { flag: "wx" });
+			expect(() =>
+				writeFileSync(originalArtifactPath, "replacement review\n", {
+					flag: "wx",
+				}),
+			).toThrow();
+			expect(readFileSync(originalArtifactPath, "utf8")).toBe(originalArtifact);
 			const taskBeforeReview = readFileSync(sessionPath.taskPath);
 			const reportPath = join(
 				sessionPath.sessionDir,

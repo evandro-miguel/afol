@@ -6,8 +6,13 @@ documentation, and local release tooling.
 
 ## Repository boundaries
 
-- `main` is merge-only. Create a short-lived topic branch from `main`, open a
-  pull request back to `main`, and merge only after review.
+- `main_dev` is the sole development and integration branch. Create short-lived
+  topic branches from `main_dev` and merge them through reviewed pull requests
+  into `main_dev`.
+- Keep `main` protected. Promotion of a tested and reviewed `main_dev` commit to
+  `main` requires separate explicit approval; this repository guidance does not
+  grant that approval.
+- Do not push directly to `main_dev` or `main`.
 - Implementation lives under `cli/**` and `src/**`; tests live under
   `cli/tests/**`; public docs live under `docs/public/**`.
 - Do not version a root `.afol/**`, `.agents/**`, private governance, raw
@@ -19,10 +24,11 @@ documentation, and local release tooling.
 ## Local validation
 
 ADR-007 separates hosted regression evidence from exact-SHA local release
-validation. Pull requests receive `quality`, `tests`, and `core-smoke`; pull
-requests targeting `main` and pushes to `main` also receive `deep-validation`.
-Run the narrowest relevant checks, then the full local gate when release
-readiness is in scope:
+validation. Pull requests receive `quality`, `tests`, and `core-smoke`. Pull
+requests targeting `main_dev` or `main`, and pushes to either branch, also
+receive `deep-validation`. Complete the local release gate and review before
+passing all required hosted checks and seeking explicit approval to promote a
+`main_dev` commit to `main`:
 
 ```bash
 bun install --frozen-lockfile

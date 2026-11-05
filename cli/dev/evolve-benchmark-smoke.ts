@@ -376,7 +376,7 @@ try {
 	)
 		throw new Error("healthy status contract failed");
 	// Bun can defer SQLite finalizers after Database.close(). Drain seeded
-	// handles before defining the read-only analysis boundary.
+	// handles after close before defining the read-only analysis boundary.
 	Bun.gc(true);
 	const dbBeforeAnalysis = analysisSnapshot(healthy);
 	const internalAnalysis = analyzeEvolutionProject(healthy);

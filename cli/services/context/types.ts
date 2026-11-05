@@ -34,6 +34,7 @@ export type ContextOmittedRule = ContextRuleReference & {
 
 export type ContextRuleInjection = {
 	identity: string;
+	base_digest: string | null;
 	state_path: string;
 	first_use: boolean;
 	injected: ContextInjectedRule[];

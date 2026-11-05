@@ -10,10 +10,10 @@ The only approved workflow is `.github/workflows/ci.yml`.
 
 | Check | Trigger | Purpose | Required check |
 | --- | --- | --- | --- |
-| `quality` | Every pull request and push to `main` | Generated drift, lint, public audit, types, template | Yes |
-| `tests` | Every pull request and push to `main` | Serial-by-file fail-fast test suite | Yes |
-| `core-smoke` | Every pull request and push to `main` | Bootstrap, provenance-bound build, public example | Yes |
-| `deep-validation` | Pull request into `main` and push to `main` | Full suite, coverage, deterministic build, provenance, distribution and clean-project smokes | Yes, for integration into `main` |
+| `quality` | Every pull request and push to either `main_dev` or `main` | Generated drift, lint, public audit, types, template | Yes |
+| `tests` | Every pull request and push to either `main_dev` or `main` | Serial-by-file fail-fast test suite | Yes |
+| `core-smoke` | Every pull request and push to either `main_dev` or `main` | Bootstrap, provenance-bound build, public example | Yes |
+| `deep-validation` | Pull request into `main_dev` or `main`, and pushes to either | Full suite, coverage, deterministic build, provenance, distribution and clean-project smokes | Yes, before integration into `main_dev` or promotion to `main` |
 
 All jobs use `ubuntu-24.04` and Bun 1.3.14. External Actions are pinned by
 full commit SHA. The workflow has read-only repository contents permission,
@@ -23,11 +23,12 @@ use `pull_request_target`, dependency caches, or uploaded artifacts.
 ## Repository settings
 
 After the first successful run registers the check names, require these status
-checks on `main`:
+checks on both `main_dev` and `main`:
 
 - `quality`
 - `tests`
 - `core-smoke`
+- `deep-validation`
 
 Keep force pushes and branch deletion disabled. Enable CodeQL default setup for
 JavaScript/TypeScript, secret scanning and push protection, Dependabot alerts,

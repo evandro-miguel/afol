@@ -336,6 +336,78 @@ describe("observation journal", () => {
 		}
 	});
 
+	test("rolls back replay projections when an SQL insert fails", () => {
+		const { root, db } = setup();
+		try {
+			const first = observation("replay-01", "S-replay-01", 1);
+			appendObservationJournalEvent({
+				root,
+				db,
+				projectId: PROJECT_ID,
+				observation: first,
+			});
+			const before = JSON.stringify({
+				observations: db.query("SELECT * FROM observations").all(),
+				clusters: db.query("SELECT * FROM issue_clusters").all(),
+				decisions: db.query("SELECT * FROM recurrence_decisions").all(),
+			});
+			db.exec(
+				"CREATE TRIGGER reject_replay_observation BEFORE INSERT ON observations BEGIN SELECT RAISE(ABORT, 'injected replay projection failure'); END;",
+			);
+
+			expect(() =>
+				appendObservationJournalEvent({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					observation: observation("replay-02", "S-replay-02", 2),
+				}),
+			).toThrow("injected replay projection failure");
+			expect(readObservationJournal(root, PROJECT_ID)).toHaveLength(1);
+			expect(
+				JSON.stringify({
+					observations: db.query("SELECT * FROM observations").all(),
+					clusters: db.query("SELECT * FROM issue_clusters").all(),
+					decisions: db.query("SELECT * FROM recurrence_decisions").all(),
+				}),
+			).toBe(before);
+		} finally {
+			db.close();
+			removeEvolutionTestRoot(root);
+		}
+	});
+
+	test("rejects replay inside a caller transaction without rolling it back", () => {
+		const { root, db } = setup();
+		try {
+			db.exec("BEGIN IMMEDIATE");
+			db.prepare(
+				"INSERT INTO evolution_metadata(key, value) VALUES ('caller_sentinel', 'preserve')",
+			).run();
+			expect(() =>
+				appendObservationJournalEvent({
+					root,
+					db,
+					projectId: PROJECT_ID,
+					observation: observation("nested-01", "S-nested-01", 1),
+				}),
+			).toThrow("cannot start a transaction within a transaction");
+			expect(
+				db
+					.query(
+						"SELECT value FROM evolution_metadata WHERE key = 'caller_sentinel'",
+					)
+					.get(),
+			).toEqual({ value: "preserve" });
+		} finally {
+			try {
+				db.exec("ROLLBACK");
+			} catch {}
+			db.close();
+			removeEvolutionTestRoot(root);
+		}
+	});
+
 	test("detects and rebuilds derived cluster drift", () => {
 		const { root, db } = setup();
 		try {

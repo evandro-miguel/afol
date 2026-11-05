@@ -10,9 +10,12 @@ import {
 	scanLegacyReferences,
 } from "../health/maintenance-review";
 import { loadCoordinationRadar } from "../local-state/coordination-radar";
+import { readCanonicalStateBoardTask } from "../local-state/workbench-index";
 import { loadProjectRoot } from "../project/root";
 import { collectGlobalStatusFindings } from "../status/global-findings";
 import { computeCatchup } from "./catchup";
+import { readTaskLifecycleState } from "./session-lifecycle-state";
+import { sessionPaths } from "./session-reader";
 
 export type StartBriefing = {
 	schema: "afol_start_briefing_v1";
@@ -72,6 +75,12 @@ function projectName(root: string): string {
 type BuildStartBriefingOptions = {
 	showProjectRoot?: boolean;
 };
+
+type SelectedTask =
+	| { kind: "open"; notes: string }
+	| { kind: "problem"; notes: string }
+	| { kind: "closed"; notes: string }
+	| { kind: "missing" };
 
 function shouldShowProjectRoot(): boolean {
 	const debugFlag = process.env.AFOL_DEBUG;
@@ -140,24 +149,55 @@ function summarizeProblemReason(
 	return undefined;
 }
 
+function readSelectedTask(
+	root: string,
+	input: { session: string; taskId: string },
+): SelectedTask {
+	const paths = sessionPaths(root, input.session);
+	if (!existsSync(paths.taskPath)) {
+		return { kind: "missing" };
+	}
+
+	const lifecycle = readTaskLifecycleState(paths.taskPath, input.session);
+	const row = readCanonicalStateBoardTask(
+		input.session,
+		paths.taskPath,
+		input.taskId,
+	).task;
+	if (!row) {
+		return { kind: "missing" };
+	}
+	if (
+		lifecycle.kind === "closed" ||
+		row.state === "done" ||
+		row.state === "moved"
+	) {
+		return { kind: "closed", notes: row.notes };
+	}
+	if (row.state === "problem") {
+		return { kind: "problem", notes: row.notes };
+	}
+	return { kind: "open", notes: row.notes };
+}
+
 function summarizeSafeNextAction(params: {
-	problemTaskCount: number;
-	openTaskIds: string[];
+	selectedTask: SelectedTask;
+	selectedTaskKey: string;
 	catchupNeedsSync: boolean;
-	nextStep: string;
 }): string {
-	if (params.problemTaskCount > 0) {
+	if (params.selectedTask.kind === "problem") {
 		return "resolve or park problem tasks before broadening scope";
+	}
+	if (params.selectedTask.kind === "missing") {
+		return `selected task ${params.selectedTaskKey} is missing; repair task source before continuing`;
+	}
+	if (params.selectedTask.kind === "closed") {
+		return `selected task ${params.selectedTaskKey} is closed; switch to an active task or start a new one`;
 	}
 	if (params.catchupNeedsSync) {
 		return "sync findings/log before more edits";
 	}
-	if (params.openTaskIds.length > 0) {
-		return `advance ${params.openTaskIds[0]}`;
-	}
-	return params.nextStep === "none" || params.nextStep.length === 0
-		? "await task assignment"
-		: params.nextStep;
+	return `advance ${params.selectedTaskKey}`;
 }
 
 function pickQuestions(input: {
@@ -227,12 +267,11 @@ export function buildStartBriefing(
 ): StartBriefing {
 	const catchup = computeCatchup(root, { session: input.session });
 	const radar = loadCoordinationRadar(root);
+	const selectedTask = readSelectedTask(root, input);
 	const maintenance = readMaintenanceReviewSummary(root);
 	const legacyRefs = scanLegacyReferences(root);
 	const problemReason = summarizeProblemReason(
-		radar.open_tasks
-			.filter((task) => task.state === "problem")
-			.map((task) => task.notes),
+		selectedTask.kind === "problem" ? [selectedTask.notes] : [],
 	);
 	const globalFindings = collectGlobalStatusFindings(root);
 	const warnings = compactWarnings([
@@ -299,13 +338,10 @@ export function buildStartBriefing(
 		},
 		...(problemReason ? { problem_reason: problemReason } : {}),
 		safe_next_action: summarizeSafeNextAction({
-			problemTaskCount: problemTasks.length,
-			openTaskIds: radar.open_tasks.map(
-				(task) => `${task.session}:${task.task_id}`,
-			),
+			selectedTask,
+			selectedTaskKey: `${input.session}:${input.taskId}`,
 			catchupNeedsSync:
 				catchup.freshness.findings_stale || catchup.freshness.log_behind_diff,
-			nextStep: catchup.next_step,
 		}),
 		warnings,
 		questions: pickQuestions({

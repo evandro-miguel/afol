@@ -1,5 +1,5 @@
 export const BENCH_SCHEMA_VERSION = "2.0.0" as const;
-export const DEFAULT_BENCH_MODEL = "gpt-5.4-mini/medium" as const;
+export const DEFAULT_BENCH_MODEL = "gpt-5.6-luna/medium" as const;
 export const DEFAULT_BENCH_PACK_ID = "comprehensive-live" as const;
 export const DEFAULT_CLI_PACK_ID = "cli-micro" as const;
 
@@ -28,8 +28,8 @@ export type BenchToolCall = {
 	command: string;
 	exit_code: number | null;
 	status: string;
-	type: BenchToolType;
-	duration_ms: number;
+	type: BenchToolType | "file_edit" | "mcp" | "other";
+	duration_ms: number | null;
 };
 
 export type BenchThresholds = {
@@ -93,14 +93,21 @@ export type BenchResult = {
 	notes: string[];
 };
 
+/** Normalized observations, separate from the historical v2 archive schema. */
 export type RawMetrics = {
-	tokens: BenchTokens;
-	timing: BenchTiming;
+	schema_version: "afol_metrics_v1";
+	source: EventStreamProfile;
+	issues: string[];
+	tokens: { [K in keyof BenchTokens]: number | null } & {
+		cache_write: number | null;
+	};
+	timing: { wall_clock_ms: number | null };
 	tools: {
 		total_calls: number;
-		success_rate: number;
-		by_type: BenchToolTypeCounts;
+		success_rate: number | null;
+		by_type: Record<BenchToolCall["type"], number>;
 		error_count: number;
+		unknown_count: number;
 		retry_count: number;
 		calls: BenchToolCall[];
 	};
@@ -109,16 +116,22 @@ export type RawMetrics = {
 		error_count: number;
 		retry_count: number;
 	};
-	plan_quality: {
-		meta_planning_detected: boolean;
-		direct_execution: boolean;
-	};
+	plan_quality: null;
 	agent_messages: {
 		count: number;
 		total_chars: number;
 		texts: string[];
 	};
 	turn_completed: boolean;
+};
+
+/** The version identifies AFOL's event adapter contract, not a model version. */
+export type EventStreamProfile = {
+	harness: string;
+	version: string;
+	format: "codex-exec-v1";
+	usage_mode: "delta" | "cumulative";
+	token_details: "included" | "exclusive";
 };
 
 export type BenchmarkBaseline = {

@@ -809,14 +809,9 @@
       "description": "Close the active session",
       "subcommands": [
         {
-          "usage": "[-m|--summary <text>]",
+          "usage": "[--session <session-id>] [-m|--summary <text>]",
           "side_effect": "write",
-          "description": "Close the active or bound session after its tasks are complete"
-        },
-        {
-          "usage": "--session <session-id> [-m|--summary <text>]",
-          "side_effect": "write",
-          "description": "Close a specific session after its tasks are complete"
+          "description": "Close the active or bound session, or a specific session, after tasks are complete"
         },
         {
           "usage": "--allow-no-report --reason <text>",
@@ -886,7 +881,7 @@
           "description": "Append text with backup and mutation journal"
         },
         {
-          "usage": "mv|move --from <path> --to <path>",
+          "usage": "mv|move --path <path> --to <path>",
           "side_effect": "write",
           "description": "Move file with backup and mutation journal"
         },
@@ -1192,7 +1187,12 @@
         {
           "usage": "bundle --persist-rule-injection",
           "side_effect": "generated",
-          "description": "Persist first-use rule injection state with local approval"
+          "description": "Record delivery diagnostics; local approval required"
+        },
+        {
+          "usage": "bundle --json --consumer <id> --context-epoch <id> [--ack-rules <digest>]",
+          "side_effect": "read",
+          "description": "Acknowledge base_digest for this consumer; reset epoch after context loss"
         },
         {
           "usage": "section --ref <ref>",
