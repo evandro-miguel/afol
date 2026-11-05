@@ -295,6 +295,7 @@ function collectFilesUnder(
 	startPath: string,
 	predicate: (entry: Dirent, relativePath: string, fullPath: string) => boolean,
 	sorted = true,
+	includeDirectory?: (relativePath: string) => boolean,
 ): string[] {
 	const startRoot = resolve(root, startPath);
 	if (!existsSync(startRoot)) {
@@ -320,7 +321,10 @@ function collectFilesUnder(
 			const relativePath = toRelativeProjectPath(root, entryPath);
 
 			if (entry.isDirectory()) {
-				if (isDirectoryExcluded(root, entryPath, projectPaths)) {
+				if (
+					isDirectoryExcluded(root, entryPath, projectPaths) ||
+					(includeDirectory && !includeDirectory(relativePath))
+				) {
 					continue;
 				}
 				stack.push(entryPath);
@@ -349,19 +353,25 @@ function collectSpecFiles(projectRoot: string): string[] {
 }
 
 function collectFileIndexFiles(projectRoot: string, sorted = true): string[] {
-	const files = collectFilesUnder(
+	// Select Git membership before traversal: ignored runtime trees may be
+	// unreadable, private, or enormous and must never be entered just to filter later.
+	const gitFiles = listGitFilesForIndex(projectRoot);
+	const gitDirectories = new Set<string>();
+	for (const filePath of gitFiles ?? []) {
+		let directory = dirname(filePath);
+		while (directory !== "." && !gitDirectories.has(directory)) {
+			gitDirectories.add(directory);
+			directory = dirname(directory);
+		}
+	}
+	return collectFilesUnder(
 		projectRoot,
 		".",
-		(_entry, _relativePath) => true,
+		(_entry, relativePath) => gitFiles === null || gitFiles.has(relativePath),
 		sorted,
-	);
-	const gitFiles = listGitFilesForIndex(projectRoot);
-	if (!gitFiles) {
-		return files;
-	}
-
-	return files.filter((filePath) =>
-		gitFiles.has(toRelativeProjectPath(projectRoot, filePath)),
+		gitFiles === null
+			? undefined
+			: (relativePath) => gitDirectories.has(relativePath),
 	);
 }
 
