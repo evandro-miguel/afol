@@ -57,20 +57,23 @@ describe("evolve parser compatibility", () => {
 		["skip", ["id", "extra"], "Unknown evolve decision argument: extra"],
 		["skip", ["--unknown", "extra"], "Unknown evolve decision argument: extra"],
 		["status", [""], "Unknown evolve argument: "],
-	] as const)("%s rejects %j before project access", async (action, args, message) => {
-		const stdout: string[] = [];
-		const stderr: string[] = [];
-		const code = await runEvolveCommand(
-			action,
-			[...args, "-j"],
-			"/nonexistent-evolve-parser-contract",
-			{
-				stdout: (value) => stdout.push(value),
-				stderr: (value) => stderr.push(value),
-			},
-		);
-		expect(code).toBe(2);
-		expect(stderr).toEqual([]);
-		expect(JSON.parse(stdout[0] ?? "{}").error.message).toBe(message);
-	});
+	] as const)(
+		"%s rejects %j before project access",
+		async (action, args, message) => {
+			const stdout: string[] = [];
+			const stderr: string[] = [];
+			const code = await runEvolveCommand(
+				action,
+				[...args, "-j"],
+				"/nonexistent-evolve-parser-contract",
+				{
+					stdout: (value) => stdout.push(value),
+					stderr: (value) => stderr.push(value),
+				},
+			);
+			expect(code).toBe(2);
+			expect(stderr).toEqual([]);
+			expect(JSON.parse(stdout[0] ?? "{}").error.message).toBe(message);
+		},
+	);
 });

@@ -107,12 +107,11 @@ describe("evolution recurrence decision authority", () => {
 		).toThrow("action is invalid");
 	});
 
-	test.each([
-		"confirm",
-		"dismiss",
-		"reopen",
-	] as const)("accepts the %s decision action", (action) => {
-		const authority = dispatchRecurrenceDecision({ ...BASE, action });
-		expect(recurrenceDecisionForAuthority(authority).action).toBe(action);
-	});
+	test.each(["confirm", "dismiss", "reopen"] as const)(
+		"accepts the %s decision action",
+		(action) => {
+			const authority = dispatchRecurrenceDecision({ ...BASE, action });
+			expect(recurrenceDecisionForAuthority(authority).action).toBe(action);
+		},
+	);
 });
