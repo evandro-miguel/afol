@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { posix, relative, resolve } from "node:path";
 import {
 	loadMutationJournal,
@@ -568,9 +569,9 @@ function withoutTerminalSessions(
 /**
  * A non-fresh persisted index can omit newly registered scope, so the radar
  * reads session task files directly instead. It never rewrites the index.
- * Sessions known only to the persisted index are kept, so the fallback can
- * add warnings but never drop scope, unless current lifecycle evidence shows
- * them archived or closed.
+ * Sessions known only to the persisted index and tasks with unavailable live
+ * sources are kept, unless current task or session lifecycle evidence
+ * supersedes them. Readable live sources remain authoritative.
  */
 function selectWorkbench(
 	root: string,
@@ -591,20 +592,41 @@ function selectWorkbench(
 		for (const task of live.tasks) {
 			liveSessions.add(task.session);
 		}
+		const liveTaskKeys = new Set(live.tasks.map(taskKey));
+		const unreadableFiles = new Map<string, boolean>();
+		const extraTaskCandidates = (persisted?.tasks ?? []).filter((task) => {
+			if (liveTaskKeys.has(taskKey(task))) {
+				return false;
+			}
+			if (!liveSessions.has(task.session)) {
+				return true;
+			}
+			// A surviving session directory does not prove its indexed task
+			// sources were read. Readable replacements (including done tasks)
+			// stay authoritative; only unavailable sources retain old scope.
+			const file = resolve(root, task.file);
+			if (!unreadableFiles.has(file)) {
+				try {
+					readFileSync(file, "utf8");
+					unreadableFiles.set(file, false);
+				} catch {
+					unreadableFiles.set(file, true);
+				}
+			}
+			return unreadableFiles.get(file) === true;
+		});
 		const extras = withoutTerminalSessions(
 			root,
 			{
 				sessions: (persisted?.sessions ?? []).filter(
 					(entry) => !liveSessions.has(entry.session),
 				),
-				tasks: (persisted?.tasks ?? []).filter(
-					(task) => !liveSessions.has(task.session),
-				),
+				tasks: extraTaskCandidates,
 			},
 			[
 				...(persisted?.sessions ?? []).map((entry) => entry.session),
 				...(persisted?.tasks ?? []).map((task) => task.session),
-			].filter((session) => !liveSessions.has(session)),
+			],
 		);
 		const extraSessions = extras.sessions;
 		const extraTasks = extras.tasks;

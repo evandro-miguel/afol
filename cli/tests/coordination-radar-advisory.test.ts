@@ -613,6 +613,154 @@ describe("coordination radar source freshness and coverage", () => {
 		);
 	});
 
+	for (const unavailable of ["missing", "unreadable"]) {
+		test(`${unavailable} live task source retains indexed writers without rewriting the index`, () => {
+			const root = createProjectRoot(unavailable);
+			for (const session of ["260618_alpha", "260618_beta"]) {
+				writeTaskFile(
+					root,
+					session,
+					[
+						"| T-01 | in_progress | alice | writer |",
+						"| T-02 | done | bob | completed |",
+					],
+					[
+						...plannedBlock("T-01", ["src/shared.ts"]),
+						...plannedBlock("T-02", ["src/shared.ts"]),
+					],
+				);
+			}
+			rebuildWorkBenchIndex(root);
+			const indexPath = join(root, ".afol", "data", "index", "workbench.json");
+			const before = readFileSync(indexPath, "utf8");
+			const taskFile = join(
+				root,
+				".afol/wb/260618_alpha/260618_alpha_task_01.md",
+			);
+			rmSync(taskFile);
+			if (unavailable === "unreadable") {
+				// A directory cannot be read as task text, including when tests run as root.
+				mkdirSync(taskFile);
+				expect(() => readFileSync(taskFile, "utf8")).toThrow();
+			}
+			const result = loadCoordinationRadar(root, { now: NOW });
+			expect(result.source.workbench_data).toBe("live_collection");
+			expect(
+				result.open_tasks.map((entry) => `${entry.session}::${entry.task_id}`),
+			).toEqual(["260618_alpha::T-01", "260618_beta::T-01"]);
+			expect(warningsWith(result, "path_overlap_planned")).toHaveLength(1);
+			expect(result.coverage.observed_complete).toBe(false);
+			expect(result.coverage.incomplete_reasons.join(" ")).toContain(
+				"260618_alpha",
+			);
+			expect(result.coverage.terminal_sessions_excluded).toEqual([]);
+			expect(readFileSync(indexPath, "utf8")).toBe(before);
+		});
+	}
+
+	test("one lost task file retains only its missing tasks alongside live done tasks", () => {
+		const root = createProjectRoot("partial-source");
+		writeTaskFile(
+			root,
+			"260618_alpha",
+			["| T-01 | in_progress | alice | first |"],
+			plannedBlock("T-01", ["src/shared.ts"]),
+		);
+		const first = join(root, ".afol/wb/260618_alpha/260618_alpha_task_01.md");
+		const second = join(root, ".afol/wb/260618_alpha/260618_alpha_task_02.md");
+		renameSync(first, second);
+		writeTaskFile(
+			root,
+			"260618_alpha",
+			["| T-02 | in_progress | bob | second |"],
+			plannedBlock("T-02", ["src/shared.ts"]),
+		);
+		writeTaskFile(
+			root,
+			"260618_beta",
+			["| T-01 | in_progress | carol | other |"],
+			plannedBlock("T-01", ["src/shared.ts"]),
+		);
+		rebuildWorkBenchIndex(root);
+		rmSync(second);
+		writeTaskFile(
+			root,
+			"260618_alpha",
+			["| T-02 | done | bob | second |"],
+			plannedBlock("T-02", ["src/shared.ts"]),
+		);
+		const result = loadCoordinationRadar(root, { now: NOW });
+		expect(
+			result.open_tasks.map((entry) => `${entry.session}::${entry.task_id}`),
+		).toEqual(["260618_alpha::T-01", "260618_beta::T-01"]);
+		expect(warningsWith(result, "path_overlap_planned")).toHaveLength(1);
+		expect(result.coverage.observed_complete).toBe(false);
+	});
+
+	test("readable replacement task sources supersede indexed scope, including removed and done tasks", () => {
+		const root = createProjectRoot("readable-replacement");
+		writeTaskFile(
+			root,
+			"260618_alpha",
+			[
+				"| T-01 | in_progress | alice | removed |",
+				"| T-02 | in_progress | bob | completing |",
+			],
+			[
+				...plannedBlock("T-01", ["src/shared.ts"]),
+				...plannedBlock("T-02", ["src/shared.ts"]),
+			],
+		);
+		writeTaskFile(
+			root,
+			"260618_beta",
+			["| T-01 | in_progress | carol | other |"],
+			plannedBlock("T-01", ["src/shared.ts"]),
+		);
+		rebuildWorkBenchIndex(root);
+		writeTaskFile(
+			root,
+			"260618_alpha",
+			["| T-02 | done | bob | completed |"],
+			plannedBlock("T-02", ["src/shared.ts"]),
+		);
+		const result = loadCoordinationRadar(root, { now: NOW });
+		expect(result.open_tasks.map((entry) => entry.session)).toEqual([
+			"260618_beta",
+		]);
+		expect(overlapWarnings(result)).toEqual([]);
+		expect(result.coverage.observed_complete).toBe(true);
+	});
+
+	test("a live done task in a new source overrides its unavailable indexed source", () => {
+		const root = createProjectRoot("relocated-done");
+		for (const session of ["260618_alpha", "260618_beta"]) {
+			writeTaskFile(
+				root,
+				session,
+				["| T-01 | in_progress | alice | writer |"],
+				plannedBlock("T-01", ["src/shared.ts"]),
+			);
+		}
+		rebuildWorkBenchIndex(root);
+		writeTaskFile(
+			root,
+			"260618_alpha",
+			["| T-01 | done | alice | completed |"],
+			plannedBlock("T-01", ["src/shared.ts"]),
+		);
+		renameSync(
+			join(root, ".afol/wb/260618_alpha/260618_alpha_task_01.md"),
+			join(root, ".afol/wb/260618_alpha/260618_alpha_task_02.md"),
+		);
+		const result = loadCoordinationRadar(root, { now: NOW });
+		expect(result.open_tasks.map((entry) => entry.session)).toEqual([
+			"260618_beta",
+		]);
+		expect(overlapWarnings(result)).toEqual([]);
+		expect(result.coverage.observed_complete).toBe(true);
+	});
+
 	test("degraded session sources mark observed coverage incomplete", () => {
 		const root = createProjectRoot("degraded");
 		writeTaskFile(root, "260618_dup", [
