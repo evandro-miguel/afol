@@ -2159,7 +2159,7 @@
       "type": "workflow",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "List, bind, switch, archive, restore, and unbind sessions",
+      "description": "Coordinate task owners/files (radar, intent); manage sessions",
       "subcommands": [
         {
           "usage": "list",
@@ -2167,9 +2167,14 @@
           "description": "Show active session, context session, and bindings"
         },
         {
-          "usage": "radar --json",
+          "usage": "radar [--json] [--all] [--session <id>] [--strict]",
           "side_effect": "read",
-          "description": "Show compact coordination warnings across open sessions"
+          "description": "Inspect who writes what and advisory overlap/coverage warnings. Read-only advisory context, not a lock, authority or liveness proof. Exit 0 means query completed, not no overlap; --strict returns 1 on critical warnings; errors/unavailable return 2. Lists are bounded; --all removes list limits; --session scopes one observed session. Inspect coverage, omissions and warnings: stale/missing/invalid/unavailable/partial or external coverage is UNKNOWN."
+        },
+        {
+          "usage": "intent --session <id> <task-id> [--owner <text>] [--write <path>]... [--read <path>]... [--clear-write] [--clear-read] [--read-only] [--json]",
+          "side_effect": "write",
+          "description": "Register advisory owner and exact file intent for one open task. Requires an existing open session/task, never creates one. Exit 0 is registration/unchanged (inspect warnings); errors return 2 without writing task intent. Coordinator/registrar records owner and exact writes before governed dispatch/expansion, then verifies radar visibility; distinct task per parallel writer. Owner text is metadata, not verified identity. Repeat --write/--read to replace a list; omitted lists stay unchanged; --clear-write/--clear-read clear them. --read-only requires no remaining writes (use --clear-write for existing writes); reviewers need no write intent. Accepts --session/-S and --task-id/-T or one positional task. Bare or ./ extensionless paths (Makefile) are rejected: use the absolute path, e.g. /path/to/project/Makefile, never ./Makefile. Supported drive/WSL aliases share identity; custom mounts/UNC are unverified. Quote supported globs; literal glob characters are ambiguous. Paths reserve no files."
         },
         {
           "usage": "bind --session <id> --dry-run",

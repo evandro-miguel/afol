@@ -43,6 +43,11 @@ Pass either option only when targeting an explicit session. If a session or work
 resume it before creating overlapping work. Use `afol preflight` before operations that depend on
 project integrity.
 
+## Coordinate writes
+
+Use `afol session radar --json` (`--all`: full; `--session <id>`: scoped). Exit 0 means query completion, never clearance; stale/missing/invalid/unavailable/partial/external coverage is UNKNOWN. Before governed dispatch/expansion, coordinators/authorized registrars use `afol session intent -S <id> <task> --owner <text> --write <path>` (repeat paths), verify scoped readback and give parallel writers distinct tasks. `afol help session` covers exits, clearing, path limits and extensionless absolute paths. Metadata proves no identity/lock/dispatch authority; IDs stay in handoffs.
+Workers follow assigned writes/lifecycle, report overlap/expansion, without global scans or registration/rebuild. Readers need no write intent. Direct work stays session-optional with a pre-write ownership check. Keep dirty work; coordinate shared writes/staging; never silently commit others' staged work.
+
 ## Work lifecycle
 
 When a task fits one pass, use the one-shot path:

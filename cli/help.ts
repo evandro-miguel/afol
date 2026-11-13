@@ -41,7 +41,7 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	bootstrap: "install elsewhere",
 	verify: "verify tasks",
 	"verify-tasks": "verify tasks",
-	session: "manage sessions",
+	session: "owners/files: radar, intent (help session)",
 	rule: "inspect rules",
 	skill: "inspect skills",
 	"local-state": "indexes (ss lists sessions)",

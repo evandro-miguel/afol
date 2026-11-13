@@ -44,6 +44,7 @@ import {
 	type ParsedSessionArgs as ParsedArgs,
 	parseSessionArgs as parseArgs,
 } from "./session-args";
+import { runSessionIntentCommand } from "./session-intent";
 
 type ActionResult = {
 	data: Record<string, unknown>;
@@ -70,6 +71,8 @@ type CoordinationRadarTask = {
 	touched_at?: string | null;
 	planned_files?: CoordinationRadarPath[];
 	touched_files?: CoordinationRadarPath[];
+	read_files?: CoordinationRadarPath[];
+	file_intent?: string;
 	warning_ids?: string[];
 	archived?: boolean;
 };
@@ -103,6 +106,8 @@ type CoordinationRadarSummary = {
 type CoordinationRadarReport = {
 	generated_at?: string | null;
 	freshness?: Record<string, unknown> | null;
+	coverage?: Record<string, unknown> | null;
+	known_sessions?: string[];
 	sessions?: CoordinationRadarSession[];
 	tasks: CoordinationRadarTask[];
 	warnings: CoordinationRadarWarning[];
@@ -112,6 +117,8 @@ type CoordinationRadarReport = {
 type CoordinationRadarSnapshot = {
 	generated_at?: string | null;
 	source?: Record<string, unknown> | null;
+	coverage?: Record<string, unknown> | null;
+	known_sessions?: string[];
 	sessions?: CoordinationRadarSession[];
 	open_tasks?: CoordinationRadarTask[];
 	warnings?: CoordinationRadarWarning[];
@@ -130,6 +137,16 @@ const RADAR_TEXT_WARNING_LIMIT = 3;
 const RADAR_JSON_TASK_LIMIT = 25;
 const RADAR_JSON_WARNING_LIMIT = 10;
 const RADAR_JSON_SESSION_LIMIT = 20;
+const RADAR_JSON_TASK_PATH_LIMIT = 4;
+const RADAR_JSON_TASK_WARNING_LIMIT = 6;
+const RADAR_EXIT_SEMANTICS =
+	"exit 0 means the advisory query completed and is not proof of no conflict; exit 1 only with --strict and critical warnings; exit 2 when the radar is unavailable";
+
+type RadarOptions = {
+	strict: boolean;
+	all: boolean;
+	session: string | null;
+};
 
 let radarReaderOverride: CoordinationRadarReader | null = null;
 
@@ -219,19 +236,62 @@ function formatRadarTask(task: CoordinationRadarTask): string {
 		`owner=${task.owner?.trim() || "(missing)"}`,
 		`planned=${task.planned_files?.length ?? 0}`,
 		`touched=${task.touched_files?.length ?? 0}`,
+		...(task.read_files?.length ? [`read=${task.read_files.length}`] : []),
+		...(task.file_intent ? [`intent=${task.file_intent}`] : []),
 		`warnings=${warningIds}`,
 		`path=${primaryTaskPath(task)}`,
 		`updated=${compactTimestamp(task.touched_at)}`,
 	].join(" ");
 }
 
-function boundRadarTask(task: CoordinationRadarTask): CoordinationRadarTask {
+function boundRadarTask(
+	task: CoordinationRadarTask,
+	all: boolean,
+): CoordinationRadarTask & {
+	omitted: {
+		planned_files: number;
+		touched_files: number;
+		read_files?: number;
+		warning_ids: number;
+	};
+} {
+	const planned = task.planned_files ?? [];
+	const touched = task.touched_files ?? [];
+	const read = task.read_files;
+	const warningIds = task.warning_ids ?? [];
+	const pathLimit = all
+		? planned.length + touched.length + (read?.length ?? 0)
+		: RADAR_JSON_TASK_PATH_LIMIT;
+	const warningLimit = all ? warningIds.length : RADAR_JSON_TASK_WARNING_LIMIT;
 	return {
 		...task,
-		planned_files: (task.planned_files ?? []).slice(0, 4),
-		touched_files: (task.touched_files ?? []).slice(0, 4),
-		warning_ids: (task.warning_ids ?? []).slice(0, 6),
+		planned_files: planned.slice(0, pathLimit),
+		touched_files: touched.slice(0, pathLimit),
+		...(read ? { read_files: read.slice(0, pathLimit) } : {}),
+		warning_ids: warningIds.slice(0, warningLimit),
+		omitted: {
+			planned_files: Math.max(0, planned.length - pathLimit),
+			touched_files: Math.max(0, touched.length - pathLimit),
+			...(read ? { read_files: Math.max(0, read.length - pathLimit) } : {}),
+			warning_ids: Math.max(0, warningIds.length - warningLimit),
+		},
 	};
+}
+
+function warningAffectsSession(
+	warning: CoordinationRadarWarning,
+	session: string,
+): boolean {
+	const affected = warning.affected_tasks ?? [];
+	// Source-level warnings (index freshness) apply to every scope.
+	if (affected.length === 0) {
+		return true;
+	}
+	return affected.some((entry) =>
+		typeof entry === "string"
+			? entry === session || entry.startsWith(`${session}:`)
+			: entry.session === session,
+	);
 }
 
 function normalizeRadarReport(
@@ -248,7 +308,11 @@ function normalizeRadarReport(
 		freshness,
 		tasks: "tasks" in report ? report.tasks : (report.open_tasks ?? []),
 		warnings: report.warnings ?? [],
+		coverage: report.coverage ?? null,
 	};
+	if (report.known_sessions !== undefined) {
+		normalized.known_sessions = report.known_sessions;
+	}
 	if (report.sessions !== undefined) {
 		normalized.sessions = report.sessions;
 	}
@@ -262,13 +326,36 @@ function getCoordinationRadarReader(): CoordinationRadarReader {
 	return radarReaderOverride ?? loadCoordinationRadar;
 }
 
+/** An invalid radar invocation, reported as exit 2 rather than unavailable. */
+class RadarInvocationError extends Error {}
+
+function assertRadarScopeExists(
+	report: CoordinationRadarReport,
+	session: string | null,
+): void {
+	if (session === null) {
+		return;
+	}
+	const known = new Set([
+		...(report.known_sessions ?? []),
+		...(report.sessions ?? []).map((entry) => entry.session),
+		...report.tasks.map((task) => task.session),
+	]);
+	if (!known.has(session)) {
+		throw new RadarInvocationError(
+			`session not found for session radar --session: ${session}; no observed workbench data names it, so an empty result would not mean clear`,
+		);
+	}
+}
+
 async function radarSessions(
 	projectRoot: string,
-	strict: boolean,
+	options: RadarOptions,
 ): Promise<ActionResult> {
 	const reader = getCoordinationRadarReader();
-	const report = await reader(projectRoot);
-	return prepareRadarResult(normalizeRadarReport(report), strict);
+	const report = normalizeRadarReport(await reader(projectRoot));
+	assertRadarScopeExists(report, options.session);
+	return prepareRadarResult(report, options);
 }
 
 function emitRadarError(
@@ -511,45 +598,114 @@ function listSessions(projectRoot: string, debug: boolean): ActionResult {
 
 function prepareRadarResult(
 	report: CoordinationRadarReport,
-	strict: boolean,
+	options: RadarOptions,
 ): ActionResult {
-	const tasks = report.tasks.filter(isOpenTask);
-	const warnings = [...report.warnings].sort(
-		(left, right) =>
-			severityWeight(left.severity) - severityWeight(right.severity) ||
-			left.id.localeCompare(right.id),
-	);
+	const scopeSession = options.session;
+	const tasks = report.tasks
+		.filter(isOpenTask)
+		.filter((task) => scopeSession === null || task.session === scopeSession);
+	const warnings = [...report.warnings]
+		.filter(
+			(warning) =>
+				scopeSession === null || warningAffectsSession(warning, scopeSession),
+		)
+		.sort(
+			(left, right) =>
+				severityWeight(left.severity) - severityWeight(right.severity) ||
+				left.id.localeCompare(right.id),
+		);
 	const sessions =
-		report.sessions?.filter((session) => session.archived !== true) ??
+		report.sessions
+			?.filter((session) => session.archived !== true)
+			.filter(
+				(session) => scopeSession === null || session.session === scopeSession,
+			) ??
 		Array.from(new Set(tasks.map((task) => task.session))).map((session) => ({
 			session,
 		}));
-	const summary = summarizeRadar({ ...report, tasks, warnings, sessions });
+	// A reader-supplied summary describes the whole report, not one session.
+	const { summary: reportSummary, ...reportBody } = report;
+	const summary = summarizeRadar({
+		...reportBody,
+		...(scopeSession === null && reportSummary
+			? { summary: reportSummary }
+			: {}),
+		tasks,
+		warnings,
+		sessions,
+	});
 	const topWarnings = warnings.slice(0, RADAR_TEXT_WARNING_LIMIT);
-	const exitCode = strict && summary.critical > 0 ? 1 : 0;
+	const exitCode = options.strict && summary.critical > 0 ? 1 : 0;
+	const limit = (value: number) =>
+		options.all ? Number.POSITIVE_INFINITY : value;
+	const omitted = {
+		sessions: Math.max(0, sessions.length - limit(RADAR_JSON_SESSION_LIMIT)),
+		tasks: Math.max(0, tasks.length - limit(RADAR_JSON_TASK_LIMIT)),
+		warnings: Math.max(0, warnings.length - limit(RADAR_JSON_WARNING_LIMIT)),
+	};
+	const boundedTasks = tasks
+		.slice(0, limit(RADAR_JSON_TASK_LIMIT))
+		.map((task) => boundRadarTask(task, options.all));
+	const anyOmitted =
+		omitted.sessions + omitted.tasks + omitted.warnings > 0 ||
+		boundedTasks.some(
+			(task) =>
+				task.omitted.planned_files +
+					task.omitted.touched_files +
+					(task.omitted.read_files ?? 0) +
+					task.omitted.warning_ids >
+				0,
+		);
+	const coverage = report.coverage ?? null;
+	const coverageLine =
+		coverage === null
+			? "coverage: unknown; absence of warnings is not proof of no conflict"
+			: `coverage: observed ${String((coverage.observed_sources as unknown[] | undefined)?.join(" + ") ?? "unknown")}; observed_complete=${String(coverage.observed_complete ?? "unknown")}; work outside these sources is not visible`;
+	const hiddenWarnings = warnings.length - topWarnings.length;
 	return {
 		data: {
 			warning_policy: "context-only",
+			exit_semantics: RADAR_EXIT_SEMANTICS,
 			generated_at: report.generated_at ?? null,
 			freshness: report.freshness ?? null,
-			summary,
-			sessions: sessions.slice(0, RADAR_JSON_SESSION_LIMIT),
-			tasks: tasks.slice(0, RADAR_JSON_TASK_LIMIT).map(boundRadarTask),
-			warnings: warnings.slice(0, RADAR_JSON_WARNING_LIMIT),
-			truncated: {
-				sessions: sessions.length > RADAR_JSON_SESSION_LIMIT,
-				tasks: tasks.length > RADAR_JSON_TASK_LIMIT,
-				warnings: warnings.length > RADAR_JSON_WARNING_LIMIT,
+			coverage,
+			scope: {
+				session: scopeSession,
+				all: options.all,
+				...(scopeSession === null ? {} : { exists: true }),
 			},
+			summary,
+			sessions: sessions.slice(0, limit(RADAR_JSON_SESSION_LIMIT)),
+			tasks: boundedTasks,
+			warnings: warnings.slice(0, limit(RADAR_JSON_WARNING_LIMIT)),
+			truncated: {
+				sessions: omitted.sessions > 0,
+				tasks: omitted.tasks > 0,
+				warnings: omitted.warnings > 0,
+			},
+			omitted,
+			recovery_hint: anyOmitted
+				? "rerun with --all for every list, or --session <id> to scope to one session"
+				: null,
 		},
 		lines: [
 			"session radar: warnings are context only, not locks",
 			`summary: sessions=${summary.sessions} open_tasks=${summary.open_tasks} warnings=${summary.warnings} critical=${summary.critical} warning=${summary.warning} info=${summary.info}`,
+			coverageLine,
 			...(topWarnings.length > 0
-				? ["warnings:", ...topWarnings.map(formatRadarWarning)]
-				: ["warnings: none"]),
+				? [
+						"warnings:",
+						...topWarnings.map(formatRadarWarning),
+						...(hiddenWarnings > 0
+							? [
+									`  (+${hiddenWarnings} more warnings; run afol session radar --json --all)`,
+								]
+							: []),
+					]
+				: ["warnings: none in observed sources"]),
 			"open tasks:",
 			...(tasks.length > 0 ? tasks.map(formatRadarTask) : ["  (none)"]),
+			"note: exit 0 means the query ran, not that no conflict exists",
 		],
 		exitCode,
 	};
@@ -808,7 +964,10 @@ function writeSessionError(
 		errorCode = "SESSION_NOT_FOUND";
 	} else if (message.includes("requires local interactive approval")) {
 		errorCode = "SESSION_APPROVAL_REQUIRED";
-	} else if (message.includes("Missing value for")) {
+	} else if (
+		message.includes("Missing value for") ||
+		message.startsWith("Unknown session radar argument")
+	) {
 		errorCode = "SESSION_PARSE_ERROR";
 	}
 	if (parsed.json) {
@@ -834,6 +993,10 @@ export async function runSessionCommand(
 	ctx: OperationContext = defaultOperationContext(),
 	runtime: SessionCommandRuntime = {},
 ): Promise<number> {
+	if (action === "intent") {
+		// Task-level flags (-S, --owner, --write) have their own parser.
+		return runSessionIntentCommand(args, projectRoot, io, ctx);
+	}
 	let parsed: ParsedArgs;
 	try {
 		parsed = parseArgs(args);
@@ -845,6 +1008,7 @@ export async function runSessionCommand(
 				dryRun: false,
 				debug: false,
 				strict: false,
+				all: false,
 				branch: null,
 				actor: null,
 				reason: null,
@@ -916,14 +1080,26 @@ export async function runSessionCommand(
 			);
 		}
 		if (action === "radar") {
+			// Radar takes no positional input; an unmatched argument is a typo.
+			const unknown = parsed.positional[0];
+			if (unknown !== undefined) {
+				throw new Error(`Unknown session radar argument: ${unknown}`);
+			}
 			try {
 				return emit(
-					await radarSessions(projectRoot, parsed.strict),
+					await radarSessions(projectRoot, {
+						strict: parsed.strict,
+						all: parsed.all,
+						session: parsed.session,
+					}),
 					"session.radar",
 					parsed.json,
 					io,
 				);
 			} catch (error) {
+				if (error instanceof RadarInvocationError) {
+					return writeSessionError(error, parsed, io);
+				}
 				return emitRadarError(parsed, io, (error as Error).message);
 			}
 		}
@@ -935,13 +1111,13 @@ export async function runSessionCommand(
 					envelopeErr("SESSION_ACTION_UNKNOWN", message, {
 						action: "session",
 						exitCode: 2,
-						hint: "use list, bind, switch, unbind, archive, restore, or radar",
+						hint: "use list, bind, switch, unbind, archive, restore, radar, or intent",
 					}),
 				),
 			);
 		} else {
 			io.stderr(
-				'err session-action-unknown hint="use list, bind, switch, unbind, archive, restore, or radar"',
+				'err session-action-unknown hint="use list, bind, switch, unbind, archive, restore, radar, or intent"',
 			);
 		}
 		return 2;

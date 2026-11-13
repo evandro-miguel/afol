@@ -8,6 +8,7 @@ describe("session argument compatibility", () => {
 			dryRun: false,
 			debug: false,
 			strict: false,
+			all: false,
 			branch: null,
 			actor: null,
 			reason: null,

@@ -2026,7 +2026,7 @@ describe("afol session command", () => {
 			const code = await runSessionCommand("nope", [], root, io.io);
 			expect(code).toBe(2);
 			expect(io.stderr.join("\n")).toContain(
-				"use list, bind, switch, unbind, archive, restore, or radar",
+				"use list, bind, switch, unbind, archive, restore, radar, or intent",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

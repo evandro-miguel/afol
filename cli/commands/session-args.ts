@@ -7,6 +7,7 @@ export type ParsedSessionArgs = {
 	dryRun: boolean;
 	debug: boolean;
 	strict: boolean;
+	all: boolean;
 	branch: string | null;
 	actor: string | null;
 	reason: string | null;
@@ -42,6 +43,7 @@ const FLAGS: readonly FlagDef<ParsedSessionArgs>[] = [
 	{ names: ["--dry-run"], kind: "flag", key: "dryRun" },
 	{ names: ["--debug"], kind: "flag", key: "debug" },
 	{ names: ["--strict"], kind: "flag", key: "strict" },
+	{ names: ["--all"], kind: "flag", key: "all" },
 	{ names: ["--candidates"], kind: "flag", key: "candidates" },
 	{
 		names: ["--session"],
@@ -89,6 +91,7 @@ export function parseSessionArgs(args: string[]): ParsedSessionArgs {
 			dryRun: false,
 			debug: false,
 			strict: false,
+			all: false,
 			branch: null,
 			actor: null,
 			reason: null,
