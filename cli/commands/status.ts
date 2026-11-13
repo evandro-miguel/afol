@@ -70,6 +70,7 @@ type StatusSessionInfo = {
 };
 
 type StatusJsonData = {
+	coordination_hint: string;
 	status: string;
 	task: string;
 	files_written: string[];
@@ -97,6 +98,8 @@ type StatusJsonData = {
 	open_sessions_omitted?: number;
 };
 
+const COORDINATION_HINT =
+	"who writes what: afol session radar --json (advisory; inspect coverage); register: afol help session";
 const COMPACT_LIST_LIMIT = 5;
 
 const FIELD_HEADERS = [
@@ -871,6 +874,7 @@ export function runStatusCommand(
 		const blockers = capList(snapshot.blockers);
 		const next = capList(snapshot.next);
 		const data: StatusJsonData = {
+			coordination_hint: COORDINATION_HINT,
 			status: snapshot.status,
 			task: snapshot.task,
 			files_written: filesWritten.entries,
@@ -937,7 +941,7 @@ export function runStatusCommand(
 		return 0;
 	}
 
-	const output = formatCompact(snapshot);
+	const output = `${formatCompact(snapshot)}\nCOORDINATION: ${COORDINATION_HINT}`;
 	io.stdout(output);
 	finishMeasurement(output);
 	return 0;

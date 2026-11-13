@@ -1,4 +1,4 @@
-import { relative, resolve } from "node:path";
+import { posix, relative, resolve } from "node:path";
 import {
 	loadMutationJournal,
 	type MutationRecord,
@@ -6,9 +6,11 @@ import {
 } from "../mutations/journal";
 import { resolveProjectPaths } from "../project/paths";
 import {
+	collectTerminalSessionEvidence,
 	collectWorkBenchSnapshot,
 	loadWorkBenchIndexSnapshot,
 	normalizeWorkbenchSnapshot,
+	type TerminalSessionEvidence,
 	validateWorkBenchIndex,
 	type WorkbenchIndexFileClaim,
 	type WorkbenchIndexSnapshot,
@@ -21,7 +23,10 @@ export type CoordinationWarningId =
 	| "path_overlap_planned"
 	| "path_overlap_touched"
 	| "mutation_overlap"
+	| "touched_overlap"
+	| "unsupported_path_pattern"
 	| "missing_file_intent"
+	| "contradictory_file_intent"
 	| "missing_owner"
 	| "stale_task_context"
 	| "stale_coordination_index";
@@ -32,9 +37,25 @@ export type CoordinationPathSource =
 	| WorkbenchIndexFileClaim["source"]
 	| "mutation";
 
+export type CoordinationPathKind =
+	| "exact"
+	| "glob"
+	| "directory"
+	| "unsupported";
+
+/**
+ * project: relative to the AFOL project root. external: an absolute path
+ * outside it. Relative claims always mean project-relative, so work in another
+ * repository must be claimed with absolute paths. A claim naming the project
+ * root itself (`.`, `./` or the absolute root) is the directory `./`, which
+ * covers every project path.
+ */
+export type CoordinationPathScope = "project" | "external";
+
 export type CoordinationTaskPath = {
 	path: string;
-	kind: "exact" | "glob";
+	kind: CoordinationPathKind;
+	scope: CoordinationPathScope;
 	source: CoordinationPathSource;
 	line?: number;
 	mutation_id?: string;
@@ -53,14 +74,17 @@ export type CoordinationWarning = {
 	affected_paths: string[];
 	source: "workbench" | "mutation_journal" | "coordination_index";
 	recovery_hint: string;
+	overlap?: "confirmed" | "possible";
 };
 
 export type CoordinationRadarTask = Omit<
 	WorkbenchIndexTask,
-	"planned_files" | "touched_files"
+	"planned_files" | "touched_files" | "read_files"
 > & {
 	planned_files: CoordinationTaskPath[];
 	touched_files: CoordinationTaskPath[];
+	/** Declared reads. They never take part in overlap rules. */
+	read_files?: CoordinationTaskPath[];
 	warning_ids: CoordinationWarningId[];
 	age_ms: number;
 	is_stale: boolean;
@@ -72,10 +96,34 @@ export type CoordinationRadarSnapshot = {
 	source: {
 		workbench_index: string;
 		mutation_journal: string;
-		workbench_status: "fresh" | "missing" | "stale" | "invalid";
+		workbench_status: "fresh" | "missing" | "stale" | "invalid" | "degraded";
+		workbench_data: "persisted_index" | "live_collection" | "injected";
 	};
+	coverage: CoordinationCoverage;
+	/** Every session named by the workbench data, open or not. */
+	known_sessions: string[];
 	open_tasks: CoordinationRadarTask[];
 	warnings: CoordinationWarning[];
+};
+
+/**
+ * Radar warnings are advisory. Coverage states which sources were read and why
+ * a quiet result can still hide conflicts.
+ */
+export type CoordinationCoverage = {
+	observed_sources: ["afol_workbench_tasks", "afol_mutation_journal"];
+	observed_complete: boolean;
+	incomplete_reasons: string[];
+	unobserved: string[];
+	/**
+	 * Sessions known only to a non-fresh index that current lifecycle evidence
+	 * shows as terminal, so their persisted tasks were not resurrected.
+	 */
+	terminal_sessions_excluded: {
+		session: string;
+		evidence: TerminalSessionEvidence;
+	}[];
+	no_warnings_means: "no_conflict_in_observed_sources_only";
 };
 
 type CoordinationBuildOptions = {
@@ -97,6 +145,7 @@ type MutationTaskData = {
 type WarningAccumulator = {
 	id: CoordinationWarningId;
 	severity: CoordinationWarningSeverity;
+	overlap?: "confirmed" | "possible";
 	reason: string;
 	source: CoordinationWarning["source"];
 	recovery_hint: string;
@@ -111,33 +160,261 @@ const OPEN_STATES = new Set([
 	"tested_needs_spec_validation",
 	"problem",
 ]);
-const GENERIC_OWNER_RE = /^(?:n\/a|none|unknown|unassigned|tbd|-)?$/i;
-const GLOB_TOKEN_RE = /[*?[\]{}]/;
+// `worker` and `agent` are lifecycle defaults, not identities.
+const GENERIC_OWNER_RE =
+	/^(?:n\/a|none|unknown|unassigned|tbd|todo|worker|agent|default|owner|-)?$/i;
 
-function normalizeRelativePath(root: string, raw: string): string {
-	const value = raw.trim().replace(/\\/g, "/").replace(/^\.\//, "");
-	if (value.length === 0) {
-		return value;
+/** True for owners the radar reports as missing_owner. */
+export function isGenericTaskOwner(owner: string): boolean {
+	return GENERIC_OWNER_RE.test(owner.trim());
+}
+const GLOB_TOKEN_RE = /[*?[\]{}]/;
+// Bun.Glob has no extglob; a leading "!" negates instead of claiming a path.
+const UNSUPPORTED_PATTERN_RE = /^!|[@!+*?]\(/;
+const DRIVE_PATH_RE = /^([A-Za-z]):(?:\/(.*))?$/;
+const PROJECT_ROOT_DISPLAY = "./";
+// Default WSL automount root; custom automount roots stay plain POSIX paths.
+const WSL_MOUNT_PATH_RE = /^\/mnt\/([A-Za-z])(?:\/(.*))?$/;
+
+type ParsedPath = {
+	path: string;
+	kind: CoordinationPathKind;
+	scope: CoordinationPathScope;
+};
+
+/**
+ * Windows drive paths (`D:/x`, `D:\x`) and their WSL mounts (`/mnt/d/x`) share
+ * one identity key. Only drive paths fold case; Linux paths never do.
+ */
+function driveKey(path: string): string | null {
+	const match = path.match(DRIVE_PATH_RE) ?? path.match(WSL_MOUNT_PATH_RE);
+	if (!match?.[1]) {
+		return null;
 	}
-	if (GLOB_TOKEN_RE.test(value)) {
-		return value;
+	const rest = posix.normalize(`/${match[2] ?? ""}`);
+	return `${match[1].toLowerCase()}:${rest}`.toLowerCase().replace(/\/$/, "");
+}
+
+function absoluteKey(path: string): string {
+	return driveKey(path) ?? posix.normalize(path).replace(/(.)\/$/, "$1");
+}
+
+/**
+ * Bun.Glob matches nothing, without an error, for unbalanced `[` or `{`, so
+ * such claims would read as clear. Classes must close within one segment.
+ */
+function isMalformedGlob(value: string): boolean {
+	let braces = 0;
+	for (let index = 0; index < value.length; index += 1) {
+		const char = value[index];
+		if (char === "[") {
+			const close = value.indexOf("]", index + 1);
+			const body = close < 0 ? "" : value.slice(index + 1, close);
+			if (close < 0 || body.replace(/^[!^]/, "") === "" || body.includes("/")) {
+				return true;
+			}
+			index = close;
+		} else if (char === "]") {
+			return true;
+		} else if (char === "{") {
+			braces += 1;
+		} else if (char === "}") {
+			braces -= 1;
+			if (braces < 0) {
+				return true;
+			}
+		}
 	}
-	const absolute = resolve(root, value);
-	const relativePath = relative(root, absolute).replace(/\\/g, "/");
-	return relativePath.startsWith("../") ? value : relativePath;
+	return braces !== 0;
+}
+
+function parsePath(root: string, raw: string): ParsedPath {
+	let value = raw.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+	const isDirectory = value.length > 1 && value.endsWith("/");
+	value = value.replace(/(.)\/+$/, "$1");
+	if (value === "" || value === ".") {
+		return { path: PROJECT_ROOT_DISPLAY, kind: "directory", scope: "project" };
+	}
+	const kind: CoordinationPathKind =
+		UNSUPPORTED_PATTERN_RE.test(value) || isMalformedGlob(value)
+			? "unsupported"
+			: GLOB_TOKEN_RE.test(value)
+				? "glob"
+				: isDirectory
+					? "directory"
+					: "exact";
+	if (kind === "unsupported") {
+		return { path: value, kind, scope: "project" };
+	}
+	const isAbsolute = value.startsWith("/") || DRIVE_PATH_RE.test(value);
+	const absolute = isAbsolute ? value : resolve(root, value);
+	const rootKey = absoluteKey(resolve(root));
+	const pathKey = absoluteKey(absolute);
+	let display = isAbsolute
+		? value
+		: relative(root, absolute).replace(/\\/g, "/");
+	let scope: CoordinationPathScope = "project";
+	if (pathKey === rootKey || pathKey.startsWith(`${rootKey}/`)) {
+		if (isAbsolute) {
+			// Keep the claim's own spelling of the project-relative remainder.
+			const segments = pathKey.split("/").length - rootKey.split("/").length;
+			const parts = posix
+				.normalize(absolute.replace(/^[A-Za-z]:/, ""))
+				.split("/");
+			display = parts.slice(parts.length - segments).join("/");
+		}
+		if (display === "" && kind !== "glob") {
+			return { path: PROJECT_ROOT_DISPLAY, kind: "directory", scope };
+		}
+	} else {
+		scope = "external";
+		display = isAbsolute ? value : absolute;
+	}
+	if (kind === "directory") {
+		display = `${display}/`;
+	}
+	return { path: display, kind, scope };
+}
+
+/** The radar's reading of one claim string, for registration checks. */
+export function classifyCoordinationClaim(
+	root: string,
+	raw: string,
+): Pick<CoordinationTaskPath, "path" | "kind" | "scope"> {
+	return parsePath(root, raw);
 }
 
 function toCoordinationPath(
 	root: string,
 	claim: WorkbenchIndexFileClaim,
 ): CoordinationTaskPath {
-	const path = normalizeRelativePath(root, claim.path);
+	const parsed = parsePath(root, claim.path);
 	return {
-		path,
-		kind: claim.kind,
+		...parsed,
 		source: claim.source,
 		line: claim.line,
 	};
+}
+
+/**
+ * Identity, not display: a project on a drive mount (`/mnt/x/...` or `X:/...`)
+ * folds case like drive paths do; a Linux project stays case-sensitive. The
+ * project root directory has the empty key. Display keeps the claim spelling.
+ */
+function comparisonKey(path: ParsedPath, foldProjectCase: boolean): string {
+	if (path.scope === "project" && path.path === PROJECT_ROOT_DISPLAY) {
+		return "";
+	}
+	const bare = path.kind === "directory" ? path.path.slice(0, -1) : path.path;
+	if (path.scope === "external") {
+		return absoluteKey(bare);
+	}
+	return foldProjectCase && path.kind !== "unsupported"
+		? bare.toLowerCase()
+		: bare;
+}
+
+/** Registration and radar share identity; the caller keeps display spelling. */
+export function coordinationClaimIdentity(root: string, raw: string): string {
+	const parsed = parsePath(root, raw);
+	return `${parsed.scope}:${comparisonKey(parsed, driveKey(resolve(root)) !== null)}`;
+}
+
+function keySegments(key: string): string[] {
+	return key === "" ? [] : key.split("/");
+}
+
+function isInsideDirectory(directoryKey: string, otherKey: string): boolean {
+	if (directoryKey === "") {
+		return otherKey !== "";
+	}
+	const prefix = directoryKey.endsWith("/") ? directoryKey : `${directoryKey}/`;
+	return otherKey.startsWith(prefix);
+}
+
+function globSegmentsPrefix(pattern: string): string[] {
+	const segments = pattern.split("/");
+	const index = segments.findIndex((segment) => GLOB_TOKEN_RE.test(segment));
+	return index < 0 ? segments : segments.slice(0, index);
+}
+
+function isSegmentPrefix(left: string[], right: string[]): boolean {
+	const shorter = left.length <= right.length ? left : right;
+	const longer = shorter === left ? right : left;
+	return shorter.every((segment, index) => longer[index] === segment);
+}
+
+/**
+ * Returns how two claims overlap, or null when they cannot. Kinds are
+ * classified before text equality: identical globs only describe the same
+ * pattern, and unsupported or malformed claims can never prove a collision.
+ */
+function pathsOverlap(
+	a: CoordinationTaskPath,
+	b: CoordinationTaskPath,
+	foldProjectCase: boolean,
+): "confirmed" | "possible" | null {
+	if (a.scope !== b.scope) {
+		return null;
+	}
+	const keyA = comparisonKey(a, foldProjectCase);
+	const keyB = comparisonKey(b, foldProjectCase);
+	if (a.kind === "unsupported" || b.kind === "unsupported") {
+		return keyA === keyB ? "possible" : null;
+	}
+	if (a.kind === "glob" && b.kind === "glob") {
+		return keyA === keyB ||
+			isSegmentPrefix(globSegmentsPrefix(keyA), globSegmentsPrefix(keyB))
+			? "possible"
+			: null;
+	}
+	if (keyA === keyB) {
+		return "confirmed";
+	}
+	if (a.kind === "glob" || b.kind === "glob") {
+		const [glob, other] = a.kind === "glob" ? [keyA, b] : [keyB, a];
+		const otherKey = other === a ? keyA : keyB;
+		if (new Bun.Glob(glob).match(otherKey)) {
+			return "confirmed";
+		}
+		if (other.kind !== "directory") {
+			return null;
+		}
+		const stem = globSegmentsPrefix(glob);
+		const directory = keySegments(otherKey);
+		if (!isSegmentPrefix(stem, directory)) {
+			return null;
+		}
+		// Every match of a glob rooted inside the directory lies inside it.
+		return stem.length >= directory.length ? "confirmed" : "possible";
+	}
+	if (a.kind === "directory" && isInsideDirectory(keyA, keyB)) {
+		return "confirmed";
+	}
+	if (b.kind === "directory" && isInsideDirectory(keyB, keyA)) {
+		return "confirmed";
+	}
+	return null;
+}
+
+/**
+ * Pure claim comparison for one project root, with no filesystem access, so
+ * drive-mounted roots can be checked without reading or writing the mount.
+ */
+export function compareCoordinationClaims(
+	root: string,
+	left: string,
+	right: string,
+): "confirmed" | "possible" | null {
+	const parse = (raw: string): CoordinationTaskPath => ({
+		...parsePath(root, raw),
+		source: "planned",
+	});
+	return pathsOverlap(
+		parse(left),
+		parse(right),
+		driveKey(resolve(root)) !== null,
+	);
 }
 
 function mutationPaths(
@@ -159,10 +436,10 @@ function mutationPaths(
 			if (typeof rawPath !== "string" || rawPath.trim().length === 0) {
 				continue;
 			}
-			const normalized = normalizeRelativePath(root, rawPath);
+			// Journal paths name real files, so glob characters are literal.
 			current.paths.push({
-				path: normalized,
-				kind: GLOB_TOKEN_RE.test(normalized) ? "glob" : "exact",
+				...parsePath(root, rawPath),
+				kind: "exact",
 				source: "mutation",
 				mutation_id: record.id,
 			});
@@ -221,70 +498,6 @@ function dedupePaths(paths: CoordinationTaskPath[]): CoordinationTaskPath[] {
 	return deduped;
 }
 
-function globToRegExp(pattern: string): RegExp {
-	let regex = "^";
-	for (let index = 0; index < pattern.length; index += 1) {
-		const char = pattern[index] ?? "";
-		const next = pattern[index + 1] ?? "";
-		if (char === "*") {
-			if (next === "*") {
-				regex += ".*";
-				index += 1;
-			} else {
-				regex += "[^/]*";
-			}
-			continue;
-		}
-		if (char === "?") {
-			regex += "[^/]";
-			continue;
-		}
-		if ("\\^$.+()|{}".includes(char)) {
-			regex += `\\${char}`;
-			continue;
-		}
-		if (char === "[") {
-			regex += "\\[";
-			continue;
-		}
-		if (char === "]") {
-			regex += "\\]";
-			continue;
-		}
-		regex += char;
-	}
-	regex += "$";
-	return new RegExp(regex);
-}
-
-function globStem(pattern: string): string {
-	return pattern.split(/[*?[\]{}]/, 1)[0]?.replace(/\/+$/, "") ?? "";
-}
-
-function pathsOverlap(
-	a: CoordinationTaskPath,
-	b: CoordinationTaskPath,
-): boolean {
-	if (a.kind === "exact" && b.kind === "exact") {
-		return a.path === b.path;
-	}
-	if (a.kind === "glob" && b.kind === "exact") {
-		return globToRegExp(a.path).test(b.path);
-	}
-	if (a.kind === "exact" && b.kind === "glob") {
-		return globToRegExp(b.path).test(a.path);
-	}
-	if (a.path === b.path) {
-		return true;
-	}
-	const stemA = globStem(a.path);
-	const stemB = globStem(b.path);
-	if (stemA.length === 0 || stemB.length === 0) {
-		return true;
-	}
-	return stemA.startsWith(stemB) || stemB.startsWith(stemA);
-}
-
 function latestTaskTimestamp(
 	task: WorkbenchIndexTask,
 	mutationData?: MutationTaskData,
@@ -309,10 +522,130 @@ function classifyWorkbenchStatus(
 	if (status.message.startsWith("missing ")) {
 		return "missing";
 	}
-	if (status.message.startsWith("invalid ")) {
+	if (
+		status.message.startsWith("invalid ") ||
+		status.message.includes("event ledger invalid")
+	) {
 		return "invalid";
 	}
+	if (status.message.startsWith("degraded ")) {
+		return "degraded";
+	}
 	return "stale";
+}
+
+type WorkbenchSelection = {
+	snapshot: WorkbenchIndexSnapshot;
+	data: CoordinationRadarSnapshot["source"]["workbench_data"];
+	incompleteReasons: string[];
+	terminalExcluded: CoordinationCoverage["terminal_sessions_excluded"];
+};
+
+/**
+ * Drops persisted sessions whose directory is gone and whose current
+ * lifecycle is terminal (archived, or closed in a valid event ledger). This is
+ * task lifecycle evidence only; it says nothing about agent liveness.
+ */
+function withoutTerminalSessions(
+	root: string,
+	snapshot: Pick<WorkbenchIndexSnapshot, "sessions" | "tasks">,
+	candidates: Iterable<string>,
+): {
+	sessions: WorkbenchIndexSnapshot["sessions"];
+	tasks: WorkbenchIndexSnapshot["tasks"];
+	excluded: CoordinationCoverage["terminal_sessions_excluded"];
+} {
+	const evidence = collectTerminalSessionEvidence(root, candidates);
+	return {
+		sessions: snapshot.sessions.filter((entry) => !evidence.has(entry.session)),
+		tasks: snapshot.tasks.filter((task) => !evidence.has(task.session)),
+		excluded: [...evidence]
+			.map(([session, kind]) => ({ session, evidence: kind }))
+			.sort((a, b) => a.session.localeCompare(b.session)),
+	};
+}
+
+/**
+ * A non-fresh persisted index can omit newly registered scope, so the radar
+ * reads session task files directly instead. It never rewrites the index.
+ * Sessions known only to the persisted index are kept, so the fallback can
+ * add warnings but never drop scope, unless current lifecycle evidence shows
+ * them archived or closed.
+ */
+function selectWorkbench(
+	root: string,
+	status: { ok: boolean; message: string },
+): WorkbenchSelection {
+	const persisted = loadWorkBenchIndexSnapshot(root);
+	if (status.ok && persisted) {
+		return {
+			snapshot: persisted,
+			data: "persisted_index",
+			incompleteReasons: [],
+			terminalExcluded: [],
+		};
+	}
+	try {
+		const live = collectWorkBenchSnapshot(root);
+		const liveSessions = new Set(live.sessions.map((entry) => entry.session));
+		for (const task of live.tasks) {
+			liveSessions.add(task.session);
+		}
+		const extras = withoutTerminalSessions(
+			root,
+			{
+				sessions: (persisted?.sessions ?? []).filter(
+					(entry) => !liveSessions.has(entry.session),
+				),
+				tasks: (persisted?.tasks ?? []).filter(
+					(task) => !liveSessions.has(task.session),
+				),
+			},
+			[
+				...(persisted?.sessions ?? []).map((entry) => entry.session),
+				...(persisted?.tasks ?? []).map((task) => task.session),
+			].filter((session) => !liveSessions.has(session)),
+		);
+		const extraSessions = extras.sessions;
+		const extraTasks = extras.tasks;
+		const extraNames = [
+			...new Set([
+				...extraSessions.map((entry) => entry.session),
+				...extraTasks.map((task) => task.session),
+			]),
+		].sort();
+		return {
+			snapshot: {
+				...live,
+				sessions: [...live.sessions, ...extraSessions],
+				tasks: [...live.tasks, ...extraTasks],
+			},
+			data: "live_collection",
+			incompleteReasons:
+				extraNames.length > 0
+					? [
+							`persisted index lists sessions without readable task files and no terminal lifecycle evidence, kept from the index: ${extraNames.join(", ")}`,
+						]
+					: [],
+			terminalExcluded: extras.excluded,
+		};
+	} catch (error) {
+		if (!persisted) {
+			throw error;
+		}
+		const kept = withoutTerminalSessions(root, persisted, [
+			...persisted.sessions.map((entry) => entry.session),
+			...persisted.tasks.map((task) => task.session),
+		]);
+		return {
+			snapshot: { ...persisted, sessions: kept.sessions, tasks: kept.tasks },
+			data: "persisted_index",
+			incompleteReasons: [
+				`live workbench collection failed (${(error as Error).message}); fell back to a non-fresh persisted index that may omit tasks or claims`,
+			],
+			terminalExcluded: kept.excluded,
+		};
+	}
 }
 
 function addWarning(
@@ -326,6 +659,8 @@ function addWarning(
 		tasks: CoordinationTaskRef[];
 		paths?: string[];
 		group?: string;
+		aggregatePaths?: boolean;
+		overlap?: "confirmed" | "possible";
 	},
 ): void {
 	const taskKeys = sortTaskRefs(input.tasks).map(taskKey);
@@ -333,7 +668,7 @@ function addWarning(
 		input.id,
 		input.source,
 		input.group ?? taskKeys.join("|"),
-		sortPaths(input.paths ?? []).join("|"),
+		input.aggregatePaths ? "" : sortPaths(input.paths ?? []).join("|"),
 	].join("::");
 	const existing = accumulator.get(key);
 	if (existing) {
@@ -343,17 +678,87 @@ function addWarning(
 		for (const path of input.paths ?? []) {
 			existing.path_keys.add(path);
 		}
+		if (input.overlap === "confirmed") {
+			existing.overlap = "confirmed";
+		}
 		return;
 	}
 	accumulator.set(key, {
 		id: input.id,
 		severity: input.severity,
+		...(input.overlap ? { overlap: input.overlap } : {}),
 		reason: input.reason,
 		source: input.source,
 		recovery_hint: input.recovery_hint,
 		task_keys: new Set(taskKeys),
 		path_keys: new Set(input.paths ?? []),
 	});
+}
+
+type OverlapRule = {
+	id: CoordinationWarningId;
+	severity: CoordinationWarningSeverity;
+	reason: string;
+	source: CoordinationWarning["source"];
+	recovery_hint: string;
+};
+
+const PLANNED_OVERLAP: OverlapRule = {
+	id: "path_overlap_planned",
+	severity: "warning",
+	reason: "Open tasks declare overlapping planned file ownership.",
+	source: "workbench",
+	recovery_hint:
+		"Split file ownership or sequence the tasks before delegation.",
+};
+
+const PLANNED_TOUCHED_OVERLAP: OverlapRule = {
+	id: "path_overlap_touched",
+	severity: "critical",
+	reason:
+		"An open task plans to touch a path another open task already marked as touched.",
+	source: "workbench",
+	recovery_hint:
+		"Review the touched file list before assigning overlapping work.",
+};
+
+const PLANNED_MUTATION_OVERLAP: OverlapRule = {
+	id: "mutation_overlap",
+	severity: "critical",
+	reason:
+		"Mutation journal shows applied file changes under a path another open task still plans to touch.",
+	source: "mutation_journal",
+	recovery_hint:
+		"Inspect the mutation journal or coordinate task ordering before further edits.",
+};
+
+/**
+ * Critical even when one touch is old: both tasks are still open and each
+ * records edits to the path, so closing either can carry or overwrite the
+ * other's change. Task lifecycle evidence, not proof of simultaneous editing.
+ */
+function touchedOverlapRule(
+	left: CoordinationTaskPath,
+	right: CoordinationTaskPath,
+): OverlapRule {
+	return {
+		id: "touched_overlap",
+		severity: "critical",
+		reason:
+			"Two open tasks both record touching the same path; this is task lifecycle evidence, not proof of simultaneous editing.",
+		source:
+			left.source === "mutation" || right.source === "mutation"
+				? "mutation_journal"
+				: "workbench",
+		recovery_hint:
+			"Reconcile both tasks' edits to the shared path before either closes or more work lands on it.",
+	};
+}
+
+function plannedVersusTouchedRule(touched: CoordinationTaskPath): OverlapRule {
+	return touched.source === "mutation"
+		? PLANNED_MUTATION_OVERLAP
+		: PLANNED_TOUCHED_OVERLAP;
 }
 
 export function buildCoordinationRadar(
@@ -367,11 +772,16 @@ export function buildCoordinationRadar(
 			: options.staleTaskMs;
 	const workbenchStatus =
 		options.workbenchStatus ?? validateWorkBenchIndex(root);
-	const rawWorkbench =
-		options.workbench ??
-		loadWorkBenchIndexSnapshot(root) ??
-		collectWorkBenchSnapshot(root);
-	const workbench = normalizeWorkbenchSnapshot(rawWorkbench);
+	const selection: WorkbenchSelection = options.workbench
+		? {
+				snapshot: options.workbench,
+				data: "injected",
+				incompleteReasons: [],
+				terminalExcluded: [],
+			}
+		: selectWorkbench(root, workbenchStatus);
+	const foldProjectCase = driveKey(resolve(root)) !== null;
+	const workbench = normalizeWorkbenchSnapshot(selection.snapshot);
 	const mutations = options.mutations ?? loadMutationJournal(root);
 	const mutationByTask = mutationPaths(root, mutations);
 	const archivedSessions = new Set(
@@ -397,12 +807,17 @@ export function buildCoordinationRadar(
 				...task.touched_files.map((claim) => toCoordinationPath(root, claim)),
 				...(mutationData?.paths ?? []),
 			]);
+			const { read_files: readClaims, ...indexTask } = task;
+			const read_files = dedupePaths(
+				(readClaims ?? []).map((claim) => toCoordinationPath(root, claim)),
+			);
 			const latestTouched = latestTaskTimestamp(task, mutationData);
 			const age_ms = Math.max(0, now.getTime() - latestTouched);
 			return {
-				...task,
+				...indexTask,
 				planned_files,
 				touched_files,
+				...(read_files.length > 0 ? { read_files } : {}),
 				warning_ids: [],
 				age_ms,
 				is_stale: age_ms > staleTaskMs,
@@ -415,15 +830,31 @@ export function buildCoordinationRadar(
 			return a.task_id.localeCompare(b.task_id);
 		});
 
+	const incompleteReasons = [...selection.incompleteReasons];
+	const degradedSessions = workbench.sessions
+		.filter((session) => session.degraded === true)
+		.map((session) => session.session);
+	if (degradedSessions.length > 0) {
+		incompleteReasons.push(
+			`degraded session task sources may hide tasks or claims: ${degradedSessions.join(", ")}`,
+		);
+	}
+	if (workbenchStatus.message.includes("event ledger invalid")) {
+		incompleteReasons.push(
+			"event ledger is invalid; archive and lifecycle state may be wrong",
+		);
+	}
 	if (!workbenchStatus.ok) {
 		addWarning(warningAccumulator, {
 			id: "stale_coordination_index",
 			severity: "warning",
 			reason:
-				"Workbench coordination data comes from a stale or missing index snapshot.",
+				selection.data === "live_collection"
+					? `Persisted workbench index is not fresh (${workbenchStatus.message}); radar read session task files directly.`
+					: `Workbench coordination data comes from a non-fresh index (${workbenchStatus.message}).`,
 			source: "coordination_index",
 			recovery_hint:
-				"Run afol local-state rebuild before relying on radar output.",
+				"Radar output stays advisory; the index owner can run afol local-state rebuild after repairing any named source.",
 			tasks: [],
 			group: workbenchStatus.message,
 		});
@@ -439,16 +870,37 @@ export function buildCoordinationRadar(
 				id: "missing_owner",
 				severity: "warning",
 				reason:
-					"Open task owner is missing or not specific enough for coordination.",
+					"Open task owner is missing or a generic default, so overlap cannot be attributed to a concrete agent.",
 				source: "workbench",
-				recovery_hint: "Assign a concrete owner in the task state board.",
+				recovery_hint:
+					"Confirm the owner from the session brief before delegating; do not hand-edit State Board rows.",
 				tasks: [{ session: task.session, task_id: task.task_id }],
+				group: "generic_owner",
 			});
 		}
+		const unsupported = [...task.planned_files, ...task.touched_files]
+			.filter((path) => path.kind === "unsupported")
+			.map((path) => path.path);
+		if (unsupported.length > 0) {
+			addWarning(warningAccumulator, {
+				id: "unsupported_path_pattern",
+				severity: "info",
+				reason:
+					"Claim uses a pattern the radar cannot parse or match (extglob, leading !, or unbalanced [ ] or { }); it never proves an overlap and identical text is only a possible overlap.",
+				source: "workbench",
+				recovery_hint:
+					"Use exact paths, directories ending in /, or balanced *, **, ?, [...] and {a,b} globs.",
+				tasks: [{ session: task.session, task_id: task.task_id }],
+				paths: unsupported,
+				group: "unsupported_path_pattern",
+				aggregatePaths: true,
+			});
+		}
+		const writes = task.planned_files.length + task.touched_files.length;
 		if (
 			task.state === "in_progress" &&
-			task.planned_files.length === 0 &&
-			task.touched_files.length === 0
+			writes === 0 &&
+			task.file_intent !== "read_only"
 		) {
 			addWarning(warningAccumulator, {
 				id: "missing_file_intent",
@@ -457,8 +909,25 @@ export function buildCoordinationRadar(
 					"In-progress task has no explicit planned files and no recorded touched files.",
 				source: "workbench",
 				recovery_hint:
-					"Add Files planned or Files touched to clarify file ownership.",
+					"Register write paths or read-only intent with afol session intent, or add Files planned or Files touched.",
 				tasks: [{ session: task.session, task_id: task.task_id }],
+			});
+		}
+		// Write claims still take part in overlap rules: a contradiction is
+		// resolved toward writing, never toward silence.
+		if (task.file_intent === "read_only" && writes > 0) {
+			addWarning(warningAccumulator, {
+				id: "contradictory_file_intent",
+				severity: "warning",
+				reason:
+					"Task is declared read-only but has planned, touched or journaled writes; the radar treats it as a writer.",
+				source: "workbench",
+				recovery_hint:
+					"Treat the task as a writer until the read-only declaration or the write claims are removed; afol session intent changes only its own managed block.",
+				tasks: [{ session: task.session, task_id: task.task_id }],
+				paths: [...task.planned_files, ...task.touched_files].map(
+					(path) => path.path,
+				),
 			});
 		}
 		if (task.is_stale) {
@@ -475,6 +944,37 @@ export function buildCoordinationRadar(
 		}
 	}
 
+	const comparePaths = (
+		left: CoordinationRadarTask,
+		right: CoordinationRadarTask,
+		leftPaths: CoordinationTaskPath[],
+		rightPaths: CoordinationTaskPath[],
+		rule: (
+			leftPath: CoordinationTaskPath,
+			rightPath: CoordinationTaskPath,
+		) => OverlapRule,
+	): void => {
+		for (const leftPath of leftPaths) {
+			for (const rightPath of rightPaths) {
+				const overlap = pathsOverlap(leftPath, rightPath, foldProjectCase);
+				if (!overlap) {
+					continue;
+				}
+				const tasks = sortTaskRefs([
+					{ session: left.session, task_id: left.task_id },
+					{ session: right.session, task_id: right.task_id },
+				]);
+				addWarning(warningAccumulator, {
+					...rule(leftPath, rightPath),
+					tasks,
+					paths: [leftPath.path, rightPath.path],
+					group: tasks.map(taskKey).join("|"),
+					overlap,
+				});
+			}
+		}
+	};
+
 	for (let index = 0; index < openTasks.length; index += 1) {
 		const left = openTasks[index];
 		if (!left) {
@@ -489,108 +989,34 @@ export function buildCoordinationRadar(
 			if (!right) {
 				continue;
 			}
-			const tasks = [
-				{ session: left.session, task_id: left.task_id },
-				{ session: right.session, task_id: right.task_id },
-			];
-
-			for (const leftPath of left.planned_files) {
-				for (const rightPath of right.planned_files) {
-					if (!pathsOverlap(leftPath, rightPath)) {
-						continue;
-					}
-					addWarning(warningAccumulator, {
-						id: "path_overlap_planned",
-						severity: "warning",
-						reason: "Open tasks declare overlapping planned file ownership.",
-						source: "workbench",
-						recovery_hint:
-							"Split file ownership or sequence the tasks before delegation.",
-						tasks,
-						paths: [leftPath.path, rightPath.path],
-						group: `${taskKey(left)}|${taskKey(right)}`,
-					});
-				}
-				for (const rightPath of right.touched_files.filter(
-					(path) => path.source !== "mutation",
-				)) {
-					if (!pathsOverlap(leftPath, rightPath)) {
-						continue;
-					}
-					addWarning(warningAccumulator, {
-						id: "path_overlap_touched",
-						severity: "critical",
-						reason:
-							"An open task plans to touch a path another open task already marked as touched.",
-						source: "workbench",
-						recovery_hint:
-							"Review the touched file list before assigning overlapping work.",
-						tasks,
-						paths: [leftPath.path, rightPath.path],
-						group: `${taskKey(left)}|${taskKey(right)}`,
-					});
-				}
-				for (const rightPath of right.touched_files.filter(
-					(path) => path.source === "mutation",
-				)) {
-					if (!pathsOverlap(leftPath, rightPath)) {
-						continue;
-					}
-					addWarning(warningAccumulator, {
-						id: "mutation_overlap",
-						severity: "critical",
-						reason:
-							"Mutation journal shows applied file changes under a path another open task still plans to touch.",
-						source: "mutation_journal",
-						recovery_hint:
-							"Inspect the mutation journal or coordinate task ordering before further edits.",
-						tasks,
-						paths: [leftPath.path, rightPath.path],
-						group: `${taskKey(left)}|${taskKey(right)}`,
-					});
-				}
-			}
-
-			for (const rightPath of right.planned_files) {
-				for (const leftPath of left.touched_files.filter(
-					(path) => path.source !== "mutation",
-				)) {
-					if (!pathsOverlap(rightPath, leftPath)) {
-						continue;
-					}
-					addWarning(warningAccumulator, {
-						id: "path_overlap_touched",
-						severity: "critical",
-						reason:
-							"An open task plans to touch a path another open task already marked as touched.",
-						source: "workbench",
-						recovery_hint:
-							"Review the touched file list before assigning overlapping work.",
-						tasks,
-						paths: [rightPath.path, leftPath.path],
-						group: `${taskKey(left)}|${taskKey(right)}`,
-					});
-				}
-				for (const leftPath of left.touched_files.filter(
-					(path) => path.source === "mutation",
-				)) {
-					if (!pathsOverlap(rightPath, leftPath)) {
-						continue;
-					}
-					addWarning(warningAccumulator, {
-						id: "mutation_overlap",
-						severity: "critical",
-						reason:
-							"Mutation journal shows applied file changes under a path another open task still plans to touch.",
-						source: "mutation_journal",
-						recovery_hint:
-							"Inspect the mutation journal or coordinate task ordering before further edits.",
-						tasks,
-						paths: [rightPath.path, leftPath.path],
-						group: `${taskKey(left)}|${taskKey(right)}`,
-					});
-				}
-			}
+			comparePaths(
+				left,
+				right,
+				left.planned_files,
+				right.planned_files,
+				() => PLANNED_OVERLAP,
+			);
+			comparePaths(
+				left,
+				right,
+				left.planned_files,
+				right.touched_files,
+				(_planned, touched) => plannedVersusTouchedRule(touched),
+			);
+			comparePaths(
+				right,
+				left,
+				right.planned_files,
+				left.touched_files,
+				(_planned, touched) => plannedVersusTouchedRule(touched),
+			);
+			comparePaths(
+				left,
+				right,
+				left.touched_files,
+				right.touched_files,
+				touchedOverlapRule,
+			);
 		}
 	}
 
@@ -608,9 +1034,15 @@ export function buildCoordinationRadar(
 				ids.add(warning.id);
 				taskWarningIds.set(key, ids);
 			}
+			// A possible (glob versus glob) overlap never escalates to critical.
+			const severity =
+				warning.overlap === "possible" && warning.severity === "critical"
+					? "warning"
+					: warning.severity;
 			return {
 				id: warning.id,
-				severity: warning.severity,
+				severity,
+				...(warning.overlap ? { overlap: warning.overlap } : {}),
 				reason: warning.reason,
 				affected_tasks,
 				affected_paths: sortPaths(warning.path_keys),
@@ -633,15 +1065,52 @@ export function buildCoordinationRadar(
 			return left.task_id.localeCompare(right.task_id);
 		});
 
+	const unsupportedClaims = openTasks.reduce(
+		(count, task) =>
+			count +
+			[...task.planned_files, ...task.touched_files].filter(
+				(path) => path.kind === "unsupported",
+			).length,
+		0,
+	);
+	if (unsupportedClaims > 0) {
+		incompleteReasons.push(
+			`${unsupportedClaims} open-task claims use unsupported or malformed patterns that cannot be matched; see unsupported_path_pattern`,
+		);
+	}
+	const knownSessions = [
+		...new Set([
+			...workbench.sessions.map((entry) => entry.session),
+			...workbench.tasks.map((task) => task.session),
+			...selection.terminalExcluded.map((entry) => entry.session),
+		]),
+	].sort();
+
 	const projectPaths = resolveProjectPaths(root);
 	return {
 		kind: "coordination_radar_v1",
 		generated_at: now.toISOString(),
 		source: {
 			workbench_index: `${projectPaths.dataIndexDir}/workbench.json`,
-			mutation_journal: normalizeRelativePath(root, mutationJournalPath(root)),
+			mutation_journal: parsePath(root, mutationJournalPath(root)).path,
 			workbench_status: classifyWorkbenchStatus(workbenchStatus),
+			workbench_data: selection.data,
 		},
+		coverage: {
+			observed_sources: ["afol_workbench_tasks", "afol_mutation_journal"],
+			observed_complete: incompleteReasons.length === 0,
+			incomplete_reasons: incompleteReasons,
+			unobserved: [
+				"work outside AFOL sessions, such as harness threads or ad hoc edits",
+				"edits not recorded as Files touched or in the mutation journal",
+				"files read without a declared claim",
+				"path aliases other than drive letters and /mnt/<drive> mounts, such as custom automount roots, UNC and \\\\wsl$ paths",
+				"the agent actually executing a task; owners are task metadata, not verified identities",
+			],
+			terminal_sessions_excluded: selection.terminalExcluded,
+			no_warnings_means: "no_conflict_in_observed_sources_only",
+		},
+		known_sessions: knownSessions,
 		open_tasks: openTasks.map((task) => ({
 			...task,
 			warning_ids: sortPaths(taskWarningIds.get(taskKey(task)) ?? []).filter(
@@ -661,8 +1130,6 @@ export function loadCoordinationRadar(
 ): CoordinationRadarSnapshot {
 	return buildCoordinationRadar(root, {
 		...options,
-		workbench:
-			loadWorkBenchIndexSnapshot(root) ?? collectWorkBenchSnapshot(root),
 		workbenchStatus: validateWorkBenchIndex(root),
 		mutations: loadMutationJournal(root),
 	});
