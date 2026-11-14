@@ -31,11 +31,16 @@ import {
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
-import type { StateBoardTableColumns } from "../local-state/workbench-index";
+import type {
+	StateBoardTableColumns,
+	WorkbenchTaskFileIntent,
+} from "../local-state/workbench-index";
 import {
 	appendEventsAndRebuildWorkBenchIndex,
 	parseCanonicalStateBoardTasks,
+	parseTaskFileClaims,
 	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { admitsEvidenceTransitionIssue } from "../project/evidence-transition-admission";
 import {
@@ -63,6 +68,15 @@ import {
 	scalarValue,
 } from "./session-lifecycle-state";
 import { loadEvidenceEntries, sessionPaths } from "./session-reader";
+import {
+	assertTaskIntentReadable,
+	normalizeTaskIntentPaths,
+	readTaskIntentBlock,
+	replaceTaskIntentBlock,
+	TaskIntentError,
+	type TaskIntentState,
+	validateTaskIntentOwner,
+} from "./task-intent";
 import type { EvidenceEntry, EvidenceProvenance, TaskState } from "./types";
 
 export type { SessionLifecycleState } from "./session-lifecycle-state";
@@ -1467,6 +1481,228 @@ export function transitionTask(
 			);
 		}
 		return warnings;
+	});
+}
+
+export type TaskIntentRegistration = WorkbenchTaskRef & {
+	owner?: string;
+	/** Replaces the registered write paths. */
+	write?: readonly string[];
+	/** Replaces the registered read paths. */
+	read?: readonly string[];
+	clearWrite?: boolean;
+	clearRead?: boolean;
+	readOnly?: boolean;
+};
+
+export type TaskIntentRegistrationResult = {
+	session: string;
+	task_id: string;
+	state: string;
+	changed: boolean;
+	owner: string;
+	previous_owner: string;
+	file_intent: WorkbenchTaskFileIntent | null;
+	previous_file_intent: WorkbenchTaskFileIntent | null;
+	write_paths: string[];
+	read_paths: string[];
+	warnings: string[];
+};
+
+const TASK_INTENT_TERMINAL_STATES = new Set(["done", "moved"]);
+
+function assertTaskIntentRequest(input: TaskIntentRegistration): void {
+	const requested =
+		input.owner !== undefined ||
+		input.write !== undefined ||
+		input.read !== undefined ||
+		input.clearWrite === true ||
+		input.clearRead === true ||
+		input.readOnly === true;
+	if (!requested) {
+		throw new TaskIntentError(
+			"invalid",
+			"Nothing to register: pass --owner, --write, --read, --read-only, --clear-write or --clear-read.",
+		);
+	}
+	if (input.write !== undefined && input.clearWrite) {
+		throw new TaskIntentError(
+			"invalid",
+			"--write already replaces registered write paths; drop --clear-write.",
+		);
+	}
+	if (input.read !== undefined && input.clearRead) {
+		throw new TaskIntentError(
+			"invalid",
+			"--read already replaces registered read paths; drop --clear-read.",
+		);
+	}
+	if (input.readOnly && input.write !== undefined) {
+		throw new TaskIntentError(
+			"conflict",
+			"--read-only contradicts --write; declare one file intent.",
+		);
+	}
+}
+
+function assertDisjointIntentPaths(
+	root: string,
+	write: readonly string[],
+	read: readonly string[],
+): void {
+	const writeKeys = normalizeTaskIntentPaths(root, write, "--write").keys;
+	for (const [key, raw] of normalizeTaskIntentPaths(root, read, "--read")
+		.keys) {
+		if (writeKeys.has(key)) {
+			throw new TaskIntentError(
+				"conflict",
+				`${JSON.stringify(raw)} is registered as both read and write; write intent already covers reading it.`,
+			);
+		}
+	}
+}
+
+/**
+ * Registers a concrete owner and file intent for one open task under the same
+ * session lock as lifecycle transitions, then refreshes the index. It never
+ * creates, starts or reopens a task, and owners are metadata, not identities.
+ */
+export function registerTaskIntent(
+	root: string,
+	input: TaskIntentRegistration,
+	runtime: LifecycleAuxiliaryRuntime = {},
+): TaskIntentRegistrationResult {
+	assertTaskIntentRequest(input);
+	const owner =
+		input.owner === undefined
+			? undefined
+			: validateTaskIntentOwner(input.owner);
+	const write =
+		input.write === undefined
+			? undefined
+			: normalizeTaskIntentPaths(root, input.write, "--write").paths;
+	const read =
+		input.read === undefined
+			? undefined
+			: normalizeTaskIntentPaths(root, input.read, "--read").paths;
+	return withSessionLock(root, input.session, () => {
+		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
+		const content = readFileSync(paths.taskPath, "utf8");
+		const rows = parseTaskRowsFromContent(paths.taskPath, content);
+		const row = rows.find((entry) => entry.taskId === input.taskId);
+		if (!row) {
+			throw new TaskIntentError(
+				"task_not_found",
+				`Task ${input.taskId} not found in ${input.session}.`,
+			);
+		}
+		if (TASK_INTENT_TERMINAL_STATES.has(row.state) || !isTaskState(row.state)) {
+			throw new TaskIntentError(
+				"task_not_open",
+				`Task ${input.taskId} is ${row.state}; intent registration never reopens or edits a finished task.`,
+			);
+		}
+		const lines = content.split(/\r?\n/);
+		const block = readTaskIntentBlock(lines, input.taskId);
+		const previous: TaskIntentState = block ?? {
+			file_intent: null,
+			write: [],
+			read: [],
+		};
+		const next: TaskIntentState = {
+			file_intent: previous.file_intent,
+			write: write ?? (input.clearWrite ? [] : previous.write),
+			read: read ?? (input.clearRead ? [] : previous.read),
+		};
+		assertDisjointIntentPaths(root, next.write, next.read);
+		if (input.readOnly) {
+			if (next.write.length > 0) {
+				throw new TaskIntentError(
+					"conflict",
+					`Task ${input.taskId} has registered write paths; add --clear-write to declare it read-only.`,
+				);
+			}
+			const outside = parseTaskFileClaims(
+				replaceTaskIntentBlock(lines, input.taskId, block, {
+					file_intent: null,
+					write: [],
+					read: [],
+				}).join("\n"),
+				rows.map((entry) => entry.taskId),
+			).get(input.taskId);
+			const outsideWrites =
+				(outside?.planned_files.length ?? 0) +
+				(outside?.touched_files.length ?? 0);
+			if (outsideWrites > 0) {
+				throw new TaskIntentError(
+					"conflict",
+					`Task ${input.taskId} has ${outsideWrites} Files planned or Files touched claims outside the managed block; read-only would contradict them.`,
+				);
+			}
+			next.file_intent = "read_only";
+		} else if (write !== undefined) {
+			next.file_intent = "write";
+		} else if (input.clearWrite && previous.file_intent === "write") {
+			next.file_intent = null;
+		}
+		const nextLines = replaceTaskIntentBlock(lines, input.taskId, block, next);
+		if (owner !== undefined && owner !== row.owner) {
+			nextLines[row.lineNumber - 1] = renderTaskRow({ ...row, owner }, row);
+		}
+		assertTaskIntentReadable(nextLines, input.taskId, next);
+		const nextContent = `${nextLines.join("\n").replace(/\n*$/g, "")}\n`;
+		const indexedRow = parseCanonicalStateBoardTasks(
+			input.session,
+			paths.taskPath,
+			nextContent,
+		).tasks.find((task) => task.task_id === input.taskId);
+		if (
+			!indexedRow ||
+			indexedRow.owner !== (owner ?? row.owner) ||
+			indexedRow.state !== row.state
+		) {
+			throw new TaskIntentError(
+				"malformed_block",
+				"Rendered task metadata is not readable by the index; no changes written.",
+			);
+		}
+		const changed = nextContent !== content;
+		const warnings: string[] = [];
+		if (changed) {
+			runtime.fencingCheck?.();
+			atomicWriteText(paths.taskPath, nextContent);
+			countHotPathOperation("workbench.canonical_write");
+		}
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => {
+				// An unchanged retry must repair or disclose a previously failed
+				// refresh. A fresh index needs no write, preserving byte idempotence.
+				if (changed || !validateWorkBenchIndex(root).ok) {
+					refreshWorkbenchLocalState(root, input.session);
+					if (!changed) {
+						const refreshed = validateWorkBenchIndex(root);
+						if (!refreshed.ok) throw new Error(refreshed.message);
+					}
+				}
+			},
+			runtime,
+		);
+		return {
+			session: input.session,
+			task_id: input.taskId,
+			state: row.state,
+			changed,
+			owner: owner ?? row.owner,
+			previous_owner: row.owner,
+			file_intent: next.file_intent,
+			previous_file_intent: previous.file_intent,
+			write_paths: next.write,
+			read_paths: next.read,
+			warnings,
+		};
 	});
 }
 

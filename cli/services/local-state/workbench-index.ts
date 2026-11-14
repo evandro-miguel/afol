@@ -33,12 +33,21 @@ export type WorkbenchIndexTask = {
 	touched_at: string;
 	planned_files: WorkbenchIndexFileClaim[];
 	touched_files: WorkbenchIndexFileClaim[];
+	/**
+	 * Declared read claims. Omitted when empty, like file_intent when
+	 * undeclared, so tasks without declarations serialize exactly as older
+	 * indexes did and a declared task in an older index reads as stale.
+	 */
+	read_files?: WorkbenchIndexFileClaim[];
+	file_intent?: WorkbenchTaskFileIntent;
 };
+
+export type WorkbenchTaskFileIntent = "write" | "read_only";
 
 export type WorkbenchIndexFileClaim = {
 	path: string;
 	kind: "exact" | "glob";
-	source: "planned" | "touched";
+	source: "planned" | "touched" | "read";
 	line: number;
 };
 
@@ -79,7 +88,8 @@ const TASK_FILE_RE = /^.+_task_\d+\.md$/;
 const STATE_BOARD_HEADING_RE = /^ {0,3}#{2,6}\s+State Board\b/i;
 const TASK_HEADING_RE = /^#{2,6}\s+(T-\d{2,3})\b/i;
 const CHECKPOINT_HEADING_RE = /^#{2,6}\s+.+checkpoint\b/i;
-const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
+const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched|read)\s*:\s*$/i;
+const FILE_INTENT_RE = /^\s*-\s*File\s+intent\s*:\s*(read-only|write)\s*$/i;
 const NESTED_LIST_ITEM_RE = /^\s{2,}[-*]\s+(.+?)\s*$/;
 const GLOB_TOKEN_RE = /[*?[\]{}]/;
 const WORKBENCH_INDEX_LOCK_SESSION = "workbench-index";
@@ -351,9 +361,83 @@ function collectSessionLifecycleEvents(
 	return lifecycle;
 }
 
+export type TerminalSessionEvidence =
+	| "archive_directory"
+	| "ledger_archive"
+	| "ledger_close";
+
+/**
+ * Terminal lifecycle evidence for sessions whose workbench directory is gone:
+ * a directory under `_archive`, or a last `workbench.archive` or
+ * `workbench.close` event in a valid event ledger. Sessions with a live
+ * directory, or without such evidence, are omitted. Telemetry session events
+ * describe agent runs, not task lifecycle, so they are ignored here.
+ */
+export function collectTerminalSessionEvidence(
+	root: string,
+	sessions: Iterable<string>,
+): Map<string, TerminalSessionEvidence> {
+	const evidence = new Map<string, TerminalSessionEvidence>();
+	let lifecycle: Map<string, { closed: boolean; archived: boolean }> | null =
+		null;
+	let ledgerRead = false;
+	for (const session of new Set(sessions)) {
+		if (sessionDirExists(root, session)) {
+			continue;
+		}
+		if (sessionHasArchiveDir(root, session)) {
+			evidence.set(session, "archive_directory");
+			continue;
+		}
+		if (!ledgerRead) {
+			ledgerRead = true;
+			const ledger = inspectEventLedger(root);
+			lifecycle = ledger.ok ? workbenchLifecycle(ledger.records) : null;
+		}
+		const state = lifecycle?.get(session);
+		if (state?.archived) {
+			evidence.set(session, "ledger_archive");
+		} else if (state?.closed) {
+			evidence.set(session, "ledger_close");
+		}
+	}
+	return evidence;
+}
+
+function workbenchLifecycle(
+	records: readonly Record<string, unknown>[],
+): Map<string, { closed: boolean; archived: boolean }> {
+	const lifecycle = new Map<string, { closed: boolean; archived: boolean }>();
+	for (const raw of records) {
+		const session = typeof raw.session === "string" ? raw.session : "";
+		if (!session) {
+			continue;
+		}
+		const state = lifecycle.get(session) ?? { closed: false, archived: false };
+		// Task work recorded after a close means the session is open again.
+		if (
+			raw.type === "workbench.new" ||
+			raw.type === "workbench.start_task" ||
+			raw.type === "workbench.transition_task"
+		) {
+			state.closed = false;
+		} else if (raw.type === "workbench.close") {
+			state.closed = true;
+		} else if (raw.type === "workbench.archive") {
+			state.archived = true;
+		} else if (raw.type === "workbench.restore") {
+			state.archived = false;
+		}
+		lifecycle.set(session, state);
+	}
+	return lifecycle;
+}
+
 type ParsedTaskClaims = {
 	planned_files: WorkbenchIndexFileClaim[];
 	touched_files: WorkbenchIndexFileClaim[];
+	read_files: WorkbenchIndexFileClaim[];
+	file_intent?: WorkbenchTaskFileIntent;
 };
 
 type WorkbenchIndexRebuildOptions = {
@@ -365,12 +449,28 @@ type WorkbenchSnapshotBuildOptions = {
 	validatedRecords?: readonly Record<string, unknown>[];
 };
 
-type FileClaimField = keyof ParsedTaskClaims;
+type FileClaimField = "planned_files" | "touched_files" | "read_files";
+
+const FILE_CLAIM_FIELDS: Record<string, FileClaimField> = {
+	planned: "planned_files",
+	touched: "touched_files",
+	read: "read_files",
+};
+
+const FILE_CLAIM_SOURCES: Record<
+	FileClaimField,
+	WorkbenchIndexFileClaim["source"]
+> = {
+	planned_files: "planned",
+	touched_files: "touched",
+	read_files: "read",
+};
 
 function emptyTaskClaims(): ParsedTaskClaims {
 	return {
 		planned_files: [],
 		touched_files: [],
+		read_files: [],
 	};
 }
 
@@ -472,6 +572,14 @@ function looksLikeClaimPath(value: string): boolean {
 		GLOB_TOKEN_RE.test(normalized) ||
 		/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(normalized)
 	);
+}
+
+/**
+ * The path a claim list item is indexed as, or null when the parser would
+ * ignore it. Registration uses this so a written claim reads back unchanged.
+ */
+export function normalizeTaskClaimPath(raw: string): string | null {
+	return looksLikeClaimPath(raw) ? normalizeClaimValue(raw) : null;
 }
 
 function parseTaskFileClaim(
@@ -734,7 +842,7 @@ export function parseCanonicalStateBoardTasks(
 
 export type CanonicalStateBoardTask = Omit<
 	WorkbenchIndexTask,
-	"planned_files" | "touched_files"
+	"planned_files" | "touched_files" | "read_files" | "file_intent"
 >;
 
 export type CanonicalStateBoardTaskRow = CanonicalStateBoardTask & {
@@ -782,6 +890,42 @@ export function readCanonicalStateBoardTask(
 	};
 }
 
+/** Blank fenced Markdown (including delimiters), retaining source line numbers.
+ * Matches the State Board fence grammar: backticks/tilde, 0-3 spaces, a
+ * same-marker closer at least as long, and no backticks in backtick info.
+ * An unmatched opener hides the remainder; it is never closed implicitly.
+ */
+export function taskMarkdownContentLines(lines: readonly string[]): string[] {
+	let fence: { marker: string; length: number } | null = null;
+	return lines.map((line) => {
+		if (fence) {
+			const closing = line.match(/^ {0,3}(`+|~+)[\t ]*$/)?.[1];
+			if (
+				closing &&
+				closing[0] === fence.marker &&
+				closing.length >= fence.length
+			) {
+				fence = null;
+			}
+			return "";
+		}
+		const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+		if (opening?.[1] && !(opening[1][0] === "`" && opening[2]?.includes("`"))) {
+			fence = { marker: opening[1][0] ?? "", length: opening[1].length };
+			return "";
+		}
+		return line;
+	});
+}
+
+/** Claims per task as the index parses them from one task file. */
+export function parseTaskFileClaims(
+	content: string,
+	taskIds: string[],
+): Map<string, ParsedTaskClaims> {
+	return parseTaskClaims(content.split(/\r?\n/), taskIds);
+}
+
 function parseTaskClaims(
 	lines: string[],
 	taskIds: string[],
@@ -789,21 +933,13 @@ function parseTaskClaims(
 	const taskIdSet = new Set(taskIds);
 	const parsed = new Map<string, ParsedTaskClaims>();
 	const singleTaskId = taskIds.length === 1 ? (taskIds[0] ?? null) : null;
-	let insideCodeBlock = false;
 	let currentTaskId: string | null = null;
 	let currentField: FileClaimField | null = null;
 
-	for (let index = 0; index < lines.length; index += 1) {
-		const line = lines[index] ?? "";
+	const contentLines = taskMarkdownContentLines(lines);
+	for (let index = 0; index < contentLines.length; index += 1) {
+		const line = contentLines[index] ?? "";
 		const trimmed = line.trim();
-
-		if (trimmed.startsWith("```")) {
-			insideCodeBlock = !insideCodeBlock;
-			continue;
-		}
-		if (insideCodeBlock) {
-			continue;
-		}
 
 		const taskHeading = trimmed.match(TASK_HEADING_RE);
 		if (taskHeading?.[1]) {
@@ -826,10 +962,22 @@ function parseTaskClaims(
 
 		const labelMatch = trimmed.match(FILE_CLAIM_LABEL_RE);
 		if (labelMatch?.[1] && currentTaskId) {
-			currentField =
-				labelMatch[1].toLowerCase() === "planned"
-					? "planned_files"
-					: "touched_files";
+			currentField = FILE_CLAIM_FIELDS[labelMatch[1].toLowerCase()] ?? null;
+			continue;
+		}
+
+		const intentMatch = trimmed.match(FILE_INTENT_RE);
+		if (intentMatch?.[1] && currentTaskId) {
+			currentField = null;
+			const bucket = parsed.get(currentTaskId) ?? emptyTaskClaims();
+			// Any write declaration wins, so mixed declarations never read as
+			// read-only.
+			bucket.file_intent =
+				bucket.file_intent === "write" ||
+				intentMatch[1].toLowerCase() === "write"
+					? "write"
+					: "read_only";
+			parsed.set(currentTaskId, bucket);
 			continue;
 		}
 
@@ -851,7 +999,7 @@ function parseTaskClaims(
 
 		const claim = parseTaskFileClaim(
 			itemMatch[1],
-			currentField === "planned_files" ? "planned" : "touched",
+			FILE_CLAIM_SOURCES[currentField],
 			index + 1,
 		);
 		if (!claim) {
@@ -881,10 +1029,13 @@ function parseTaskRows(
 			tasks: parsedBoard.tasks.map((task) => {
 				const claims = parsedClaims.get(task.task_id) ?? emptyTaskClaims();
 				const { cells: _cells, columns: _columns, ...indexTask } = task;
+				const read_files = dedupeClaims(claims.read_files);
 				return {
 					...indexTask,
 					planned_files: dedupeClaims(claims.planned_files),
 					touched_files: dedupeClaims(claims.touched_files),
+					...(read_files.length > 0 ? { read_files } : {}),
+					...(claims.file_intent ? { file_intent: claims.file_intent } : {}),
 				};
 			}),
 			malformed: parsedBoard.malformed,
@@ -1071,6 +1222,10 @@ function isPositiveInteger(value: unknown): value is number {
 
 function isWorkbenchIndexFileClaim(
 	value: unknown,
+	sources: readonly WorkbenchIndexFileClaim["source"][] = [
+		"planned",
+		"touched",
+	],
 ): value is WorkbenchIndexFileClaim {
 	if (!isRecord(value)) {
 		return false;
@@ -1079,9 +1234,13 @@ function isWorkbenchIndexFileClaim(
 		typeof value.path === "string" &&
 		value.path.length > 0 &&
 		(value.kind === "exact" || value.kind === "glob") &&
-		(value.source === "planned" || value.source === "touched") &&
+		sources.includes(value.source as WorkbenchIndexFileClaim["source"]) &&
 		isPositiveInteger(value.line)
 	);
+}
+
+function isReadClaim(value: unknown): boolean {
+	return isWorkbenchIndexFileClaim(value, ["read"]);
 }
 
 function isWorkbenchIndexTaskInput(
@@ -1109,11 +1268,17 @@ function isWorkbenchIndexTaskInput(
 		(plannedFiles === undefined ||
 			plannedFiles === null ||
 			(Array.isArray(plannedFiles) &&
-				plannedFiles.every(isWorkbenchIndexFileClaim))) &&
+				plannedFiles.every((claim) => isWorkbenchIndexFileClaim(claim)))) &&
 		(touchedFiles === undefined ||
 			touchedFiles === null ||
 			(Array.isArray(touchedFiles) &&
-				touchedFiles.every(isWorkbenchIndexFileClaim)))
+				touchedFiles.every((claim) => isWorkbenchIndexFileClaim(claim)))) &&
+		(value.read_files === undefined ||
+			(Array.isArray(value.read_files) &&
+				value.read_files.every((claim) => isReadClaim(claim)))) &&
+		(value.file_intent === undefined ||
+			value.file_intent === "write" ||
+			value.file_intent === "read_only")
 	);
 }
 

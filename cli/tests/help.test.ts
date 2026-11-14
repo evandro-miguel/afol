@@ -410,7 +410,9 @@ describe("help formatter", () => {
 		const help = formatCommandHelp("session", kernelRegistry);
 
 		expect(help).not.toBeNull();
-		expect(help).toContain("radar --json [read]");
+		expect(help).toContain(
+			"radar [--json] [--all] [--session <id>] [--strict] [read]",
+		);
 	});
 
 	test("makes risky file operations explicit in command help", () => {
