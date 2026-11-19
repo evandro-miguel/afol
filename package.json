@@ -79,10 +79,10 @@
 		"valibot": "^1.5.0"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.14",
-		"@types/bun": "^1.4.2",
-		"knip": "^6.38.0",
-		"oxlint": "^1.86.0",
+		"@biomejs/biome": "^2.6.8",
+		"@types/bun": "^1.4.4",
+		"knip": "^6.45.1",
+		"oxlint": "^1.94.0",
 		"typescript": "7.0.2"
 	},
 	"knip": {
